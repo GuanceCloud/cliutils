@@ -203,3 +203,18 @@ func (s *Service) Install() error {
 	s.genInit()
 	return s.installAndStart()
 }
+
+func StopService(name string) error {
+	var cmd *exec.Cmd
+	switch detectInitType() {
+	case upstartStop:
+		cmd = exec.Command(`stop`, []string{name}...)
+
+	case systemd:
+		cmd = exec.Command(`systemctl`, []string{`stop`, name}...)
+	}
+
+	_, err := cmd.Output()
+
+	return err
+}
