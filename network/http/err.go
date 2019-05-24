@@ -15,11 +15,11 @@ var (
 )
 
 type HttpError struct {
-	ErrCode  string
-	Err      error
-	HttpCode int
-	Message  string
-	Content  interface{}
+	ErrCode  string      `json:"errorCode,omitempty"`
+	Err      error       `json:"-"`
+	HttpCode int         `json:"code,omitempty"`
+	Message  string      `json:"message,omitempty"`
+	Content  interface{} `json:"content,omitempty"`
 }
 
 func NewErr(err error, httpCode int, namespace string) *HttpError {
@@ -75,6 +75,29 @@ func (he *HttpError) HttpBody(c *gin.Context, body interface{}) {
 	c.Data(he.HttpCode, `application/json`, j)
 }
 
+func (he *HttpError) WSResp(w nhttp.ResponseWriter, args ...interface{}) {
+
+	obj := map[string]interface{}{
+		"code":      he.HttpCode,
+		"errorCode": he.ErrCode,
+	}
+
+	if args == nil {
+		obj[`message`] = he.Error()
+	} else {
+		obj[`message`] = fmt.Sprint(he.Error(), args)
+	}
+
+	j, err := json.Marshal(&obj)
+	if err != nil {
+		ErrUnexpectedInternalServerError.WSResp(w, err)
+		return
+	}
+
+	w.WriteHeader(he.HttpCode)
+	_, _ = w.Write(j)
+}
+
 func (he *HttpError) HttpResp(c *gin.Context, args ...interface{}) {
 	obj := map[string]interface{}{
 		"code":      he.HttpCode,
@@ -104,6 +127,18 @@ func HttpErr(c *gin.Context, err error) {
 		he = NewErr(err, nhttp.StatusInternalServerError, ``)
 		he.ErrCode = ""
 		he.HttpResp(c)
+	}
+}
+
+func WSErr(w nhttp.ResponseWriter, err error) {
+
+	he, ok := err.(*HttpError)
+	if ok {
+		he.WSResp(w)
+	} else {
+		he = NewErr(err, nhttp.StatusInternalServerError, ``)
+		he.ErrCode = ""
+		he.WSResp(w)
 	}
 }
 

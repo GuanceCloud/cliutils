@@ -1,7 +1,10 @@
 package cliutils
 
 import (
+	"fmt"
+	"math"
 	"math/rand"
+	"sync"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
@@ -26,6 +29,27 @@ func (s *Sem) Close() {
 
 func (s *Sem) Wait() <-chan interface{} {
 	return s.sem
+}
+
+func WgWait(wg *sync.WaitGroup, timeout int) {
+
+	c := make(chan interface{})
+
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+
+	if timeout > 0 {
+		select {
+		case <-c:
+		case <-time.After(time.Second * time.Duration(timeout)):
+		}
+	} else {
+		select {
+		case <-c:
+		}
+	}
 }
 
 var (
@@ -62,4 +86,17 @@ func UUID(p string) string {
 			return p + id.String()
 		}
 	}
+}
+
+func SizeFmt(n int64) string {
+	f := float64(n)
+
+	unit := []string{"", "K", "M", "G", "T", "P", "E", "Z"}
+	for _, u := range unit {
+		if math.Abs(f) < 1024.0 {
+			return fmt.Sprintf("%3.4f%sB", f, u)
+		}
+		f /= 1024.0
+	}
+	return fmt.Sprintf("%3.4fYB", f)
 }
