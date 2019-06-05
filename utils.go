@@ -81,7 +81,11 @@ func CreateRandomString(n int) string {
 
 func UUID(p string) string {
 	for {
-		id := uuid.NewV4()
+		id, err := uuid.NewV4()
+		if err != nil {
+			continue
+		}
+
 		return p + id.String()
 	}
 }
