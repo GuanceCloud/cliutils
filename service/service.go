@@ -218,3 +218,33 @@ func StopService(name string) error {
 
 	return err
 }
+
+func RestartService(name string) error {
+	var cmd *exec.Cmd
+	switch detectInitType() {
+	case upstartStop:
+		cmd = exec.Command(`restart`, []string{name}...)
+
+	case systemd:
+		cmd = exec.Command(`systemctl`, []string{`restart`, name}...)
+	}
+
+	_, err := cmd.Output()
+
+	return err
+}
+
+func StartService(name string) error {
+	var cmd *exec.Cmd
+	switch detectInitType() {
+	case upstartStop:
+		cmd = exec.Command(`start`, []string{name}...)
+
+	case systemd:
+		cmd = exec.Command(`systemctl`, []string{`start`, name}...)
+	}
+
+	_, err := cmd.Output()
+
+	return err
+}
