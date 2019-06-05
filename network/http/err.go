@@ -6,8 +6,6 @@ import (
 	"fmt"
 	nhttp "net/http"
 	"strings"
-
-	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -38,6 +36,7 @@ func (he *HttpError) Error() string {
 	}
 }
 
+/*
 func (he *HttpError) Json(args ...interface{}) ([]byte, error) {
 
 	obj := map[string]interface{}{
@@ -57,9 +56,10 @@ func (he *HttpError) Json(args ...interface{}) ([]byte, error) {
 	}
 
 	return j, nil
-}
+} */
 
-func (he *HttpError) HttpBody(c *gin.Context, body interface{}) {
+func (he *HttpError) JsonBody(body interface{}) ([]byte, error) {
+
 	obj := map[string]interface{}{
 		"code":      he.HttpCode,
 		"errorCode": he.ErrCode,
@@ -68,11 +68,48 @@ func (he *HttpError) HttpBody(c *gin.Context, body interface{}) {
 
 	j, err := json.Marshal(&obj)
 	if err != nil {
-		ErrUnexpectedInternalServerError.HttpResp(c, err)
-		return
+		return nil, err
 	}
 
-	c.Data(he.HttpCode, `application/json`, j)
+	return j, nil
+}
+
+func (he *HttpError) JsonErr() ([]byte, error) {
+
+	obj := map[string]interface{}{
+		"code":      he.HttpCode,
+		"errorCode": he.ErrCode,
+	}
+
+	j, err := json.Marshal(&obj)
+	if err != nil {
+		return nil, err
+	}
+	return j, nil
+}
+
+// 按照默认的方式返回既定的 error 信息
+func HttpErr(err error) *HttpError {
+	he, ok := err.(*HttpError)
+	if ok {
+		return he
+	} else {
+		he = NewErr(err, nhttp.StatusInternalServerError, ``)
+		he.ErrCode = ""
+		return he
+	}
+}
+
+func WSErr(w nhttp.ResponseWriter, err error) {
+
+	he, ok := err.(*HttpError)
+	if ok {
+		he.WSResp(w)
+	} else {
+		he = NewErr(err, nhttp.StatusInternalServerError, ``)
+		he.ErrCode = ""
+		he.WSResp(w)
+	}
 }
 
 func (he *HttpError) WSResp(w nhttp.ResponseWriter, args ...interface{}) {
@@ -96,50 +133,6 @@ func (he *HttpError) WSResp(w nhttp.ResponseWriter, args ...interface{}) {
 
 	w.WriteHeader(he.HttpCode)
 	_, _ = w.Write(j)
-}
-
-func (he *HttpError) HttpResp(c *gin.Context, args ...interface{}) {
-	obj := map[string]interface{}{
-		"code":      he.HttpCode,
-		"errorCode": he.ErrCode,
-	}
-
-	if args == nil {
-		obj[`message`] = he.Error()
-	} else {
-		obj[`message`] = fmt.Sprint(he.Error(), args)
-	}
-
-	j, err := json.Marshal(&obj)
-	if err != nil {
-		ErrUnexpectedInternalServerError.HttpResp(c, err)
-		return
-	}
-
-	c.Data(he.HttpCode, `application/json`, j)
-}
-
-func HttpErr(c *gin.Context, err error) {
-	he, ok := err.(*HttpError)
-	if ok {
-		he.HttpResp(c)
-	} else {
-		he = NewErr(err, nhttp.StatusInternalServerError, ``)
-		he.ErrCode = ""
-		he.HttpResp(c)
-	}
-}
-
-func WSErr(w nhttp.ResponseWriter, err error) {
-
-	he, ok := err.(*HttpError)
-	if ok {
-		he.WSResp(w)
-	} else {
-		he = NewErr(err, nhttp.StatusInternalServerError, ``)
-		he.ErrCode = ""
-		he.WSResp(w)
-	}
 }
 
 func titleErr(namespace string, err error) string {
