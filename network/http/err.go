@@ -36,28 +36,6 @@ func (he *HttpError) Error() string {
 	}
 }
 
-/*
-func (he *HttpError) Json(args ...interface{}) ([]byte, error) {
-
-	obj := map[string]interface{}{
-		"code":      he.HttpCode,
-		"errorCode": he.ErrCode,
-	}
-
-	if args == nil {
-		obj[`message`] = he.Error()
-	} else {
-		obj[`message`] = fmt.Sprint(he.Error(), args)
-	}
-
-	j, err := json.Marshal(&obj)
-	if err != nil {
-		return nil, err
-	}
-
-	return j, nil
-} */
-
 func (he *HttpError) JsonBody(body interface{}) ([]byte, error) {
 
 	obj := map[string]interface{}{
@@ -71,20 +49,6 @@ func (he *HttpError) JsonBody(body interface{}) ([]byte, error) {
 		return nil, err
 	}
 
-	return j, nil
-}
-
-func (he *HttpError) JsonErr() ([]byte, error) {
-
-	obj := map[string]interface{}{
-		"code":      he.HttpCode,
-		"errorCode": he.ErrCode,
-	}
-
-	j, err := json.Marshal(&obj)
-	if err != nil {
-		return nil, err
-	}
 	return j, nil
 }
 
