@@ -2,7 +2,7 @@ package http
 
 import (
 	"log"
-	"net"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,7 +20,7 @@ func GetCliIP(c *gin.Context) (string, bool) {
 		addr := c.Request.Header.Get(h)
 		if len(addr) > 0 {
 
-			realIP, port, err := net.SplitHostPort(addr)
+			realIP := strings.Split(addr, `,`)[0] // 此处只取第一个 IP
 			if err != nil {
 				log.Printf("[error] invalid addr: %s", addr)
 				// ignore
