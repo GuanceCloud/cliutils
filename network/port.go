@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -11,11 +12,14 @@ import (
 func PortInUse(ipport string, timeout time.Duration) bool {
 	c, err := net.DialTimeout(`tcp`, ipport, timeout)
 	if err != nil {
+		log.Printf("[error] %s", err.Error())
 		return false
 	}
 
+	log.Printf("[debug] port %s used under TCP", ipport)
+
 	defer c.Close()
-	return false
+	return true
 }
 
 func ParseListen(listen string) (string, int, error) {
