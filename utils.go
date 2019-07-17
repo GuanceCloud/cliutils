@@ -1,9 +1,15 @@
 package cliutils
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/md5"
+	crand "crypto/rand"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"math"
-	"math/rand"
+	mrand "math/rand"
 	"sync"
 	"time"
 
@@ -61,7 +67,7 @@ var (
 
 func CreateRandomString(n int) string {
 
-	var src = rand.NewSource(time.Now().UnixNano())
+	var src = mrand.NewSource(time.Now().UnixNano())
 
 	b := make([]byte, n)
 	for i, cache, remain := n-1, src.Int63(), letterIdxMax; i >= 0; {
@@ -81,7 +87,7 @@ func CreateRandomString(n int) string {
 
 func UUID(p string) string {
 	for {
-		id := uuid.NewV4()
+		id, _ := uuid.NewV4()
 
 		return p + id.String()
 	}
@@ -98,4 +104,49 @@ func SizeFmt(n int64) string {
 		f /= 1024.0
 	}
 	return fmt.Sprintf("%3.4fYB", f)
+}
+
+func Md5Hash(data []byte) string {
+	hasher := md5.New()
+	hasher.Write(data)
+	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+func Encrypt(data, phrase []byte) ([]byte, error) {
+
+	md5Cipher := Md5Hash(phrase)
+
+	block, _ := aes.NewCipher([]byte(md5Cipher))
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err = io.ReadFull(crand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	return gcm.Seal(nonce, nonce, data, nil), nil
+}
+
+func Decrypt(endata, phrase []byte) ([]byte, error) {
+	md5Cipher := Md5Hash(phrase)
+
+	block, err := aes.NewCipher([]byte(md5Cipher))
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonceSize := gcm.NonceSize()
+	nonce, ciphertext := endata[:nonceSize], endata[nonceSize:]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, err
+	}
+	return plaintext, nil
 }
