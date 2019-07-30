@@ -26,7 +26,7 @@ func ParseListen(listen string) (string, int, error) {
 	parts := strings.Split(listen, `:`)
 
 	if len(parts) == 1 { // 只有 port 部分
-		port, err := strconv.ParseInt(parts[0], 10, 16)
+		port, err := strconv.ParseUint(parts[0], 10, 16)
 		if err != nil {
 			return "", -1, fmt.Errorf("invalid listen addr: %s", listen)
 		}
@@ -37,7 +37,7 @@ func ParseListen(listen string) (string, int, error) {
 		return "", -1, fmt.Errorf("invalid listen addr: %s", listen)
 	}
 
-	port, err := strconv.ParseInt(parts[1], 10, 16)
+	port, err := strconv.ParseUint(parts[1], 10, 16)
 	if err != nil {
 		return "", -1, fmt.Errorf("invalid listen addr: %s", listen)
 	}
