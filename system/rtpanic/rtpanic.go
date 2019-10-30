@@ -2,6 +2,7 @@ package rtpanic
 
 import (
 	"log"
+	"reflect"
 	"runtime"
 )
 
@@ -30,7 +31,7 @@ func Recover(recoverCallback, cleanupCallback RecoverCallback) {
 		}
 
 		if recoverCallback != nil {
-			log.Printf("[info] try recover...")
+			log.Printf("[info] try recover %s", runtime.FuncForPC(reflect.ValueOf(recoverCallback).Pointer()).Name())
 			recoverCallback(buf, nil) // 将 panic 信息回送给复活函数处理
 		}
 	}
