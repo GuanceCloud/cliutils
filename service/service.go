@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -25,7 +26,7 @@ respawn
 respawn limit 10 5
 umask 022
 chdir {{.InstallDir}}
-exec {{.StartCmd}}
+exec {{.StartCMD}}
 post-stop exec sleep 1`,
 
 		/////////////////////////////////////////////////////////////////////////////////////////
@@ -43,7 +44,7 @@ ExecReload=/bin/kill -2 $MAINPID
 KillMode=process
 Restart=always
 RestartSec=3s
-ExecStart={{.StartCmd}}
+ExecStart={{.StartCMD}}
 
 [Install]
 WantedBy=default.target`,
@@ -69,16 +70,17 @@ func (s *Service) genInit() error {
 		t := template.New(``)
 		t, err := t.Parse(init)
 		if err != nil {
+			log.Printf("[error] %s", err.Error())
 			return err
 		}
 
 		var f string
 		switch k {
 		case `upstart`:
-			f = path.Join(s.InstallDir, `deamon.conf`)
+			f = path.Join(s.InstallDir, `daemon.conf`)
 			s.upstart = f
 		case `systemd`:
-			f = path.Join(s.InstallDir, `deamon.service`)
+			f = path.Join(s.InstallDir, `daemon.service`)
 			s.systemd = f
 		default:
 			return ErrUnknownInstallType
@@ -86,12 +88,14 @@ func (s *Service) genInit() error {
 
 		fd, err := os.OpenFile(f, os.O_CREATE|os.O_TRUNC|os.O_RDWR, os.ModePerm)
 		if err != nil {
+			log.Printf("[error] %s", err.Error())
 			return err
 		}
 
 		defer fd.Close()
 
 		if err := t.Execute(fd, s); err != nil {
+			log.Printf("[error] %s", err.Error())
 			return err
 		}
 	}
@@ -118,6 +122,9 @@ func detectInitType() string {
 }
 
 func (s *Service) installAndStart() error {
+
+	log.Printf("[debug] install service %+#v", s)
+
 	switch detectInitType() {
 	case upstartStop:
 		return s.upstartInstall()
@@ -141,6 +148,7 @@ func (s *Service) upstartInstall() error {
 	}
 
 	installPath := path.Join(`/etc/init`, s.Name+`.conf`)
+
 	if err := ioutil.WriteFile(installPath, data, os.ModePerm); err != nil {
 		return err
 	}
@@ -154,11 +162,8 @@ func (s *Service) upstartInstall() error {
 
 func (s *Service) systemdInstall() error {
 
-	cmd := exec.Command(`sytemctl`, []string{`stop`, s.Name}...)
-	_, err := cmd.Output()
-	if err != nil {
-		return err
-	}
+	cmd := exec.Command(systemd, []string{`stop`, s.Name}...)
+	cmd.Output() // ignore stop error: service may not install before
 
 	systemdPath := ""
 	systemdPaths := []string{`/lib/systemd`, `/etc/systemd`}
@@ -175,23 +180,26 @@ func (s *Service) systemdInstall() error {
 
 	i, err := ioutil.ReadFile(s.systemd)
 	if err != nil {
+		log.Printf("[error] open %s failed: %s", s.systemd, err.Error())
 		return err
 	}
 
 	to := path.Join(systemdPath, `system`, s.Name+`.service`)
 
 	if err := ioutil.WriteFile(to, i, os.ModePerm); err != nil {
+		log.Printf("[error] %s", err.Error())
 		return err
 	}
 
 	cmds := []*exec.Cmd{
-		exec.Command(`systemctl`, []string{`enable`, s.Name + `.service`}...),
-		exec.Command(`systemctl`, []string{`start`, s.Name + `.service`}...),
+		exec.Command(systemd, []string{`enable`, s.Name + `.service`}...),
+		exec.Command(systemd, []string{`start`, s.Name + `.service`}...),
 	}
 
 	for _, cmd := range cmds {
 		_, err := cmd.Output()
 		if err != nil {
+			log.Printf("[error] %s", err.Error())
 			return err
 		}
 	}
@@ -200,7 +208,13 @@ func (s *Service) systemdInstall() error {
 }
 
 func (s *Service) Install() error {
-	s.genInit()
+
+	log.Printf("[debug] init service %+#v", s)
+
+	if err := s.genInit(); err != nil {
+		return err
+	}
+
 	return s.installAndStart()
 }
 
@@ -211,7 +225,7 @@ func StopService(name string) error {
 		cmd = exec.Command(`stop`, []string{name}...)
 
 	case systemd:
-		cmd = exec.Command(`systemctl`, []string{`stop`, name}...)
+		cmd = exec.Command(systemd, []string{`stop`, name}...)
 	}
 
 	_, err := cmd.Output()
