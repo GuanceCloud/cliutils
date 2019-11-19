@@ -138,8 +138,10 @@ func (s *Service) installAndStart() error {
 func (s *Service) upstartInstall() error {
 	cmd := exec.Command(`stop`, []string{s.Name}...)
 	_, err := cmd.Output()
+
 	if err != nil {
-		return err
+		// XXX: ignore the error: s.Name may not install before
+		log.Printf("[warn] %s", err.Error())
 	}
 
 	data, err := ioutil.ReadFile(s.upstart)
