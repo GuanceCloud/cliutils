@@ -146,19 +146,23 @@ func (s *Service) upstartInstall() error {
 
 	data, err := ioutil.ReadFile(s.upstart)
 	if err != nil {
+		log.Printf("[error] %s", err.Error())
 		return err
 	}
 
 	installPath := path.Join(`/etc/init`, s.Name+`.conf`)
 
 	if err := ioutil.WriteFile(installPath, data, os.ModePerm); err != nil {
+		log.Printf("[error] %s", err.Error())
 		return err
 	}
 
 	cmd = exec.Command(`start`, []string{s.Name}...)
 	if _, err := cmd.Output(); err != nil {
+		log.Printf("[error] %s", err.Error())
 		return err
 	}
+
 	return nil
 }
 
