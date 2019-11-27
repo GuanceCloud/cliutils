@@ -33,13 +33,13 @@ func TestNoBackup(t *testing.T) {
 	lw.SetLevel(Info)
 	lw.DisableBackup()
 
-	RotateSize = 32 * 1024 * 1024
-	i := 0
-	for {
-		log.Printf("[ERROR] log %d error", i)
-		log.Printf("[WARN] log %d warn", i)
-		i++
-	}
+	// RotateSize = 32 * 1024 * 1024
+	// i := 0
+	// for {
+	// 	log.Printf("[ERROR] log %d error", i)
+	// 	log.Printf("[WARN] log %d warn", i)
+	// 	i++
+	// }
 }
 
 func TestLog(t *testing.T) {
@@ -52,7 +52,6 @@ func TestLog(t *testing.T) {
 	log.SetOutput(lw)
 	log.SetFlags(log.Llongfile | log.LstdFlags)
 
-	log.SetPrefix("{callerxxxx:tracexxxxx}")
 	log.Printf("[debug] this is a debug message")
 	log.Printf("[info] this is a info message")
 	log.Printf("[error] this is a error message")
@@ -78,8 +77,10 @@ func TestLog(t *testing.T) {
 
 	lw.SetLevel(Debug)
 
+	log.SetPrefix("{callerxxxx1:tracexxxxx2}")
 	log.Printf("[debug] SHOULD-LOGGED: %+#v", x)
 	log.Printf("SHOULD-LOGGED: %+#v", x)
+	log.SetPrefix("")
 
 	// RotateSize = 32 * 1024 * 1024
 	// i := 0
@@ -99,12 +100,12 @@ func TestJsonFormatLog(t *testing.T) {
 	defer lw.Close()
 
 	log.SetOutput(lw)
-	log.SetPrefix("{callerxxxx:tracexxxxx}")
+
 	log.SetFlags(log.Llongfile)
 
 	log.Printf("[debug] this is a debug message")
 	log.Printf("[info] this is a info message")
-	log.SetPrefix("{callerxxxx1:tracexxxxx2}")
+	log.SetPrefix("{callerxxxx11:tracexxxxx22}")
 	log.Printf("[error] this is a error message")
 	log.Printf("")
 	log.Printf("raw message")
@@ -130,6 +131,7 @@ func TestJsonFormatLog(t *testing.T) {
 
 	log.Printf("[debug] SHOULD-LOGGED: %+#v", x)
 	log.Printf("SHOULD-LOGGED: %+#v", x)
+	log.SetPrefix("")
 
 	// RotateSize = 32 * 1024 * 1024
 	// i := 0
