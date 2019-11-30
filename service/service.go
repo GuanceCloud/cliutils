@@ -11,12 +11,15 @@ import (
 )
 
 var (
+	TypeSystemctl = `systemctl`
+	TypeUpstart   = `upstart`
+
 	initTemplates = map[string]string{
 
 		/////////////////////////////////////////////////////////////////////////////////////////
 		// upstart
 		/////////////////////////////////////////////////////////////////////////////////////////
-		"upstart": `# upstart service settings
+		TypeUpstart: `# upstart service settings
 description "{{.Description}}"
 start on runlevel [2345]
 stop on runlevel [!2345]
@@ -30,9 +33,9 @@ exec {{.StartCMD}}
 post-stop exec sleep 1`,
 
 		/////////////////////////////////////////////////////////////////////////////////////////
-		// systemd
+		// systemctl
 		/////////////////////////////////////////////////////////////////////////////////////////
-		`systemd`: `# systemd serivce setting
+		TypeSystemctl: `# systemd serivce setting
 [Unit]
 Description={{.Description}}
 After=network.target
@@ -59,9 +62,10 @@ type Service struct {
 	Description string
 	InstallDir  string
 	StartCMD    string
+	Type        string
+	InstallOnly bool
 
-	upstart string
-	systemd string
+	upstart, systemd string
 }
 
 // 根据模板，生成多种启动文件
@@ -76,10 +80,10 @@ func (s *Service) genInit() error {
 
 		var f string
 		switch k {
-		case `upstart`:
+		case TypeUpstart:
 			f = path.Join(s.InstallDir, `daemon.conf`)
 			s.upstart = f
-		case `systemd`:
+		case TypeSystemctl:
 			f = path.Join(s.InstallDir, `daemon.service`)
 			s.systemd = f
 		default:
@@ -103,32 +107,12 @@ func (s *Service) genInit() error {
 	return nil
 }
 
-var (
-	upstartStop = `stop`
-	systemd     = `systemctl`
-)
-
-func detectInitType() string {
-	cmds := []string{upstartStop, systemd}
-
-	for _, cmd := range cmds {
-		_, err := exec.LookPath(cmd)
-		if err == nil {
-			return cmd
-		}
-	}
-
-	return ""
-}
-
 func (s *Service) installAndStart() error {
 
-	log.Printf("[debug] install service %+#v", s)
-
-	switch detectInitType() {
-	case upstartStop:
+	switch s.Type {
+	case TypeUpstart:
 		return s.upstartInstall()
-	case systemd:
+	case TypeSystemctl:
 		return s.systemdInstall()
 	}
 
@@ -138,11 +122,6 @@ func (s *Service) installAndStart() error {
 func (s *Service) upstartInstall() error {
 	cmd := exec.Command(`stop`, []string{s.Name}...)
 	_, err := cmd.Output()
-
-	if err != nil {
-		// XXX: ignore the error: s.Name may not install before
-		log.Printf("[warn] %s", err.Error())
-	}
 
 	data, err := ioutil.ReadFile(s.upstart)
 	if err != nil {
@@ -157,10 +136,12 @@ func (s *Service) upstartInstall() error {
 		return err
 	}
 
-	cmd = exec.Command(`start`, []string{s.Name}...)
-	if _, err := cmd.Output(); err != nil {
-		log.Printf("[error] %s", err.Error())
-		return err
+	if !s.InstallOnly {
+		cmd = exec.Command(`start`, []string{s.Name}...)
+		if _, err := cmd.Output(); err != nil {
+			log.Printf("[error] %s", err.Error())
+			return err
+		}
 	}
 
 	return nil
@@ -168,7 +149,7 @@ func (s *Service) upstartInstall() error {
 
 func (s *Service) systemdInstall() error {
 
-	cmd := exec.Command(systemd, []string{`stop`, s.Name}...)
+	cmd := exec.Command(`systemctl`, []string{`stop`, s.Name}...)
 	cmd.Output() // ignore stop error: service may not install before
 
 	systemdPath := ""
@@ -198,8 +179,11 @@ func (s *Service) systemdInstall() error {
 	}
 
 	cmds := []*exec.Cmd{
-		exec.Command(systemd, []string{`enable`, s.Name + `.service`}...),
-		exec.Command(systemd, []string{`start`, s.Name + `.service`}...),
+		exec.Command(`systemctl`, []string{`enable`, s.Name + `.service`}...),
+	}
+
+	if !s.InstallOnly {
+		cmds = append(cmds, exec.Command(`systemctl`, []string{`start`, s.Name + `.service`}...))
 	}
 
 	for _, cmd := range cmds {
@@ -215,56 +199,9 @@ func (s *Service) systemdInstall() error {
 
 func (s *Service) Install() error {
 
-	log.Printf("[debug] init service %+#v", s)
-
 	if err := s.genInit(); err != nil {
 		return err
 	}
 
 	return s.installAndStart()
-}
-
-func StopService(name string) error {
-	var cmd *exec.Cmd
-	switch detectInitType() {
-	case upstartStop:
-		cmd = exec.Command(`stop`, []string{name}...)
-
-	case systemd:
-		cmd = exec.Command(systemd, []string{`stop`, name}...)
-	}
-
-	_, err := cmd.Output()
-
-	return err
-}
-
-func RestartService(name string) error {
-	var cmd *exec.Cmd
-	switch detectInitType() {
-	case upstartStop:
-		cmd = exec.Command(`restart`, []string{name}...)
-
-	case systemd:
-		cmd = exec.Command(`systemctl`, []string{`restart`, name}...)
-	}
-
-	_, err := cmd.Output()
-
-	return err
-}
-
-func StartService(name string) error {
-	var cmd *exec.Cmd
-	switch detectInitType() {
-	case upstartStop:
-		cmd = exec.Command(`start`, []string{name}...)
-
-	case systemd:
-		cmd = exec.Command(`systemctl`, []string{`start`, name}...)
-	}
-
-	_, err := cmd.Output()
-
-	return err
 }
