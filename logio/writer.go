@@ -20,7 +20,7 @@ const (
 )
 
 var (
-	JsonFormat = "{\"timestamp\":%d, \"level\": \"%s\", \"message\": \"%s\"}\n"
+	JsonFormat = "{\"timestamp\":%d, \"level\": \"%s\", \"message\": \"%s\",\"traceId\":\"%s\", \"caller\":\"%s\"}\n"
 
 	levels = map[string]int{
 
@@ -227,10 +227,17 @@ func (w *RotateWriter) Write(data []byte) (int, error) {
 	case JsonFormat:
 		data = data[0 : len(data)-1]                            // 去掉自带的换行
 		data = bytes.Replace(data, []byte(key), []byte(``), -1) // 去掉消息体中的 level
+		rs := []string{``, ``}
+		index := 0
+		if string(data[0]) == `{` {
+			index = bytes.Index(data, []byte(`}`)) // 前缀添加 {caller:traceId}
+			res := data[1:index]
+			rs = strings.Split(string(res), `:`)
+		}
 		n, err = w.fp.Write([]byte(fmt.Sprintf(w.format,
 			time.Now().Unix(),
 			strings.ToUpper(level),
-			data)))
+			data[index+1:], rs[1], rs[0])))
 	default: // 不带任何格式化，则按照默认情况输出
 		n, err = w.fp.Write(data)
 	}
