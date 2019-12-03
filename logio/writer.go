@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -20,20 +21,20 @@ const (
 )
 
 var (
-	JsonFormat = "{\"timestamp\":%d, \"level\": \"%s\", \"message\": \"%s\",\"traceId\":\"%s\", \"caller\":\"%s\"}\n"
+	JsonFormat = "{\"timestamp\":%d, \"level\": \"%s\", \"message\": \"%s\",\"traceId\":\"%s\"}\n"
 
 	levels = map[string]int{
 
-		`[debug] `: Debug,
-		`[DEBUG] `: Debug,
-		`[info] `:  Info,
-		`[INFO] `:  Info,
-		`[warn] `:  Warn,
-		`[WARN] `:  Warn,
-		`[error] `: Error,
-		`[ERROR] `: Error,
-		`[fatal] `: Fatal,
-		`[FATAL] `: Fatal,
+		`[debug]`: Debug,
+		`[DEBUG]`: Debug,
+		`[info]`:  Info,
+		`[INFO]`:  Info,
+		`[warn]`:  Warn,
+		`[WARN]`:  Warn,
+		`[error]`: Error,
+		`[ERROR]`: Error,
+		`[fatal]`: Fatal,
+		`[FATAL]`: Fatal,
 	}
 )
 
@@ -207,12 +208,12 @@ func (w *RotateWriter) Write(data []byte) (int, error) {
 	var err error
 
 	level := `debug`
-	key := `[debug] `
+	key := `[debug]`
 	lv := Debug
 
 	for k, l := range levels {
 		if bytes.Contains(data, []byte(k)) {
-			level = k[1 : len(k)-2]
+			level = k[1 : len(k)-1]
 			lv = l
 			key = k
 			break
@@ -227,17 +228,18 @@ func (w *RotateWriter) Write(data []byte) (int, error) {
 	case JsonFormat:
 		data = data[0 : len(data)-1]                            // 去掉自带的换行
 		data = bytes.Replace(data, []byte(key), []byte(``), -1) // 去掉消息体中的 level
-		rs := []string{``, ``}
-		index := 0
-		if string(data[0]) == `{` {
-			index = bytes.Index(data, []byte(`}`)) // 前缀添加 {caller:traceId}
-			res := data[1:index]
-			rs = strings.Split(string(res), `:`)
+		var traceId string
+		r := regexp.MustCompile(`\[traceId:(.+)\]`)
+		ts := r.FindAllStringSubmatch(string(data), -1)
+		for _, s := range ts {
+			data = bytes.Replace(data, []byte(s[0]), []byte(``), -1)
+			traceId = s[1]
 		}
+
 		n, err = w.fp.Write([]byte(fmt.Sprintf(w.format,
 			time.Now().Unix(),
 			strings.ToUpper(level),
-			data[index+1:], rs[1], rs[0])))
+			data, traceId)))
 	default: // 不带任何格式化，则按照默认情况输出
 		n, err = w.fp.Write(data)
 	}
