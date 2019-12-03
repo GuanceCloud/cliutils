@@ -229,7 +229,7 @@ func (w *RotateWriter) Write(data []byte) (int, error) {
 		data = data[0 : len(data)-1]                            // 去掉自带的换行
 		data = bytes.Replace(data, []byte(key), []byte(``), -1) // 去掉消息体中的 level
 		var traceId string
-		r := regexp.MustCompile(`\[traceId:(.+)\]`)
+		r := regexp.MustCompile(`(?i)\[traceId:(.+)\]`)
 		ts := r.FindAllStringSubmatch(string(data), -1)
 		for _, s := range ts {
 			data = bytes.Replace(data, []byte(s[0]), []byte(``), -1)
