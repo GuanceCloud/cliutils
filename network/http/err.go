@@ -6,6 +6,8 @@ import (
 	"fmt"
 	nhttp "net/http"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -13,11 +15,11 @@ var (
 )
 
 type HttpError struct {
-	ErrCode  string      `json:"errorCode,omitempty"`
-	Err      error       `json:"-"`
-	HttpCode int         `json:"code,omitempty"`
-	Message  string      `json:"message,omitempty"`
-	Content  interface{} `json:"content,omitempty"`
+	ErrCode  string
+	Err      error
+	HttpCode int
+	Message  string
+	Content  interface{}
 }
 
 func NewErr(err error, httpCode int, namespace string) *HttpError {
@@ -36,47 +38,7 @@ func (he *HttpError) Error() string {
 	}
 }
 
-func (he *HttpError) JsonBody(body interface{}) ([]byte, error) {
-
-	obj := map[string]interface{}{
-		"code":      he.HttpCode,
-		"errorCode": he.ErrCode,
-		"content":   body,
-	}
-
-	j, err := json.Marshal(&obj)
-	if err != nil {
-		return nil, err
-	}
-
-	return j, nil
-}
-
-// 按照默认的方式返回既定的 error 信息
-func HttpErr(err error) *HttpError {
-	he, ok := err.(*HttpError)
-	if ok {
-		return he
-	} else {
-		he = NewErr(err, nhttp.StatusInternalServerError, ``)
-		he.ErrCode = ""
-		return he
-	}
-}
-
-func WSErr(w nhttp.ResponseWriter, err error) {
-
-	he, ok := err.(*HttpError)
-	if ok {
-		he.WSResp(w)
-	} else {
-		he = NewErr(err, nhttp.StatusInternalServerError, ``)
-		he.ErrCode = ""
-		he.WSResp(w)
-	}
-}
-
-func (he *HttpError) WSResp(w nhttp.ResponseWriter, args ...interface{}) {
+func (he *HttpError) Json(args ...interface{}) ([]byte, error) {
 
 	obj := map[string]interface{}{
 		"code":      he.HttpCode,
@@ -91,12 +53,98 @@ func (he *HttpError) WSResp(w nhttp.ResponseWriter, args ...interface{}) {
 
 	j, err := json.Marshal(&obj)
 	if err != nil {
-		ErrUnexpectedInternalServerError.WSResp(w, err)
+		return nil, err
+	}
+
+	return j, nil
+}
+
+func (he *HttpError) HttpBody(c *gin.Context, body interface{}) {
+	obj := map[string]interface{}{
+		"code":      he.HttpCode,
+		"errorCode": he.ErrCode,
+		"content":   body,
+	}
+
+	j, err := json.Marshal(&obj)
+	if err != nil {
+		ErrUnexpectedInternalServerError.HttpResp(c, err)
 		return
 	}
 
-	w.WriteHeader(he.HttpCode)
-	_, _ = w.Write(j)
+	c.Data(he.HttpCode, `application/json`, j)
+}
+
+func (he *HttpError) HttpResp(c *gin.Context, args ...interface{}) {
+	obj := map[string]interface{}{
+		"code":      he.HttpCode,
+		"errorCode": he.ErrCode,
+	}
+
+	if args == nil {
+		obj[`message`] = he.Error()
+	} else {
+		obj[`message`] = fmt.Sprint(he.Error(), args)
+	}
+
+	j, err := json.Marshal(&obj)
+	if err != nil {
+		ErrUnexpectedInternalServerError.HttpResp(c, err)
+		return
+	}
+
+	c.Data(he.HttpCode, `application/json`, j)
+}
+
+func (he *HttpError) HttpTraceIdResp(c *gin.Context, traceId string, args ...interface{}) {
+	obj := map[string]interface{}{
+		"code":      he.HttpCode,
+		"errorCode": he.ErrCode,
+	}
+
+	if args == nil {
+		obj[`message`] = he.Error()
+	} else {
+		obj[`message`] = fmt.Sprint(he.Error(), args)
+	}
+
+	j, err := json.Marshal(&obj)
+	if err != nil {
+		ErrUnexpectedInternalServerError.HttpResp(c, err)
+		return
+	}
+
+	c.Writer.Header().Set(`X-Trace-Id`, traceId)
+
+	c.Data(he.HttpCode, `application/json`, j)
+}
+
+func (he *HttpError) HttpTraceIdBody(c *gin.Context, traceId string, body interface{}) {
+	obj := map[string]interface{}{
+		"code":      he.HttpCode,
+		"errorCode": he.ErrCode,
+		"content":   body,
+	}
+
+	j, err := json.Marshal(&obj)
+	if err != nil {
+		ErrUnexpectedInternalServerError.HttpResp(c, err)
+		return
+	}
+
+	c.Writer.Header().Set(`X-Trace-Id`, traceId)
+	c.Data(he.HttpCode, `application/json`, j)
+}
+
+func HttpErr(c *gin.Context, err error) {
+	he, ok := err.(*HttpError)
+	if ok {
+		he.HttpResp(c)
+	} else {
+		he = NewErr(err, nhttp.StatusInternalServerError, ``)
+		he.ErrCode = ""
+		he.HttpResp(c)
+	}
 }
 
 func titleErr(namespace string, err error) string {

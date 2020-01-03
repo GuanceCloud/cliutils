@@ -21,7 +21,7 @@ const (
 )
 
 var (
-	JsonFormat = "{\"timestamp\":%d, \"level\": \"%s\", \"message\": \"%s\",\"traceId\":\"%s\"}\n"
+	JSONFormat = "{\"timestamp\":%d, \"level\": \"%s\", \"message\": \"%s\",\"traceId\":\"%s\"}\n"
 
 	levels = map[string]int{
 
@@ -36,14 +36,30 @@ var (
 		`[fatal]`: Fatal,
 		`[FATAL]`: Fatal,
 	}
+
+	NoBackUp = -1
 )
 
 var (
-	RotateSize = int64(1024 * 1024 * 32)
-	Backups    = 5
+	defaultRotateSize = int64(1024 * 1024 * 32)
+	defaultBackups    = 5
+	defaultFlags      = log.LstdFlags | log.Llongfile | log.LUTC
 )
 
-type RotateWriter struct {
+type Option struct {
+	Path  string
+	Level string
+
+	JSONFormat bool
+	Flags      int
+	Backups    int
+	RotateSize int64
+
+	rw     *rotateWriter
+	format string
+}
+
+type rotateWriter struct {
 	lock          sync.Mutex
 	filename      string
 	fp            *os.File
@@ -53,77 +69,109 @@ type RotateWriter struct {
 	level         int
 	beginAt       time.Time
 	disableBackup bool
+
+	o *Option
 }
 
-func New(f, format string) (*RotateWriter, error) {
-	w := &RotateWriter{filename: f, format: format}
-
-	if err := w.rotate(); err != nil {
-		return nil, err
+func (o *Option) newWriter() error {
+	rw := &rotateWriter{
+		filename: o.Path,
+		format:   o.format,
+		o:        o,
 	}
-	return w, nil
+
+	o.rw = rw
+
+	if err := o.rotate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (o *Option) SetLog() error {
+	if err := os.MkdirAll(path.Dir(o.Path), os.ModePerm); err != nil {
+		return err
+	}
+
+	if o.JSONFormat {
+		o.format = JSONFormat
+	}
+
+	if err := o.newWriter(); err != nil {
+		return err
+	}
+
+	if o.Flags == 0 {
+		o.Flags = defaultFlags
+	}
+
+	switch o.Backups {
+	case 0:
+		o.Backups = defaultBackups
+	case NoBackUp:
+		o.Backups = 0
+	}
+
+	if o.RotateSize == 0 {
+		o.RotateSize = defaultRotateSize
+	}
+
+	log.SetFlags(o.Flags)
+
+	switch strings.ToUpper(o.Level) {
+	case `DEBUG`:
+		o.SetLevel(Debug)
+	case `INFO`:
+		o.SetLevel(Info)
+	case `WARN`:
+		o.SetLevel(Warn)
+	case `ERROR`:
+		o.SetLevel(Error)
+	case `FATAL`:
+		o.SetLevel(Fatal)
+	default:
+		o.SetLevel(Debug)
+	}
+
+	log.SetOutput(o.rw)
+	return nil
 }
 
 func SetLog(f, level string, disableJsonFmt, disableLongFileName bool) {
-
-	if err := os.MkdirAll(path.Dir(f), os.ModePerm); err != nil {
-		log.Fatal(err)
+	defaultOption := &Option{
+		Path:       f,
+		Level:      level,
+		JSONFormat: !disableJsonFmt,
+		Flags:      log.LstdFlags | log.Llongfile,
+		RotateSize: defaultRotateSize,
+		Backups:    defaultBackups,
 	}
-
-	format := JsonFormat
-	if disableJsonFmt {
-		format = ""
-	}
-
-	rw, err := New(f, format)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	logFlags := log.LstdFlags | log.Llongfile
 
 	if disableLongFileName {
-		logFlags = log.LstdFlags | log.Lshortfile
+		defaultOption.Flags = log.LstdFlags | log.Lshortfile
 	}
 
-	log.SetFlags(logFlags)
-
-	switch strings.ToUpper(level) {
-	case `DEBUG`:
-		rw.SetLevel(Debug)
-	case `INFO`:
-		rw.SetLevel(Info)
-	case `WARN`:
-		rw.SetLevel(Warn)
-	case `ERROR`:
-		rw.SetLevel(Error)
-	case `FATAL`:
-		rw.SetLevel(Fatal)
-	default:
-		rw.SetLevel(Debug)
-	}
-
-	log.SetOutput(rw)
+	defaultOption.SetLog()
 }
 
-func (w *RotateWriter) DisableBackup() {
+func (w *rotateWriter) DisableBackup() {
 	w.disableBackup = true
 }
 
-func (w *RotateWriter) Close() error {
+func (w *rotateWriter) Close() error {
 	return w.fp.Close()
 }
 
-func (w *RotateWriter) SetLevel(l int) {
+func (o *Option) SetLevel(l int) {
 	switch l {
 	case Fatal, Error, Warn, Info, Debug:
-		w.level = l
+		o.rw.level = l
 	default:
-		w.level = Debug
+		o.rw.level = Debug
 	}
 }
 
-func (w *RotateWriter) LogFiles(all bool) []string {
+func (w *rotateWriter) logFiles(all bool) []string {
 	if all {
 		return append(w.backups, w.filename)
 	} else {
@@ -137,51 +185,51 @@ func fmtTs(t time.Time) string {
 		t.Hour(), t.Minute(), t.Second())
 }
 
-func (w *RotateWriter) rotate() error {
-	w.lock.Lock()
-	defer w.lock.Unlock()
+func (o *Option) rotate() error {
+	o.rw.lock.Lock()
+	defer o.rw.lock.Unlock()
 
 	var err error
 
-	if w.fp != nil {
-		err = w.fp.Close()
-		w.fp = nil
+	if o.rw.fp != nil {
+		err = o.rw.fp.Close()
+		o.rw.fp = nil
 		if err != nil {
 			return err
 		}
 	}
 
-	if fi, err := os.Stat(w.filename); err == nil {
-		if fi.Size() < RotateSize { // 继续追加日志
+	if fi, err := os.Stat(o.rw.filename); err == nil {
+		if fi.Size() < o.RotateSize { // 继续追加日志
 			goto __open_file
 		} else {
 			// 切分出另一个日志
-			backupName := w.filename + `-` + fmtTs(w.beginAt) + `-` + fmtTs(time.Now())
-			if err := os.Rename(w.filename, backupName); err != nil {
+			backupName := o.rw.filename + `-` + fmtTs(o.rw.beginAt) + `-` + fmtTs(time.Now())
+			if err := os.Rename(o.rw.filename, backupName); err != nil {
 				return err
 			}
 
-			w.backups = append(w.backups, backupName)
-			w.beginAt = time.Now()
+			o.rw.backups = append(o.rw.backups, backupName)
+			o.rw.beginAt = time.Now()
 
-			if len(w.backups) > Backups {
+			if len(o.rw.backups) > o.Backups {
 				// 移除 backup 日志
 
-				_ = os.Remove(w.backups[0])
-				w.backups = w.backups[1:]
+				_ = os.Remove(o.rw.backups[0])
+				o.rw.backups = o.rw.backups[1:]
 			}
 		}
 	}
 
 __open_file:
-	w.fp, err = os.OpenFile(w.filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	o.rw.fp, err = os.OpenFile(o.rw.filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		return err
 	}
 
 	// append 模式下, 当前文件大小计入 curBytes
-	if fi, err := os.Stat(w.filename); err == nil {
-		w.curBytes = fi.Size()
+	if fi, err := os.Stat(o.rw.filename); err == nil {
+		o.rw.curBytes = fi.Size()
 	} else {
 		return err
 	}
@@ -189,13 +237,13 @@ __open_file:
 	return nil
 }
 
-func (w *RotateWriter) Write(data []byte) (int, error) {
+func (w *rotateWriter) Write(data []byte) (int, error) {
 	if w.curBytes == 0 {
 		w.beginAt = time.Now()
 	}
 
-	if w.curBytes >= RotateSize && !w.disableBackup {
-		if err := w.rotate(); err != nil {
+	if w.curBytes >= w.o.RotateSize && !w.disableBackup {
+		if err := w.o.rotate(); err != nil {
 			log.Printf("rotate failed: %s, ignored", err.Error())
 		}
 		w.curBytes = 0
@@ -225,7 +273,8 @@ func (w *RotateWriter) Write(data []byte) (int, error) {
 	}
 
 	switch w.format {
-	case JsonFormat:
+	case JSONFormat:
+
 		data = data[0 : len(data)-1]                            // 去掉自带的换行
 		data = bytes.Replace(data, []byte(key), []byte(``), -1) // 去掉消息体中的 level
 		var traceId string
