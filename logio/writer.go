@@ -105,6 +105,13 @@ func (o *Option) SetLog() error {
 		o.Flags = defaultFlags
 	}
 
+	switch o.Level {
+	case `debug`, `info`, `warn`, `error`, `fatal`:
+		// ok
+	default:
+		o.Level = `DEBUG`
+	}
+
 	switch o.Backups {
 	case 0:
 		o.Backups = defaultBackups
