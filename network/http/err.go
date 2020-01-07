@@ -12,6 +12,8 @@ import (
 
 var (
 	ErrUnexpectedInternalServerError = NewErr(errors.New(`unexpected internal server error`), nhttp.StatusInternalServerError, ``)
+	ErrBadAuthHeader                 = NewErr(errors.New("invalid http Authorization header"), nhttp.StatusForbidden, ``)
+	ErrAuthFailed                    = NewErr(errors.New("http Authorization failed"), nhttp.StatusForbidden, ``)
 )
 
 type HttpError struct {
