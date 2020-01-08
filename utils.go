@@ -92,7 +92,7 @@ func UUID(p string) string {
 	//	return p + id.String()
 	//}
 
-	return uuid.NewV4()
+	return uuid.NewV4().String()
 }
 
 func SizeFmt(n int64) string {
