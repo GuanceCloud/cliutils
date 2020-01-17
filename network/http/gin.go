@@ -2,8 +2,10 @@ package http
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -40,7 +42,28 @@ type bodyLoggerWriter struct {
 	body *bytes.Buffer
 }
 
-func BodyLoggerMiddleware(c *gin.Context) {
+func FormatRequest(r *http.Request) string {
+	var request []string
+
+	// Add the request string
+	url := fmt.Sprintf("%v %v %v", r.Method, r.URL, r.Proto)
+	request = append(request, url)
+	// Add the host
+	request = append(request, fmt.Sprintf("Host: %v", r.Host))
+	// Loop through headers
+
+	for name, headers := range r.Header {
+		// name = strings.ToLower(name)
+		for _, h := range headers {
+			request = append(request, fmt.Sprintf("%v: %v", name, h))
+		}
+	}
+
+	// Return the request as a string
+	return strings.Join(request, "\n")
+}
+
+func RequestLoggerMiddleware(c *gin.Context) {
 
 	w := &bodyLoggerWriter{
 		ResponseWriter: c.Writer,
@@ -55,5 +78,8 @@ func BodyLoggerMiddleware(c *gin.Context) {
 	switch code {
 	case http.StatusOK:
 		log.Printf("[debug][%s] body size: %d", tid, w.body.Len())
+	default:
+		log.Printf("[warn][%s] Status: %d, RemoteAddr: %s, Request: %s, error: %s",
+			tid, code, c.Request.RemoteAddr, FormatRequest(c.Request), w.body.String())
 	}
 }
