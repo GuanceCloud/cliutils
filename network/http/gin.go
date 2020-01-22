@@ -16,15 +16,34 @@ const (
 	HdrTraceID = `X-Trace-ID`
 )
 
-func TraceIDMiddleware(c *gin.Context) {
-	tid := c.Request.Header.Get(HdrTraceID)
-	if len(tid) == 0 {
-		tid = cliutils.UUID(`trace_`)
-		c.Request.Header.Set(HdrTraceID, tid)
+func CORSMiddleware(c *gin.Context) {
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+	c.Writer.Header().Set("Access-Control-Allow-Headers",
+		"Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+	c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT")
+
+	if c.Request.Method == "OPTIONS" {
+		c.AbortWithStatus(204)
+		return
 	}
 
-	c.Writer.Header().Set(HdrTraceID, tid)
 	c.Next()
+}
+
+func TraceIDMiddleware(c *gin.Context) {
+	if c.Request.Method == `OPTIONS` {
+		c.Next()
+	} else {
+		tid := c.Request.Header.Get(HdrTraceID)
+		if len(tid) == 0 {
+			tid = cliutils.UUID(`trace_`)
+			c.Request.Header.Set(HdrTraceID, tid)
+		}
+
+		c.Writer.Header().Set(HdrTraceID, tid)
+		c.Next()
+	}
 }
 
 func CorsMiddleware(c *gin.Context) {
