@@ -94,8 +94,8 @@ func RequestLoggerMiddleware(c *gin.Context) {
 
 	tid := c.Writer.Header().Get(HdrTraceID)
 	code := c.Writer.Status()
-	switch code {
-	case http.StatusOK:
+	switch code / 200 {
+	case 1:
 		log.Printf("[debug][%s] body size: %d", tid, w.body.Len())
 	default:
 		log.Printf("[warn][%s] Status: %d, RemoteAddr: %s, Request: %s, error: %s",
