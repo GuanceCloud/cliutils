@@ -86,8 +86,7 @@ func CreateRandomString(n int) string {
 }
 
 func UUID(p string) string {
-	u, _ := uuid.NewV4()
-	return p + u.String()
+	return p + uuid.NewV4().String()
 }
 
 func SizeFmt(n int64) string {
