@@ -86,7 +86,7 @@ func (he *HttpError) HttpResp(c *gin.Context, args ...interface{}) {
 	if args == nil {
 		obj[`message`] = he.Error()
 	} else {
-		obj[`message`] = fmt.Sprint(he.Error(), args)
+		obj[`message`] = fmt.Sprint(args)
 	}
 
 	j, err := json.Marshal(&obj)
