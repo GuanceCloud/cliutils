@@ -78,12 +78,17 @@ func FormatRequest(r *http.Request) string {
 		}
 	}
 
+	if r.Method == "POST" {
+		request = append(request, "\n")
+	}
+
 	// Return the request as a string
 	return strings.Join(request, "\n")
 }
 
 func RequestLoggerMiddleware(c *gin.Context) {
 
+	tid := c.Writer.Header().Get(HdrTraceID)
 	w := &bodyLoggerWriter{
 		ResponseWriter: c.Writer,
 		body:           bytes.NewBufferString(``),
@@ -92,11 +97,11 @@ func RequestLoggerMiddleware(c *gin.Context) {
 	c.Writer = w
 	c.Next()
 
-	tid := c.Writer.Header().Get(HdrTraceID)
 	code := c.Writer.Status()
 	switch code / 200 {
 	case 1:
-		log.Printf("[debug][%s] body size: %d", tid, w.body.Len())
+		log.Printf("[debug][%s] body size: %d, url: %s, method: %s",
+			tid, w.body.Len(), c.Request.URL, c.Request.Method)
 	default:
 		log.Printf("[warn][%s] Status: %d, RemoteAddr: %s, Request: %s, error: %s",
 			tid, code, c.Request.RemoteAddr, FormatRequest(c.Request), w.body.String())
