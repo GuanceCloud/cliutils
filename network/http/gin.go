@@ -46,16 +46,6 @@ func TraceIDMiddleware(c *gin.Context) {
 	}
 }
 
-func CorsMiddleware(c *gin.Context) {
-	switch c.Request.Method {
-	case `OPTIONS`, `HEAD`:
-		c.AbortWithStatus(204)
-		return
-	}
-
-	c.Next()
-}
-
 type bodyLoggerWriter struct {
 	gin.ResponseWriter
 	body *bytes.Buffer
