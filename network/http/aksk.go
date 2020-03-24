@@ -20,12 +20,13 @@ type SignOption struct {
 
 func DefaultSignOption(authType string, headers []string) *SignOption {
 	return &SignOption{
-		AuthorizationType:authType,
-		SignHeaders： sort.Strings(headers),
+		AuthorizationType: authType,
+		SignHeaders:       sort.Strings(headers),
+	}
 }
 
 func (o *SignOption) SignReq(r *http.Request) string {
-	signElems := []stringk
+	signElems := []string{
 		r.Method,
 	}
 
