@@ -19,9 +19,12 @@ type SignOption struct {
 }
 
 func DefaultSignOption(authType string, headers []string) *SignOption {
+
+	sort.Strings(headers)
+
 	return &SignOption{
 		AuthorizationType: authType,
-		SignHeaders:       sort.Strings(headers),
+		SignHeaders:       headers,
 	}
 }
 
