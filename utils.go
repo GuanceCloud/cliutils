@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rs/xid"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -87,6 +88,10 @@ func CreateRandomString(n int) string {
 
 func UUID(p string) string {
 	return p + uuid.NewV4().String()
+}
+
+func XID(p string) string {
+	return p + xid.New().String()
 }
 
 func SizeFmt(n int64) string {
