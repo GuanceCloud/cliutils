@@ -29,6 +29,7 @@ func CORSMiddleware(c *gin.Context) {
 		"X-Datakit-UUID",
 		"X-RP",
 		"X-Precision",
+		"X-Lua",
 	}
 
 	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")

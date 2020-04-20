@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/rs/xid"
-	uuid "github.com/satori/go.uuid"
 )
 
 type Sem struct {
@@ -84,10 +83,6 @@ func CreateRandomString(n int) string {
 	}
 
 	return string(b)
-}
-
-func UUID(p string) string {
-	return p + uuid.NewV4().String()
 }
 
 func XID(p string) string {
