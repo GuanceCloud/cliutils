@@ -1,9 +1,11 @@
 package logger
 
 import (
+	"fmt"
+	"strings"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"strings"
 )
 
 const (
@@ -14,6 +16,30 @@ const (
 	DEBUG = "debug"
 	INFO  = "info"
 )
+
+var (
+	defaultRootLogger *zap.Logger
+)
+
+func SetGlobalRootLogger(fpath, level string, options int) {
+	if defaultRootLogger != nil {
+		panic(fmt.Sprintf("global root logger has been initialized: %+#v", defaultRootLogger))
+	}
+
+	var err error
+	defaultRootLogger, err = NewRootLogger(fpath, level, options)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func Logger(name string) *zap.Logger {
+	return GetLogger(defaultRootLogger, name)
+}
+
+func SLogger(name string) *zap.SugaredLogger {
+	return GetSugarLogger(defaultRootLogger, name)
+}
 
 func GetLogger(root *zap.Logger, name string) *zap.Logger {
 	return root.Named(name)
