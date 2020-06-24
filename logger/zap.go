@@ -33,11 +33,22 @@ func SetGlobalRootLogger(fpath, level string, options int) {
 	}
 }
 
+const (
+	rootNotInitialized = "you should call SetGlobalRootLogger to initialize the global root logger"
+)
+
 func Logger(name string) *zap.Logger {
+	if defaultRootLogger == nil {
+		panic(rootNotInitialized)
+	}
 	return GetLogger(defaultRootLogger, name)
 }
 
 func SLogger(name string) *zap.SugaredLogger {
+	if defaultRootLogger == nil {
+		panic(rootNotInitialized)
+	}
+
 	return GetSugarLogger(defaultRootLogger, name)
 }
 

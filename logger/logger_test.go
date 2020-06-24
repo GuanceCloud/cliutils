@@ -8,6 +8,11 @@ import (
 	"go.uber.org/zap"
 )
 
+func TestGlobalLoggerNotSet(t *testing.T) {
+	sl := SLogger("sugar-module")
+	sl.Debugf("sugar debug msg")
+}
+
 func TestGlobalLogger(t *testing.T) {
 	SetGlobalRootLogger("/tmp/log.globle", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
 
