@@ -8,6 +8,16 @@ import (
 	"go.uber.org/zap"
 )
 
+func TestStdoutGlobalLogger(t *testing.T) {
+	if err := SetGlobalRootLogger("", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER); err != nil {
+		t.Fatal(err)
+	}
+
+	l := SLogger("test")
+	l.Debug("this is debug message")
+	l.Info("this is info message")
+}
+
 func TestWinGlobalLogger(t *testing.T) {
 	if err := SetGlobalRootLogger("C:\\Program Files\\DataFlux\\datakit\\datakit.log", DEBUG, OPT_STDOUT|OPT_ENC_CONSOLE|OPT_SHORT_CALLER); err != nil {
 		t.Fatal(err)

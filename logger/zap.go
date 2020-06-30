@@ -73,8 +73,7 @@ func newWinFileSink(u *url.URL) (zap.Sink, error) {
 func NewRootLogger(fpath, level string, options int) (*zap.Logger, error) {
 
 	cfg := &zap.Config{
-		Encoding:    `json`,
-		OutputPaths: []string{fpath},
+		Encoding: `json`,
 		EncoderConfig: zapcore.EncoderConfig{
 			NameKey:    "MOD",
 			MessageKey: "MSG",
@@ -90,10 +89,14 @@ func NewRootLogger(fpath, level string, options int) (*zap.Logger, error) {
 		},
 	}
 
-	if runtime.GOOS == "windows" { // See: https://github.com/uber-go/zap/issues/621
-		zap.RegisterSink("winfile", newWinFileSink)
-		cfg.OutputPaths = []string{
-			"winfile:///" + fpath,
+	if fpath != "" {
+		cfg.OutputPaths = []string{fpath}
+
+		if runtime.GOOS == "windows" { // See: https://github.com/uber-go/zap/issues/621
+			zap.RegisterSink("winfile", newWinFileSink)
+			cfg.OutputPaths = []string{
+				"winfile:///" + fpath,
+			}
 		}
 	}
 
@@ -114,7 +117,7 @@ func NewRootLogger(fpath, level string, options int) (*zap.Logger, error) {
 		cfg.EncoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
 	}
 
-	if options&OPT_STDOUT != 0 {
+	if options&OPT_STDOUT != 0 || fpath == "" { // if no log file path set, default set to stdout
 		cfg.OutputPaths = append(cfg.OutputPaths, "stdout")
 	}
 
