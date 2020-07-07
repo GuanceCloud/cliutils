@@ -8,6 +8,20 @@ import (
 	"go.uber.org/zap"
 )
 
+func TestColor(t *testing.T) {
+	if err := SetGlobalRootLogger("", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR); err != nil {
+		t.Fatal(err)
+	}
+
+	l := SLogger("test")
+	l.Debug("this is debug message")
+	l.Info("this is info message")
+	l.Warn("this is warn message")
+	l.Error("this is error message")
+	//l.Fatal("this is fatal message")
+	//l.Panic("this is panic message")
+}
+
 func TestStdoutGlobalLogger(t *testing.T) {
 	if err := SetGlobalRootLogger("", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER); err != nil {
 		t.Fatal(err)
