@@ -2,11 +2,73 @@ package logger
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
 	"go.uber.org/zap"
 )
+
+func TestRorate(t *testing.T) {
+	l, _ := _NewRotateRootLogger("/tmp/x.log", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
+
+	l1 := GetSugarLogger(l, "test1")
+	l2 := GetSugarLogger(l, "test2")
+
+	l1.Info("this is msg")
+	l2.Info("this is msg")
+}
+
+func TestXX(t *testing.T) {
+	base := 4
+	if err := SetGlobalRootLogger("/tmp/xlog", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR); err != nil {
+		t.Fatal(err)
+	}
+
+	l1 := SLogger("test")
+	l2 := SLogger("test")
+
+	wg := sync.WaitGroup{}
+
+	for j := 0; j < base; j++ {
+		wg.Add(2)
+		go func() {
+			i := 0
+			defer wg.Done()
+			for {
+				l1.Debugf("L1: %v", l1)
+				i++
+
+				if i%(base*8) == 0 {
+					fmt.Printf("[%d]L1: %d\n", j, i)
+				}
+
+				if i > base*32 {
+					return
+				}
+			}
+		}()
+
+		go func() {
+			i := 0
+			defer wg.Done()
+			for {
+				l2.Debugf("L2: %v", l2)
+				i++
+
+				if i%(base*8) == 0 {
+					fmt.Printf("[%d]L2: %d\n", j, i)
+				}
+
+				if i > base*32 {
+					return
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+}
 
 func TestColor(t *testing.T) {
 	if err := SetGlobalRootLogger("", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR); err != nil {
