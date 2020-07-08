@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"fmt"
 	"net/url"
 	"os"
 	"runtime"
@@ -41,7 +40,8 @@ type Logger struct {
 
 func SetGlobalRootLogger(fpath, level string, options int) error {
 	if defaultRootLogger != nil {
-		panic(fmt.Sprintf("global root logger has been initialized: %+#v", defaultRootLogger))
+		__l.Warnf("global root logger has been initialized %+#v", defaultRootLogger)
+		return nil
 	}
 
 	var err error

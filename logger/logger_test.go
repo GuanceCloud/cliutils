@@ -18,7 +18,7 @@ func TestLogger1(t *testing.T) {
 	l.Debug("this is debug msg")
 	l.Info("this is info msg")
 	l.Error("this is error msg")
-	l.Panic("this is panic msg")
+	//l.Panic("this is panic msg")
 }
 
 func TestRorate(t *testing.T) {
