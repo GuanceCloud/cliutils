@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"flag"
 	"fmt"
 	"sync"
 	"testing"
@@ -9,8 +10,41 @@ import (
 	"go.uber.org/zap"
 )
 
-func TestLogger1(t *testing.T) {
-	if err := SetGlobalRootLogger("", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR); err != nil {
+var (
+	flagLogFile = flag.String("f", "/dev/null", "log file path")
+)
+
+func _init() {
+	flag.Parse()
+}
+
+func TestLogger4(t *testing.T) {
+	_init()
+	if err := SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_DEFAULT); err != nil {
+		t.Fatal(err)
+	}
+
+	l := SLogger("test")
+	l.Debug("this is debug msg")
+	l.Info("this is info msg")
+	l.Error("this is error msg")
+}
+
+func TestLogger3(t *testing.T) {
+	_init()
+	if err := SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR|OPT_RESERVED_LOGGER); err != nil {
+		t.Fatal(err)
+	}
+
+	l := SLogger("test")
+	l.Debug("this is debug msg")
+	l.Info("this is info msg")
+	l.Error("this is error msg")
+}
+
+func TestLogger2(t *testing.T) {
+	_init()
+	if err := SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR); err != nil {
 		t.Fatal(err)
 	}
 
@@ -22,7 +56,8 @@ func TestLogger1(t *testing.T) {
 }
 
 func TestRorate(t *testing.T) {
-	l, _ := _NewRotateRootLogger("/tmp/x.log", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
+	_init()
+	l, _ := _NewRotateRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
 
 	l1 := getSugarLogger(l, "test1")
 	l2 := getSugarLogger(l, "test2")
@@ -31,9 +66,10 @@ func TestRorate(t *testing.T) {
 	l2.Info("this is msg")
 }
 
-func TestXX(t *testing.T) {
+func TestLogger1(t *testing.T) {
+	_init()
 	base := 4
-	if err := SetGlobalRootLogger("/tmp/xlog", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR); err != nil {
+	if err := SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR); err != nil {
 		t.Fatal(err)
 	}
 
@@ -83,7 +119,8 @@ func TestXX(t *testing.T) {
 }
 
 func TestColor(t *testing.T) {
-	if err := SetGlobalRootLogger("", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR); err != nil {
+	_init()
+	if err := SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR); err != nil {
 		t.Fatal(err)
 	}
 
@@ -97,7 +134,8 @@ func TestColor(t *testing.T) {
 }
 
 func TestStdoutGlobalLogger(t *testing.T) {
-	if err := SetGlobalRootLogger("", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER); err != nil {
+	_init()
+	if err := SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER); err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,7 +145,8 @@ func TestStdoutGlobalLogger(t *testing.T) {
 }
 
 func TestWinGlobalLogger(t *testing.T) {
-	if err := SetGlobalRootLogger("C:\\Program Files\\DataFlux\\datakit\\datakit.log", DEBUG, OPT_STDOUT|OPT_ENC_CONSOLE|OPT_SHORT_CALLER); err != nil {
+	_init()
+	if err := SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_STDOUT|OPT_ENC_CONSOLE|OPT_SHORT_CALLER); err != nil {
 		t.Fatal(err)
 	}
 
@@ -118,12 +157,14 @@ func TestWinGlobalLogger(t *testing.T) {
 }
 
 func TestGlobalLoggerNotSet(t *testing.T) {
+	_init()
 	sl := SLogger("sugar-module")
 	sl.Debugf("sugar debug msg")
 }
 
 func TestGlobalLogger(t *testing.T) {
-	SetGlobalRootLogger("/tmp/log.globle", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
+	_init()
+	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
 
 	sl := SLogger("sugar-module")
 	sl.Debugf("sugar debug msg")
@@ -147,7 +188,8 @@ func TestGlobalLogger(t *testing.T) {
 }
 
 func TestLogger(t *testing.T) {
-	rl, err := newRootLogger("/tmp/x", INFO, OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
+	_init()
+	rl, err := newRootLogger(*flagLogFile, INFO, OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
 	if err != nil {
 		panic(err)
 	}
