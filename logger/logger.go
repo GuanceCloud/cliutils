@@ -35,20 +35,24 @@ var (
 	MaxAge     = 28 // day
 )
 
+type Logger struct {
+	*zap.SugaredLogger
+}
+
 func SetGlobalRootLogger(fpath, level string, options int) error {
 	if defaultRootLogger != nil {
 		panic(fmt.Sprintf("global root logger has been initialized: %+#v", defaultRootLogger))
 	}
 
 	var err error
-	defaultRootLogger, err = NewRootLogger(fpath, level, options)
+	defaultRootLogger, err = newRootLogger(fpath, level, options)
 	if err != nil {
 		panic(err)
 	}
 
 	slogs = &sync.Map{}
 
-	__l = GetSugarLogger(defaultRootLogger, reservedSLoggerName)
+	__l = getSugarLogger(defaultRootLogger, reservedSLoggerName)
 	slogs.Store(reservedSLoggerName, __l)
 
 	__l.Info("root logger init ok")
@@ -60,20 +64,16 @@ const (
 	rootNotInitialized = "you should call SetGlobalRootLogger to initialize the global root logger"
 )
 
-func Logger(name string) *zap.Logger {
-	if defaultRootLogger == nil {
-		panic(rootNotInitialized)
-	}
-
-	return GetLogger(defaultRootLogger, name)
+func SLogger(name string) *Logger {
+	return &Logger{SugaredLogger: slogger(name)}
 }
 
-func SLogger(name string) *zap.SugaredLogger {
+func slogger(name string) *zap.SugaredLogger {
 	if defaultRootLogger == nil {
 		panic(rootNotInitialized)
 	}
 
-	newlog := GetSugarLogger(defaultRootLogger, name)
+	newlog := getSugarLogger(defaultRootLogger, name)
 
 	l, ok := slogs.LoadOrStore(name, newlog)
 	if ok {
@@ -85,11 +85,19 @@ func SLogger(name string) *zap.SugaredLogger {
 	return l.(*zap.SugaredLogger)
 }
 
-func GetLogger(root *zap.Logger, name string) *zap.Logger {
+func _XLogger(name string) *zap.Logger {
+	if defaultRootLogger == nil {
+		panic(rootNotInitialized)
+	}
+
+	return getLogger(defaultRootLogger, name)
+}
+
+func getLogger(root *zap.Logger, name string) *zap.Logger {
 	return root.Named(name)
 }
 
-func GetSugarLogger(root *zap.Logger, name string) *zap.SugaredLogger {
+func getSugarLogger(root *zap.Logger, name string) *zap.SugaredLogger {
 	return root.Sugar().Named(name)
 }
 
@@ -126,7 +134,7 @@ func _NewRotateRootLogger(fpath, level string, options int) (*zap.Logger, error)
 	return l, nil
 }
 
-func NewRootLogger(fpath, level string, options int) (*zap.Logger, error) {
+func newRootLogger(fpath, level string, options int) (*zap.Logger, error) {
 
 	cfg := &zap.Config{
 		Encoding: `json`,

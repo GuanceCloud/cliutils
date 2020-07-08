@@ -9,11 +9,23 @@ import (
 	"go.uber.org/zap"
 )
 
+func TestLogger1(t *testing.T) {
+	if err := SetGlobalRootLogger("", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR); err != nil {
+		t.Fatal(err)
+	}
+
+	l := SLogger("test")
+	l.Debug("this is debug msg")
+	l.Info("this is info msg")
+	l.Error("this is error msg")
+	l.Panic("this is panic msg")
+}
+
 func TestRorate(t *testing.T) {
 	l, _ := _NewRotateRootLogger("/tmp/x.log", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
 
-	l1 := GetSugarLogger(l, "test1")
-	l2 := GetSugarLogger(l, "test2")
+	l1 := getSugarLogger(l, "test1")
+	l2 := getSugarLogger(l, "test2")
 
 	l1.Info("this is msg")
 	l2.Info("this is msg")
@@ -117,7 +129,7 @@ func TestGlobalLogger(t *testing.T) {
 	sl.Debugf("sugar debug msg")
 
 	//l := Logger("x-module")
-	l := GetLogger(defaultRootLogger, "x-module")
+	l := getLogger(defaultRootLogger, "x-module")
 	fmt.Printf("%+#v", l)
 	//l.Debug("normal msg: ", zap.String("url", "http://1.2.3.4"), zap.Int("attempts", 3), zap.Duration("costs", time.Millisecond))
 	//l.Debug("normal msg: ", zap.String("url", "http://1.2.3.4"))
@@ -135,15 +147,15 @@ func TestGlobalLogger(t *testing.T) {
 }
 
 func TestLogger(t *testing.T) {
-	rl, err := NewRootLogger("/tmp/x", INFO, OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
+	rl, err := newRootLogger("/tmp/x", INFO, OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
 	if err != nil {
 		panic(err)
 	}
 
-	sl := GetSugarLogger(rl, "testing")
+	sl := getSugarLogger(rl, "testing")
 	sl.Debug("test message")
 	sl.Info("this is info msg: ", "info msg")
 
-	l := GetLogger(rl, "debug")
+	l := getLogger(rl, "debug")
 	l.Debug("this is debug: ", zap.Int("int", 42))
 }
