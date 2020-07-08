@@ -39,12 +39,12 @@ type Logger struct {
 	*zap.SugaredLogger
 }
 
-func SetGlobalRootLogger(fpath, level string, options int) error {
+func SetGlobalRootLogger(fpath, level string, options int) {
 	if defaultRootLogger != nil {
 		if __l != nil {
 			__l.Warnf("global root logger has been initialized %+#v", defaultRootLogger)
 		}
-		return nil
+		return
 	}
 
 	var err error
@@ -61,8 +61,6 @@ func SetGlobalRootLogger(fpath, level string, options int) error {
 
 		__l.Info("root logger init ok")
 	}
-
-	return nil
 }
 
 const (

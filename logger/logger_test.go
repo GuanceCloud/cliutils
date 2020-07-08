@@ -20,9 +20,7 @@ func _init() {
 
 func TestLogger4(t *testing.T) {
 	_init()
-	if err := SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_DEFAULT); err != nil {
-		t.Fatal(err)
-	}
+	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_DEFAULT)
 
 	l := SLogger("test")
 	l.Debug("this is debug msg")
@@ -32,9 +30,7 @@ func TestLogger4(t *testing.T) {
 
 func TestLogger3(t *testing.T) {
 	_init()
-	if err := SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR|OPT_RESERVED_LOGGER); err != nil {
-		t.Fatal(err)
-	}
+	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR|OPT_RESERVED_LOGGER)
 
 	l := SLogger("test")
 	l.Debug("this is debug msg")
@@ -44,9 +40,7 @@ func TestLogger3(t *testing.T) {
 
 func TestLogger2(t *testing.T) {
 	_init()
-	if err := SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR); err != nil {
-		t.Fatal(err)
-	}
+	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
 
 	l := SLogger("test")
 	l.Debug("this is debug msg")
@@ -69,9 +63,7 @@ func TestRorate(t *testing.T) {
 func TestLogger1(t *testing.T) {
 	_init()
 	base := 4
-	if err := SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR); err != nil {
-		t.Fatal(err)
-	}
+	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
 
 	l1 := SLogger("test")
 	l2 := SLogger("test")
@@ -120,9 +112,7 @@ func TestLogger1(t *testing.T) {
 
 func TestColor(t *testing.T) {
 	_init()
-	if err := SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR); err != nil {
-		t.Fatal(err)
-	}
+	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
 
 	l := SLogger("test")
 	l.Debug("this is debug message")
@@ -135,9 +125,7 @@ func TestColor(t *testing.T) {
 
 func TestStdoutGlobalLogger(t *testing.T) {
 	_init()
-	if err := SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER); err != nil {
-		t.Fatal(err)
-	}
+	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
 
 	l := SLogger("test")
 	l.Debug("this is debug message")
@@ -146,9 +134,7 @@ func TestStdoutGlobalLogger(t *testing.T) {
 
 func TestWinGlobalLogger(t *testing.T) {
 	_init()
-	if err := SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_STDOUT|OPT_ENC_CONSOLE|OPT_SHORT_CALLER); err != nil {
-		t.Fatal(err)
-	}
+	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_STDOUT|OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
 
 	l := SLogger("test")
 
