@@ -18,6 +18,18 @@ func _init() {
 	flag.Parse()
 }
 
+func TestLogger5(t *testing.T) {
+	_init()
+
+	SetStdoutRootLogger(DEBUG, OPT_DEFAULT)
+	l1 := SLogger("test")
+	l1.Info("haha")
+
+	SetGlobalRootLogger("/tmp/x.log", DEBUG, OPT_DEFAULT)
+	l2 := SLogger("test")
+	l2.Info("haha")
+}
+
 func TestLogger4(t *testing.T) {
 	_init()
 	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_DEFAULT)
