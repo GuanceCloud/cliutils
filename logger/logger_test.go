@@ -18,6 +18,29 @@ func _init() {
 	flag.Parse()
 }
 
+func TestLogger6(t *testing.T) {
+
+	f := func(i int) {
+		l := SLogger(fmt.Sprintf("logger-%d", i))
+		l.Debugf("[%d] debug msg", i)
+		l.Infof("[%d] info msg", i)
+		l.Warnf("[%d] warn msg", i)
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(100)
+	for i := 0; i < 100; i++ {
+		go func(i int) {
+			defer wg.Done()
+			f(i)
+		}(i)
+	}
+
+	wg.Wait()
+
+	fmt.Printf("stdout pirint...")
+}
+
 func TestLogger5(t *testing.T) {
 	_init()
 
