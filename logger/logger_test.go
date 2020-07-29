@@ -21,7 +21,7 @@ func _init() {
 func TestLogger6(t *testing.T) {
 
 	f := func(i int) {
-		l := SLogger(fmt.Sprintf("logger-%d", i))
+		l := DefaultSLogger(fmt.Sprintf("logger-%d", i))
 		l.Debugf("[%d] debug msg", i)
 		l.Infof("[%d] info msg", i)
 		l.Warnf("[%d] warn msg", i)

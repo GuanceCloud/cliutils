@@ -60,6 +60,8 @@ func SetStdoutRootLogger(level string, options int) {
 }
 
 func SetGlobalRootLogger(fpath, level string, options int) {
+	mtx.Lock()
+	defer mtx.Unlock()
 
 	if defaultRootLogger != nil {
 		if __l != nil {
@@ -90,6 +92,14 @@ const (
 )
 
 func SLogger(name string) *Logger {
+	if defaultRootLogger == nil && stdoutRootLogger == nil {
+		panic(rootNotInitialized)
+	}
+
+	return &Logger{SugaredLogger: slogger(name)}
+}
+
+func DefaultSLogger(name string) *Logger {
 	return &Logger{SugaredLogger: slogger(name)}
 }
 
