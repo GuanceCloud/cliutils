@@ -1,8 +1,10 @@
 package logger
 
 import (
+	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -146,6 +148,12 @@ func newWinFileSink(u *url.URL) (zap.Sink, error) {
 }
 
 func _NewRotateRootLogger(fpath, level string, options int) (*zap.Logger, error) {
+
+	if fpath == "" {
+		fmt.Printf("default log file set to %s/logger.log\n", os.TempDir())
+		fpath = filepath.Join(os.TempDir(), `logger.log`)
+	}
+
 	w := zapcore.AddSync(&lumberjack.Logger{
 		Filename:   fpath,
 		MaxSize:    MaxSize,
@@ -167,9 +175,31 @@ func _NewRotateRootLogger(fpath, level string, options int) (*zap.Logger, error)
 		EncodeCaller: zapcore.FullCallerEncoder,
 	}
 
-	encoder := zapcore.NewConsoleEncoder(encodeCfg)
+	if options&OPT_COLOR != 0 {
+		encodeCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	}
 
-	core := zapcore.NewCore(encoder, w, zap.InfoLevel)
+	if options&OPT_SHORT_CALLER != 0 {
+		encodeCfg.EncodeCaller = zapcore.ShortCallerEncoder
+	}
+
+	var enc zapcore.Encoder
+	if options&OPT_ENC_CONSOLE != 0 {
+		enc = zapcore.NewConsoleEncoder(encodeCfg)
+	} else {
+		enc = zapcore.NewJSONEncoder(encodeCfg)
+	}
+
+	lvl := zap.InfoLevel
+	switch strings.ToLower(level) {
+	case INFO: // pass
+	case DEBUG:
+		lvl = zap.DebugLevel
+	default:
+		lvl = zap.DebugLevel
+	}
+
+	core := zapcore.NewCore(enc, w, lvl)
 	l := zap.New(core)
 	return l, nil
 }

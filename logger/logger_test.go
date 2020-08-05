@@ -75,7 +75,8 @@ func TestLogger3(t *testing.T) {
 
 func TestLogger2(t *testing.T) {
 	_init()
-	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
+	//SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
+	SetGlobalRootLogger("/tmp/x.log", DEBUG, OPT_DEFAULT)
 
 	l := SLogger("test")
 	l.Debug("this is debug msg")
@@ -86,13 +87,32 @@ func TestLogger2(t *testing.T) {
 
 func TestRorate(t *testing.T) {
 	_init()
-	l, _ := _NewRotateRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
+	MaxSize = 1
+	MaxBackups = 5
+	//f := `/tmp/x`
+	f := ``
+	//l, err := _NewRotateRootLogger("/dev/stdout", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
+	//l, err := _NewRotateRootLogger("/dev/stdout", DEBUG, OPT_ENC_CONSOLE|OPT_COLOR)
+	l, err := _NewRotateRootLogger(f, DEBUG, OPT_SHORT_CALLER|OPT_ENC_CONSOLE)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	l1 := getSugarLogger(l, "test1")
 	l2 := getSugarLogger(l, "test2")
+	l3 := getSugarLogger(l, "test3")
+	l4 := getSugarLogger(l, "test4")
 
-	l1.Info("this is msg")
-	l2.Info("this is msg")
+	for {
+		l1.Debug("this is debug msg")
+		l1.Info("this is info msg")
+		l2.Info("this is info msg")
+		l2.Debug("this is info msg")
+		l3.Info("this is info msg")
+		l3.Debug("this is info msg")
+		l4.Info("this is info msg")
+		l4.Debug("this is info msg")
+	}
 }
 
 func TestLogger1(t *testing.T) {
