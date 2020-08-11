@@ -85,15 +85,36 @@ func TestLogger2(t *testing.T) {
 	//l.Panic("this is panic msg")
 }
 
+func TestRorate2(t *testing.T) {
+	_init()
+	MaxSize = 1
+	MaxBackups = 5
+	f := `/dev/stdout`
+	l, err := newRotateRootLogger(f, DEBUG, OPT_SHORT_CALLER|OPT_ENC_CONSOLE|OPT_COLOR)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	l1 := getSugarLogger(l, "test1")
+
+	fn := func() {
+		l1.Debug("this is debug msg")
+		l1.Error("this is error msg")
+		l1.Warn("this is warn msg")
+	}
+
+	fn()
+}
+
 func TestRorate(t *testing.T) {
 	_init()
 	MaxSize = 1
 	MaxBackups = 5
 	//f := `/tmp/x`
 	f := ``
-	//l, err := _NewRotateRootLogger("/dev/stdout", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
-	//l, err := _NewRotateRootLogger("/dev/stdout", DEBUG, OPT_ENC_CONSOLE|OPT_COLOR)
-	l, err := _NewRotateRootLogger(f, DEBUG, OPT_SHORT_CALLER|OPT_ENC_CONSOLE)
+	//l, err := newRotateRootLogger("/dev/stdout", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
+	//l, err := newRotateRootLogger("/dev/stdout", DEBUG, OPT_ENC_CONSOLE|OPT_COLOR)
+	l, err := newRotateRootLogger(f, DEBUG, OPT_SHORT_CALLER|OPT_ENC_CONSOLE)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,16 +124,29 @@ func TestRorate(t *testing.T) {
 	l3 := getSugarLogger(l, "test3")
 	l4 := getSugarLogger(l, "test4")
 
-	for {
-		l1.Debug("this is debug msg")
-		l1.Info("this is info msg")
-		l2.Info("this is info msg")
-		l2.Debug("this is info msg")
-		l3.Info("this is info msg")
-		l3.Debug("this is info msg")
-		l4.Info("this is info msg")
-		l4.Debug("this is info msg")
-	}
+	exit := make(chan interface{})
+
+	go func() {
+		for {
+			l1.Debug("this is debug msg")
+			l1.Info("this is info msg")
+			l2.Info("this is info msg")
+			l2.Debug("this is info msg")
+			l3.Info("this is info msg")
+			l3.Debug("this is info msg")
+			l4.Info("this is info msg")
+			l4.Debug("this is info msg")
+
+			select {
+			case <-exit:
+				return
+			default:
+			}
+		}
+	}()
+
+	time.Sleep(time.Second * 30)
+	close(exit)
 }
 
 func TestLogger1(t *testing.T) {

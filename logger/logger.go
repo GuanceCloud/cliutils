@@ -20,7 +20,8 @@ const (
 	OPT_STDOUT          = 4
 	OPT_COLOR           = 8
 	OPT_RESERVED_LOGGER = 16
-	OPT_DEFAULT         = OPT_ENC_CONSOLE | OPT_SHORT_CALLER
+	OPT_ROTATE          = 32
+	OPT_DEFAULT         = OPT_ENC_CONSOLE | OPT_SHORT_CALLER | OPT_ROTATE
 
 	DEBUG = "debug"
 	INFO  = "info"
@@ -147,7 +148,7 @@ func newWinFileSink(u *url.URL) (zap.Sink, error) {
 	return os.OpenFile(u.Path[1:], os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 }
 
-func _NewRotateRootLogger(fpath, level string, options int) (*zap.Logger, error) {
+func newRotateRootLogger(fpath, level string, options int) (*zap.Logger, error) {
 
 	if fpath == "" {
 		fmt.Printf("default log file set to %s/logger.log\n", os.TempDir())
@@ -200,11 +201,15 @@ func _NewRotateRootLogger(fpath, level string, options int) (*zap.Logger, error)
 	}
 
 	core := zapcore.NewCore(enc, w, lvl)
-	l := zap.New(core)
+	l := zap.New(core, zap.AddCaller())
 	return l, nil
 }
 
 func newRootLogger(fpath, level string, options int) (*zap.Logger, error) {
+
+	if options&OPT_ROTATE != 0 {
+		return newRotateRootLogger(fpath, level, options)
+	}
 
 	cfg := &zap.Config{
 		Encoding: `json`,
