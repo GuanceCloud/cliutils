@@ -18,6 +18,13 @@ func _init() {
 	flag.Parse()
 }
 
+func TestLogger7(t *testing.T) {
+	l := DefaultSLogger("test-7")
+	l.Info("info")
+	l.Warn("warn")
+	l.Error("err")
+}
+
 func TestLogger6(t *testing.T) {
 
 	f := func(i int) {
@@ -95,7 +102,7 @@ func TestRorate2(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	l1 := getSugarLogger(l, "test1")
+	l1 := getSugarLogger(l, "TestRorate2")
 
 	fn := func() {
 		l1.Debug("this is debug msg")
@@ -119,10 +126,10 @@ func TestRorate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	l1 := getSugarLogger(l, "test1")
-	l2 := getSugarLogger(l, "test2")
-	l3 := getSugarLogger(l, "test3")
-	l4 := getSugarLogger(l, "test4")
+	l1 := getSugarLogger(l, "TestRorate.1")
+	l2 := getSugarLogger(l, "TestRorate.2")
+	l3 := getSugarLogger(l, "TestRorate.3")
+	l4 := getSugarLogger(l, "TestRorate.4")
 
 	exit := make(chan interface{})
 

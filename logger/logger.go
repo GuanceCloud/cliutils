@@ -114,7 +114,7 @@ func slogger(name string) *zap.SugaredLogger {
 	}
 
 	if root == nil {
-		SetStdoutRootLogger(DEBUG, OPT_DEFAULT)
+		SetStdoutRootLogger(DEBUG, OPT_DEFAULT|OPT_STDOUT)
 		root = stdoutRootLogger
 	}
 
@@ -207,7 +207,7 @@ func newRotateRootLogger(fpath, level string, options int) (*zap.Logger, error) 
 
 func newRootLogger(fpath, level string, options int) (*zap.Logger, error) {
 
-	if options&OPT_ROTATE != 0 {
+	if options&OPT_ROTATE != 0 && options&OPT_STDOUT == 0 {
 		return newRotateRootLogger(fpath, level, options)
 	}
 
