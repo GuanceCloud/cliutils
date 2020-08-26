@@ -22,25 +22,30 @@ func PortInUse(ipport string, timeout time.Duration) bool {
 	return true
 }
 
-func ParseListen(listen string) (string, int, error) {
+func ParseListen(listen string) (ip string, port int64, err error) {
 	parts := strings.Split(listen, `:`)
 
-	if len(parts) == 1 { // 只有 port 部分
-		port, err := strconv.ParseUint(parts[0], 10, 16)
+	if len(parts) == 1 { //nolint:gomnd // 只有 port 部分
+		port, err = strconv.ParseInt(parts[0], 10, 16)
 		if err != nil {
-			return "", -1, fmt.Errorf("invalid listen addr: %s", listen)
+			err = fmt.Errorf("invalid listen addr: %s", listen)
 		}
-		return "", int(port), nil
+
+		return
 	}
 
-	if len(parts) != 2 {
-		return "", -1, fmt.Errorf("invalid listen addr: %s", listen)
+	if len(parts) != 2 { //nolint:gomnd
+		err = fmt.Errorf("invalid listen addr: %s", listen)
+		return
 	}
 
-	port, err := strconv.ParseUint(parts[1], 10, 16)
+	port, err = strconv.ParseInt(parts[1], 10, 16)
 	if err != nil {
-		return "", -1, fmt.Errorf("invalid listen addr: %s", listen)
+		err = fmt.Errorf("invalid listen addr: %s", listen)
+		return
 	}
 
-	return parts[0], int(port), nil
+	ip = parts[0]
+
+	return
 }

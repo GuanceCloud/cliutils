@@ -1,7 +1,7 @@
 package http
 
 import (
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec
 	"fmt"
 	"log"
 	"net/http"
@@ -24,7 +24,7 @@ func TestSign(t *testing.T) {
 	}
 
 	r.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
-	r.Header.Set(`Content-MD5`, fmt.Sprintf("%x", md5.Sum([]byte(`{}`))))
+	r.Header.Set(`Content-MD5`, fmt.Sprintf("%x", md5.Sum([]byte(`{}`)))) //nolint:gosec
 	r.Header.Set(`Content-Type`, `application/json`)
 
 	o.Sign = o.SignReq(r)

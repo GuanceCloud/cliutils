@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"testing"
-	//"time"
 )
 
 func TestRecover(t *testing.T) {
@@ -26,6 +25,4 @@ func TestRecover(t *testing.T) {
 	}
 
 	f(nil, nil)
-
-	//time.Sleep(time.Second)
 }

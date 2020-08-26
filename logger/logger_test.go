@@ -82,14 +82,12 @@ func TestLogger3(t *testing.T) {
 
 func TestLogger2(t *testing.T) {
 	_init()
-	//SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
 	SetGlobalRootLogger("/tmp/x.log", DEBUG, OPT_DEFAULT)
 
 	l := SLogger("test")
 	l.Debug("this is debug msg")
 	l.Info("this is info msg")
 	l.Error("this is error msg")
-	//l.Panic("this is panic msg")
 }
 
 func TestRorate2(t *testing.T) {
@@ -117,10 +115,8 @@ func TestRorate(t *testing.T) {
 	_init()
 	MaxSize = 1
 	MaxBackups = 5
-	//f := `/tmp/x`
+
 	f := ``
-	//l, err := newRotateRootLogger("/dev/stdout", DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
-	//l, err := newRotateRootLogger("/dev/stdout", DEBUG, OPT_ENC_CONSOLE|OPT_COLOR)
 	l, err := newRotateRootLogger(f, DEBUG, OPT_SHORT_CALLER|OPT_ENC_CONSOLE)
 	if err != nil {
 		t.Fatal(err)
@@ -193,7 +189,7 @@ func TestLogger1(t *testing.T) {
 				i++
 
 				if i%(base*8) == 0 {
-					fmt.Printf("[%d]L2: %d\n", j, i)
+					fmt.Printf("[%d]L2: %d\n", j, i) //nolint:govet
 				}
 
 				if i > base*32 {
@@ -215,8 +211,6 @@ func TestColor(t *testing.T) {
 	l.Info("this is info message")
 	l.Warn("this is warn message")
 	l.Error("this is error message")
-	//l.Fatal("this is fatal message")
-	//l.Panic("this is panic message")
 }
 
 func TestStdoutGlobalLogger(t *testing.T) {
@@ -251,11 +245,8 @@ func TestGlobalLogger(t *testing.T) {
 	sl := SLogger("sugar-module")
 	sl.Debugf("sugar debug msg")
 
-	//l := Logger("x-module")
 	l := getLogger(defaultRootLogger, "x-module")
 	fmt.Printf("%+#v", l)
-	//l.Debug("normal msg: ", zap.String("url", "http://1.2.3.4"), zap.Int("attempts", 3), zap.Duration("costs", time.Millisecond))
-	//l.Debug("normal msg: ", zap.String("url", "http://1.2.3.4"))
 
 	f := zap.Duration("backoff", time.Second)
 	fmt.Println(f)
@@ -265,8 +256,6 @@ func TestGlobalLogger(t *testing.T) {
 		zap.String("url", "baidu.com"),
 		zap.Int("attempt", 3),
 		zap.Int("attempt", 4))
-	//		zap.Duration("backoff", time.Millisecond),
-	//	)
 }
 
 func TestLogger(t *testing.T) {
