@@ -131,7 +131,6 @@ func (p *parse) summary() []*ifxcli.Point {
 	var pts []*ifxcli.Point
 
 	for _, m := range p.metrics {
-		fmt.Println(m)
 		summary := m.GetSummary()
 		if summary == nil {
 			continue
