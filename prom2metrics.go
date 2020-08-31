@@ -137,7 +137,7 @@ func (p *parse) summary() []*ifxcli.Point {
 		}
 
 		for _, quantile := range summary.GetQuantile() {
-			tags := map[string]string{"quantile": fmt.Sprintf("%.3f", quantile.GetQuantile())}
+			tags := map[string]string{"quantile": fmt.Sprintf("%.5f", quantile.GetQuantile())}
 			fields := map[string]interface{}{p.metricName: quantile.GetValue()}
 
 			pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
@@ -203,7 +203,7 @@ func (p *parse) histogram() []*ifxcli.Point {
 		pts = append(pts, pt)
 
 		for _, bucket := range histogram.GetBucket() {
-			tags["le"] = fmt.Sprintf("%.3f", bucket.GetUpperBound())
+			tags["le"] = fmt.Sprintf("%.5f", bucket.GetUpperBound())
 			fields := map[string]interface{}{p.metricName + "_bucket": int64(bucket.GetCumulativeCount())}
 
 			pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
