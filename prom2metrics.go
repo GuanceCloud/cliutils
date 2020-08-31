@@ -22,7 +22,7 @@ import (
 ///
 ///     3. 允许手动添加字符串前缀，如果前缀为空字符串，则不添加。例如 measurementPrefix 为 `cloudcare`，measurement 为 `cloudcare_go_gc`
 ///
-///     4. 允许设置默认 measurement，当 point 没有 tags 时，使用默认 measurement，此规则并不适用所有，无效于 summary 和 histogram（bucket）类型的数据
+///     4. 允许设置默认 measurement，当 point 没有 tags 时，使用默认 measurement。默认 measurement 不允许为空字符串。
 ///
 ///     5. 允许设置默认时间，当无法解析 prometheus 数据的 timestamp 时，使用默认时间
 ///
@@ -34,10 +34,15 @@ type parse struct {
 	metricName         string
 	measurement        string
 	defaultMeasurement string
+	metrics            []*dto.Metric
 	t                  time.Time
 }
 
 func PromTextToMetrics(data io.Reader, measurementPrefix, defaultMeasurement string, t time.Time) ([]*ifxcli.Point, error) {
+	if defaultMeasurement == "" {
+		return nil, fmt.Errorf("invalid defaultMeasurement, it is empty")
+	}
+
 	var parser expfmt.TextParser
 	metrics, err := parser.TextToMetricFamilies(data)
 	if err != nil {
@@ -55,53 +60,44 @@ func PromTextToMetrics(data io.Reader, measurementPrefix, defaultMeasurement str
 			metricName:         name,
 			measurement:        measurement,
 			defaultMeasurement: defaultMeasurement,
+			metrics:            metric.GetMetric(),
 			t:                  t,
 		}
 
 		switch metric.GetType() {
 		case dto.MetricType_COUNTER:
-			pts = append(pts, parseCounter(&p, metric.GetMetric())...)
+			pts = append(pts, p.counter()...)
 
 		case dto.MetricType_GAUGE:
-			pts = append(pts, parseGauge(&p, metric.GetMetric())...)
+			pts = append(pts, p.gauge()...)
 
 		case dto.MetricType_SUMMARY:
-			pts = append(pts, parseSummary(&p, metric.GetMetric())...)
+			pts = append(pts, p.summary()...)
 
 		case dto.MetricType_UNTYPED:
-			pts = append(pts, parseUntyped(&p, metric.GetMetric())...)
+			pts = append(pts, p.untyped()...)
 
 		case dto.MetricType_HISTOGRAM:
-			pts = append(pts, parseHistogram(&p, metric.GetMetric())...)
+			pts = append(pts, p.histogram()...)
 
 		}
 	}
 	return pts, nil
 }
 
-func parseCounter(p *parse, metrics []*dto.Metric) []*ifxcli.Point {
+func (p *parse) counter() []*ifxcli.Point {
 	var pts []*ifxcli.Point
-	var measurement string
 
-	for _, m := range metrics {
+	for _, m := range p.metrics {
 		counter := m.GetCounter()
 		if counter == nil {
 			continue
 		}
-		if m.GetTimestampMs() > 0 {
-			p.t = time.Unix(0, m.GetTimestampMs()*int64(time.Millisecond))
-		}
-
-		fields := map[string]interface{}{p.metricName: counter.GetValue()}
 
 		tags := labelToTags(m.GetLabel())
-		if tags == nil {
-			measurement = p.defaultMeasurement
-		} else {
-			measurement = p.measurement
-		}
+		fields := map[string]interface{}{p.metricName: counter.GetValue()}
 
-		pt, err := ifxcli.NewPoint(measurement, tags, fields, p.t)
+		pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
 		if err != nil {
 			continue
 		}
@@ -110,29 +106,19 @@ func parseCounter(p *parse, metrics []*dto.Metric) []*ifxcli.Point {
 	return pts
 }
 
-func parseGauge(p *parse, metrics []*dto.Metric) []*ifxcli.Point {
+func (p *parse) gauge() []*ifxcli.Point {
 	var pts []*ifxcli.Point
-	var measurement string
 
-	for _, m := range metrics {
+	for _, m := range p.metrics {
 		gauge := m.GetGauge()
 		if gauge == nil {
 			continue
 		}
-		if m.GetTimestampMs() > 0 {
-			p.t = time.Unix(0, m.GetTimestampMs()*int64(time.Millisecond))
-		}
-
-		fields := map[string]interface{}{p.metricName: gauge.GetValue()}
 
 		tags := labelToTags(m.GetLabel())
-		if tags == nil {
-			measurement = p.defaultMeasurement
-		} else {
-			measurement = p.measurement
-		}
+		fields := map[string]interface{}{p.metricName: gauge.GetValue()}
 
-		pt, err := ifxcli.NewPoint(measurement, tags, fields, p.t)
+		pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
 		if err != nil {
 			continue
 		}
@@ -141,34 +127,34 @@ func parseGauge(p *parse, metrics []*dto.Metric) []*ifxcli.Point {
 	return pts
 }
 
-func parseSummary(p *parse, metrics []*dto.Metric) []*ifxcli.Point {
+func (p *parse) summary() []*ifxcli.Point {
 	var pts []*ifxcli.Point
 
-	for _, m := range metrics {
+	for _, m := range p.metrics {
+		fmt.Println(m)
 		summary := m.GetSummary()
 		if summary == nil {
 			continue
-		}
-		if m.GetTimestampMs() > 0 {
-			p.t = time.Unix(0, m.GetTimestampMs()*int64(time.Millisecond))
 		}
 
 		for _, quantile := range summary.GetQuantile() {
 			tags := map[string]string{"quantile": fmt.Sprintf("%.3f", quantile.GetQuantile())}
 			fields := map[string]interface{}{p.metricName: quantile.GetValue()}
 
-			pt, err := ifxcli.NewPoint(p.measurement, tags, fields, p.t)
+			pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
 			if err != nil {
 				continue
 			}
 			pts = append(pts, pt)
 		}
 
+		tags := labelToTags(m.GetLabel())
 		fields := map[string]interface{}{
 			p.metricName + "_count": int64(summary.GetSampleCount()),
 			p.metricName + "_sum":   summary.GetSampleSum(),
 		}
-		pt, err := ifxcli.NewPoint(p.measurement, nil, fields, p.t)
+
+		pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
 		if err != nil {
 			continue
 		}
@@ -177,20 +163,17 @@ func parseSummary(p *parse, metrics []*dto.Metric) []*ifxcli.Point {
 	return pts
 }
 
-func parseUntyped(p *parse, metrics []*dto.Metric) []*ifxcli.Point {
+func (p *parse) untyped() []*ifxcli.Point {
 	var pts []*ifxcli.Point
 
-	for _, m := range metrics {
+	for _, m := range p.metrics {
 		untyped := m.GetUntyped()
 		if untyped == nil {
 			continue
 		}
-		if m.GetTimestampMs() > 0 {
-			p.t = time.Unix(0, m.GetTimestampMs()*int64(time.Millisecond))
-		}
 		fields := map[string]interface{}{p.metricName: untyped.GetValue()}
 
-		pt, err := ifxcli.NewPoint(p.defaultMeasurement, nil, fields, p.t)
+		pt, err := p.newPoint(nil, fields, m.GetTimestampMs())
 		if err != nil {
 			continue
 		}
@@ -199,24 +182,22 @@ func parseUntyped(p *parse, metrics []*dto.Metric) []*ifxcli.Point {
 	return pts
 }
 
-func parseHistogram(p *parse, metrics []*dto.Metric) []*ifxcli.Point {
+func (p *parse) histogram() []*ifxcli.Point {
 	var pts []*ifxcli.Point
 
-	for _, m := range metrics {
+	for _, m := range p.metrics {
 		histogram := m.GetHistogram()
 		if histogram == nil {
 			continue
 		}
-		if m.GetTimestampMs() > 0 {
-			p.t = time.Unix(0, m.GetTimestampMs()*int64(time.Millisecond))
-		}
-		tags := labelToTags(m.GetLabel())
 
+		tags := labelToTags(m.GetLabel())
 		fields := map[string]interface{}{
 			p.metricName + "_count": int64(histogram.GetSampleCount()),
 			p.metricName + "_sum":   histogram.GetSampleSum(),
 		}
-		pt, err := ifxcli.NewPoint(p.measurement, tags, fields, p.t)
+
+		pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
 		if err != nil {
 			continue
 		}
@@ -226,7 +207,7 @@ func parseHistogram(p *parse, metrics []*dto.Metric) []*ifxcli.Point {
 			tags["le"] = fmt.Sprintf("%.3f", bucket.GetUpperBound())
 			fields := map[string]interface{}{p.metricName + "_bucket": int64(bucket.GetCumulativeCount())}
 
-			pt, err := ifxcli.NewPoint(p.measurement, tags, fields, p.t)
+			pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
 			if err != nil {
 				continue
 			}
@@ -234,6 +215,19 @@ func parseHistogram(p *parse, metrics []*dto.Metric) []*ifxcli.Point {
 		}
 	}
 	return pts
+}
+
+func (p *parse) newPoint(tags map[string]string, fields map[string]interface{}, ts int64) (*ifxcli.Point, error) {
+	if ts > 0 {
+		p.t = time.Unix(0, ts*int64(time.Millisecond))
+	}
+	var measurement string
+	if tags == nil {
+		measurement = p.defaultMeasurement
+	} else {
+		measurement = p.measurement
+	}
+	return ifxcli.NewPoint(measurement, tags, fields, p.t)
 }
 
 func getMeasurement(name, measurementPrefix string) string {

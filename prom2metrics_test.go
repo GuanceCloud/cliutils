@@ -73,11 +73,24 @@ confluence_request_duration_on_path_sum{path="/plugins",} 0.971921824
 confluence_total_cluster_nodes_gauge 0.0
 `
 
+const data3 = `
+# HELP jvm_gc_collection_seconds Time spent in a given JVM garbage collector in seconds.
+# TYPE jvm_gc_collection_seconds summary
+jvm_gc_collection_seconds_count{gc="G1 Young Generation",} 129.0
+jvm_gc_collection_seconds_sum{gc="G1 Young Generation",} 4.615
+jvm_gc_collection_seconds_count{gc="G1 Old Generation",} 0.0
+jvm_gc_collection_seconds_sum{gc="G1 Old Generation",} 0.0
+`
+
 func TestProm2Metrics(t *testing.T) {
 	const measurementPrefix = "testing"
 	const defaultMeasurement = "default_testing"
 
-	pts, err := PromTextToMetrics(strings.NewReader(data1), measurementPrefix, defaultMeasurement, time.Now())
+	data := strings.NewReader(data1)
+	// data := strings.NewReader(data2)
+	// data := strings.NewReader(data3)
+
+	pts, err := PromTextToMetrics(data, measurementPrefix, defaultMeasurement, time.Now())
 	if err != nil {
 		panic(err)
 	}
@@ -85,60 +98,4 @@ func TestProm2Metrics(t *testing.T) {
 	for _, pt := range pts {
 		t.Log(pt)
 	}
-	// output:
-	// testing_go_gc,quantile=0.000 go_gc_duration_seconds=0.000074545 1598611000473403377
-	// testing_go_gc,quantile=0.250 go_gc_duration_seconds=0.000076999 1598611000473403377
-	// testing_go_gc,quantile=0.500 go_gc_duration_seconds=0.000277935 1598611000473403377
-	// testing_go_gc,quantile=0.750 go_gc_duration_seconds=0.000706591 1598611000473403377
-	// testing_go_gc,quantile=1.000 go_gc_duration_seconds=0.000706591 1598611000473403377
-	// testing_go_gc go_gc_duration_seconds_count=4i,go_gc_duration_seconds_sum=0.00113607 1598611000473403377
-	// default_testing go_goroutines=15 1598611000473403377
-	// testing_cpu_usage,cpu=cpu0 cpu_usage_user=1.4112903225816156 1598611000473403377
-	// testing_cpu_usage,cpu=cpu1 cpu_usage_user=0.702106318955865 1598611000473403377
-	// testing_cpu_usage,cpu=cpu2 cpu_usage_user=2.0161290322588776 1598611000473403377
-	// testing_cpu_usage,cpu=cpu3 cpu_usage_user=1.5045135406226022 1598611000473403377
-
-	pts2, err := PromTextToMetrics(strings.NewReader(data2), measurementPrefix, defaultMeasurement, time.Now())
-	if err != nil {
-		panic(err)
-	}
-
-	for _, pt := range pts2 {
-		t.Log(pt)
-	}
-	// output:
-	// testing_confluence_request,path=/rest confluence_request_duration_on_path_count=6i,confluence_request_duration_on_path_sum=2.336312921 1598611146774553251
-	// testing_confluence_request,le=0.005,path=/rest confluence_request_duration_on_path_bucket=0i 1598611146774553251
-	// testing_confluence_request,le=0.010,path=/rest confluence_request_duration_on_path_bucket=4i 1598611146774553251
-	// testing_confluence_request,le=0.025,path=/rest confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=0.050,path=/rest confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=0.075,path=/rest confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=0.100,path=/rest confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=0.250,path=/rest confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=0.500,path=/rest confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=0.750,path=/rest confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=1.000,path=/rest confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=2.500,path=/rest confluence_request_duration_on_path_bucket=6i 1598611146774553251
-	// testing_confluence_request,le=5.000,path=/rest confluence_request_duration_on_path_bucket=6i 1598611146774553251
-	// testing_confluence_request,le=7.500,path=/rest confluence_request_duration_on_path_bucket=6i 1598611146774553251
-	// testing_confluence_request,le=10.000,path=/rest confluence_request_duration_on_path_bucket=6i 1598611146774553251
-	// testing_confluence_request,le=+Inf,path=/rest confluence_request_duration_on_path_bucket=6i 1598611146774553251
-	// testing_confluence_request,path=/plugins confluence_request_duration_on_path_count=5i,confluence_request_duration_on_path_sum=0.971921824 1598611146774553251
-	// testing_confluence_request,le=0.005,path=/plugins confluence_request_duration_on_path_bucket=0i 1598611146774553251
-	// testing_confluence_request,le=0.010,path=/plugins confluence_request_duration_on_path_bucket=0i 1598611146774553251
-	// testing_confluence_request,le=0.025,path=/plugins confluence_request_duration_on_path_bucket=0i 1598611146774553251
-	// testing_confluence_request,le=0.050,path=/plugins confluence_request_duration_on_path_bucket=1i 1598611146774553251
-	// testing_confluence_request,le=0.075,path=/plugins confluence_request_duration_on_path_bucket=1i 1598611146774553251
-	// testing_confluence_request,le=0.100,path=/plugins confluence_request_duration_on_path_bucket=1i 1598611146774553251
-	// testing_confluence_request,le=0.250,path=/plugins confluence_request_duration_on_path_bucket=3i 1598611146774553251
-	// testing_confluence_request,le=0.500,path=/plugins confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=0.750,path=/plugins confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=1.000,path=/plugins confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=2.500,path=/plugins confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=5.000,path=/plugins confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=7.500,path=/plugins confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=10.000,path=/plugins confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// testing_confluence_request,le=+Inf,path=/plugins confluence_request_duration_on_path_bucket=5i 1598611146774553251
-	// default_testing confluence_total_cluster_nodes_gauge=0 1598611146774553251
-	// testing_confluence_user,username=admin confluence_user_logout_count=2 1598611146774553251
 }
