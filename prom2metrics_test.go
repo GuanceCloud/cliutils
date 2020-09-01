@@ -83,13 +83,12 @@ jvm_gc_collection_seconds_sum{gc="G1 Old Generation",} 0.0
 `
 
 func TestProm2Metrics(t *testing.T) {
-	const measurementPrefix = "testing"
-	const defaultMeasurement = "default_testing"
+	const measurementPrefix = "confluence"
+	const defaultMeasurement = "confluence"
 
-	data := strings.NewReader(data1)
+	data := strings.NewReader(data2)
 	// data := strings.NewReader(data2)
 	// data := strings.NewReader(data3)
-
 	pts, err := PromTextToMetrics(data, measurementPrefix, defaultMeasurement, time.Now())
 	if err != nil {
 		panic(err)

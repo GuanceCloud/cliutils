@@ -11,31 +11,32 @@ import (
 	"github.com/prometheus/common/expfmt"
 )
 
-/// prometheus 数据转行协议 point
-///
-/// prometheus 数据以 K/V 描述，以 `go_gc_duration_seconds{quantile="0"} 7.4545e-05` 为例
+/// prometheus 数据转行协议 metrics
 ///
 /// 转换规则
-///     1. measurement： 取 K 的第一个下划线，左右临近字符串。示例 measurement 为 `go_gc`
+/// prometheus 数据是Key/Value 格式，以 `cpu_usage_user{cpu="cpu0"} 1.4112903225816156` 为例
+///     - measurement:
+///          1. 取 Key 字符串的第一个下划线，左右临近字符串。示例 measurement 为 `cpu_usage`
+///          2. 允许手动添加 measurement 前缀，如果前缀为空字符串，则不添加。例如 measurementPrefix 为 `cloudcare`，measurement 为 `cloudcare_cpu_usage`
+///          3. 前缀不会重复，不会出现 `cloudcare_cloudcare_cpu_usage` 的情况
+///          4. 允许设置默认 measurement，当 tags 为空时，使用默认 measurement。默认 measurement 不允许为空字符串。
+///     - tags:
+///          1. 大括号中的所有键值对，全部转换成 tags。例如 `cpu=cpu0`
+///     - fields:
+///          1. 大括号以外的 Key/Value 转换成 fields。例如 `cpu_usage_user=1.4112903225816156`
+///          2. 所有 fields 值都是 float64 类型
+///     - time:
+///          1. 允许设置默认时间，当无法解析 prometheus 数据的 timestamp 时，使用默认时间
 ///
-///     2. 所有大括号中的数据，全部做成 Key/Value 形式的 tags
-///
-///     3. 允许手动添加字符串前缀，如果前缀为空字符串，则不添加。例如 measurementPrefix 为 `cloudcare`，measurement 为 `cloudcare_go_gc`
-///
-///     4. 允许设置默认 measurement，当 point 没有 tags 时，使用默认 measurement。默认 measurement 不允许为空字符串。
-///
-///     5. 允许设置默认时间，当无法解析 prometheus 数据的 timestamp 时，使用默认时间
-///
-///     6. 如果遇到空数据，则跳过执行下一条
-///
-///  具体输出，参照测试用例 prom2metrics_test.go
+///     如果遇到空数据，则跳过执行下一条。丢弃原有的直方图数据。具体输出，参照测试用例 prom2metrics_test.go
 
-type parse struct {
+type prom struct {
 	metricName         string
 	measurement        string
 	defaultMeasurement string
 	metrics            []*dto.Metric
 	t                  time.Time
+	pts                []*ifxcli.Point
 }
 
 func PromTextToMetrics(data io.Reader, measurementPrefix, defaultMeasurement string, t time.Time) ([]*ifxcli.Point, error) {
@@ -50,173 +51,112 @@ func PromTextToMetrics(data io.Reader, measurementPrefix, defaultMeasurement str
 	}
 
 	var pts []*ifxcli.Point
+
 	for name, metric := range metrics {
 		measurement := name
 		if measurementPrefix != "" {
 			measurement = getMeasurement(name, measurementPrefix)
 		}
 
-		p := parse{
+		p := prom{
 			metricName:         name,
 			measurement:        measurement,
 			defaultMeasurement: defaultMeasurement,
 			metrics:            metric.GetMetric(),
 			t:                  t,
+			pts:                []*ifxcli.Point{},
 		}
 
 		switch metric.GetType() {
-		case dto.MetricType_COUNTER:
-			pts = append(pts, p.counter()...)
-
 		case dto.MetricType_GAUGE:
-			pts = append(pts, p.gauge()...)
-
-		case dto.MetricType_SUMMARY:
-			pts = append(pts, p.summary()...)
-
+			p.gauge()
 		case dto.MetricType_UNTYPED:
-			pts = append(pts, p.untyped()...)
-
+			p.untyped()
+		case dto.MetricType_COUNTER:
+			p.counter()
+		case dto.MetricType_SUMMARY:
+			p.summary()
 		case dto.MetricType_HISTOGRAM:
-			pts = append(pts, p.histogram()...)
-
+			p.histogram()
 		}
+
+		pts = append(pts, p.pts...)
 	}
 	return pts, nil
 }
 
-func (p *parse) counter() []*ifxcli.Point {
-	var pts []*ifxcli.Point
-
+func (p *prom) gauge() {
 	for _, m := range p.metrics {
-		counter := m.GetCounter()
-		if counter == nil {
-			continue
-		}
-
-		tags := labelToTags(m.GetLabel())
-		fields := map[string]interface{}{p.metricName: counter.GetValue()}
-
-		pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
-		if err != nil {
-			continue
-		}
-		pts = append(pts, pt)
+		p.getValue(m, m.GetGauge())
 	}
-	return pts
+}
+func (p *prom) untyped() {
+	for _, m := range p.metrics {
+		p.getValue(m, m.GetUntyped())
+	}
+}
+func (p *prom) counter() {
+	for _, m := range p.metrics {
+		p.getValue(m, m.GetCounter())
+	}
 }
 
-func (p *parse) gauge() []*ifxcli.Point {
-	var pts []*ifxcli.Point
-
+func (p *prom) summary() {
 	for _, m := range p.metrics {
-		gauge := m.GetGauge()
-		if gauge == nil {
-			continue
-		}
-
-		tags := labelToTags(m.GetLabel())
-		fields := map[string]interface{}{p.metricName: gauge.GetValue()}
-
-		pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
-		if err != nil {
-			continue
-		}
-		pts = append(pts, pt)
+		p.getCountAndSum(m, m.GetSummary())
 	}
-	return pts
 }
 
-func (p *parse) summary() []*ifxcli.Point {
-	var pts []*ifxcli.Point
-
+func (p *prom) histogram() {
 	for _, m := range p.metrics {
-		summary := m.GetSummary()
-		if summary == nil {
-			continue
-		}
-
-		for _, quantile := range summary.GetQuantile() {
-			tags := map[string]string{"quantile": fmt.Sprintf("%.5f", quantile.GetQuantile())}
-			fields := map[string]interface{}{p.metricName: quantile.GetValue()}
-
-			pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
-			if err != nil {
-				continue
-			}
-			pts = append(pts, pt)
-		}
-
-		tags := labelToTags(m.GetLabel())
-		fields := map[string]interface{}{
-			p.metricName + "_count": int64(summary.GetSampleCount()),
-			p.metricName + "_sum":   summary.GetSampleSum(),
-		}
-
-		pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
-		if err != nil {
-			continue
-		}
-		pts = append(pts, pt)
+		p.getCountAndSum(m, m.GetHistogram())
 	}
-	return pts
 }
 
-func (p *parse) untyped() []*ifxcli.Point {
-	var pts []*ifxcli.Point
-
-	for _, m := range p.metrics {
-		untyped := m.GetUntyped()
-		if untyped == nil {
-			continue
-		}
-		fields := map[string]interface{}{p.metricName: untyped.GetValue()}
-
-		pt, err := p.newPoint(nil, fields, m.GetTimestampMs())
-		if err != nil {
-			continue
-		}
-		pts = append(pts, pt)
-	}
-	return pts
+type value interface {
+	GetValue() float64
 }
 
-func (p *parse) histogram() []*ifxcli.Point {
-	var pts []*ifxcli.Point
-
-	for _, m := range p.metrics {
-		histogram := m.GetHistogram()
-		if histogram == nil {
-			continue
-		}
-
-		tags := labelToTags(m.GetLabel())
-		fields := map[string]interface{}{
-			p.metricName + "_count": int64(histogram.GetSampleCount()),
-			p.metricName + "_sum":   histogram.GetSampleSum(),
-		}
-
-		pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
-		if err != nil {
-			continue
-		}
-		pts = append(pts, pt)
-
-		for _, bucket := range histogram.GetBucket() {
-			tags["le"] = fmt.Sprintf("%.5f", bucket.GetUpperBound())
-			fields := map[string]interface{}{p.metricName + "_bucket": int64(bucket.GetCumulativeCount())}
-
-			pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
-			if err != nil {
-				continue
-			}
-			pts = append(pts, pt)
-		}
+func (p *prom) getValue(m *dto.Metric, v value) {
+	if v == nil {
+		return
 	}
-	return pts
+
+	tags := labelToTags(m.GetLabel())
+	fields := map[string]interface{}{p.metricName: v.GetValue()}
+
+	pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
+	if err != nil {
+		return
+	}
+	p.pts = append(p.pts, pt)
 }
 
-func (p *parse) newPoint(tags map[string]string, fields map[string]interface{}, ts int64) (*ifxcli.Point, error) {
+type countAndSum interface {
+	GetSampleCount() uint64
+	GetSampleSum() float64
+}
+
+func (p *prom) getCountAndSum(m *dto.Metric, c countAndSum) {
+	if c == nil {
+		return
+	}
+
+	tags := labelToTags(m.GetLabel())
+	fields := map[string]interface{}{
+		p.metricName + "_count": float64(c.GetSampleCount()),
+		p.metricName + "_sum":   c.GetSampleSum(),
+	}
+
+	pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
+	if err != nil {
+		return
+	}
+	p.pts = append(p.pts, pt)
+
+}
+
+func (p *prom) newPoint(tags map[string]string, fields map[string]interface{}, ts int64) (*ifxcli.Point, error) {
 	if ts > 0 {
 		p.t = time.Unix(0, ts*int64(time.Millisecond))
 	}
@@ -234,8 +174,10 @@ func getMeasurement(name, measurementPrefix string) string {
 	if len(nameBlocks) > 2 {
 		name = strings.Join(nameBlocks[:2], "_")
 	}
-	if !strings.HasPrefix(name, measurementPrefix) {
-		name = measurementPrefix + "_" + name
+	if measurementPrefix != "" {
+		if !strings.HasPrefix(name, measurementPrefix) {
+			name = measurementPrefix + "_" + name
+		}
 	}
 	return name
 }
