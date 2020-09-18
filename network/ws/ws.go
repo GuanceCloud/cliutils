@@ -17,24 +17,24 @@ import (
 )
 
 var (
-	epoller     *epoll
-	l           = logger.DefaultSLogger("ws")
-	totalMsgCnt uint64
-	up          = time.Now()
+	l = logger.DefaultSLogger("ws")
 )
 
 type MsgType int
 
+const (
+	MsgTypeErr int = iota - 1
+)
+
 type Msg interface {
 	Type() MsgType
-	Msg() interface{} // get message object
-	To() string       // where the msg send to(usually some ID/UUID)
-	Data() []byte     // dump msg as bytes
+	To() string   // where the msg send to(usually some ID/UUID)
+	Data() []byte // dump msg as bytes
 
-	TraceID() string
+	GetTraceID() string
 	SetTraceID(id string)
-	GetResp() (interface{}, error)
-	SetResp(interface{})
+	GetResp() (Msg, error)
+	SetResp(Msg)
 }
 
 type Server struct {

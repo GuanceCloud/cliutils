@@ -22,6 +22,14 @@ var (
 	CommonChanCap = 128
 )
 
+type ErrMsg struct {
+	Err error
+}
+
+func (e *ErrMsg) Type() {
+	return MsgTypeErr
+}
+
 type Cli struct {
 	conn          net.Conn
 	id            string
@@ -50,11 +58,11 @@ func (s *Server) dispatcher() {
 					s.clis[cli.id] = cli
 				}
 
-			case msg := <-s.dmsgCh: // send ws msg to cli
+			case msg := <-s.sendMsgCh: // send ws msg to cli
 				s.doSendMsgToClient(msg)
 
-			case msg := <-s.respCh:
-				handleResp(msg)
+			case msg := <-s.recvMsgCh:
+				s.handleResp(msg)
 
 			case cliid := <-s.hbCh: // cli heartbeat comming
 				if cli, ok := s.clis[cliid]; ok {
@@ -89,13 +97,13 @@ func todo() {
 }
 
 func (s *Server) doSendMsgToClient(msg Msg) {
-	tid := msg.TraceID()
+	tid := msg.GetTraceID()
 	if tid == "" {
 		tid = cliutils.XID("wmsg_")
 		msg.SetTraceID(tid)
 	}
 
-	cliid := wmsg.msg.To()
+	cliid := msg.To()
 
 	cli, ok := s.clis[cliid]
 	if !ok {
@@ -104,7 +112,7 @@ func (s *Server) doSendMsgToClient(msg Msg) {
 		return
 	}
 
-	if err := wsutil.WriteServerText(cli.conn, wmsg.msg.Data()); err != nil {
+	if err := wsutil.WriteServerText(cli.conn, msg.Data()); err != nil {
 		l.Errorf("wsutil.WriteServerText(): %s", err.Error())
 		msg.SetResp(ErrReceiverNotFound)
 		return
@@ -115,7 +123,7 @@ func (s *Server) doSendMsgToClient(msg Msg) {
 }
 
 func (s *Server) handleResp(resp Msg) {
-	tid := resp.TraceID()
+	tid := resp.GetTraceID()
 	origMsg, ok := s.msgs[tid]
 	if !ok {
 		l.Errorf("origin msg %s not found", tid)
@@ -137,7 +145,7 @@ func (s *Server) Heartbeat(id string) {
 	}
 }
 
-func (s *Server) SendServerMsg(msg Msg) (resp interface{}, err error) {
+func (s *Server) SendServerMsg(msg Msg) (resp Msg, err error) {
 	s.sendMsgCh <- msg
 	return msg.GetResp()
 }

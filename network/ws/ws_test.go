@@ -15,11 +15,14 @@ import (
 )
 
 var (
-	__wsip    = `0.0.0.0`
-	__wsport  = ":18080"
-	__wsupath = "/wstest"
-	__wsurl   = url.URL{Scheme: "ws", Host: __wsip + __wsport, Path: __wsupath}
-	__wg      = sync.WaitGroup{}
+	__wsip       = `0.0.0.0`
+	__wsport     = 18080
+	__df_wsupath = "/dfwstest"
+	__dw_wsupath = "/dwwstest"
+	__df_wsurl   = url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", __wsip, __wsport+1), Path: __df_wsupath}
+	__dw_wsurl   = url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", __wsip, __wsport), Path: __dw_wsupath}
+
+	__wg = sync.WaitGroup{}
 
 	__ASK = MsgType(0)
 	__ANS = MsgType(1)
@@ -34,14 +37,14 @@ type testmsg struct {
 	resp chan interface{}
 }
 
-func (tm *testmsg) Type() MsgType            { return tm.MsgType }
-func (tm *testmsg) Msg() interface{}         { return tm.MsgData }
-func (tm *testmsg) To() string               { return tm.ID }
-func (tm *testmsg) TraceID() string          { return tm.TraceID }
-func (tm *testmsg) SetTraceID(id string)     { tm.TraceID = id }
-func (tm *testmsg) GetResp() interface{}     { return <-tm.resp }
-func (tm *testmsg) SetResp(resp interface{}) { tm.resp <- resp }
-func (tm *testmsg) Expired() bool            { return false }
+func (tm *testmsg) Type() MsgType                 { return tm.MsgType }
+func (tm *testmsg) Msg() interface{}              { return tm.MsgData }
+func (tm *testmsg) To() string                    { return tm.ID }
+func (tm *testmsg) GetTraceID() string            { return tm.TraceID }
+func (tm *testmsg) SetTraceID(id string)          { tm.TraceID = id }
+func (tm *testmsg) GetResp() (interface{}, error) { return <-tm.resp, nil }
+func (tm *testmsg) SetResp(resp interface{})      { tm.resp <- resp }
+func (tm *testmsg) Expired() bool                 { return false }
 
 func (tm *testmsg) Data() []byte {
 	j, err := json.Marshal(tm)
@@ -54,42 +57,145 @@ func (tm *testmsg) Data() []byte {
 
 func handler(s *Server, c net.Conn, data []byte, op ws.OpCode) error {
 
-	var tm testmsg
-	if err := json.Unmarshal(data, &tm); err != nil {
-		return err
-	}
-
-	l.Debugf("receive from %s(op: %d): %s", c.RemoteAddr().String(), op, string(data))
-	switch tm.MsgType {
-	case __ASK:
-
-		ans := &testmsg{
-			MsgData: fmt.Sprintf("your addr is %s, what's you name?", c.RemoteAddr().String()),
-			ID:      c.RemoteAddr().String(),
-			MsgType: __ASK,
-		}
-
-		resp, err := s.SendServerMsg(ans, true, 0)
-		if err != nil {
+	/*
+		var tm testmsg
+		if err := json.Unmarshal(data, &tm); err != nil {
 			return err
 		}
 
-		switch resp.(type) {
-		case testmsg:
-			l.Debugf("%+#v", tm.(testmsg))
-		default:
-			panic("unknown msg")
-		}
+		l.Debugf("receive from %s(op: %d): %s", c.RemoteAddr().String(), op, string(data))
+		switch tm.MsgType {
+		case __ASK:
 
-	case __ANS:
-		l.Debugf("%+#v", tm)
-	}
+			ans := &testmsg{
+				MsgData: fmt.Sprintf("your addr is %s, what's you name?", c.RemoteAddr().String()),
+				ID:      c.RemoteAddr().String(),
+				MsgType: __ASK,
+			}
+
+			resp, err := s.SendServerMsg(ans)
+			if err != nil {
+				return err
+			}
+
+			switch resp.(type) {
+			case testmsg:
+				l.Debugf("%+#v", tm.(testmsg))
+			default:
+				panic("unknown msg")
+			}
+
+		case __ANS:
+			l.Debugf("%+#v", tm)
+		} */
 
 	return nil
 }
 
+func TestServer3(t *testing.T) {
+
+	// dataflux as ws server
+	df_srv, err := NewServer(fmt.Sprintf("%s:%d", __wsip, __wsport), __df_wsupath, func(s *Server, c net.Conn, data []byte, op ws.OpCode) error {
+		l.Debugf("receive from %s(op: %d): %s", c.RemoteAddr().String(), op, string(data))
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go df_srv.Start()
+
+	// dataway as ws server
+	dw_srv, err := NewServer(fmt.Sprintf("%s:%d", __wsip, __wsport+1), __dw_wsupath, func(s *Server, c net.Conn, data []byte, op ws.OpCode) error {
+		l.Debugf("receive from %s(op: %d): %s", c.RemoteAddr().String(), op, string(data))
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	go dw_srv.Start()
+
+	time.Sleep(time.Second)
+
+	// dataway as ws client
+	dw_cli, _, err := websocket.DefaultDialer.Dial(__df_wsurl.String(), nil)
+	if err != nil {
+		t.Fatalf("Failed to connect: %s", err.Error())
+	}
+
+	// datakit as ws client
+	dk_cli, _, err := websocket.DefaultDialer.Dial(__dw_wsurl.String(), nil)
+	if err != nil {
+		t.Fatalf("Failed to connect: %s", err.Error())
+	}
+
+	for _, c := range df_srv.clis {
+		l.Debugf("df-ws-cli: %+#v", c)
+	}
+
+	dkid := ""
+	for _, c := range dw_srv.clis {
+		l.Debugf("dw-ws-cli: %+#v", c)
+		dkid = c.id
+	}
+
+	// two ws clients read ws msg
+	go func() {
+		for {
+			if err, _, data := dw_cli.ReadMessage(); err != nil {
+				t.Fatalf("client write failed: %s", err.Error())
+			} else {
+				l.Debugf("dk get %s", string(data))
+				// use dw_srv resend to datakit
+				tm := testmsg{
+					resp: make(chan interface{}),
+				}
+				if err := json.Unmarshal(data, &tm); err != nil {
+					t.Fatal(err)
+				}
+
+				respmsg, err := dw_srv.SendServerMsg(&tm)
+				if err != nil {
+					panic(err)
+				}
+
+				l.Debugf("get datakit resp: %+#v", respmsg.Data())
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			if err, _, data := dk_cli.ReadMessage(); err != nil {
+				t.Fatalf("client write failed: %s", err.Error())
+			} else {
+				l.Debugf("dk get %s", string(data))
+			}
+		}
+	}()
+
+	// df send msg to dw_wscli -> dw_wssrv -> dk
+	df_srv.SendServerMsg(&testmsg{
+		MsgType: __ASK,
+		MsgData: "hello datakit.",
+		ID:      dkid,
+	})
+
+	// dw-ws-cli get the hello, then forward to ws-ws-srv
+
+	/*
+		j, _ := json.Marshal(&testmsg{
+			MsgType: __ASK,
+			MsgData: "where am I?",
+		})
+
+		if err := c.WriteMessage(websocket.TextMessage, j); err != nil {
+			t.Fatalf("client write msg failed: %s", err.Error())
+		} */
+}
+
 func TestServer1(t *testing.T) {
-	s, err := NewServer(__wsip+__wsport, __wsupath, handler)
+	s, err := NewServer(fmt.Sprintf("%s:%d", __wsip, __wsport), __dw_wsupath, handler)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,18 +204,15 @@ func TestServer1(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	c, _, err := websocket.DefaultDialer.Dial(__wsurl.String(), nil)
+	c, _, err := websocket.DefaultDialer.Dial(__dw_wsurl.String(), nil)
 	if err != nil {
 		t.Fatalf("Failed to connect: %s", err.Error())
 	}
 
-	//if err := c.SetWriteDeadline(time.Now().Add(time.Second)); err != nil {
-	//	t.Fatal(err)
-	//}
-
-	if err := c.WriteControl(websocket.PingMessage, nil, time.Now().Add(time.Second)); err != nil {
-		t.Fatalf("client write ping failed: %s", err.Error())
-	}
+	/*
+		if err := c.WriteControl(websocket.PingMessage, nil, time.Now().Add(time.Second)); err != nil {
+			t.Fatalf("client write ping failed: %s", err.Error())
+		} */
 
 	j, _ := json.Marshal(&testmsg{
 		MsgType: __ASK,
@@ -118,21 +221,22 @@ func TestServer1(t *testing.T) {
 
 	if err := c.WriteMessage(websocket.TextMessage, j); err != nil {
 		t.Fatalf("client write msg failed: %s", err.Error())
+	}
+
+	mt, resp, err := c.ReadMessage()
+	if err != nil {
+		t.Fatalf("client read msg failed: %s", err.Error())
+	}
+
+	l.Debugf("write ok, resp: %s(%d)", string(resp), mt)
+	var tm testmsg
+	if err := json.Unmarshal(resp, &tm); err != nil {
+		t.Fatal(err)
 	} else {
-		if mt, resp, err := c.ReadMessage(); err != nil {
-			t.Fatalf("client read msg failed: %s", err.Error())
-		} else {
-			l.Debugf("write ok, resp: %s(%d)", string(resp), mt)
-			var tm testmsg
-			if err := json.Unmarshal(resp, &tm); err != nil {
-				t.Fatal(err)
-			} else {
-				j, _ = json.Marshal(&testmsg{
-					MsgType: __ANS,
-					MsgData: "I'm 42",
-				})
-			}
-		}
+		j, _ = json.Marshal(&testmsg{
+			MsgType: __ANS,
+			MsgData: "I'm 42",
+		})
 	}
 
 	s.Stop()
@@ -154,7 +258,7 @@ func TestServer2(t *testing.T) {
 
 	var conns []*websocket.Conn
 	for i := 0; i < nconn; i++ {
-		c, _, err := websocket.DefaultDialer.Dial(__wsurl.String(), nil)
+		c, _, err := websocket.DefaultDialer.Dial(__dw_wsurl.String(), nil)
 		if err != nil {
 			fmt.Println("Failed to connect", i, err)
 			break
