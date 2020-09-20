@@ -11,6 +11,7 @@ require (
 	github.com/gobwas/ws v1.0.4
 	github.com/gorilla/websocket v0.0.0-20170926233335-4201258b820c
 	github.com/influxdata/influxdb1-client v0.0.0-20200827194710-b269163b24ab
+	github.com/koding/websocketproxy v0.0.0-20181220232114-7ed82d81a28c
 	github.com/mitchellh/hashstructure v1.0.0 // indirect
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.13.0

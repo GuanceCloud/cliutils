@@ -48,7 +48,6 @@ type Server struct {
 	uptime  time.Time
 
 	clis map[string]*Cli
-	msgs map[string]Msg
 
 	exit *cliutils.Sem
 	wg   *sync.WaitGroup
@@ -78,7 +77,6 @@ func NewServer(bind, path string, h func(*Server, net.Conn, []byte, ws.OpCode) e
 		uptime: time.Now(),
 
 		clis: map[string]*Cli{},
-		msgs: map[string]Msg{},
 		exit: cliutils.NewSem(),
 		wg:   &sync.WaitGroup{},
 

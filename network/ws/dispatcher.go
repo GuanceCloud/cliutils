@@ -26,8 +26,8 @@ type ErrMsg struct {
 	Err error
 }
 
-func (e *ErrMsg) Type() {
-	return MsgTypeErr
+func (e *ErrMsg) Type() MsgType {
+	return MsgType(MsgTypeErr)
 }
 
 type Cli struct {
@@ -54,7 +54,7 @@ func (s *Server) dispatcher() {
 			select {
 			case cli := <-s.wscliCh: // new ws connection comming
 				if cli != nil {
-					l.Debugf("add datakit %s(from %s)", cli.id, cli.conn.RemoteAddr().String())
+					l.Debugf("%s add datakit %s(from %s)", s.Bind, cli.id, cli.conn.RemoteAddr().String())
 					s.clis[cli.id] = cli
 				}
 
@@ -77,6 +77,7 @@ func (s *Server) dispatcher() {
 				//  - clear expired dmsg
 				//  - clear ws cli without heartbeat
 				//  - ...
+				l.Infof("total clients: %d", len(s.clis))
 			case <-s.exit.Wait():
 				l.Info("dispatcher exit.")
 				//for _, c := range s.clis {
@@ -108,29 +109,20 @@ func (s *Server) doSendMsgToClient(msg Msg) {
 	cli, ok := s.clis[cliid]
 	if !ok {
 		l.Warnf("cli ID %s not found", cliid)
-		msg.SetResp(ErrReceiverNotFound)
+		//msg.SetResp(ErrReceiverNotFound)
 		return
 	}
 
 	if err := wsutil.WriteServerText(cli.conn, msg.Data()); err != nil {
 		l.Errorf("wsutil.WriteServerText(): %s", err.Error())
-		msg.SetResp(ErrReceiverNotFound)
+		//msg.SetResp(ErrReceiverNotFound)
 		return
 	}
 
 	// TODO: if any error, should we remove s.clis[dkid]?
-	s.msgs[tid] = msg // cache the message for latter response
 }
 
 func (s *Server) handleResp(resp Msg) {
-	tid := resp.GetTraceID()
-	origMsg, ok := s.msgs[tid]
-	if !ok {
-		l.Errorf("origin msg %s not found", tid)
-		return
-	}
-
-	origMsg.SetResp(resp)
 }
 
 func (s *Server) AddCli(c *Cli) {
