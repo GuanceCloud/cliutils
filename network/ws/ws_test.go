@@ -1,8 +1,6 @@
 package ws
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -14,8 +12,6 @@ import (
 	"github.com/gobwas/ws"
 	"github.com/gorilla/websocket"
 	"github.com/koding/websocketproxy"
-
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 )
 
 var (
@@ -33,15 +29,7 @@ func TestProxy(t *testing.T) {
 	// dataflux as ws server
 	dfwsurl := fmt.Sprintf("%s:%d", __wsip, __wsport+1)
 	df_srv, err := NewServer(dfwsurl, __wsupath, func(s *Server, c net.Conn, data []byte, op ws.OpCode) error {
-
-		b64 := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("your are %s", c.RemoteAddr().String())))
-
-		s.SendServerMsg(&Msg{
-			Type:    1234,
-			ID:      MsgID(cliutils.XID("wsmsg_")),
-			Dest:    c.RemoteAddr().String(),
-			B64Data: b64,
-		})
+		s.SendServerMsg(c.RemoteAddr().String(), []byte(fmt.Sprintf("your are %s", c.RemoteAddr().String())))
 		return nil
 	})
 	if err != nil {
@@ -95,16 +83,7 @@ func TestProxy(t *testing.T) {
 					t.Log(err)
 				} else {
 					if total%512 == 0 {
-						var m Msg
-						if err := json.Unmarshal(resp, &m); err != nil {
-							t.Fatal(err)
-						} else {
-							msg, err := base64.StdEncoding.DecodeString(m.B64Data)
-							if err != nil {
-								t.Fatal(err)
-							}
-							l.Debugf("%s", string(msg))
-						}
+						l.Debugf("%s", string(resp))
 					}
 				}
 

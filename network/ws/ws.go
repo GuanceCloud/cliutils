@@ -20,22 +20,9 @@ var (
 	l = logger.DefaultSLogger("ws")
 )
 
-type MsgType int
-type MsgID string
-
-const (
-	MsgTypeErr int = iota + 1024
-)
-
-type Msg struct {
-	Type    MsgType
-	ID      MsgID
-	Dest    string
-	B64Data string
-}
-
-func (m *Msg) Invalid() bool {
-	return (m.Type == 0 || m.ID == "" || m.Dest == "")
+type srvmsg struct {
+	to  string
+	msg []byte
 }
 
 type Server struct {
@@ -53,7 +40,7 @@ type Server struct {
 	exit *cliutils.Sem
 	wg   *sync.WaitGroup
 
-	sendMsgCh chan *Msg
+	sendMsgCh chan *srvmsg
 
 	hbCh    chan string
 	wscliCh chan *Cli
@@ -80,7 +67,7 @@ func NewServer(bind, path string, h func(*Server, net.Conn, []byte, ws.OpCode) e
 		exit: cliutils.NewSem(),
 		wg:   &sync.WaitGroup{},
 
-		sendMsgCh: make(chan *Msg, CommonChanCap),
+		sendMsgCh: make(chan *srvmsg, CommonChanCap),
 		hbCh:      make(chan string, CommonChanCap),
 		wscliCh:   make(chan *Cli, CommonChanCap),
 	}

@@ -3,8 +3,6 @@
 package ws
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -15,20 +13,8 @@ import (
 )
 
 var (
-	ErrReceiverNotFound      = errors.New("receiver not found")
-	ErrBadDatakitMsg         = errors.New("bad datakit msg")
-	ErrWriteServerTextFailed = errors.New("dispatch msg to datakit failed")
-
 	CommonChanCap = 128
 )
-
-type ErrMsg struct {
-	Err error
-}
-
-func (e *ErrMsg) Type() MsgType {
-	return MsgType(MsgTypeErr)
-}
 
 type Cli struct {
 	conn          net.Conn
@@ -59,7 +45,7 @@ func (s *Server) dispatcher() {
 				}
 
 			case msg := <-s.sendMsgCh: // send ws msg to cli
-				s.doSendMsgToClient(msg)
+				s.doSendMsgToClient(msg.to, msg.msg)
 
 			case cliid := <-s.hbCh: // cli heartbeat comming
 				if cli, ok := s.clis[cliid]; ok {
@@ -95,26 +81,16 @@ func todo() {
 	panic(fmt.Errorf("not implement"))
 }
 
-func (s *Server) doSendMsgToClient(msg *Msg) {
+func (s *Server) doSendMsgToClient(to string, msg []byte) {
 
-	if msg.Invalid() {
-		return
-	}
-
-	cli, ok := s.clis[msg.Dest]
+	cli, ok := s.clis[to]
 	if !ok {
-		l.Warnf("cli ID %s not found", msg.Dest)
-		return
-	}
-
-	j, err := json.Marshal(msg)
-	if err != nil {
-		l.Errorf("json.Marshal(): %s", err.Error())
+		l.Warnf("cli ID %s not found", to)
 		return
 	}
 
 	// send data to ws client
-	if err := wsutil.WriteServerText(cli.conn, j); err != nil {
+	if err := wsutil.WriteServerText(cli.conn, msg); err != nil {
 		l.Errorf("wsutil.WriteServerText(): %s", err.Error())
 		return
 	}
@@ -132,6 +108,9 @@ func (s *Server) Heartbeat(id string) {
 	}
 }
 
-func (s *Server) SendServerMsg(msg *Msg) {
-	s.sendMsgCh <- msg
+func (s *Server) SendServerMsg(to string, msg []byte) {
+	s.sendMsgCh <- &srvmsg{
+		to:  to,
+		msg: msg,
+	}
 }
