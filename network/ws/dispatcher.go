@@ -3,6 +3,7 @@
 package ws
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/gobwas/ws/wsutil"
 
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/system/rtpanic"
 )
 
@@ -61,9 +61,6 @@ func (s *Server) dispatcher() {
 			case msg := <-s.sendMsgCh: // send ws msg to cli
 				s.doSendMsgToClient(msg)
 
-			case msg := <-s.recvMsgCh:
-				s.handleResp(msg)
-
 			case cliid := <-s.hbCh: // cli heartbeat comming
 				if cli, ok := s.clis[cliid]; ok {
 					l.Debugf("update heartbeat on %s", cliid)
@@ -79,12 +76,13 @@ func (s *Server) dispatcher() {
 				//  - ...
 				l.Infof("total clients: %d", len(s.clis))
 			case <-s.exit.Wait():
+				for _, c := range s.clis {
+					if err := c.conn.Close(); err != nil {
+						l.Warn("c.conn.Close(): %s, ignored", err.Error())
+					}
+				}
+
 				l.Info("dispatcher exit.")
-				//for _, c := range s.clis {
-				//	if err := c.conn.Close(); err != nil {
-				//		l.Warn("c.conn.Close(): %s, ignored", err.Error())
-				//	}
-				//}
 				return
 			}
 		}
@@ -97,32 +95,29 @@ func todo() {
 	panic(fmt.Errorf("not implement"))
 }
 
-func (s *Server) doSendMsgToClient(msg Msg) {
-	tid := msg.GetTraceID()
-	if tid == "" {
-		tid = cliutils.XID("wmsg_")
-		msg.SetTraceID(tid)
+func (s *Server) doSendMsgToClient(msg *Msg) {
+
+	if msg.Invalid() {
+		return
 	}
 
-	cliid := msg.To()
-
-	cli, ok := s.clis[cliid]
+	cli, ok := s.clis[msg.Dest]
 	if !ok {
-		l.Warnf("cli ID %s not found", cliid)
-		//msg.SetResp(ErrReceiverNotFound)
+		l.Warnf("cli ID %s not found", msg.Dest)
 		return
 	}
 
-	if err := wsutil.WriteServerText(cli.conn, msg.Data()); err != nil {
+	j, err := json.Marshal(msg)
+	if err != nil {
+		l.Errorf("json.Marshal(): %s", err.Error())
+		return
+	}
+
+	// send data to ws client
+	if err := wsutil.WriteServerText(cli.conn, j); err != nil {
 		l.Errorf("wsutil.WriteServerText(): %s", err.Error())
-		//msg.SetResp(ErrReceiverNotFound)
 		return
 	}
-
-	// TODO: if any error, should we remove s.clis[dkid]?
-}
-
-func (s *Server) handleResp(resp Msg) {
 }
 
 func (s *Server) AddCli(c *Cli) {
@@ -137,7 +132,6 @@ func (s *Server) Heartbeat(id string) {
 	}
 }
 
-func (s *Server) SendServerMsg(msg Msg) (resp Msg, err error) {
+func (s *Server) SendServerMsg(msg *Msg) {
 	s.sendMsgCh <- msg
-	return msg.GetResp()
 }

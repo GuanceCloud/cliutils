@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -13,61 +14,34 @@ import (
 	"github.com/gobwas/ws"
 	"github.com/gorilla/websocket"
 	"github.com/koding/websocketproxy"
+
+	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 )
 
 var (
-	__wsip       = `0.0.0.0`
-	__wsport     = 18080
-	__df_wsupath = "/wstest"
-	__dw_wsupath = "/wstest"
-	__df_wsurl   = url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", __wsip, __wsport+1), Path: __df_wsupath}
-	__dw_wsurl   = url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", __wsip, __wsport), Path: __dw_wsupath}
+	__wsip     = `0.0.0.0`
+	__wsport   = 18080
+	__wsupath  = "/wstest"
+	__df_wsurl = url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", __wsip, __wsport+1), Path: __wsupath}
+	__dw_wsurl = url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", __wsip, __wsport), Path: __wsupath}
 
 	__wg = sync.WaitGroup{}
-
-	__ASK = MsgType(0)
-	__ANS = MsgType(1)
 )
-
-type testmsg struct {
-	MsgType MsgType `json:"msg_type"`
-	MsgData string  `json:"msg_data"`
-	ID      string  `json:"id,omitempty"`
-	TraceID string  `json:"trace_id"`
-
-	resp chan interface{}
-}
-
-func (tm *testmsg) Type() MsgType         { return tm.MsgType }
-func (tm *testmsg) Msg() interface{}      { return tm.MsgData }
-func (tm *testmsg) To() string            { return tm.ID }
-func (tm *testmsg) GetTraceID() string    { return tm.TraceID }
-func (tm *testmsg) SetTraceID(id string)  { tm.TraceID = id }
-func (tm *testmsg) GetResp() (Msg, error) { /*return <-tm.resp, nil*/ return nil, nil }
-func (tm *testmsg) SetResp(resp Msg)      { /*tm.resp <- resp*/ return }
-func (tm *testmsg) Expired() bool         { return false }
-
-func (tm *testmsg) Data() []byte {
-	j, err := json.Marshal(tm)
-	if err != nil {
-		panic(err)
-	}
-
-	return j
-}
 
 func TestProxy(t *testing.T) {
 
 	// dataflux as ws server
 	dfwsurl := fmt.Sprintf("%s:%d", __wsip, __wsport+1)
-	df_srv, err := NewServer(dfwsurl, __df_wsupath, func(s *Server, c net.Conn, data []byte, op ws.OpCode) error {
+	df_srv, err := NewServer(dfwsurl, __wsupath, func(s *Server, c net.Conn, data []byte, op ws.OpCode) error {
 
-		ans := &testmsg{
-			MsgData: fmt.Sprintf("your are %s", c.RemoteAddr().String()),
-			ID:      c.RemoteAddr().String(),
-		}
+		b64 := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("your are %s", c.RemoteAddr().String())))
 
-		s.SendServerMsg(ans)
+		s.SendServerMsg(&Msg{
+			Type:    1234,
+			ID:      MsgID(cliutils.XID("wsmsg_")),
+			Dest:    c.RemoteAddr().String(),
+			B64Data: b64,
+		})
 		return nil
 	})
 	if err != nil {
@@ -117,13 +91,27 @@ func TestProxy(t *testing.T) {
 				}
 
 				total++
-				if _, _, err := c.ReadMessage(); err != nil {
-					t.Error(err)
+				if _, resp, err := c.ReadMessage(); err != nil {
+					t.Log(err)
+				} else {
+					if total%512 == 0 {
+						var m Msg
+						if err := json.Unmarshal(resp, &m); err != nil {
+							t.Fatal(err)
+						} else {
+							msg, err := base64.StdEncoding.DecodeString(m.B64Data)
+							if err != nil {
+								t.Fatal(err)
+							}
+							l.Debugf("%s", string(msg))
+						}
+					}
 				}
 
 				time.Sleep(time.Millisecond)
 				select {
 				case <-ch:
+					c.Close()
 					return
 				default:
 				}
@@ -133,6 +121,8 @@ func TestProxy(t *testing.T) {
 
 	time.Sleep(time.Minute)
 	close(ch)
+
+	df_srv.Stop()
 
 	__wg.Wait()
 }

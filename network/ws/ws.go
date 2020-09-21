@@ -21,20 +21,21 @@ var (
 )
 
 type MsgType int
+type MsgID string
 
 const (
-	MsgTypeErr int = iota - 1
+	MsgTypeErr int = iota + 1024
 )
 
-type Msg interface {
-	Type() MsgType
-	To() string   // where the msg send to(usually some ID/UUID)
-	Data() []byte // dump msg as bytes
+type Msg struct {
+	Type    MsgType
+	ID      MsgID
+	Dest    string
+	B64Data string
+}
 
-	GetTraceID() string
-	SetTraceID(id string)
-	GetResp() (Msg, error)
-	SetResp(Msg)
+func (m *Msg) Invalid() bool {
+	return (m.Type == 0 || m.ID == "" || m.Dest == "")
 }
 
 type Server struct {
@@ -52,8 +53,7 @@ type Server struct {
 	exit *cliutils.Sem
 	wg   *sync.WaitGroup
 
-	sendMsgCh chan Msg
-	recvMsgCh chan Msg
+	sendMsgCh chan *Msg
 
 	hbCh    chan string
 	wscliCh chan *Cli
@@ -80,8 +80,7 @@ func NewServer(bind, path string, h func(*Server, net.Conn, []byte, ws.OpCode) e
 		exit: cliutils.NewSem(),
 		wg:   &sync.WaitGroup{},
 
-		recvMsgCh: make(chan Msg, CommonChanCap),
-		sendMsgCh: make(chan Msg, CommonChanCap),
+		sendMsgCh: make(chan *Msg, CommonChanCap),
 		hbCh:      make(chan string, CommonChanCap),
 		wscliCh:   make(chan *Cli, CommonChanCap),
 	}
