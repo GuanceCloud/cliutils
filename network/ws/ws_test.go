@@ -12,6 +12,8 @@ import (
 	"github.com/gobwas/ws"
 	"github.com/gorilla/websocket"
 	"github.com/koding/websocketproxy"
+
+	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 )
 
 var (
@@ -19,7 +21,6 @@ var (
 	__wsport   = 18080
 	__wsupath  = "/wstest"
 	__df_wsurl = url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", __wsip, __wsport+1), Path: __wsupath}
-	__dw_wsurl = url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", __wsip, __wsport), Path: __wsupath}
 
 	__wg = sync.WaitGroup{}
 )
@@ -28,12 +29,39 @@ func TestProxy(t *testing.T) {
 
 	// dataflux as ws server
 	dfwsurl := fmt.Sprintf("%s:%d", __wsip, __wsport+1)
-	df_srv, err := NewServer(dfwsurl, __wsupath, func(s *Server, c net.Conn, data []byte, op ws.OpCode) error {
-		s.SendServerMsg([]byte(fmt.Sprintf("your are %s", c.RemoteAddr().String())), []string{c.RemoteAddr().String()}...)
-		return nil
-	})
+	df_srv, err := NewServer(dfwsurl, __wsupath)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	df_srv.MsgHandler = func(s *Server, c net.Conn, data []byte, op ws.OpCode) error {
+		s.SendServerMsg([]byte(fmt.Sprintf("your are %s", c.RemoteAddr().String())), []string{string(data)}...)
+		return nil
+	}
+
+	df_srv.AddCli = func(w http.ResponseWriter, r *http.Request) {
+		conn, _, _, err := ws.UpgradeHTTP(r, w)
+		if err != nil {
+			l.Error("ws.UpgradeHTTP error: %s", err.Error())
+			return
+		}
+
+		id := r.URL.Query().Get("id") // get id from ws request URL
+		if id == "" {
+			t.Fatal("id miss")
+		}
+
+		l.Debugf("request URL: %s", r.URL.String())
+
+		cli := &Cli{
+			Conn: conn,
+			ID:   id,
+		}
+
+		if err := df_srv.AddClient(cli); err != nil {
+			l.Error(err)
+		}
+		return
 	}
 
 	go df_srv.Start()
@@ -48,14 +76,31 @@ func TestProxy(t *testing.T) {
 
 	time.Sleep(time.Second)
 
+	ncli := 2
+
+	type wscli struct {
+		id  string
+		cli *websocket.Conn
+	}
+
 	// datakit as ws proxy client
-	dkclis := []*websocket.Conn{}
-	for i := 0; i < 100; i++ {
-		dk_cli, _, err := websocket.DefaultDialer.Dial(__dw_wsurl.String(), nil)
+	dkclis := []*wscli{}
+	for i := 0; i < ncli; i++ {
+
+		cliid := cliutils.XID("id_")
+
+		dw_wsurl := url.URL{
+			Scheme:   "ws",
+			Host:     fmt.Sprintf("%s:%d", __wsip, __wsport),
+			Path:     __wsupath,
+			RawQuery: fmt.Sprintf(`id=%s&version=v1.0.0.0-1234-gabcdef`, cliid),
+		}
+
+		dk_cli, _, err := websocket.DefaultDialer.Dial(dw_wsurl.String(), nil)
 		if err != nil {
 			t.Fatalf("Failed to connect: %s", err.Error())
 		}
-		dkclis = append(dkclis, dk_cli)
+		dkclis = append(dkclis, &wscli{id: cliid, cli: dk_cli})
 	}
 
 	time.Sleep(time.Second)
@@ -64,22 +109,22 @@ func TestProxy(t *testing.T) {
 		l.Debugf("dk-ws-cli: %+#v", c)
 	}
 
-	__wg.Add(100)
+	__wg.Add(ncli)
 	ch := make(chan interface{})
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < ncli; i++ {
 		go func(i int) {
 			total := 0
 			c := dkclis[i]
 			defer __wg.Done()
 
 			for {
-				if err := c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("who am i[%d]", i))); err != nil {
+				if err := c.cli.WriteMessage(websocket.TextMessage, []byte(c.id)); err != nil {
 					t.Fatalf("client write failed: %s", err.Error())
 				}
 
 				total++
-				if _, resp, err := c.ReadMessage(); err != nil {
+				if _, resp, err := c.cli.ReadMessage(); err != nil {
 					t.Log(err)
 				} else {
 					if total%512 == 0 {
@@ -90,7 +135,7 @@ func TestProxy(t *testing.T) {
 				time.Sleep(time.Millisecond)
 				select {
 				case <-ch:
-					c.Close()
+					c.cli.Close()
 					return
 				default:
 				}
@@ -104,42 +149,4 @@ func TestProxy(t *testing.T) {
 	df_srv.Stop()
 
 	__wg.Wait()
-}
-
-func TestServer2(t *testing.T) {
-
-	// clients
-	nconn := 1024 * 60
-
-	var conns []*websocket.Conn
-	for i := 0; i < nconn; i++ {
-		c, _, err := websocket.DefaultDialer.Dial(__dw_wsurl.String(), nil)
-		if err != nil {
-			fmt.Println("Failed to connect", i, err)
-			break
-		}
-		conns = append(conns, c)
-		defer func() {
-			c.WriteControl(websocket.CloseMessage,
-				websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
-				time.Now().Add(time.Second))
-			time.Sleep(time.Second)
-			c.Close()
-		}()
-	}
-
-	fmt.Printf("Finished initializing %d connections\n", len(conns))
-
-	totalSend := 0
-	for {
-		for i := 0; i < len(conns); i++ {
-			time.Sleep(time.Duration(totalSend%7) * time.Microsecond)
-			conn := conns[i]
-			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(time.Second*5)); err != nil {
-				fmt.Printf("Failed to receive pong: %v", err)
-			}
-			conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Hello from conn %v", i)))
-			totalSend++
-		}
-	}
 }

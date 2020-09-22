@@ -17,10 +17,8 @@ var (
 )
 
 type Cli struct {
-	conn          net.Conn
-	id            string
-	born          time.Time
-	lastHeartbeat time.Time
+	Conn net.Conn
+	ID   string
 }
 
 func (s *Server) dispatcher() {
@@ -40,20 +38,12 @@ func (s *Server) dispatcher() {
 			select {
 			case cli := <-s.wscliCh: // new ws connection comming
 				if cli != nil {
-					l.Debugf("%s add datakit %s(from %s)", s.Bind, cli.id, cli.conn.RemoteAddr().String())
-					s.clis[cli.id] = cli
+					l.Debugf("%s add client %s(from %s)", s.Bind, cli.ID, cli.Conn.RemoteAddr().String())
+					s.clis[cli.ID] = cli
 				}
 
 			case msg := <-s.sendMsgCh: // send ws msg to cli
 				s.doSendMsgToClient(msg.msg, msg.to...)
-
-			case cliid := <-s.hbCh: // cli heartbeat comming
-				if cli, ok := s.clis[cliid]; ok {
-					l.Debugf("update heartbeat on %s", cliid)
-					cli.lastHeartbeat = time.Now()
-				} else {
-					l.Warnf("cliid %s not found", cliid)
-				}
 
 			case <-tick.C:
 				// TODO:
@@ -63,7 +53,7 @@ func (s *Server) dispatcher() {
 				l.Infof("total clients: %d", len(s.clis))
 			case <-s.exit.Wait():
 				for _, c := range s.clis {
-					if err := c.conn.Close(); err != nil {
+					if err := c.Conn.Close(); err != nil {
 						l.Warn("c.conn.Close(): %s, ignored", err.Error())
 					}
 				}
@@ -91,22 +81,10 @@ func (s *Server) doSendMsgToClient(msg []byte, to ...string) {
 		}
 
 		// send data to ws client
-		if err := wsutil.WriteServerText(cli.conn, msg); err != nil {
+		if err := wsutil.WriteServerText(cli.Conn, msg); err != nil {
 			l.Errorf("wsutil.WriteServerText(): %s", err.Error())
 			return
 		}
-	}
-}
-
-func (s *Server) AddCli(c *Cli) {
-	s.wscliCh <- c
-}
-
-func (s *Server) Heartbeat(id string) {
-	if s.hbinterval > 0 {
-		s.hbCh <- id
-	} else {
-		l.Warn("max heartbeat interval not set")
 	}
 }
 

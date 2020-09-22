@@ -32,8 +32,10 @@ type Server struct {
 
 	hbinterval time.Duration
 
-	handler func(*Server, net.Conn, []byte, ws.OpCode) error //server msg handler
-	uptime  time.Time
+	MsgHandler func(*Server, net.Conn, []byte, ws.OpCode) error //server msg handler
+	AddCli     func(w http.ResponseWriter, r *http.Request)
+
+	uptime time.Time
 
 	clis map[string]*Cli
 
@@ -41,9 +43,7 @@ type Server struct {
 	wg   *sync.WaitGroup
 
 	sendMsgCh chan *srvmsg
-
-	hbCh    chan string
-	wscliCh chan *Cli
+	wscliCh   chan *Cli
 
 	epoller *epoll
 }
@@ -52,14 +52,13 @@ func (s *Server) SetMaxHeartbeatInterval(i time.Duration) {
 	s.hbinterval = i
 }
 
-func NewServer(bind, path string, h func(*Server, net.Conn, []byte, ws.OpCode) error) (s *Server, err error) {
+func NewServer(bind, path string) (s *Server, err error) {
 
 	s = &Server{
 		Path: path,
 		Bind: bind,
 
 		ChanCap: CommonChanCap,
-		handler: h,
 
 		uptime: time.Now(),
 
@@ -68,7 +67,6 @@ func NewServer(bind, path string, h func(*Server, net.Conn, []byte, ws.OpCode) e
 		wg:   &sync.WaitGroup{},
 
 		sendMsgCh: make(chan *srvmsg, CommonChanCap),
-		hbCh:      make(chan string, CommonChanCap),
 		wscliCh:   make(chan *Cli, CommonChanCap),
 	}
 
@@ -81,27 +79,17 @@ func NewServer(bind, path string, h func(*Server, net.Conn, []byte, ws.OpCode) e
 	return
 }
 
-func (s *Server) epollAddConn(w http.ResponseWriter, r *http.Request) {
-	conn, _, _, err := ws.UpgradeHTTP(r, w)
-	if err != nil {
-		l.Error("ws.UpgradeHTTP error: %s", err.Error())
-		return
-	}
+func (s *Server) AddClient(cli *Cli) error {
 
-	if err := s.epoller.Add(conn); err != nil {
+	l.Debugf("epoll add connection from %s", cli.Conn.RemoteAddr().String())
+	if err := s.epoller.Add(cli.Conn); err != nil {
 		l.Errorf("epoll.Add() error: %s", err.Error())
-		conn.Close()
-		return
+		cli.Conn.Close()
+		return err
 	}
 
-	cli := &Cli{
-		conn: conn,
-		id:   conn.RemoteAddr().String(), // FIXME:
-		born: time.Now(),
-	}
-
-	l.Debugf("epoll add connection from %s", conn.RemoteAddr().String())
 	s.wscliCh <- cli
+	return nil
 }
 
 func (s *Server) Stop() {
@@ -149,7 +137,11 @@ func (s *Server) Start() {
 		Addr: s.Bind,
 	}
 
-	http.HandleFunc(s.Path, s.epollAddConn)
+	if s.AddCli == nil {
+		l.Fatal("AddCli not set")
+	}
+
+	http.HandleFunc(s.Path, s.AddCli)
 
 	s.wg.Add(1)
 	go func() {
@@ -178,8 +170,6 @@ func (s *Server) startEpoll() {
 
 		default:
 
-			//l.Debug("eneneneneen")
-
 			connections, err := s.epoller.Wait() // wait for 100ms
 			if err != nil {
 				l.Errorf("Failed to epoll wait %v", err)
@@ -200,8 +190,10 @@ func (s *Server) startEpoll() {
 					l.Debugf("close cli %s", conn.RemoteAddr().String())
 					conn.Close()
 				} else {
-					if err := s.handler(s, conn, data, opcode); err != nil {
-						l.Error("s.handler() error: %s", err.Error())
+					if s.MsgHandler != nil {
+						if err := s.MsgHandler(s, conn, data, opcode); err != nil {
+							l.Error("s.handler() error: %s", err.Error())
+						}
 					}
 				}
 			}
