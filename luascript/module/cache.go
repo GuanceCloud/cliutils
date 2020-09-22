@@ -6,11 +6,11 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-type luaCache struct {
+type LuaCache struct {
 	sync.Map
 }
 
-func (c *luaCache) get(L *lua.LState) int {
+func (c *LuaCache) get(L *lua.LState) int {
 	key := L.ToString(1)
 	value, ok := c.Load(key)
 	if !ok {
@@ -34,12 +34,12 @@ func (c *luaCache) get(L *lua.LState) int {
 	return 1
 }
 
-func (c *luaCache) set(L *lua.LState) int {
+func (c *LuaCache) set(L *lua.LState) int {
 	c.Store(L.ToString(1), L.Get(2))
 	return 0
 }
 
-func (c *luaCache) list(L *lua.LState) int {
+func (c *LuaCache) list(L *lua.LState) int {
 	var list []string
 	c.Range(func(key, value interface{}) bool {
 		list = append(list, key.(string))

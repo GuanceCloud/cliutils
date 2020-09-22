@@ -11,6 +11,26 @@ func Clean() {
 	connPool.close()
 }
 
+func RegisterAllFuncs(l *lua.LState, cache *LuaCache, logOutput io.Writer) {
+	RegisterHTTPFuncs(l)
+	RegisterSQLFuncs(l)
+	RegisterRedisFuncs(l)
+	RegisterMongoFuncs(l)
+	RegisterJsonFuncs(l)
+	RegisterCsvFuncs(l)
+	RegisterXmlFuncs(l)
+	RegisterCryptoFuncs(l)
+	RegisterRegexFuncs(l)
+
+	if cache != nil {
+		RegisterCacheFuncs(l, cache)
+	}
+
+	if logOutput != nil {
+		RegisterLogFuncs(l, logOutput)
+	}
+}
+
 func RegisterHTTPFuncs(l *lua.LState) {
 	var hc = NewHttpModule(&http.Client{})
 	l.SetGlobal("http_request", l.NewFunction(hc.request))
@@ -53,13 +73,6 @@ func RegisterXmlFuncs(l *lua.LState) {
 	l.SetGlobal("xml_decode", l.NewFunction(xmlDecode))
 }
 
-func RegisterCacheFuncs(l *lua.LState) {
-	c := luaCache{}
-	l.SetGlobal("cache_get", l.NewFunction(c.get))
-	l.SetGlobal("cache_set", l.NewFunction(c.set))
-	l.SetGlobal("cache_list", l.NewFunction(c.list))
-}
-
 func RegisterRegexFuncs(l *lua.LState) {
 	l.SetGlobal("re_quote", l.NewFunction(reQuote))
 	l.SetGlobal("re_find", l.NewFunction(reFind))
@@ -75,6 +88,12 @@ func RegisterCryptoFuncs(l *lua.LState) {
 	l.SetGlobal("hmac", l.NewFunction(hmacFn))
 	l.SetGlobal("encrypt", l.NewFunction(encryptFn))
 	l.SetGlobal("decrypt", l.NewFunction(decryptFn))
+}
+
+func RegisterCacheFuncs(l *lua.LState, c *LuaCache) {
+	l.SetGlobal("cache_get", l.NewFunction(c.get))
+	l.SetGlobal("cache_set", l.NewFunction(c.set))
+	l.SetGlobal("cache_list", l.NewFunction(c.list))
 }
 
 func RegisterLogFuncs(l *lua.LState, ouput io.Writer) {

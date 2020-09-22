@@ -1,47 +1,39 @@
 package luascript
 
 import (
-	"log"
-
 	"github.com/robfig/cron"
-	"gitlab.jiagouyun.com/cloudcare-tools/ftagent/luamode"
+	lua "github.com/yuin/gopher-lua"
+
+	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/luascript/module"
 )
 
-type CronHandle struct {
-	Code  string
-	Sched cron.Schedule
+type LuaCron struct {
+	*cron.Cron
 }
 
-type CronLua struct {
-	crontab *cron.Cron
-	Handles []CronHandle
-}
-
-func NewCronLua() CronLua {
-	return CronLua{
-		crontab: cron.New(),
-		Handles: []CronHandle{},
+func NewLuaCron() *LuaCron {
+	return &LuaCron{
+		cron.New(),
 	}
 }
 
-func (cs *CronLua) Run() {
-	for _, c := range cs.Handles {
-
-		l := luamode.NewLuaMode()
-		l.RegisterFuncs()
-		l.RegisterCacheFuncs(cache)
-
-		code := c.Code
-		cs.crontab.Schedule(c.Sched, cron.FuncJob(func() {
-			if err := l.DoString(code); err != nil {
-				log.Fatalf("[fatal] should not been here: %s", err.Error())
-			}
-		}))
+func (c *LuaCron) AddHandle(code string, intervalSpec string) error {
+	if err := CheckLuaCode(code); err != nil {
+		return err
 	}
 
-	cs.crontab.Start()
+	luastate := lua.NewState()
+	module.RegisterAllFuncs(luastate, luaCache, nil)
+
+	return c.AddFunc(intervalSpec, func() {
+		luastate.DoString(code)
+	})
 }
 
-func (cs *CronLua) AppendHandle(h CronHandle) {
-	cs.Handles = append(cs.Handles, h)
+func (c *LuaCron) Run() {
+	c.Start()
+}
+
+func (c *LuaCron) Stop() {
+	c.Stop()
 }
