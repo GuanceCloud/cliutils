@@ -21,7 +21,7 @@ var (
 )
 
 type srvmsg struct {
-	to  string
+	to  []string
 	msg []byte
 }
 

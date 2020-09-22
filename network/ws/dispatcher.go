@@ -45,7 +45,7 @@ func (s *Server) dispatcher() {
 				}
 
 			case msg := <-s.sendMsgCh: // send ws msg to cli
-				s.doSendMsgToClient(msg.to, msg.msg)
+				s.doSendMsgToClient(msg.msg, msg.to...)
 
 			case cliid := <-s.hbCh: // cli heartbeat comming
 				if cli, ok := s.clis[cliid]; ok {
@@ -81,18 +81,20 @@ func todo() {
 	panic(fmt.Errorf("not implement"))
 }
 
-func (s *Server) doSendMsgToClient(to string, msg []byte) {
+func (s *Server) doSendMsgToClient(msg []byte, to ...string) {
 
-	cli, ok := s.clis[to]
-	if !ok {
-		l.Warnf("cli ID %s not found", to)
-		return
-	}
+	for _, dst := range to {
+		cli, ok := s.clis[dst]
+		if !ok {
+			l.Warnf("cli ID %s not found", dst)
+			return
+		}
 
-	// send data to ws client
-	if err := wsutil.WriteServerText(cli.conn, msg); err != nil {
-		l.Errorf("wsutil.WriteServerText(): %s", err.Error())
-		return
+		// send data to ws client
+		if err := wsutil.WriteServerText(cli.conn, msg); err != nil {
+			l.Errorf("wsutil.WriteServerText(): %s", err.Error())
+			return
+		}
 	}
 }
 
@@ -108,7 +110,7 @@ func (s *Server) Heartbeat(id string) {
 	}
 }
 
-func (s *Server) SendServerMsg(to string, msg []byte) {
+func (s *Server) SendServerMsg(msg []byte, to ...string) {
 	s.sendMsgCh <- &srvmsg{
 		to:  to,
 		msg: msg,

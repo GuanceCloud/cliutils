@@ -29,7 +29,7 @@ func TestProxy(t *testing.T) {
 	// dataflux as ws server
 	dfwsurl := fmt.Sprintf("%s:%d", __wsip, __wsport+1)
 	df_srv, err := NewServer(dfwsurl, __wsupath, func(s *Server, c net.Conn, data []byte, op ws.OpCode) error {
-		s.SendServerMsg(c.RemoteAddr().String(), []byte(fmt.Sprintf("your are %s", c.RemoteAddr().String())))
+		s.SendServerMsg([]byte(fmt.Sprintf("your are %s", c.RemoteAddr().String())), []string{c.RemoteAddr().String()}...)
 		return nil
 	})
 	if err != nil {
