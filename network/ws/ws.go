@@ -17,8 +17,14 @@ import (
 )
 
 var (
-	l = logger.DefaultSLogger("ws")
+	l             = logger.DefaultSLogger("ws")
+	CommonChanCap = 128
 )
+
+type Cli interface {
+	ID() string
+	Conn() net.Conn
+}
 
 type srvmsg struct {
 	to  []string
@@ -37,13 +43,13 @@ type Server struct {
 
 	uptime time.Time
 
-	clis map[string]*Cli
+	clis map[string]Cli
 
 	exit *cliutils.Sem
 	wg   *sync.WaitGroup
 
 	sendMsgCh chan *srvmsg
-	wscliCh   chan *Cli
+	wscliCh   chan Cli
 
 	epoller *epoll
 }
@@ -62,12 +68,12 @@ func NewServer(bind, path string) (s *Server, err error) {
 
 		uptime: time.Now(),
 
-		clis: map[string]*Cli{},
+		clis: map[string]Cli{},
 		exit: cliutils.NewSem(),
 		wg:   &sync.WaitGroup{},
 
 		sendMsgCh: make(chan *srvmsg, CommonChanCap),
-		wscliCh:   make(chan *Cli, CommonChanCap),
+		wscliCh:   make(chan Cli, CommonChanCap),
 	}
 
 	s.epoller, err = MkEpoll()
@@ -79,12 +85,12 @@ func NewServer(bind, path string) (s *Server, err error) {
 	return
 }
 
-func (s *Server) AddClient(cli *Cli) error {
+func (s *Server) AddClient(cli Cli) error {
 
-	l.Debugf("epoll add connection from %s", cli.Conn.RemoteAddr().String())
-	if err := s.epoller.Add(cli.Conn); err != nil {
+	l.Debugf("epoll add connection from %s", cli.Conn().RemoteAddr().String())
+	if err := s.epoller.Add(cli.Conn()); err != nil {
 		l.Errorf("epoll.Add() error: %s", err.Error())
-		cli.Conn.Close()
+		cli.Conn().Close()
 		return err
 	}
 

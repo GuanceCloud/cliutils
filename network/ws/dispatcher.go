@@ -4,22 +4,12 @@ package ws
 
 import (
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/gobwas/ws/wsutil"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/system/rtpanic"
 )
-
-var (
-	CommonChanCap = 128
-)
-
-type Cli struct {
-	Conn net.Conn
-	ID   string
-}
 
 func (s *Server) dispatcher() {
 	var f rtpanic.RecoverCallback
@@ -38,8 +28,8 @@ func (s *Server) dispatcher() {
 			select {
 			case cli := <-s.wscliCh: // new ws connection comming
 				if cli != nil {
-					l.Debugf("%s add client %s(from %s)", s.Bind, cli.ID, cli.Conn.RemoteAddr().String())
-					s.clis[cli.ID] = cli
+					l.Debugf("%s add client %s(from %s)", s.Bind, cli.ID(), cli.Conn().RemoteAddr().String())
+					s.clis[cli.ID()] = cli
 				}
 
 			case msg := <-s.sendMsgCh: // send ws msg to cli
@@ -53,7 +43,7 @@ func (s *Server) dispatcher() {
 				l.Infof("total clients: %d", len(s.clis))
 			case <-s.exit.Wait():
 				for _, c := range s.clis {
-					if err := c.Conn.Close(); err != nil {
+					if err := c.Conn().Close(); err != nil {
 						l.Warn("c.conn.Close(): %s, ignored", err.Error())
 					}
 				}
@@ -81,7 +71,7 @@ func (s *Server) doSendMsgToClient(msg []byte, to ...string) {
 		}
 
 		// send data to ws client
-		if err := wsutil.WriteServerText(cli.Conn, msg); err != nil {
+		if err := wsutil.WriteServerText(cli.Conn(), msg); err != nil {
 			l.Errorf("wsutil.WriteServerText(): %s", err.Error())
 			return
 		}
