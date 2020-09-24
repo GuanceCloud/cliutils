@@ -109,6 +109,8 @@ func (s *Server) Stop() {
 
 func (s *Server) Start() {
 
+	l = logger.SLogger("ws")
+
 	// remove resources limitations
 	var rLimit syscall.Rlimit
 	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
