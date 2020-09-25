@@ -1,66 +1,36 @@
-package luascript
+package points
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
 	influxdb "github.com/influxdata/influxdb1-client/v2"
 	lua "github.com/yuin/gopher-lua"
+
+	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/luascript"
 )
 
-func TestSendMetatable(t *testing.T) {
+func TestSendPoints(t *testing.T) {
 	var luaCode = `
 function handle(points)
 	for _, pt in pairs(points) do
-		print("name:", pt.name)
-		print("time:", pt.time)
-		print("-------\ntags:")
-		for k, v in pairs(pt.tags) do
-			print(k, v)
-		end
-		print("-------\nfields:")
-		for k, v in pairs(pt.fields) do
-			print(k, v)
-			if k == "f1" or k == "f2" then
-				print("+1", v+1)
+		for k, v in pairs(pt) do
+			print("name", pt.name)
+			print("time", pt.time)
+			print("-------\ntags:")
+			for k, v in pairs(pt.tags) do
+				print(k, v)
+			end
+			print("-------\nfields:")
+			for k, v in pairs(pt.fields) do
+				print(k, v)
 			end
 		end
 		print("-----------------------")
 	end
-
-	for i, pt in pairs(points) do
-		pt.name = "new_name"
-		pt.time = 11111111111
-		for k, v in pairs(pt.tags) do
-			pt.tags[k] = "new_tags_value"
-		end
-		for k, v in pairs(pt.fields) do
-			pt.fields[k] = "new_fields_value"
-		end
-	end
-
-	print("=================== modify points ==================")
-
-	for _, pt in pairs(points) do
-		print("name:", pt.name)
-		print("time:", pt.time)
-		print("-------\ntags:")
-		for k, v in pairs(pt.tags) do
-			print(k, v)
-		end
-		print("-------\nfields:")
-		for k, v in pairs(pt.fields) do
-			print(k, v)
-		end
-		print("-----------------------")
-	end
-
 	return points
 end
-print("out function")
 `
-
 	pt1, _ := influxdb.NewPoint("point01",
 		map[string]string{
 			"t1": "tags10",
@@ -96,22 +66,23 @@ print("out function")
 		t.Fatal(err)
 	}
 
-	ret, err := sendMetatable(l, []*influxdb.Point{pt1, pt2})
+	p, err := NewPoints("test", false, []*influxdb.Point{pt1, pt2})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Log("type: ", reflect.TypeOf(ret))
-	t.Log("table: ", *ret)
-
-	if pts, err := table2Points(ret); err != nil {
+	ret, err := luascript.SendToLua(l, luascript.ToLValue(l, p.DataToLua()), "handle", "points")
+	if err != nil {
 		t.Fatal(err)
-	} else {
-		t.Log("points: ", pts)
 	}
+	jsonStr, err := luascript.JsonEncode(ret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Handle(jsonStr, nil)
 }
 
-func TestAddPoint(t *testing.T) {
+func TestAddPoints(t *testing.T) {
 	var luaCode = `
 function handle(points)
 	table.insert(points,
@@ -142,10 +113,6 @@ function handle(points)
 	return points
 end`
 
-	if err := CheckLuaCode(luaCode); err != nil {
-		t.Fatal(err)
-	}
-
 	pt1, _ := influxdb.NewPoint("point01",
 		map[string]string{
 			"t1": "tags10",
@@ -167,14 +134,9 @@ end`
 		t.Fatal(err)
 	}
 
-	ret, err := sendMetatable(l, []*influxdb.Point{pt1})
+	p, err := NewPoints("test", true, []*influxdb.Point{pt1})
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if pts, err := table2Points(ret); err != nil {
-		t.Fatal(err)
-	} else {
-		t.Log("points: ", pts)
-	}
+	_ = p
 }

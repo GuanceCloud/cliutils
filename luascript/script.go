@@ -2,146 +2,53 @@ package luascript
 
 import (
 	"fmt"
-	"sync"
-	"time"
+	"strings"
 
-	influxdb "github.com/influxdata/influxdb1-client/v2"
 	lua "github.com/yuin/gopher-lua"
+	"github.com/yuin/gopher-lua/parse"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/luascript/module"
 )
 
-const (
-	defaultWorkNum = 4
+const defaultWorkerNum = 4
 
-	defaultEnableStrongType = true
-
-	defaultWorkingTimeout = time.Second * 6
-)
-
-type pointsReq struct {
-	name string
-	pts  []*influxdb.Point
-	ch   chan interface{}
+type LuaData interface {
+	Handle(value string, err error)
+	DataToLua() interface{}
+	Name() string
+	CallbackFnName() string
+	CallbackTypeName() string
 }
 
-var (
-	pointsChan = make(chan *pointsReq, defaultWorkNum*2)
-)
-
-type work struct {
-	ls      map[string][]*lua.LState
-	typelog map[string]fieldType
-	opt     *Option
-}
-
-func newWork(lines map[string][]string, opt *Option) (*work, error) {
-	wk := &work{
-		ls:      make(map[string][]*lua.LState),
-		typelog: make(map[string]fieldType),
-		opt:     opt,
-	}
-
-	for name, codes := range lines {
-		lst := []*lua.LState{}
-
-		for _, code := range codes {
-			luastate := lua.NewState()
-			module.RegisterAllFuncs(luastate, luaCache, nil)
-
-			if err := luastate.DoString(code); err != nil {
-				return nil, err
-			}
-
-			lst = append(lst, luastate)
-		}
-
-		wk.ls[name] = lst
-	}
-
-	return wk, nil
-}
-
-func (wk *work) run() {
-	var err error
-
-	for {
-	AGAIN:
-		select {
-		case pd := <-pointsChan:
-			ls, ok := wk.ls[pd.name]
-			if !ok {
-				goto AGAIN
-			}
-			pts := pd.pts
-
-			if wk.opt.EnableStrongType {
-				wk.typelog = logType(pts)
-			}
-
-			for _, luastate := range ls {
-				pts, err = PointsOnHandle(luastate, pts, wk.typelog)
-				if err != nil {
-					goto AGAIN
-				}
-			}
-
-			if wk.opt.EnableStrongType {
-				pts, err = typeRecove(pts, wk.typelog)
-				if err != nil {
-					goto AGAIN
-				}
-			}
-
-			pd.ch <- pts
-
-		case <-wk.opt.exit.Wait():
-			wk.clean()
-			return
-		}
-	}
-}
-
-func (wk *work) clean() {
-	for _, ls := range wk.ls {
-		for _, luastate := range ls {
-			luastate.Close()
-		}
-	}
-}
-
-type Option struct {
-	WorkNum          int
-	EnableStrongType bool
-	exit             *cliutils.Sem
+var defaultLuaScript = &LuaScript{
+	codes:     make(map[string][]string),
+	workerNum: defaultWorkerNum,
+	luaCache:  &module.LuaCache{},
+	dataChan:  make(chan LuaData, defaultWorkerNum*2),
+	exit:      cliutils.NewSem(),
 }
 
 type LuaScript struct {
-	lines map[string][]string
-	opt   *Option
-	wg    sync.WaitGroup
+	codes     map[string][]string
+	workerNum int
+	luaCache  *module.LuaCache
+	dataChan  chan LuaData
+	exit      *cliutils.Sem
 }
 
-func NewLuaScript(opt ...*Option) *LuaScript {
-	s := &LuaScript{
-		lines: make(map[string][]string),
-		wg:    sync.WaitGroup{},
+func NewLuaScript(workerNum int) *LuaScript {
+	return &LuaScript{
+		codes:     make(map[string][]string),
+		workerNum: workerNum,
+		luaCache:  &module.LuaCache{},
+		dataChan:  make(chan LuaData, workerNum*2),
+		exit:      cliutils.NewSem(),
 	}
-	if len(opt) > 0 {
-		s.opt = opt[0]
-	} else {
-		s.opt = &Option{
-			WorkNum:          defaultWorkNum,
-			EnableStrongType: defaultEnableStrongType,
-		}
-	}
-	s.opt.exit = cliutils.NewSem()
-	return s
 }
 
-func (s *LuaScript) AddLuaCode(name string, codes []string) error {
-	if _, ok := s.lines[name]; ok {
+func (s *LuaScript) AddLuaVMs(name string, codes []string) error {
+	if _, ok := s.codes[name]; ok {
 		return fmt.Errorf("the %s runner line already exist", name)
 	}
 
@@ -150,51 +57,89 @@ func (s *LuaScript) AddLuaCode(name string, codes []string) error {
 			return err
 		}
 	}
-
-	s.lines[name] = codes
+	s.codes[name] = codes
 	return nil
 }
 
 func (s *LuaScript) Run() {
-	for i := 0; i < s.opt.WorkNum; i++ {
-		s.wg.Add(1)
+	for i := 0; i < s.workerNum; i++ {
 		go func() {
-			defer s.wg.Done()
-
-			wk, err := newWork(s.lines, s.opt)
-			if err != nil {
-				return
-			}
+			wk := newWork(s, s.codes)
 			wk.run()
 		}()
 	}
 }
 
-func (s *LuaScript) SendPoints(name string, pts []*influxdb.Point) ([]*influxdb.Point, error) {
-	req := &pointsReq{
-		name: name,
-		pts:  pts,
-		ch:   make(chan interface{}),
+func (s *LuaScript) Stop() {
+	s.exit.Close()
+}
+
+type worker struct {
+	script *LuaScript
+	ls     map[string][]*lua.LState
+}
+
+func newWork(script *LuaScript, lines map[string][]string) *worker {
+	wk := &worker{
+		script: script,
+		ls:     make(map[string][]*lua.LState),
 	}
-	pointsChan <- req
-	defer close(req.ch)
+	for name, codes := range lines {
+		lst := []*lua.LState{}
+		for _, code := range codes {
+			luastate := lua.NewState()
+			module.RegisterAllFuncs(luastate, wk.script.luaCache, nil)
 
-	select {
-	case <-time.After(defaultWorkingTimeout):
-		return nil, fmt.Errorf("%s working timeout", name)
+			luastate.DoString(code)
+			lst = append(lst, luastate)
+		}
+		wk.ls[name] = lst
+	}
+	return wk
+}
 
-	case result := <-req.ch:
-		switch t := result.(type) {
-		case error:
-			return nil, result.(error)
-		case []*influxdb.Point:
-			return result.([]*influxdb.Point), nil
-		default:
-			return nil, fmt.Errorf("invalid result type: %v", t)
+func (wk *worker) run() {
+	for {
+	AGAIN:
+		select {
+		case data := <-wk.script.dataChan:
+			ls := wk.ls[data.Name()]
+			if len(ls) == 0 {
+				data.Handle("", fmt.Errorf("not found LuaState for this name"))
+				goto AGAIN
+			}
+
+			var err error
+			val := lua.LNil
+			for index, l := range ls {
+				if index == 0 {
+					val = ToLValue(l, data.DataToLua())
+				}
+				val, err = SendToLua(l, val, data.CallbackFnName(), data.CallbackTypeName())
+				if err != nil {
+					data.Handle("", fmt.Errorf("luaState exec error: %v", err))
+					goto AGAIN
+				}
+			}
+			data.Handle(val.String(), nil)
+
+		case <-wk.script.exit.Wait():
+			wk.clean()
+			return
 		}
 	}
 }
 
-func (s *LuaScript) Stop() {
-	s.opt.exit.Close()
+func (wk *worker) clean() {
+	for _, ls := range wk.ls {
+		for _, luastate := range ls {
+			luastate.Close()
+		}
+	}
+}
+
+func CheckLuaCode(code string) error {
+	reader := strings.NewReader(code)
+	_, err := parse.Parse(reader, "<string>")
+	return err
 }

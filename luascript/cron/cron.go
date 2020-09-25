@@ -11,6 +11,8 @@ type LuaCron struct {
 	*cron.Cron
 }
 
+// var specParser = cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month)
+
 func NewLuaCron() *LuaCron {
 	return &LuaCron{
 		cron.New(),

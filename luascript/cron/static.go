@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	l = logger.DefaultSLogger("lua_script")
+	ll = logger.DefaultSLogger("lua_script")
 	// l = logger.SLogger("lua_script")
 	specParser = cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month)
 

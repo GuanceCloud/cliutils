@@ -25,6 +25,7 @@ require (
 	github.com/robfig/cron v1.2.0
 	github.com/rs/xid v1.2.1
 	github.com/satori/go.uuid v1.2.0
+	github.com/tidwall/gjson v1.6.1
 	github.com/yuin/gopher-lua v0.0.0-20200816102855-ee81675732da
 	gitlab.jiagouyun.com/cloudcare-tools/dataway v1.0.1
 	gitlab.jiagouyun.com/cloudcare-tools/ftagent v1.0.1 // indirect
@@ -33,4 +34,5 @@ require (
 	go.uber.org/zap v1.15.0
 	golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
+	layeh.com/gopher-luar v1.0.8
 )
