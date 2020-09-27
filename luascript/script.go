@@ -39,8 +39,8 @@ func Run() {
 	defaultLuaScript.Run()
 }
 
-func Exec(d LuaData) error {
-	return defaultLuaScript.Exec(d)
+func SendData(d LuaData) error {
+	return defaultLuaScript.SendData(d)
 }
 
 func Stop() {
@@ -103,7 +103,7 @@ func (s *LuaScript) Run() {
 	s.runStatus = true
 }
 
-func (s *LuaScript) Exec(d LuaData) error {
+func (s *LuaScript) SendData(d LuaData) error {
 	// channel already close?
 	if _, ok := s.codes[d.Name()]; !ok {
 		return fmt.Errorf("not found luaState of this name '%s'", d.Name())

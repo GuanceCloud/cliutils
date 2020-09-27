@@ -72,7 +72,7 @@ end
 		t.Fatal(err)
 	}
 
-	Exec(p)
+	SendData(p)
 
 	time.Sleep(time.Second * 2)
 
