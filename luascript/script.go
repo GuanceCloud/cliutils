@@ -3,6 +3,7 @@ package luascript
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	lua "github.com/yuin/gopher-lua"
 	"github.com/yuin/gopher-lua/parse"
@@ -26,28 +27,50 @@ var defaultLuaScript = &LuaScript{
 	workerNum: defaultWorkerNum,
 	luaCache:  &module.LuaCache{},
 	dataChan:  make(chan LuaData, defaultWorkerNum*2),
-	exit:      cliutils.NewSem(),
+	runStatus: false,
+	wg:        sync.WaitGroup{},
+}
+
+func AddLuaLines(name string, codes []string) error {
+	return defaultLuaScript.AddLuaLines(name, codes)
+}
+
+func Run() {
+	defaultLuaScript.Run()
+}
+
+func Exec(d LuaData) error {
+	return defaultLuaScript.Exec(d)
+}
+
+func Stop() {
+	defaultLuaScript.Stop()
 }
 
 type LuaScript struct {
 	codes     map[string][]string
 	workerNum int
-	luaCache  *module.LuaCache
 	dataChan  chan LuaData
+
+	luaCache *module.LuaCache
+
 	exit      *cliutils.Sem
+	runStatus bool
+	wg        sync.WaitGroup
 }
 
 func NewLuaScript(workerNum int) *LuaScript {
 	return &LuaScript{
 		codes:     make(map[string][]string),
 		workerNum: workerNum,
-		luaCache:  &module.LuaCache{},
 		dataChan:  make(chan LuaData, workerNum*2),
-		exit:      cliutils.NewSem(),
+		luaCache:  &module.LuaCache{},
+		runStatus: false,
+		wg:        sync.WaitGroup{},
 	}
 }
 
-func (s *LuaScript) AddLuaVMs(name string, codes []string) error {
+func (s *LuaScript) AddLuaLines(name string, codes []string) error {
 	if _, ok := s.codes[name]; ok {
 		return fmt.Errorf("the %s runner line already exist", name)
 	}
@@ -62,16 +85,40 @@ func (s *LuaScript) AddLuaVMs(name string, codes []string) error {
 }
 
 func (s *LuaScript) Run() {
+	if s.runStatus {
+		return
+	}
+
+	s.exit = cliutils.NewSem()
+
 	for i := 0; i < s.workerNum; i++ {
+		s.wg.Add(1)
 		go func() {
 			wk := newWork(s, s.codes)
 			wk.run()
+			s.wg.Done()
 		}()
 	}
+
+	s.runStatus = true
+}
+
+func (s *LuaScript) Exec(d LuaData) error {
+	// channel already close?
+	if _, ok := s.codes[d.Name()]; !ok {
+		return fmt.Errorf("not found luaState of this name '%s'", d.Name())
+	}
+	s.dataChan <- d
+	return nil
 }
 
 func (s *LuaScript) Stop() {
+	if !s.runStatus {
+		return
+	}
 	s.exit.Close()
+	s.wg.Wait()
+	s.runStatus = false
 }
 
 type worker struct {
@@ -103,25 +150,28 @@ func (wk *worker) run() {
 	AGAIN:
 		select {
 		case data := <-wk.script.dataChan:
-			ls := wk.ls[data.Name()]
-			if len(ls) == 0 {
-				data.Handle("", fmt.Errorf("not found LuaState for this name"))
-				goto AGAIN
-			}
-
 			var err error
+			ls := wk.ls[data.Name()]
 			val := lua.LNil
+
 			for index, l := range ls {
 				if index == 0 {
 					val = ToLValue(l, data.DataToLua())
 				}
 				val, err = SendToLua(l, val, data.CallbackFnName(), data.CallbackTypeName())
 				if err != nil {
-					data.Handle("", fmt.Errorf("luaState exec error: %v", err))
+					data.Handle("", fmt.Errorf("lua '%s' exec error: %v", data.Name(), err))
 					goto AGAIN
 				}
 			}
-			data.Handle(val.String(), nil)
+
+			jsonStr, err := JsonEncode(val)
+			if err != nil {
+				data.Handle("", fmt.Errorf("lua '%s' exec error: %v", data.Name(), err))
+				goto AGAIN
+			}
+
+			data.Handle(jsonStr, nil)
 
 		case <-wk.script.exit.Wait():
 			wk.clean()

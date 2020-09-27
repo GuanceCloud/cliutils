@@ -38,19 +38,14 @@ func ToLValue(l *lua.LState, value interface{}) lua.LValue {
 	switch val := reflect.ValueOf(value); val.Kind() {
 	case reflect.Bool:
 		return lua.LBool(val.Bool())
-
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return lua.LNumber(val.Int())
-
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return lua.LNumber(val.Uint())
-
 	case reflect.Float32, reflect.Float64:
 		return lua.LNumber(val.Float())
-
 	case reflect.String:
 		return lua.LString(val.String())
-
 	case reflect.Map:
 		if val.IsNil() {
 			return lua.LNil
@@ -61,7 +56,6 @@ func ToLValue(l *lua.LState, value interface{}) lua.LValue {
 			tb.RawSet(ToLValue(l, valMap.Key().Interface()), ToLValue(l, valMap.Value().Interface()))
 		}
 		return tb
-
 	case reflect.Slice:
 		if val.IsNil() {
 			return lua.LNil
@@ -73,13 +67,11 @@ func ToLValue(l *lua.LState, value interface{}) lua.LValue {
 			tb.Append(ToLValue(l, val.Index(i).Interface()))
 		}
 		return tb
-
 	case reflect.Ptr:
 		if val.IsNil() {
 			return lua.LNil
 		}
 		return ToLValue(l, val.Elem().Interface())
-
 	case reflect.Struct:
 		fallthrough
 	default:

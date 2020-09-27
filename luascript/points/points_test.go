@@ -134,9 +134,19 @@ end`
 		t.Fatal(err)
 	}
 
-	p, err := NewPoints("test", true, []*influxdb.Point{pt1})
+	p, err := NewPoints("test", false, []*influxdb.Point{pt1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = p
+
+	ret, err := luascript.SendToLua(l, luascript.ToLValue(l, p.DataToLua()), "handle", "points")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	jsonStr, err := luascript.JsonEncode(ret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Handle(jsonStr, nil)
 }
