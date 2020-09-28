@@ -85,9 +85,9 @@ end
 }
 
 type pointData struct {
-	name    string
-	data    []map[string]interface{}
-	typelog map[string]fieldType
+	name   string
+	data   []map[string]interface{}
+	intlog map[string][]string
 }
 
 func NewPointData(name string, pts []*influxdb.Point) (*pointData, error) {
@@ -95,7 +95,11 @@ func NewPointData(name string, pts []*influxdb.Point) (*pointData, error) {
 		return nil, errors.New("name doesnot empty")
 	}
 
-	var p = pointData{name: name, data: []map[string]interface{}{}}
+	var p = pointData{
+		name:   name,
+		data:   []map[string]interface{}{},
+		intlog: map[string][]string{},
+	}
 
 	for _, pt := range pts {
 		f, err := pt.Fields()
@@ -109,8 +113,8 @@ func NewPointData(name string, pts []*influxdb.Point) (*pointData, error) {
 			"fields": f,
 			"time":   pt.UnixNano(),
 		})
+		p.intlog[pt.Name()] = integerLog(f)
 	}
-	p.typelog = logType(pts)
 
 	return &p, nil
 }
@@ -151,106 +155,34 @@ func (p *pointData) Handle(value string, err error) {
 
 	pts := []*influxdb.Point{}
 	for _, m := range x {
+		recoveType(p.intlog[m.Name], m.Fields)
+
 		pt, _ := influxdb.NewPoint(m.Name, m.Tags, m.Fields, time.Unix(0, m.Time))
 		pts = append(pts, pt)
 	}
 
-	pts, err = typeRecove(pts, p.typelog)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
 	for _, pt := range pts {
 		fmt.Println(pt.String())
 	}
 }
 
-// log only `int' fields
-type fieldType []string
-
-func logType(pts []*influxdb.Point) map[string]fieldType {
-	fts := map[string]fieldType{}
-	for _, p := range pts {
-		fts[p.Name()] = filterIntFields(p)
-	}
-	return fts
-}
-
-func filterIntFields(pt *influxdb.Point) fieldType {
-	ft := fieldType{}
-	fs, err := pt.Fields()
-	if err != nil {
-		return nil
-	}
-
-	for k, v := range fs {
+func integerLog(m map[string]interface{}) []string {
+	var list []string
+	for k, v := range m {
 		switch v.(type) {
 		case int, int8, int16, int32, int64,
 			uint, uint8, uint16, uint32, uint64:
-			ft = append(ft, k)
+			list = append(list, k)
 		}
 	}
-	return ft
+	return list
 }
 
-func typeRecove(pts []*influxdb.Point, typelog map[string]fieldType) ([]*influxdb.Point, error) {
-	var points []*influxdb.Point
-	for _, pt := range pts {
-		newpt, err := recoverIntFields(pt, typelog[pt.Name()])
-		if err != nil {
-			return nil, err
-		}
-		points = append(points, newpt)
-	}
-	return points, nil
-}
-
-func recoverIntFields(p *influxdb.Point, ft fieldType) (*influxdb.Point, error) {
-	if len(ft) == 0 { // FIXME: need new point based on @p?
-		return p, nil
-	}
-
-	fs, err := p.Fields()
-	if err != nil {
-		return nil, err
-	}
-
-	pn := p.Name()
-
-	n := 0
-
-	// NOTE: Lua do not distinguish int/float, all Golang got is float.
-	// if your really need int to be float, disable type-safe in configure.
-	// Loop all original int fields, they must be float now, convert to int anyway.
-	// We do not check other types of fields, the Lua developer SHOULD becarefull
-	// to treat them type-safe when updating exists field values, or influxdb
-	// may refuse to accept the point handled by Lua.
-	for _, k := range ft {
-		if fs[k] == nil {
-			// l.Debugf("ignore missing filed %s.%s", pn, k)
-			continue
-		}
-		switch fs[k].(type) {
-		case float32:
-			fs[k] = int64(fs[k].(float32))
-			n++
+func recoveType(intlog []string, m map[string]interface{}) {
+	for _, k := range intlog {
+		switch m[k].(type) {
 		case float64:
-			fs[k] = int64(fs[k].(float64))
-			n++
-		default:
-			// l.Warnf("overwrite int field(%s.%s) with conflict type: int > %v, point: %s, ft: %v",pn, k, fs[k], p.String(), ft)
+			m[k] = int64(m[k].(float64))
 		}
-	}
-
-	if n == 0 { // no field updated
-		return p, nil
-	} else {
-		// l.Debugf("%d points type recovered", n)
-		pt, err := influxdb.NewPoint(pn, p.Tags(), fs, p.Time())
-		if err != nil {
-			// l.Error(err)
-			return nil, err
-		}
-		return pt, nil
 	}
 }
