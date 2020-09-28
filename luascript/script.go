@@ -2,61 +2,51 @@ package luascript
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 
 	lua "github.com/yuin/gopher-lua"
-	"github.com/yuin/gopher-lua/parse"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/luascript/module"
 )
 
-const defaultWorkerNum = 4
-
+// LuLuaData LuaScript所接收的数据接口
 type LuaData interface {
+
+	// 主要执行函数，接收从lua中返回的数据的json字符串，和执行过程中出现的error
 	Handle(value string, err error)
+
+	// 要发送给lua的数据，建议是基础类型，如整型、浮点型、map和slice等
 	DataToLua() interface{}
+
+	// 数据要执行的lua分组名称
 	Name() string
+
+	// lua执行函数的函数名
 	CallbackFnName() string
+
+	// lua执行函数的唯一形参，即DataToLua数据在lua中的具体表现名称
 	CallbackTypeName() string
 }
 
-var defaultLuaScript = &LuaScript{
-	codes:     make(map[string][]string),
-	workerNum: defaultWorkerNum,
-	luaCache:  &module.LuaCache{},
-	dataChan:  make(chan LuaData, defaultWorkerNum*2),
-	runStatus: false,
-	wg:        sync.WaitGroup{},
-}
-
-func AddLuaLines(name string, codes []string) error {
-	return defaultLuaScript.AddLuaLines(name, codes)
-}
-
-func Run() {
-	defaultLuaScript.Run()
-}
-
-func SendData(d LuaData) error {
-	return defaultLuaScript.SendData(d)
-}
-
-func Stop() {
-	defaultLuaScript.Stop()
-}
-
 type LuaScript struct {
-	codes     map[string][]string
-	workerNum int
-	dataChan  chan LuaData
+	// 代码组，每个组名有N个代码块
+	codes map[string][]string
 
+	workerNum int
+
+	dataChan chan LuaData
+
+	// 注册lua模块所需，每个LuaScript共享同一份luaCache
 	luaCache *module.LuaCache
 
-	exit      *cliutils.Sem
+	// 退出广播
+	exit *cliutils.Sem
+
+	// 是否处于运行状态
 	runStatus bool
-	wg        sync.WaitGroup
+
+	wg sync.WaitGroup
 }
 
 func NewLuaScript(workerNum int) *LuaScript {
@@ -64,7 +54,7 @@ func NewLuaScript(workerNum int) *LuaScript {
 		codes:     make(map[string][]string),
 		workerNum: workerNum,
 		dataChan:  make(chan LuaData, workerNum*2),
-		luaCache:  &module.LuaCache{},
+		luaCache:  globalLuaCache,
 		runStatus: false,
 		wg:        sync.WaitGroup{},
 	}
@@ -104,10 +94,10 @@ func (s *LuaScript) Run() {
 }
 
 func (s *LuaScript) SendData(d LuaData) error {
-	// channel already close?
 	if _, ok := s.codes[d.Name()]; !ok {
 		return fmt.Errorf("not found luaState of this name '%s'", d.Name())
 	}
+
 	s.dataChan <- d
 	return nil
 }
@@ -188,8 +178,22 @@ func (wk *worker) clean() {
 	}
 }
 
-func CheckLuaCode(code string) error {
-	reader := strings.NewReader(code)
-	_, err := parse.Parse(reader, "<string>")
-	return err
+const defaultWorkerNum = 4
+
+var defaultLuaScript = NewLuaScript(defaultWorkerNum)
+
+func AddLuaLines(name string, codes []string) error {
+	return defaultLuaScript.AddLuaLines(name, codes)
+}
+
+func Run() {
+	defaultLuaScript.Run()
+}
+
+func SendData(d LuaData) error {
+	return defaultLuaScript.SendData(d)
+}
+
+func Stop() {
+	defaultLuaScript.Stop()
 }

@@ -1,12 +1,10 @@
 ## luascript 开发使用文档
 
-### 前言
+### 说明
 
 luascript 旨在提供一个 golang 所使用的功能完善、集成简单的 lua 沙盒环境，以适应日渐繁杂的 DataFlux 业务需求。
 
 luascript 支持跨平台，其所使用的 lua 沙盒环境为 lua 5.1 版本。
-
-本文写于所在项目的 git hash 值为 `cb8b1281f91c947a57ec1a01653c184498908a39`。
 
 ### 创建 LuaScript 对象
 
