@@ -65,7 +65,7 @@ end
 	)
 
 	var err error
-	err = AddLuaLines("ptdata", []string{luaCode})
+	err = AddLuaCodes("ptdata", []string{luaCode})
 	if err != nil {
 		t.Fatal(err)
 	}

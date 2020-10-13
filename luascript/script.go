@@ -2,6 +2,7 @@ package luascript
 
 import (
 	"fmt"
+	"io/ioutil"
 	"sync"
 
 	lua "github.com/yuin/gopher-lua"
@@ -60,7 +61,7 @@ func NewLuaScript(workerNum int) *LuaScript {
 	}
 }
 
-func (s *LuaScript) AddLuaLines(name string, codes []string) error {
+func (s *LuaScript) AddLuaCodes(name string, codes []string) error {
 	if _, ok := s.codes[name]; ok {
 		return fmt.Errorf("the %s runner line already exist", name)
 	}
@@ -69,6 +70,31 @@ func (s *LuaScript) AddLuaLines(name string, codes []string) error {
 		if err := CheckLuaCode(code); err != nil {
 			return err
 		}
+	}
+	s.codes[name] = codes
+	return nil
+}
+
+func (s *LuaScript) AddLuaCodesFromFile(name string, filePath []string) error {
+	if _, ok := s.codes[name]; ok {
+		return fmt.Errorf("the %s runner line already exist", name)
+	}
+
+	codes := []string{}
+
+	for _, file := range filePath {
+		content, err := ioutil.ReadFile(file)
+		if err != nil {
+			return err
+		}
+
+		code := string(content)
+
+		if err := CheckLuaCode(code); err != nil {
+			return err
+		}
+
+		codes = append(codes, code)
 	}
 	s.codes[name] = codes
 	return nil
@@ -182,8 +208,12 @@ const defaultWorkerNum = 4
 
 var defaultLuaScript = NewLuaScript(defaultWorkerNum)
 
-func AddLuaLines(name string, codes []string) error {
-	return defaultLuaScript.AddLuaLines(name, codes)
+func AddLuaCodes(name string, codes []string) error {
+	return defaultLuaScript.AddLuaCodes(name, codes)
+}
+
+func AddLuaCodesFromFile(name string, filePath []string) error {
+	return defaultLuaScript.AddLuaCodesFromFile(name, filePath)
 }
 
 func Run() {
