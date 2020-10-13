@@ -22,17 +22,15 @@ function handle(points)
 		}
 	)
 	for _, pt in pairs(points) do
-		for k, v in pairs(pt) do
-			print("name", pt.name)
-			print("time", pt.time)
-			print("-------\ntags:")
-			for k, v in pairs(pt.tags) do
-				print(k, v)
-			end
-			print("-------\nfields:")
-			for k, v in pairs(pt.fields) do
-				print(k, v)
-			end
+		print("name", pt.name)
+		print("time", pt.time)
+		print("-------\ntags:")
+		for k, v in pairs(pt.tags) do
+			print(k, v)
+		end
+		print("-------\nfields:")
+		for k, v in pairs(pt.fields) do
+			print(k, v)
 		end
 		print("-----------------------")
 	end
