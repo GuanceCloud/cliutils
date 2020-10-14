@@ -17,39 +17,23 @@ import (
 )
 
 var (
-	l = logger.DefaultSLogger("ws")
+	l             = logger.DefaultSLogger("ws")
+	CommonChanCap = 128
 )
 
-type srvmsg struct {
-	to  []string
-	msg []byte
-}
-
 type Server struct {
-	Path    string
-	Bind    string
-	ChanCap int
-
-	hbinterval time.Duration
+	Path string
+	Bind string
 
 	MsgHandler func(*Server, net.Conn, []byte, ws.OpCode) error //server msg handler
 	AddCli     func(w http.ResponseWriter, r *http.Request)
 
 	uptime time.Time
 
-	clis map[string]*Cli
-
 	exit *cliutils.Sem
 	wg   *sync.WaitGroup
 
-	sendMsgCh chan *srvmsg
-	wscliCh   chan *Cli
-
 	epoller *epoll
-}
-
-func (s *Server) SetMaxHeartbeatInterval(i time.Duration) {
-	s.hbinterval = i
 }
 
 func NewServer(bind, path string) (s *Server, err error) {
@@ -58,16 +42,10 @@ func NewServer(bind, path string) (s *Server, err error) {
 		Path: path,
 		Bind: bind,
 
-		ChanCap: CommonChanCap,
-
 		uptime: time.Now(),
 
-		clis: map[string]*Cli{},
 		exit: cliutils.NewSem(),
 		wg:   &sync.WaitGroup{},
-
-		sendMsgCh: make(chan *srvmsg, CommonChanCap),
-		wscliCh:   make(chan *Cli, CommonChanCap),
 	}
 
 	s.epoller, err = MkEpoll()
@@ -79,17 +57,19 @@ func NewServer(bind, path string) (s *Server, err error) {
 	return
 }
 
-func (s *Server) AddClient(cli *Cli) error {
+func (s *Server) AddConnection(conn net.Conn) error {
 
-	l.Debugf("epoll add connection from %s", cli.Conn.RemoteAddr().String())
-	if err := s.epoller.Add(cli.Conn); err != nil {
+	if err := s.epoller.Add(conn); err != nil {
 		l.Errorf("epoll.Add() error: %s", err.Error())
-		cli.Conn.Close()
+		conn.Close()
 		return err
 	}
 
-	s.wscliCh <- cli
 	return nil
+}
+
+func SendMsgToClient(msg []byte, conn net.Conn) error {
+	return wsutil.WriteServerText(conn, msg)
 }
 
 func (s *Server) Stop() {
@@ -102,6 +82,8 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) Start() {
+
+	l = logger.SLogger("ws")
 
 	// remove resources limitations
 	var rLimit syscall.Rlimit
@@ -120,12 +102,6 @@ func (s *Server) Start() {
 	//		l.Fatalf("pprof failed: %v", err)
 	//	}
 	//}()
-
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		s.dispatcher()
-	}()
 
 	s.wg.Add(1)
 	go func() {

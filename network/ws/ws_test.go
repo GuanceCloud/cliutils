@@ -25,6 +25,19 @@ var (
 	__wg = sync.WaitGroup{}
 )
 
+type cli struct {
+	id   string
+	conn net.Conn
+}
+
+func (c *cli) ID() string {
+	return c.id
+}
+
+func (c *cli) Conn() net.Conn {
+	return c.conn
+}
+
 func TestProxy(t *testing.T) {
 
 	// dataflux as ws server
@@ -53,9 +66,9 @@ func TestProxy(t *testing.T) {
 
 		l.Debugf("request URL: %s", r.URL.String())
 
-		cli := &Cli{
-			Conn: conn,
-			ID:   id,
+		cli := &cli{
+			conn: conn,
+			id:   id,
 		}
 
 		if err := df_srv.AddClient(cli); err != nil {
