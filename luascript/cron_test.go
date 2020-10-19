@@ -11,7 +11,7 @@ func TestCron(t *testing.T) {
 	`
 
 	c := NewLuaCron()
-	err := c.AddHandle(luaCode, "*/1 * * * *")
+	err := c.AddLua(luaCode, "*/1 * * * *")
 	if err != nil {
 		t.Fatal(err)
 	}
