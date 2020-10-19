@@ -27,7 +27,7 @@ func NewLuaCron() *LuaCron {
 	}
 }
 
-func (c *LuaCron) AddLua(code string, intervalSpec string) error {
+func (c *LuaCron) AddLua(code string, schedule string) error {
 	if err := CheckLuaCode(code); err != nil {
 		return err
 	}
@@ -35,13 +35,13 @@ func (c *LuaCron) AddLua(code string, intervalSpec string) error {
 	luastate := lua.NewState()
 	module.RegisterAllFuncs(luastate, globalLuaCache, nil)
 
-	_, err := c.AddFunc(intervalSpec, func() {
+	_, err := c.AddFunc(schedule, func() {
 		luastate.DoString(code)
 	})
 	return err
 }
 
-func (c *LuaCron) AddLuaFromFile(code string, intervalSpec string) error {
+func (c *LuaCron) AddLuaFromFile(code string, schedule string) error {
 	if err := CheckLuaCode(code); err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (c *LuaCron) AddLuaFromFile(code string, intervalSpec string) error {
 	luastate := lua.NewState()
 	module.RegisterAllFuncs(luastate, globalLuaCache, nil)
 
-	_, err := c.AddFunc(intervalSpec, func() {
+	_, err := c.AddFunc(schedule, func() {
 		luastate.DoString(code)
 	})
 	return err
