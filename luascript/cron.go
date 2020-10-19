@@ -1,6 +1,7 @@
 package luascript
 
 import (
+	"io/ioutil"
 	"strings"
 
 	"github.com/robfig/cron/v3"
@@ -27,29 +28,36 @@ func NewLuaCron() *LuaCron {
 	}
 }
 
-func (c *LuaCron) AddLua(code string, schedule string) error {
-	if err := CheckLuaCode(code); err != nil {
-		return err
+func (c *LuaCron) AddLua(code string, schedule string) (err error) {
+	if err = CheckLuaCode(code); err != nil {
+		return
 	}
 
 	luastate := lua.NewState()
 	module.RegisterAllFuncs(luastate, globalLuaCache, nil)
 
-	_, err := c.AddFunc(schedule, func() {
+	_, err = c.AddFunc(schedule, func() {
 		luastate.DoString(code)
 	})
 	return err
 }
 
-func (c *LuaCron) AddLuaFromFile(code string, schedule string) error {
-	if err := CheckLuaCode(code); err != nil {
+func (c *LuaCron) AddLuaFromFile(file string, schedule string) (err error) {
+	content, _err := ioutil.ReadFile(file)
+	if _err != nil {
+		return _err
+	}
+
+	code := string(content)
+
+	if err = CheckLuaCode(code); err != nil {
 		return err
 	}
 
 	luastate := lua.NewState()
 	module.RegisterAllFuncs(luastate, globalLuaCache, nil)
 
-	_, err := c.AddFunc(schedule, func() {
+	_, err = c.AddFunc(schedule, func() {
 		luastate.DoString(code)
 	})
 	return err
