@@ -5,17 +5,19 @@ import (
 	"time"
 )
 
-func TestCronLua(t *testing.T) {
-	luaCode := `
+func TestCron(t *testing.T) {
+	var luaCode = `
 	print("---------- lua ---------")
 	`
+
 	c := NewLuaCron()
-	err := c.AddHandle(luaCode, "*/1 * * * *")
+	err := c.AddLua(luaCode, "*/1 * * * *")
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	c.Run()
-	defer c.Stop()
+	defer c.Stoping()
 
 	time.Sleep(time.Second * 5)
 }

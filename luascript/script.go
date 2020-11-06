@@ -2,146 +2,67 @@ package luascript
 
 import (
 	"fmt"
+	"io/ioutil"
 	"sync"
-	"time"
 
-	influxdb "github.com/influxdata/influxdb1-client/v2"
 	lua "github.com/yuin/gopher-lua"
 
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/luascript/module"
 )
 
-const (
-	defaultWorkNum = 4
+// LuLuaData LuaScript所接收的数据接口
+type LuaData interface {
 
-	defaultEnableStrongType = true
+	// 主要执行函数，接收从lua中返回的数据的json字符串，和执行过程中出现的error
+	Handle(value string, err error)
 
-	defaultWorkingTimeout = time.Second * 6
-)
+	// 要发送给lua的数据，建议是基础类型，如整型、浮点型、map和slice等
+	DataToLua() interface{}
 
-type pointsReq struct {
-	name string
-	pts  []*influxdb.Point
-	ch   chan interface{}
-}
+	// 数据要执行的lua分组名称
+	Name() string
 
-var (
-	pointsChan = make(chan *pointsReq, defaultWorkNum*2)
-)
+	// lua执行函数的函数名
+	CallbackFnName() string
 
-type work struct {
-	ls      map[string][]*lua.LState
-	typelog map[string]fieldType
-	opt     *Option
-}
-
-func newWork(lines map[string][]string, opt *Option) (*work, error) {
-	wk := &work{
-		ls:      make(map[string][]*lua.LState),
-		typelog: make(map[string]fieldType),
-		opt:     opt,
-	}
-
-	for name, codes := range lines {
-		lst := []*lua.LState{}
-
-		for _, code := range codes {
-			luastate := lua.NewState()
-			module.RegisterAllFuncs(luastate, luaCache, nil)
-
-			if err := luastate.DoString(code); err != nil {
-				return nil, err
-			}
-
-			lst = append(lst, luastate)
-		}
-
-		wk.ls[name] = lst
-	}
-
-	return wk, nil
-}
-
-func (wk *work) run() {
-	var err error
-
-	for {
-	AGAIN:
-		select {
-		case pd := <-pointsChan:
-			ls, ok := wk.ls[pd.name]
-			if !ok {
-				goto AGAIN
-			}
-			pts := pd.pts
-
-			if wk.opt.EnableStrongType {
-				wk.typelog = logType(pts)
-			}
-
-			for _, luastate := range ls {
-				pts, err = PointsOnHandle(luastate, pts, wk.typelog)
-				if err != nil {
-					goto AGAIN
-				}
-			}
-
-			if wk.opt.EnableStrongType {
-				pts, err = typeRecove(pts, wk.typelog)
-				if err != nil {
-					goto AGAIN
-				}
-			}
-
-			pd.ch <- pts
-
-		case <-wk.opt.exit.Wait():
-			wk.clean()
-			return
-		}
-	}
-}
-
-func (wk *work) clean() {
-	for _, ls := range wk.ls {
-		for _, luastate := range ls {
-			luastate.Close()
-		}
-	}
-}
-
-type Option struct {
-	WorkNum          int
-	EnableStrongType bool
-	exit             *cliutils.Sem
+	// lua执行函数的唯一形参，即DataToLua数据在lua中的具体表现名称
+	CallbackTypeName() string
 }
 
 type LuaScript struct {
-	lines map[string][]string
-	opt   *Option
-	wg    sync.WaitGroup
+	// 代码组，每个组名有N个代码块
+	codes map[string][]string
+
+	workerNum int
+
+	dataChan chan LuaData
+
+	// 注册lua模块所需，每个LuaScript共享同一份luaCache
+	luaCache *module.LuaCache
+
+	// 退出广播
+	exit *cliutils.Sem
+
+	// 是否处于运行状态
+	runStatus bool
+
+	wg sync.WaitGroup
 }
 
-func NewLuaScript(opt ...*Option) *LuaScript {
-	s := &LuaScript{
-		lines: make(map[string][]string),
-		wg:    sync.WaitGroup{},
+func NewLuaScript(workerNum int) *LuaScript {
+	return &LuaScript{
+		codes:     make(map[string][]string),
+		workerNum: workerNum,
+		dataChan:  make(chan LuaData, workerNum*2),
+		luaCache:  globalLuaCache,
+		runStatus: false,
+		wg:        sync.WaitGroup{},
 	}
-	if len(opt) > 0 {
-		s.opt = opt[0]
-	} else {
-		s.opt = &Option{
-			WorkNum:          defaultWorkNum,
-			EnableStrongType: defaultEnableStrongType,
-		}
-	}
-	s.opt.exit = cliutils.NewSem()
-	return s
 }
 
-func (s *LuaScript) AddLuaCode(name string, codes []string) error {
-	if _, ok := s.lines[name]; ok {
+func (s *LuaScript) AddLuaCodes(name string, codes []string) error {
+	if _, ok := s.codes[name]; ok {
 		return fmt.Errorf("the %s runner line already exist", name)
 	}
 
@@ -150,51 +71,159 @@ func (s *LuaScript) AddLuaCode(name string, codes []string) error {
 			return err
 		}
 	}
+	s.codes[name] = codes
+	return nil
+}
 
-	s.lines[name] = codes
+func (s *LuaScript) AddLuaCodesFromFile(name string, filePath []string) error {
+	if _, ok := s.codes[name]; ok {
+		return fmt.Errorf("the %s runner line already exist", name)
+	}
+
+	codes := []string{}
+
+	for _, file := range filePath {
+		content, err := ioutil.ReadFile(file)
+		if err != nil {
+			return err
+		}
+
+		code := string(content)
+
+		if err := CheckLuaCode(code); err != nil {
+			return err
+		}
+
+		codes = append(codes, code)
+	}
+	s.codes[name] = codes
 	return nil
 }
 
 func (s *LuaScript) Run() {
-	for i := 0; i < s.opt.WorkNum; i++ {
+	if s.runStatus {
+		return
+	}
+
+	s.exit = cliutils.NewSem()
+
+	for i := 0; i < s.workerNum; i++ {
 		s.wg.Add(1)
 		go func() {
-			defer s.wg.Done()
-
-			wk, err := newWork(s.lines, s.opt)
-			if err != nil {
-				return
-			}
+			wk := newWork(s, s.codes)
 			wk.run()
+			s.wg.Done()
 		}()
 	}
+
+	s.runStatus = true
 }
 
-func (s *LuaScript) SendPoints(name string, pts []*influxdb.Point) ([]*influxdb.Point, error) {
-	req := &pointsReq{
-		name: name,
-		pts:  pts,
-		ch:   make(chan interface{}),
+func (s *LuaScript) SendData(d LuaData) error {
+	if _, ok := s.codes[d.Name()]; !ok {
+		return fmt.Errorf("not found luaState of this name '%s'", d.Name())
 	}
-	pointsChan <- req
-	defer close(req.ch)
 
-	select {
-	case <-time.After(defaultWorkingTimeout):
-		return nil, fmt.Errorf("%s working timeout", name)
+	s.dataChan <- d
+	return nil
+}
 
-	case result := <-req.ch:
-		switch t := result.(type) {
-		case error:
-			return nil, result.(error)
-		case []*influxdb.Point:
-			return result.([]*influxdb.Point), nil
-		default:
-			return nil, fmt.Errorf("invalid result type: %v", t)
+func (s *LuaScript) Stop() {
+	if !s.runStatus {
+		return
+	}
+	s.exit.Close()
+	s.wg.Wait()
+	s.runStatus = false
+}
+
+type worker struct {
+	script *LuaScript
+	ls     map[string][]*lua.LState
+}
+
+func newWork(script *LuaScript, lines map[string][]string) *worker {
+	wk := &worker{
+		script: script,
+		ls:     make(map[string][]*lua.LState),
+	}
+	for name, codes := range lines {
+		lst := []*lua.LState{}
+		for _, code := range codes {
+			luastate := lua.NewState()
+			module.RegisterAllFuncs(luastate, wk.script.luaCache, nil)
+
+			luastate.DoString(code)
+			lst = append(lst, luastate)
+		}
+		wk.ls[name] = lst
+	}
+	return wk
+}
+
+func (wk *worker) run() {
+	for {
+	AGAIN:
+		select {
+		case data := <-wk.script.dataChan:
+			var err error
+			ls := wk.ls[data.Name()]
+			val := lua.LNil
+
+			for index, l := range ls {
+				if index == 0 {
+					val = ToLValue(l, data.DataToLua())
+				}
+				val, err = SendToLua(l, val, data.CallbackFnName(), data.CallbackTypeName())
+				if err != nil {
+					data.Handle("", fmt.Errorf("lua '%s' exec error: %v", data.Name(), err))
+					goto AGAIN
+				}
+			}
+
+			jsonStr, err := JsonEncode(val)
+			if err != nil {
+				data.Handle("", fmt.Errorf("lua '%s' exec error: %v", data.Name(), err))
+				goto AGAIN
+			}
+
+			data.Handle(jsonStr, nil)
+
+		case <-wk.script.exit.Wait():
+			wk.clean()
+			return
 		}
 	}
 }
 
-func (s *LuaScript) Stop() {
-	s.opt.exit.Close()
+func (wk *worker) clean() {
+	for _, ls := range wk.ls {
+		for _, luastate := range ls {
+			luastate.Close()
+		}
+	}
+}
+
+const defaultWorkerNum = 4
+
+var defaultLuaScript = NewLuaScript(defaultWorkerNum)
+
+func AddLuaCodes(name string, codes []string) error {
+	return defaultLuaScript.AddLuaCodes(name, codes)
+}
+
+func AddLuaCodesFromFile(name string, filePath []string) error {
+	return defaultLuaScript.AddLuaCodesFromFile(name, filePath)
+}
+
+func Run() {
+	defaultLuaScript.Run()
+}
+
+func SendData(d LuaData) error {
+	return defaultLuaScript.SendData(d)
+}
+
+func Stop() {
+	defaultLuaScript.Stop()
 }
