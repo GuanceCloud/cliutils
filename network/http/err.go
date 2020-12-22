@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	ErrUnexpectedInternalServerError = NewErr(errors.New(`unexpected internal server error`), nhttp.StatusInternalServerError, "")
-	ErrBadAuthHeader                 = NewErr(errors.New("invalid http Authorization header"), nhttp.StatusForbidden, "")
-	ErrAuthFailed                    = NewErr(errors.New("http Authorization failed"), nhttp.StatusForbidden, "")
+	DefaultNamespace                 = ""
+	ErrUnexpectedInternalServerError = NewErr(errors.New(`unexpected internal server error`), nhttp.StatusInternalServerError)
+	ErrBadAuthHeader                 = NewErr(errors.New("invalid http Authorization header"), nhttp.StatusForbidden)
+	ErrAuthFailed                    = NewErr(errors.New("http Authorization failed"), nhttp.StatusForbidden)
 )
 
 type HttpError struct {
@@ -29,7 +30,7 @@ type bodyResp struct {
 	Content interface{} `json:"content,omitempty"`
 }
 
-func NewErr(err error, httpCode int, namespace string) *HttpError {
+func NewNamespaceErr(err error, httpCode int, namespace string) *HttpError {
 	if err == nil {
 		return &HttpError{
 			HttpCode: httpCode,
@@ -43,30 +44,12 @@ func NewErr(err error, httpCode int, namespace string) *HttpError {
 	}
 }
 
-func (he *HttpError) HttpBody(c *gin.Context, body interface{}) {
-	resp := &bodyResp{
-		HttpError: he,
-		Content:   body,
-	}
-
-	j, err := json.Marshal(resp)
-	if err != nil {
-		ErrUnexpectedInternalServerError.httpResp(c, err)
-		return
-	}
-
-	c.Data(he.HttpCode, `application/json`, j)
+func NewErr(err error, httpCode int) *HttpError {
+	return NewNamespaceErr(err, httpCode, DefaultNamespace)
 }
 
-func HttpErr(c *gin.Context, err error, msg string) {
-	he, ok := err.(*HttpError)
-	if ok {
-		he.httpResp(c, msg)
-	} else {
-		he = NewErr(err, nhttp.StatusInternalServerError, "")
-		he.ErrCode = ""
-		he.httpResp(c, msg)
-	}
+func internalServerErr(err error) *HttpError {
+	return NewErr(err, nhttp.StatusInternalServerError)
 }
 
 func (he *HttpError) Error() string {
@@ -77,18 +60,55 @@ func (he *HttpError) Error() string {
 	}
 }
 
-func (he *HttpError) httpResp(c *gin.Context, args ...interface{}) {
+func (he *HttpError) HttpBody(c *gin.Context, body interface{}) {
+	resp := &bodyResp{
+		HttpError: he,
+		Content:   body,
+	}
+
+	j, err := json.Marshal(resp)
+	if err != nil {
+		internalServerErr(err).httpResp(c, "%s: %+#v", "json.Marshal() failed", resp)
+		return
+	}
+
+	c.Data(he.HttpCode, `application/json`, j)
+}
+
+func HttpErr(c *gin.Context, err error) {
+	he, ok := err.(*HttpError)
+	if ok {
+		he.httpResp(c, "")
+	} else { // undefined error code
+		internalServerErr(err).httpResp(c, "")
+	}
+}
+
+func HttpErrf(c *gin.Context, err error, format string, args ...interface{}) {
+	he, ok := err.(*HttpError)
+	if ok {
+		he.httpResp(c, format, args...)
+	} else {
+
+		internalServerErr(err).httpResp(c, "")
+		//he = NewErr(err, nhttp.StatusInternalServerError)
+		//he.ErrCode = ""
+		//he.httpResp(c, format, args...)
+	}
+}
+
+func (he *HttpError) httpResp(c *gin.Context, format string, args ...interface{}) {
 	resp := &bodyResp{
 		HttpError: he,
 	}
 
 	if args != nil {
-		resp.Message = fmt.Sprint(args...)
+		resp.Message = fmt.Sprintf(format, args...)
 	}
 
 	j, err := json.Marshal(&resp)
 	if err != nil {
-		ErrUnexpectedInternalServerError.httpResp(c, err)
+		internalServerErr(err).httpResp(c, "%s: %+#v", "json.Marshal() failed", resp)
 		return
 	}
 
