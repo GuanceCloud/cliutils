@@ -32,3 +32,30 @@ func TestHTTPErr(t *testing.T) {
 		panic(err)
 	}
 }
+
+func TestMsgError(t *testing.T) {
+	errTest := NewNamespaceErr(errors.New("test error"), nhttp.StatusForbidden, "testing")
+
+	router := gin.New()
+	g := router.Group("")
+
+	g.GET("/errmsg",
+		func(c *gin.Context) {
+			err := Error(errTest, "this is a error with specific message")
+			HttpErr(c, err)
+		})
+
+	g.GET("/errfmsg",
+		func(c *gin.Context) {
+			err := Errorf(errTest, "%s: %v", "this is a message with fmt", map[string]int{"abc": 123})
+			HttpErr(c, err)
+		})
+	srv := nhttp.Server{
+		Addr:    ":8090",
+		Handler: router,
+	}
+
+	if err := srv.ListenAndServe(); err != nil && err != nhttp.ErrServerClosed {
+		panic(err)
+	}
+}

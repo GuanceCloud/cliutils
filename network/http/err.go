@@ -48,7 +48,7 @@ func NewErr(err error, httpCode int) *HttpError {
 	return NewNamespaceErr(err, httpCode, DefaultNamespace)
 }
 
-func internalServerErr(err error) *HttpError {
+func undefinedErr(err error) *HttpError {
 	return NewErr(err, nhttp.StatusInternalServerError)
 }
 
@@ -68,7 +68,7 @@ func (he *HttpError) HttpBody(c *gin.Context, body interface{}) {
 
 	j, err := json.Marshal(resp)
 	if err != nil {
-		internalServerErr(err).httpResp(c, "%s: %+#v", "json.Marshal() failed", resp)
+		undefinedErr(err).httpResp(c, "%s: %+#v", "json.Marshal() failed", resp)
 		return
 	}
 
@@ -76,24 +76,31 @@ func (he *HttpError) HttpBody(c *gin.Context, body interface{}) {
 }
 
 func HttpErr(c *gin.Context, err error) {
-	he, ok := err.(*HttpError)
-	if ok {
+
+	switch err.(type) {
+	case *HttpError:
+		he := err.(*HttpError)
 		he.httpResp(c, "")
-	} else { // undefined error code
-		internalServerErr(err).httpResp(c, "")
+	case *MsgError:
+		me := err.(*MsgError)
+		if me.Args != nil {
+			me.HttpError.httpResp(c, me.Fmt, me.Args...)
+		}
+	default:
+		undefinedErr(err).httpResp(c, "")
 	}
 }
 
 func HttpErrf(c *gin.Context, err error, format string, args ...interface{}) {
-	he, ok := err.(*HttpError)
-	if ok {
+	switch err.(type) {
+	case *HttpError:
+		he := err.(*HttpError)
 		he.httpResp(c, format, args...)
-	} else {
-
-		internalServerErr(err).httpResp(c, "")
-		//he = NewErr(err, nhttp.StatusInternalServerError)
-		//he.ErrCode = ""
-		//he.httpResp(c, format, args...)
+	case *MsgError:
+		me := err.(*MsgError)
+		me.HttpError.httpResp(c, format, args...)
+	default:
+		undefinedErr(err).httpResp(c, "")
 	}
 }
 
@@ -108,7 +115,7 @@ func (he *HttpError) httpResp(c *gin.Context, format string, args ...interface{}
 
 	j, err := json.Marshal(&resp)
 	if err != nil {
-		internalServerErr(err).httpResp(c, "%s: %+#v", "json.Marshal() failed", resp)
+		undefinedErr(err).httpResp(c, "%s: %+#v", "json.Marshal() failed", resp)
 		return
 	}
 
@@ -137,4 +144,35 @@ func titleErr(namespace string, err error) string {
 	}
 
 	return out
+}
+
+// Dynamic error create based on specific HttpError
+type MsgError struct {
+	*HttpError
+	Fmt  string
+	Args []interface{}
+}
+
+func Errorf(he *HttpError, format string, args ...interface{}) *MsgError {
+	return &MsgError{
+		HttpError: he,
+		Fmt:       format,
+		Args:      args,
+	}
+}
+
+func Error(he *HttpError, msg string) *MsgError {
+	return &MsgError{
+		HttpError: he,
+		Fmt:       "%s",
+		Args:      []interface{}{msg},
+	}
+}
+
+func (me *MsgError) Error() string {
+	if me.HttpError != nil {
+		return me.Err.Error()
+	} else {
+		return ""
+	}
 }
