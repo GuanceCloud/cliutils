@@ -22,6 +22,7 @@ func TestHTTPErr(t *testing.T) {
 	g.GET("/err2", func(c *gin.Context) { HttpErr(c, errTest2) })
 	g.GET("/errf", func(c *gin.Context) { HttpErrf(c, errTest, "%s: %s", "this is a test error", "ignore me") })
 	g.GET("/ok", func(c *gin.Context) { errOK.HttpBody(c, map[string]interface{}{"data1": 1, "data2": "abc"}) })
+	g.GET("/okbody", func(c *gin.Context) { errOK.HttpBody(c, nil) })
 
 	srv := nhttp.Server{
 		Addr:    ":8090",
