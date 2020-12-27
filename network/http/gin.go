@@ -125,7 +125,7 @@ func GinReadWithMD5(c *gin.Context) (buf []byte, md5str string, err error) {
 	md5str = fmt.Sprintf("%x", md5.Sum(buf))
 
 	if c.Request.Header.Get("Content-Encoding") == "gzip" {
-		buf, err = unzipBody(buf)
+		buf, err = Unzip(buf)
 	}
 	return
 }
@@ -137,7 +137,7 @@ func GinRead(c *gin.Context) (buf []byte, err error) {
 	}
 
 	if c.Request.Header.Get("Content-Encoding") == "gzip" {
-		buf, err = unzipBody(buf)
+		buf, err = Unzip(buf)
 	}
 	return
 }
@@ -153,18 +153,18 @@ func GinGetArg(c *gin.Context, hdr, param string) (v string, err error) {
 	return
 }
 
-func unzipBody(body []byte) ([]byte, error) {
-	gzr, err := gzip.NewReader(bytes.NewBuffer(body))
+func Unzip(in []byte) (out []byte, err error) {
+	gzr, err := gzip.NewReader(bytes.NewBuffer(in))
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	buf, err := ioutil.ReadAll(gzr)
+	out, err = ioutil.ReadAll(gzr)
 	if err != nil {
-		return nil, err
+		return
 	}
 	gzr.Close()
-	return buf, nil
+	return
 }
 
 func readBody(c *gin.Context) ([]byte, error) {
