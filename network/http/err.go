@@ -63,6 +63,7 @@ func (he *HttpError) Error() string {
 func (he *HttpError) HttpBody(c *gin.Context, body interface{}) {
 	if body == nil {
 		c.Data(he.HttpCode, `application/json`, nil)
+		return
 	}
 
 	resp := &bodyResp{
