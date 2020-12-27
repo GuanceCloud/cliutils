@@ -142,6 +142,17 @@ func GinRead(c *gin.Context) (buf []byte, err error) {
 	return
 }
 
+func GinGetArg(c *gin.Context, hdr, param string) (v string, err error) {
+	v = c.Request.Header.Get(hdr)
+	if v == "" {
+		v = c.Query(param)
+		if v == "" {
+			err = fmt.Errorf("HTTP header %s and query param %s missing", hdr, param)
+		}
+	}
+	return
+}
+
 func unzipBody(body []byte) ([]byte, error) {
 	gzr, err := gzip.NewReader(bytes.NewBuffer(body))
 	if err != nil {
