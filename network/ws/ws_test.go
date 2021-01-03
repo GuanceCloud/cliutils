@@ -17,7 +17,7 @@ import (
 
 var (
 	__wsip     = `0.0.0.0`
-	__wsport   = 18080
+	__wsport   = 54321
 	__wsupath  = "/wstest"
 	__df_wsurl = url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", __wsip, __wsport), Path: __wsupath}
 
@@ -61,7 +61,7 @@ func TestWSServer(t *testing.T) {
 	go df_srv.Start()
 	time.Sleep(time.Second)
 
-	ncli := 1024
+	ncli := 128
 
 	type wscli struct {
 		id  string

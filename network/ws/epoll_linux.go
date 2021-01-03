@@ -5,6 +5,7 @@ package ws
 import (
 	"net"
 	"sync"
+	"syscall"
 
 	"golang.org/x/sys/unix"
 )
