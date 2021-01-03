@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -93,7 +94,7 @@ func (s *Server) Start() {
 
 	rLimit.Cur = rLimit.Max
 	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
-		panic(err)
+		fmt.Printf("warn: Setrlimit %+#v failed: %s\n", rLimit, err.Error())
 	}
 
 	// Enable pprof hooks
@@ -146,7 +147,7 @@ func (s *Server) startEpoll() {
 
 		default:
 
-			connections, err := s.epoller.Wait() // wait for 100ms
+			connections, err := s.epoller.Wait(100)
 			if err != nil {
 				l.Errorf("Failed to epoll wait %v", err)
 				continue
@@ -159,14 +160,19 @@ func (s *Server) startEpoll() {
 				}
 
 				if data, opcode, err := wsutil.ReadClientData(conn); err != nil {
+
+					l.Debugf("ReadClientData: %s", err.Error())
+
 					if err := s.epoller.Remove(conn); err != nil {
 						l.Errorf("Failed to remove %v", err)
 					}
 
 					l.Debugf("close cli %s", conn.RemoteAddr().String())
 					conn.Close()
+
 				} else {
 					if s.MsgHandler != nil {
+
 						if err := s.MsgHandler(s, conn, data, opcode); err != nil {
 							l.Error("s.handler() error: %s", err.Error())
 						}
