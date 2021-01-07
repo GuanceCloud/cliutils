@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"net/http"
@@ -21,10 +22,14 @@ var (
 	__wsupath  = "/wstest"
 	__df_wsurl = url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", __wsip, __wsport), Path: __wsupath}
 
+	__fcliCnt   = flag.Int("cli-cnt", 128, ``)
+	__ftestTime = flag.Duration("test-time", time.Minute, ``)
+
 	__wg = sync.WaitGroup{}
 )
 
 func TestWSServer(t *testing.T) {
+	flag.Parse()
 
 	// ws server
 	dfwsurl := fmt.Sprintf("%s:%d", __wsip, __wsport)
@@ -61,12 +66,12 @@ func TestWSServer(t *testing.T) {
 	go df_srv.Start()
 	time.Sleep(time.Second)
 
-	ncli := 128
-
 	type wscli struct {
 		id  string
 		cli *websocket.Conn
 	}
+
+	ncli := *__fcliCnt
 
 	// datakit as ws proxy client
 	dkclis := []*wscli{}
@@ -105,6 +110,7 @@ func TestWSServer(t *testing.T) {
 
 				total++
 				if _, resp, err := c.cli.ReadMessage(); err != nil {
+					_ = resp
 					t.Log(err)
 				} else {
 					if total%(ncli/2) == 0 {
@@ -116,6 +122,7 @@ func TestWSServer(t *testing.T) {
 				select {
 				case <-ch:
 					c.cli.Close()
+					l.Debugf("cli %d exit", i)
 					return
 				default:
 				}
@@ -123,7 +130,7 @@ func TestWSServer(t *testing.T) {
 		}(i)
 	}
 
-	time.Sleep(time.Minute)
+	time.Sleep(*__ftestTime)
 	close(ch)
 
 	df_srv.Stop()

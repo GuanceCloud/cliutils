@@ -92,6 +92,8 @@ func (s *Server) Start() {
 		panic(err)
 	}
 
+	l.Debugf("rLimit cur: %d, max: %d", rLimit.Cur, rLimit.Max)
+
 	rLimit.Cur = rLimit.Max
 	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
 		fmt.Printf("warn: Setrlimit %+#v failed: %s\n", rLimit, err.Error())

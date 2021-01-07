@@ -84,10 +84,10 @@ func (e *epoll) Remove(conn net.Conn) error {
 
 func (e *epoll) Wait(count int) ([]net.Conn, error) {
 	events := make([]syscall.Kevent_t, count)
-	e.lock.RLock()
-	defer e.lock.RUnlock()
 
+	e.lock.RLock()
 	changes := e.changes
+	e.lock.RUnlock()
 
 retry:
 
@@ -102,7 +102,7 @@ retry:
 	}
 
 	connections := make([]net.Conn, 0, n)
-	//e.lock.RLock()
+	e.lock.RLock()
 
 	for i := 0; i < n; i++ {
 		conn := e.connections[int(events[i].Ident)]
@@ -112,7 +112,7 @@ retry:
 		connections = append(connections, conn)
 	}
 
-	//e.lock.RUnlock()
+	e.lock.RUnlock()
 
 	return connections, nil
 }
