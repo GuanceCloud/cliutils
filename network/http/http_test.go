@@ -27,7 +27,10 @@ func TestSign(t *testing.T) {
 	r.Header.Set(`Content-MD5`, fmt.Sprintf("%x", md5.Sum([]byte(`{}`)))) //nolint:gosec
 	r.Header.Set(`Content-Type`, `application/json`)
 
-	o.Sign = o.SignReq(r)
+	o.Sign, err = o.SignReq(r)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	r.Header.Set(`Authorization`, fmt.Sprintf("%s %s:%s", o.AuthorizationType, o.AK, o.Sign))
 	log.Printf("[debug] %+#v", o)
@@ -43,8 +46,8 @@ func TestSign(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if o2.Sign != o2.SignReq(r) {
-		t.Fatalf("sign not match")
+	if sign, err := o2.SignReq(r); err != nil || o2.Sign != sign {
+		t.Fatalf("sign failed: %v, %s <> %s", err, o2.Sign, sign)
 	}
 	log.Printf("[debug] %+#v", o)
 }
