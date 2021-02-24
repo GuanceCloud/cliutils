@@ -58,6 +58,27 @@ func (he *HttpError) Error() string {
 	}
 }
 
+func (he *HttpError) HttpBodyPretty(c *gin.Context, body interface{}) {
+
+	if body == nil {
+		c.Status(he.HttpCode)
+		return
+	}
+
+	resp := &bodyResp{
+		HttpError: he,
+		Content:   body,
+	}
+
+	j, err := json.MarshalIndent(resp, "", "    ")
+	if err != nil {
+		undefinedErr(err).httpResp(c, "%s: %+#v", "json.Marshal() failed", resp)
+		return
+	}
+
+	c.Data(he.HttpCode, `application/json`, j)
+}
+
 func (he *HttpError) HttpBody(c *gin.Context, body interface{}) {
 	if body == nil {
 		c.Status(he.HttpCode)
