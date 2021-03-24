@@ -9,6 +9,67 @@ import (
 	influxdb "github.com/influxdata/influxdb1-client/v2"
 )
 
+func TestMakeLineProtoPoint(t *testing.T) {
+	var cases = []struct {
+		name   string
+		tags   map[string]string
+		fields map[string]interface{}
+		ts     time.Time
+		opt    *Option
+		expect string
+		fail   bool
+	}{
+		{
+			name:   "abc",
+			tags:   nil,
+			fields: map[string]interface{}{"f1": 123},
+			opt:    &Option{Time: time.Unix(0, 123)},
+			expect: "abc f1=123i 123",
+			fail:   false,
+		},
+
+		{
+			name:   "abc",
+			tags:   nil,
+			fields: map[string]interface{}{"f1": 123},
+			opt:    &Option{Time: time.Unix(0, 123)},
+			expect: "abc f1=123i 123",
+			fail:   false,
+		},
+
+		{
+			name:   "abc",
+			tags:   map[string]string{"tag1": "val1", `tag2\`: `val2\`},
+			fields: map[string]interface{}{"f1": 123},
+			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+			fail:   true,
+		},
+
+		{
+			name:   "abc",
+			tags:   map[string]string{"tag1": "val1", `tag2\`: `val2\`},
+			fields: map[string]interface{}{"f1": 123},
+			opt:    &Option{Time: time.Unix(0, 123), Strict: false},
+			expect: "abc,tag1=val1,tag2=val2 f1=123i 123",
+			fail:   false,
+		},
+	}
+
+	for _, tc := range cases {
+		pt, err := MakeLineProtoPoint(tc.name, tc.tags, tc.fields, tc.opt)
+
+		if tc.fail {
+			testutil.NotOk(t, err, "")
+			t.Logf("expect error: %s", err)
+		} else {
+			testutil.Ok(t, err)
+
+			testutil.Equals(t, tc.expect, pt.String())
+			t.Logf("[pass] exp: %s, parse ok? %v", tc.expect, ParseLineProto([]byte(pt.String()), "n"))
+		}
+	}
+}
+
 func TestParsePoint(t *testing.T) {
 	newPoint := func(m string,
 		tags map[string]string,
@@ -23,10 +84,10 @@ func TestParsePoint(t *testing.T) {
 	}
 
 	var cases = []struct {
-		data     []byte
-		opt      *Option
-		expected []*influxdb.Point
-		fail     bool
+		data   []byte
+		opt    *Option
+		expect []*influxdb.Point
+		fail   bool
 	}{
 		{
 			data: nil,
@@ -35,7 +96,7 @@ func TestParsePoint(t *testing.T) {
 		{
 			data: []byte(`abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc" 123`),
 			opt:  &Option{Time: time.Unix(0, 123)},
-			expected: []*influxdb.Point{
+			expect: []*influxdb.Point{
 				newPoint("abc",
 					map[string]string{"tag1": "1", "tag2": "2"},
 					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
@@ -46,7 +107,7 @@ func TestParsePoint(t *testing.T) {
 		{
 			data: []byte(`abc f1=1i,f2=2,f3="abc" 123`), // no tags
 			opt:  &Option{Time: time.Unix(0, 123)},
-			expected: []*influxdb.Point{
+			expect: []*influxdb.Point{
 				newPoint("abc",
 					nil,
 					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
@@ -63,7 +124,7 @@ abc f1=1i,f2=2,f3="abc" 789
 
 			`), // multiple empty lines
 			opt: &Option{Time: time.Unix(0, 123)},
-			expected: []*influxdb.Point{
+			expect: []*influxdb.Point{
 				newPoint("abc",
 					nil,
 					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
@@ -92,12 +153,59 @@ abc f1=1i,f2=2,f3="abc" 789
 				Time:      time.Unix(0, 123),
 				ExtraTags: map[string]string{"tag1": "1", "tag2": "2"},
 			},
-			expected: []*influxdb.Point{
+			expect: []*influxdb.Point{
 				newPoint("abc",
 					map[string]string{"tag1": "1", "tag2": "2"},
 					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 			},
+		},
+
+		{
+			data: []byte(`abc f1=1i,f2=2,f3="abc" 123`),
+			opt: &Option{
+				Time:      time.Unix(0, 123),
+				ExtraTags: map[string]string{`tag1\`: `1`, "tag2": `2`}, // extra tag key with `\` suffix
+			},
+			expect: []*influxdb.Point{
+				newPoint("abc",
+					map[string]string{`tag1\`: "1", "tag2": `2`},
+					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					time.Unix(0, 123)),
+			},
+		},
+
+		{
+			data: []byte(`abc f1=1i,f2=2,f3="abc" 123`),
+			opt: &Option{
+				Time:      time.Unix(0, 123),
+				ExtraTags: map[string]string{`tag1`: `1,`, "tag2": `2\`, "tag3": `3`}, // extra tag val with `\` suffix
+			},
+			expect: []*influxdb.Point{
+				newPoint("abc",
+					map[string]string{`tag1`: "1,", "tag2": `2\`, "tag3": `3`},
+					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					time.Unix(0, 123)),
+			},
+		},
+
+		{
+			data: []byte(`abc f1=1i,f2=2,f3="abc" 123`),
+			opt: &Option{
+				Time:      time.Unix(0, 123),
+				ExtraTags: map[string]string{`tag\1`: `1`, "tag2": `2\34`}, // extra tag kv with `\`
+			},
+			expect: []*influxdb.Point{
+				newPoint("abc",
+					map[string]string{`tag\1`: "1", "tag2": `2\34`},
+					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					time.Unix(0, 123)),
+			},
+		},
+
+		{
+			fail: true,
+			data: []byte(`abc,tag1\=1,tag2=2\ f1=1i 123123`), // tag kv with `\`: missing tag value
 		},
 	}
 
@@ -110,11 +218,10 @@ abc f1=1i,f2=2,f3="abc" 789
 			testutil.Ok(t, err)
 
 			for idx, pt := range pts {
-				exp := tc.expected[idx].String()
+				exp := tc.expect[idx].String()
 				got := pt.String()
 				testutil.Equals(t, exp, got)
-				t.Logf("exp: %s", exp)
-				t.Logf("got: %s", got)
+				t.Logf("[pass] exp: %s, parse ok? %v", exp, ParseLineProto([]byte(exp), "n"))
 			}
 		}
 	}
