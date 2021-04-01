@@ -213,12 +213,12 @@ abc f1=1i,f2=2,f3="abc" 789
 			data: []byte(`abc f1=1i,f2=2,f3="abc" 123`),
 			opt: &Option{
 				Time: time.Unix(0, 123),
-				Callback: func(p models.Point) models.Point {
+				Callback: func(p models.Point) (models.Point, error) {
 					if string(p.Name()) == "abc" {
 						t.Logf("haha, we get measurement `abc'")
 					}
 					p.AddTag("callback-added-tag", "callback-added-tag-value")
-					return p
+					return p, nil
 				},
 			},
 			expect: []*influxdb.Point{
