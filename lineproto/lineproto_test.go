@@ -6,6 +6,7 @@ import (
 
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/testutil"
 
+	"github.com/influxdata/influxdb1-client/models"
 	influxdb "github.com/influxdata/influxdb1-client/v2"
 )
 
@@ -207,6 +208,26 @@ abc f1=1i,f2=2,f3="abc" 789
 			fail: true,
 			data: []byte(`abc,tag1\=1,tag2=2\ f1=1i 123123`), // tag kv with `\`: missing tag value
 		},
+
+		{
+			data: []byte(`abc f1=1i,f2=2,f3="abc" 123`),
+			opt: &Option{
+				Time: time.Unix(0, 123),
+				Callback: func(p models.Point) models.Point {
+					if string(p.Name()) == "abc" {
+						t.Logf("haha, we get measurement `abc'")
+					}
+					p.AddTag("callback-added-tag", "callback-added-tag-value")
+					return p
+				},
+			},
+			expect: []*influxdb.Point{
+				newPoint("abc",
+					map[string]string{"callback-added-tag": "callback-added-tag-value"},
+					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					time.Unix(0, 123)),
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -218,10 +239,12 @@ abc f1=1i,f2=2,f3="abc" 789
 			testutil.Ok(t, err)
 
 			for idx, pt := range pts {
-				exp := tc.expect[idx].String()
-				got := pt.String()
-				testutil.Equals(t, exp, got)
-				t.Logf("[pass] exp: %s, parse ok? %v", exp, ParseLineProto([]byte(exp), "n"))
+				if len(tc.expect) > 0 {
+					exp := tc.expect[idx].String()
+					got := pt.String()
+					testutil.Equals(t, exp, got)
+					t.Logf("[pass] exp: %s, parse ok? %v", exp, ParseLineProto([]byte(exp), "n"))
+				}
 			}
 		}
 	}
