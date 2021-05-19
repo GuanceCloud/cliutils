@@ -46,7 +46,7 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			fail:   true,
 		},
 
-		{
+		{ // under non-strict: auto fix tag-key, tag-value
 			name:   "abc",
 			tags:   map[string]string{"tag1": "val1", `tag2\`: `val2\`},
 			fields: map[string]interface{}{"f1": 123},
@@ -54,19 +54,89 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			expect: "abc,tag1=val1,tag2=val2 f1=123i 123",
 			fail:   false,
 		},
+
+		{ // under strict: error
+			name:   "abc",
+			tags:   map[string]string{"tag1": "val1", `tag2\`: `val2\`},
+			fields: map[string]interface{}{"f1": 123},
+			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+			expect: "abc,tag1=val1,tag2=val2 f1=123i 123",
+			fail:   true,
+		},
+
+		{ // under strict: field is nil
+			name:   "abc",
+			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`},
+			fields: map[string]interface{}{"f1": 123, "f2": nil},
+			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+			expect: "abc,tag1=val1,tag2=val2 f1=123i 123",
+			fail:   true,
+		},
+
+		{ // under strict: field is map
+			name:   "abc",
+			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`},
+			fields: map[string]interface{}{"f1": 123, "f2": map[string]interface{}{"a": "b"}},
+			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+			expect: "abc,tag1=val1,tag2=val2 f1=123i 123",
+			fail:   true,
+		},
+
+		{ // under strict: field is object
+			name:   "abc",
+			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`},
+			fields: map[string]interface{}{"f1": 123, "f2": struct{ a string }{a: "abc"}},
+			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+			expect: "abc,tag1=val1,tag2=val2 f1=123i 123",
+			fail:   true,
+		},
+
+		{ // under non-strict, ignore nil field
+			name:   "abc",
+			tags:   map[string]string{"tag1": "val1", `tag2\`: `val2\`},
+			fields: map[string]interface{}{"f1": 123, "f2": nil},
+			opt:    &Option{Time: time.Unix(0, 123), Strict: false},
+			expect: "abc,tag1=val1,tag2=val2 f1=123i 123",
+			fail:   false,
+		},
+
+		{ // under strict, utf8 characters in metric-name
+			name:   "abc≈≈≈≈øøππ†®",
+			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`},
+			fields: map[string]interface{}{"f1": 123},
+			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+			expect: "abc≈≈≈≈øøππ†®,tag1=val1,tag2=val2 f1=123i 123",
+			fail:   false,
+		},
+
+		{ // under strict, utf8 characters in metric-name, fields, tags
+			name:   "abc≈≈≈≈øøππ†®",
+			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`, "tag3": `ºª•¶§∞¢£`},
+			fields: map[string]interface{}{"f1": 123, "f2": "¡™£¢∞§¶•ªº"},
+			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+			expect: `abc≈≈≈≈øøππ†®,tag1=val1,tag2=val2,tag3=ºª•¶§∞¢£ f1=123i,f2="¡™£¢∞§¶•ªº" 123`,
+			fail:   false,
+		},
+
+		{ // missing field
+			name:   "abc≈≈≈≈øøππ†®",
+			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`, "tag3": `ºª•¶§∞¢£`},
+			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+			expect: `abc≈≈≈≈øøππ†®,tag1=val1,tag2=val2,tag3=ºª•¶§∞¢£ f1=123i,f2="¡™£¢∞§¶•ªº" 123`,
+			fail:   true,
+		},
 	}
 
-	for _, tc := range cases {
+	for i, tc := range cases {
 		pt, err := MakeLineProtoPoint(tc.name, tc.tags, tc.fields, tc.opt)
 
 		if tc.fail {
 			testutil.NotOk(t, err, "")
-			t.Logf("expect error: %s", err)
+			t.Logf("[%d] expect error: %s", i, err)
 		} else {
 			testutil.Ok(t, err)
-
 			testutil.Equals(t, tc.expect, pt.String())
-			t.Logf("[pass] exp: %s, parse ok? %v", tc.expect, ParseLineProto([]byte(pt.String()), "n"))
+			testutil.Equals(t, ParseLineProto([]byte(pt.String()), "n"), nil)
 		}
 	}
 }

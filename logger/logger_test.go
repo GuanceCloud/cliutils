@@ -3,6 +3,7 @@ package logger
 import (
 	"flag"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -16,6 +17,30 @@ var (
 
 func _init() {
 	flag.Parse()
+}
+
+// test write on symlink
+func TestLogger8(t *testing.T) {
+	MaxSize = 1
+	MaxBackups = 5
+	logmsg := "1234567890qwertyuioplkjhgfdsazxcvbnm"
+	_ = logmsg
+
+	logf := "log.origin"
+	logln := "/tmp/log.ln"
+
+	_ = os.Remove(logln) // ignore
+
+	if err := os.Symlink(logf, logln); err != nil {
+		t.Fatal(err)
+	}
+
+	SetGlobalRootLogger(logln, DEBUG, OPT_DEFAULT)
+
+	l := SLogger("TestLogger8")
+	for {
+		l.Debug(logmsg)
+	}
 }
 
 func TestLogger7(t *testing.T) {
