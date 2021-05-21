@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+
+	tu "gitlab.jiagouyun.com/cloudcare-tools/cliutils/testutil"
 )
 
 var (
@@ -17,6 +19,72 @@ var (
 
 func _init() {
 	flag.Parse()
+}
+
+func TestInitRootAndLevels(t *testing.T) {
+	InitRoot(nil)
+	l := SLogger("test")
+	l.Debug("abc123")
+
+	Reset()
+
+	err := InitRoot(&Option{
+		Level: "undefined",
+	})
+	tu.NotOk(t, err, "")
+	t.Log(err)
+
+	Reset()
+	err = InitRoot(&Option{
+		Level: WARN,
+	})
+	tu.Ok(t, err)
+	l = SLogger("test-level-warn")
+	l.Info("info: abc123")
+	l.Warn("warn: abc123")
+
+	Reset()
+	err = InitRoot(&Option{
+		Level: DPANIC,
+	})
+	tu.Ok(t, err)
+	l = SLogger("test-level-dpanic")
+	l.Info("info: abc123")
+	l.Warn("warn: abc123")
+	l.DPanic("panic: abc123")
+
+	//Reset()
+	//err = InitRoot(&Option{
+	//	Level: FATAL,
+	//})
+	//tu.Ok(t, err)
+	//l = SLogger("test-level-fatal")
+	//l.Info("info: abc123")
+	//l.Warn("warn: abc123")
+
+	//Reset()
+	//err = InitRoot(&Option{
+	//	Level: PANIC,
+	//})
+	//tu.Ok(t, err)
+	//l = SLogger("test-level-panic")
+	//l.Info("info: abc123")
+	//l.Warn("warn: abc123")
+	//l.Panic("panic: abc123")
+}
+
+func TestSetEnvRootLogger(t *testing.T) {
+	envName := "not-set"
+	SetEnvRootLogger(envName, DEBUG, OPT_DEFAULT)
+
+	l := SLogger("test")
+	l.Debug("abc123")
+
+	envName = "try-set"
+	os.Setenv(envName, ".abc.log")
+	SetEnvRootLogger(envName, DEBUG, OPT_DEFAULT)
+	l = SLogger("test")
+	l.Debug("abc123")
 }
 
 // test write on symlink
