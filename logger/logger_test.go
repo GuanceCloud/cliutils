@@ -21,6 +21,15 @@ func _init() {
 	flag.Parse()
 }
 
+func TestDefaultEnvLogger(t *testing.T) {
+	f := ".env-default-root.log"
+	defer os.Remove(f)
+	os.Setenv(EnvRootLoggerPath, f)
+
+	l := DefaultSLogger("TestDefaultEnvLogger")
+	l.Debug("abc123")
+}
+
 func TestInitRootAndLevels(t *testing.T) {
 	InitRoot(nil)
 	l := SLogger("test")
@@ -35,6 +44,14 @@ func TestInitRootAndLevels(t *testing.T) {
 	t.Log(err)
 
 	Reset()
+
+	err = InitRoot(&Option{
+		Level: "", // no level, default DEBUG
+	})
+	tu.NotOk(t, err, "")
+	l.Debug("no level, default debug")
+
+	Reset()
 	err = InitRoot(&Option{
 		Level: WARN,
 	})
@@ -42,6 +59,16 @@ func TestInitRootAndLevels(t *testing.T) {
 	l = SLogger("test-level-warn")
 	l.Info("info: abc123")
 	l.Warn("warn: abc123")
+
+	Reset()
+	err = InitRoot(&Option{
+		Level: ERROR,
+	})
+	tu.Ok(t, err)
+	l = SLogger("test-level-warn")
+	l.Info("info: abc123")
+	l.Warn("warn: abc123")
+	l.Error("warn: abc123")
 
 	Reset()
 	err = InitRoot(&Option{
@@ -53,62 +80,50 @@ func TestInitRootAndLevels(t *testing.T) {
 	l.Warn("warn: abc123")
 	l.DPanic("panic: abc123")
 
-	//Reset()
-	//err = InitRoot(&Option{
-	//	Level: FATAL,
-	//})
-	//tu.Ok(t, err)
-	//l = SLogger("test-level-fatal")
-	//l.Info("info: abc123")
-	//l.Warn("warn: abc123")
+	Reset()
+	os.Setenv("test-env", ".test.log")
+	defer os.Remove(".test.log")
+	err = InitRoot(&Option{
+		Env:   "test-env",
+		Level: DEBUG,
+	})
 
-	//Reset()
-	//err = InitRoot(&Option{
-	//	Level: PANIC,
-	//})
-	//tu.Ok(t, err)
-	//l = SLogger("test-level-panic")
-	//l.Info("info: abc123")
-	//l.Warn("warn: abc123")
-	//l.Panic("panic: abc123")
+	tu.Ok(t, err)
+	l = SLogger("test-level-fatal")
+	l.Info("info: abc123")
+	l.Warn("warn: abc123")
+
+	Reset()
+	err = InitRoot(&Option{
+		Level: FATAL,
+	})
+	tu.Ok(t, err)
+	l = SLogger("test-level-fatal")
+	l.Info("info: abc123")
+	l.Warn("warn: abc123")
+
+	Reset()
+	err = InitRoot(&Option{
+		Level: PANIC,
+	})
+	tu.Ok(t, err)
+	l = SLogger("test-level-panic")
+	l.Info("info: abc123")
+	l.Warn("warn: abc123")
 }
 
 func TestSetEnvRootLogger(t *testing.T) {
 	envName := "not-set"
-	SetEnvRootLogger(envName, DEBUG, OPT_DEFAULT)
-
-	l := SLogger("test")
-	l.Debug("abc123")
+	if err := SetEnvRootLogger(envName, DEBUG, OPT_DEFAULT); err != nil {
+		t.Log(err)
+	}
 
 	envName = "try-set"
 	os.Setenv(envName, ".abc.log")
+	defer os.Remove(".abc.log")
 	SetEnvRootLogger(envName, DEBUG, OPT_DEFAULT)
-	l = SLogger("test")
+	l := SLogger("test")
 	l.Debug("abc123")
-}
-
-// test write on symlink
-func TestLogger8(t *testing.T) {
-	MaxSize = 1
-	MaxBackups = 5
-	logmsg := "1234567890qwertyuioplkjhgfdsazxcvbnm"
-	_ = logmsg
-
-	logf := "log.origin"
-	logln := "/tmp/log.ln"
-
-	_ = os.Remove(logln) // ignore
-
-	if err := os.Symlink(logf, logln); err != nil {
-		t.Fatal(err)
-	}
-
-	SetGlobalRootLogger(logln, DEBUG, OPT_DEFAULT)
-
-	l := SLogger("TestLogger8")
-	for {
-		l.Debug(logmsg)
-	}
 }
 
 func TestLogger7(t *testing.T) {
