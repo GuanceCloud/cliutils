@@ -48,7 +48,7 @@ func TestInitRootAndLevels(t *testing.T) {
 	err = InitRoot(&Option{
 		Level: "", // no level, default DEBUG
 	})
-	tu.NotOk(t, err, "")
+	tu.Ok(t, err)
 	l.Debug("no level, default debug")
 
 	Reset()
