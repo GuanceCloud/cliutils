@@ -1,6 +1,7 @@
 package lineproto
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -125,6 +126,18 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			expect: `abc≈≈≈≈øøππ†®,tag1=val1,tag2=val2,tag3=ºª•¶§∞¢£ f1=123i,f2="¡™£¢∞§¶•ªº" 123`,
 			fail:   true,
 		},
+
+		{ // new line in field
+			name: "abc",
+			tags: map[string]string{"tag1": "val1"},
+			fields: map[string]interface{}{"f1": `aaa
+bbb
+ccc`},
+			opt: &Option{Time: time.Unix(0, 123), Strict: true},
+			expect: `abc,tag1=val1 f1="aaa
+bbb
+ccc" 123`,
+		},
 	}
 
 	for i, tc := range cases {
@@ -135,8 +148,10 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			t.Logf("[%d] expect error: %s", i, err)
 		} else {
 			testutil.Ok(t, err)
-			testutil.Equals(t, tc.expect, pt.String())
-			testutil.Equals(t, ParseLineProto([]byte(pt.String()), "n"), nil)
+			x := pt.String()
+			testutil.Equals(t, tc.expect, x)
+			testutil.Equals(t, ParseLineProto([]byte(x), "n"), nil)
+			fmt.Printf("\n[%d]%s\n", i, x)
 		}
 	}
 }
