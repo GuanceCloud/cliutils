@@ -130,14 +130,14 @@ func TestMakeLineProtoPoint(t *testing.T) {
 		{ // new line in field
 			name: "abc",
 			tags: map[string]string{"tag1": "val1"},
-			fields: map[string]interface{}{"f1": `aaa
-bbb
-ccc`},
+			fields: map[string]interface{}{
+				"f1": `aaa
+	bbb
+			ccc`},
 			opt: &Option{Time: time.Unix(0, 123), Strict: true},
 			expect: `abc,tag1=val1 f1="aaa
-bbb
-ccc" 123`,
-		},
+	bbb
+			ccc" 123`},
 	}
 
 	for i, tc := range cases {
