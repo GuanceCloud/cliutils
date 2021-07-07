@@ -11,6 +11,14 @@ import (
 	influxdb "github.com/influxdata/influxdb1-client/v2"
 )
 
+func TestAdjustTags(t *testing.T) {
+	cases := []struct {
+		tags map[string]string
+	}{}
+
+	_ = cases
+}
+
 func TestMakeLineProtoPoint(t *testing.T) {
 	var cases = []struct {
 		name   string
@@ -22,7 +30,17 @@ func TestMakeLineProtoPoint(t *testing.T) {
 		fail   bool
 	}{
 
-		{
+		{ // field-val with `\n` => ok
+			name: "abc",
+			fields: map[string]interface{}{"f1": `abc
+123`},
+			opt: &Option{Time: time.Unix(0, 123), Strict: false},
+			expect: `abc f1="abc
+123" 123`,
+			fail: false,
+		},
+
+		{ // tag-k/v with `\n` under non-strict => ok
 			name: "abc",
 			tags: map[string]string{
 				"tag1": `abc
@@ -36,7 +54,7 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			fail:   false,
 		},
 
-		{
+		{ // tag-k/v with `\n` under strict => fail
 			name: "abc",
 			tags: map[string]string{
 				"tag1": `abc
@@ -48,15 +66,6 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
 			expect: "abc,tag\\ 2=def\\ 456,tag1=abc\\ 123 f1=123i 123",
 			fail:   true,
-		},
-
-		{
-			name:   "abc",
-			tags:   nil,
-			fields: map[string]interface{}{"f1": 123},
-			opt:    &Option{Time: time.Unix(0, 123)},
-			expect: "abc f1=123i 123",
-			fail:   false,
 		},
 
 		{
