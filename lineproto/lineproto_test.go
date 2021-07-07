@@ -21,6 +21,35 @@ func TestMakeLineProtoPoint(t *testing.T) {
 		expect string
 		fail   bool
 	}{
+
+		{
+			name: "abc",
+			tags: map[string]string{
+				"tag1": `abc
+123`,
+				`tag
+2`: `def
+456\`},
+			fields: map[string]interface{}{"f1": 123},
+			opt:    &Option{Time: time.Unix(0, 123), Strict: false},
+			expect: "abc,tag\\ 2=def\\ 456,tag1=abc\\ 123 f1=123i 123",
+			fail:   false,
+		},
+
+		{
+			name: "abc",
+			tags: map[string]string{
+				"tag1": `abc
+123`,
+				`tag
+2`: `def
+456\`},
+			fields: map[string]interface{}{"f1": 123},
+			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+			expect: "abc,tag\\ 2=def\\ 456,tag1=abc\\ 123 f1=123i 123",
+			fail:   true,
+		},
+
 		{
 			name:   "abc",
 			tags:   nil,
