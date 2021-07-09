@@ -13,33 +13,29 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
-var (
-	GlobalTracer *Tracer
-	l            = logger.DefaultSLogger("dk_tracer")
-)
+var l = logger.DefaultSLogger("dk_tracer")
 
 type DDLog struct{}
 
-func (ddl DDLog) Log(msg string) {
+func (ddl DDLog) Log(msg string) { // use exist logger for ddtrace log
 	l.Debug(msg)
 }
 
 type Option func(opt *Tracer)
 
 type Tracer struct {
-	Service  string `toml:"service"`
-	Version  string `toml:"version"`
-	Enabled  bool   `toml:"enabled"`
-	Resource string `toml:"resource"`
-	Host     string `toml:"host"`
-	Port     int    `toml:"port"`
-	addr     string
-	Debug    bool `toml:"debug"`
-	logger   ddtrace.Logger
+	Service string `toml:"service"`
+	Version string `toml:"version"`
+	Enabled bool   `toml:"enabled"`
+	Host    string `toml:"host"`
+	Port    int    `toml:"port"`
+	addr    string
+	Debug   bool `toml:"debug"`
+	logger  ddtrace.Logger
 }
 
-func newTracer(opts ...Option) *Tracer {
-	tracer := &Tracer{}
+func NewTracer(enabled bool, opts ...Option) *Tracer {
+	tracer := &Tracer{Enabled: enabled}
 	for _, opt := range opts {
 		opt(tracer)
 	}
@@ -48,13 +44,15 @@ func newTracer(opts ...Option) *Tracer {
 }
 
 func (t *Tracer) Start(opts ...Option) {
+	if !t.Enabled {
+		return
+	}
+
 	for _, opt := range opts {
 		opt(t)
 	}
 
-	if !t.Enabled {
-		return
-	}
+	t.addr = fmt.Sprintf("%s:%d", t.Host, t.Port)
 
 	sopts := []tracer.StartOption{
 		tracer.WithEnv("prod"),
@@ -70,6 +68,10 @@ func (t *Tracer) Start(opts ...Option) {
 }
 
 func (t *Tracer) StartSpan(resource string) ddtrace.Span {
+	if !t.Enabled {
+		return nil
+	}
+
 	opts := []ddtrace.StartSpanOption{
 		tracer.SpanType(ext.SpanTypeHTTP),
 		tracer.ServiceName(t.Service),
@@ -79,26 +81,32 @@ func (t *Tracer) StartSpan(resource string) ddtrace.Span {
 	return tracer.StartSpan(resource, opts...)
 }
 
-func (t *Tracer) Stop() {
-	if t.Enabled {
-		tracer.Stop()
+func (t *Tracer) SetSpanTag(span tracer.Span, key string, value interface{}) {
+	if t.Enabled && span != nil {
+		span.SetTag(key, value)
 	}
 }
 
-func (t *Tracer) Middleware(opts ...Option) gin.HandlerFunc {
-	for _, opt := range opts {
-		opt(t)
+func (t *Tracer) FinishSpan(span tracer.Span, opts ...ddtrace.FinishOption) {
+	if t.Enabled && span != nil {
+		span.Finish(opts...)
 	}
+}
 
+func (t *Tracer) Middleware(resource string, opts ...Option) gin.HandlerFunc {
 	if !t.Enabled {
 		return func(c *gin.Context) {
 			c.Next()
 		}
 	} else {
+		for _, opt := range opts {
+			opt(t)
+		}
+
 		return func(c *gin.Context) {
 			ssopts := []ddtrace.StartSpanOption{
 				tracer.ServiceName(t.Service),
-				tracer.ResourceName(t.Resource),
+				tracer.ResourceName(resource),
 				tracer.SpanType(ext.SpanTypeWeb),
 				tracer.Tag(ext.HTTPMethod, c.Request.Method),
 				tracer.Tag(ext.HTTPURL, c.Request.URL.Path),
@@ -126,10 +134,14 @@ func (t *Tracer) Middleware(opts ...Option) gin.HandlerFunc {
 	}
 }
 
-// func init() {
-// 	if cfg.Cfg.TracerConf != nil {
-// 		GlobalTracer = newTracer(WithService("dataway", git.Version), WithEnable(cfg.Cfg.TracerConf.Enabled), WithAgentAddr(cfg.Cfg.TracerConf.Host, cfg.Cfg.TracerConf.Port), WithDebug(cfg.Cfg.TracerConf.Debug), WithLogger(DDLog{}))
-// 	} else {
-// 		GlobalTracer = newTracer(WithEnable(false))
-// 	}
-// }
+func (t *Tracer) Inject(span ddtrace.Span, header http.Header) {
+	if t.Enabled {
+		tracer.Inject(span.Context(), tracer.HTTPHeadersCarrier(header))
+	}
+}
+
+func (t *Tracer) Stop() {
+	if t.Enabled {
+		tracer.Stop()
+	}
+}

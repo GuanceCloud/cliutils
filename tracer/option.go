@@ -15,18 +15,6 @@ func WithService(name, version string) Option {
 	}
 }
 
-func WithResource(resource string) Option {
-	return func(opt *Tracer) {
-		opt.Resource = resource
-	}
-}
-
-func WithEnable(enable bool) Option {
-	return func(opt *Tracer) {
-		opt.Enabled = enable
-	}
-}
-
 func WithAgentAddr(host string, port int) Option {
 	addr := fmt.Sprintf("%s:%d", host, port)
 	return func(opt *Tracer) {
