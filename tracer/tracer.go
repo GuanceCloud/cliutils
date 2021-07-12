@@ -24,13 +24,13 @@ func (ddl DDLog) Log(msg string) { // use exist logger for ddtrace log
 type Option func(opt *Tracer)
 
 type Tracer struct {
-	Service string `toml:"service"`
-	Version string `toml:"version"`
-	Enabled bool   `toml:"enabled"`
-	Host    string `toml:"host"`
-	Port    int    `toml:"port"`
+	Service string `toml:"service", yaml:"service"`
+	Version string `toml:"version", yaml:"version"`
+	Enabled bool   `toml:"enabled", yaml:"enabled"`
+	Host    string `toml:"host", yaml:"host"`
+	Port    int    `toml:"port", yaml:"port"`
 	addr    string
-	Debug   bool `toml:"debug"`
+	Debug   bool `toml:"debug", yaml:"debug"`
 	logger  ddtrace.Logger
 }
 
@@ -93,6 +93,12 @@ func (t *Tracer) FinishSpan(span tracer.Span, opts ...ddtrace.FinishOption) {
 	}
 }
 
+func (t *Tracer) Inject(span ddtrace.Span, header http.Header) {
+	if t.Enabled {
+		tracer.Inject(span.Context(), tracer.HTTPHeadersCarrier(header))
+	}
+}
+
 func (t *Tracer) Middleware(resource string, opts ...Option) gin.HandlerFunc {
 	if !t.Enabled {
 		return func(c *gin.Context) {
@@ -131,12 +137,6 @@ func (t *Tracer) Middleware(resource string, opts ...Option) gin.HandlerFunc {
 				span.SetTag("gin.errors", c.Errors.String())
 			}
 		}
-	}
-}
-
-func (t *Tracer) Inject(span ddtrace.Span, header http.Header) {
-	if t.Enabled {
-		tracer.Inject(span.Context(), tracer.HTTPHeadersCarrier(header))
 	}
 }
 
