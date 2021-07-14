@@ -1,3 +1,13 @@
+# github.com/DataDog/datadog-go v4.4.0+incompatible
+github.com/DataDog/datadog-go/statsd
+# github.com/DataDog/sketches-go v1.0.0
+github.com/DataDog/sketches-go/ddsketch
+github.com/DataDog/sketches-go/ddsketch/mapping
+github.com/DataDog/sketches-go/ddsketch/pb/sketchpb
+github.com/DataDog/sketches-go/ddsketch/store
+# github.com/Microsoft/go-winio v0.5.0
+github.com/Microsoft/go-winio
+github.com/Microsoft/go-winio/pkg/guid
 # github.com/aliyun/aliyun-oss-go-sdk v2.1.2+incompatible
 github.com/aliyun/aliyun-oss-go-sdk/oss
 # github.com/aws/aws-sdk-go v1.31.12
@@ -72,6 +82,8 @@ github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
 # github.com/golang/snappy v0.0.1
 github.com/golang/snappy
+# github.com/google/uuid v1.0.0
+github.com/google/uuid
 # github.com/gorilla/websocket v0.0.0-20170926233335-4201258b820c
 github.com/gorilla/websocket
 # github.com/influxdata/influxdb1-client v0.0.0-20200827194710-b269163b24ab
@@ -90,8 +102,6 @@ github.com/klauspost/compress/huff0
 github.com/klauspost/compress/snappy
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-# github.com/koding/websocketproxy v0.0.0-20181220232114-7ed82d81a28c
-github.com/koding/websocketproxy
 # github.com/leodido/go-urn v1.2.0
 github.com/leodido/go-urn
 # github.com/lib/pq v1.8.0
@@ -106,6 +116,8 @@ github.com/matttproud/golang_protobuf_extensions/pbutil
 github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.1
 github.com/modern-go/reflect2
+# github.com/philhofer/fwd v1.1.1
+github.com/philhofer/fwd
 # github.com/pkg/errors v0.9.1
 github.com/pkg/errors
 # github.com/prometheus/client_model v0.2.0
@@ -118,6 +130,8 @@ github.com/prometheus/common/model
 github.com/robfig/cron/v3
 # github.com/rs/xid v1.2.1
 github.com/rs/xid
+# github.com/tinylib/msgp v1.1.2
+github.com/tinylib/msgp/msgp
 # github.com/ugorji/go/codec v1.1.7
 github.com/ugorji/go/codec
 # github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c
@@ -184,8 +198,11 @@ golang.org/x/net/html/charset
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.0.0-20200316230553-a7d97aace0b0
+# golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c
+golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
+golang.org/x/sys/windows
+golang.org/x/sys/windows/registry
 # golang.org/x/text v0.3.3
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -207,6 +224,9 @@ golang.org/x/text/transform
 golang.org/x/text/unicode/norm
 # golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
 golang.org/x/time/rate
+# golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
+golang.org/x/xerrors
+golang.org/x/xerrors/internal
 # google.golang.org/protobuf v1.25.0
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
@@ -237,6 +257,15 @@ google.golang.org/protobuf/runtime/protoimpl
 google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
+# gopkg.in/DataDog/dd-trace-go.v1 v1.31.1
+gopkg.in/DataDog/dd-trace-go.v1/ddtrace
+gopkg.in/DataDog/dd-trace-go.v1/ddtrace/ext
+gopkg.in/DataDog/dd-trace-go.v1/ddtrace/internal
+gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer
+gopkg.in/DataDog/dd-trace-go.v1/internal
+gopkg.in/DataDog/dd-trace-go.v1/internal/globalconfig
+gopkg.in/DataDog/dd-trace-go.v1/internal/log
+gopkg.in/DataDog/dd-trace-go.v1/internal/version
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0
 gopkg.in/natefinch/lumberjack.v2
 # gopkg.in/yaml.v2 v2.3.0
