@@ -1,0 +1,5 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory `/Users/codapewild/Code/go/src/gitlab.jiagouyun.com/cloudcare-tools/cliutils'
+golangci-lint run | tee lint.err
+make: Leaving directory `/Users/codapewild/Code/go/src/gitlab.jiagouyun.com/cloudcare-tools/cliutils'
+ 

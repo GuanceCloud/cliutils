@@ -1,0 +1,248 @@
+make all --print-data-base --no-builtin-variables --no-builtin-rules --question
+# GNU Make 3.81
+# Copyright (C) 2006  Free Software Foundation, Inc.
+# This is free software; see the source for copying conditions.
+# There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE.
+
+# This program built for i386-apple-darwin11.3.0
+
+# Make data base, printed on Thu Jul  8 13:29:10 2021
+
+# Variables
+
+# automatic
+<D = $(patsubst %/,%,$(dir $<))
+# automatic
+?F = $(notdir $?)
+# environment
+ssh_proxy = ProxyCommand=nc -X 5 -x 127.0.0.1:1086 %h %p
+# automatic
+?D = $(patsubst %/,%,$(dir $?))
+# environment
+CPPFLAGS = CPPFLAGS -I/usr/local/opt/libffi/include -I/usr/local/opt/llvm@9/include -I/usr/local/Cellar/protoc-3.14.0-osx-x86_64/include -I/usr/local/opt/icu4c/include -I/usr/local/opt/ruby@2.5/include -I/usr/local/Cellar/hwloc/2.4.1/include
+# automatic
+@D = $(patsubst %/,%,$(dir $@))
+# automatic
+@F = $(notdir $@)
+# makefile
+CURDIR := /Users/codapewild/Code/go/src/gitlab.jiagouyun.com/cloudcare-tools/cliutils
+# makefile
+SHELL = /bin/sh
+# environment
+VSCODE_NLS_CONFIG = {"locale":"en-us","availableLanguages":{},"_languagePackSupport":true}
+# environment
+_ = /usr/bin/make
+# makefile (from `Makefile', line 1)
+MAKEFILE_LIST :=  Makefile
+# environment
+VSCODE_NODE_CACHED_DATA_DIR = /Users/codapewild/Library/Application Support/Code/CachedData/940b5f4bb5fa47866a54529ed759d95d09ee80be
+# environment
+GO111MODULE = auto
+# environment
+VERBOSE_LOGGING = true
+# environment
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/2r/hqwhgckj4qzdm0b324vsxbq40000gn/T/vscode-ipc-1aa2f906-4cf7-4d63-b467-de30a92206ee.sock
+# environment
+GOPROXY = https://goproxy.io,direct
+# environment
+PATH = /usr/local/Cellar/goroot/bin:/Users/codapewild/.cargo/bin:/usr/local/opt/ruby@2.5/bin:/usr/local/lib/ruby/gems/2.5.0/bin:/Library/Java/JavaVirtualMachines/jdk-15.0.2.jdk/Contents/Home/bin:/usr/local/opt/icu4c/sbin:/usr/local/opt/icu4c/bin:/Users/codapewild/Code/go/bin:/usr/local/opt/llvm@9/bin:/Users/codapewild/bin:/usr/local/bin:/usr/local/sbin/:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/share/dotnet:~/.dotnet/tools:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/Users/codapewild/.cargo/bin
+# environment
+no_proxy = localhost,127.0.0.1,10.100.0.0/16,172.16.2.0/24,172.16.5.0/24,192.168.1.0/24,*.jiagouyun.com
+# environment
+LSCOLORS = Gxfxcxdxbxegedabagacad
+# environment
+LIBRARY_PATH = /usr/local/lib
+# environment
+CPATH = /usr/local/include
+# environment
+GOPATH = /Users/codapewild/Code/go
+# environment
+VSCODE_LOG_STACK = false
+# environment
+ELECTRON_RUN_AS_NODE = 1
+# environment
+LDFLAGS = -L/usr/local/lib -L/usr/local/opt/libffi/lib -L/usr/local/opt/llvm@9/lib -L/usr/local/opt/icu4c/lib -L/usr/local/opt/ruby@2.5/lib -L/usr/local/Cellar/hwloc/2.4.1/lib
+# default
+.FEATURES := target-specific order-only second-expansion else-if archives jobserver check-symlink
+# environment
+SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.aXRn6auKpI/Listeners
+# automatic
+%F = $(notdir $%)
+# environment
+all_proxy = http://127.0.0.1:1083
+# environment
+PWD = /Users/codapewild/Code/go/src/gitlab.jiagouyun.com/cloudcare-tools/cliutils
+# environment
+ORIGINAL_XDG_CURRENT_DESKTOP = undefined
+# environment
+GOMODCACHE = /Users/codapewild/Code/go/pkg/mod
+# environment
+HOME = /Users/codapewild
+# default
+MAKEFILEPATH = $(shell /usr/bin/xcode-select -print-path 2>/dev/null || echo /Developer)/Makefiles
+# environment
+LOGNAME = codapewild
+# environment
+APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = true
+# environment
+ZSH = /Users/codapewild/.oh-my-zsh
+# environment
+VSCODE_HANDLES_UNCAUGHT_ERRORS = true
+# automatic
+^D = $(patsubst %/,%,$(dir $^))
+# environment
+XPC_FLAGS = 0x0
+# default
+MAKE = $(MAKE_COMMAND)
+# default
+MAKECMDGOALS := all
+# environment
+SHLVL = 1
+# environment
+JAVA_HOME = /Library/Java/JavaVirtualMachines/jdk-15.0.2.jdk/Contents/Home
+# environment
+XPC_SERVICE_NAME = com.microsoft.VSCode.21276
+# default
+MAKE_VERSION := 3.81
+# environment
+AMD_ENTRYPOINT = vs/workbench/services/extensions/node/extensionHostProcess
+# environment
+USER = codapewild
+# makefile
+.DEFAULT_GOAL := check
+# environment
+GOROOT = /usr/local/Cellar/goroot
+# environment
+PIPE_LOGGING = true
+# environment
+LESS = -R
+# automatic
+%D = $(patsubst %/,%,$(dir $%))
+# default
+MAKE_COMMAND := /Library/Developer/CommandLineTools/usr/bin/make
+# default
+.VARIABLES := 
+# environment
+TMPDIR = /var/folders/2r/hqwhgckj4qzdm0b324vsxbq40000gn/T/
+# automatic
+*F = $(notdir $*)
+# environment
+VSCODE_IPC_HOOK = /Users/codapewild/Library/Application Support/Code/1.52.0-main.sock
+# makefile
+MAKEFLAGS = Rrqp
+# environment
+MFLAGS = -Rrqp
+# automatic
+*D = $(patsubst %/,%,$(dir $*))
+# environment
+GOROOT_BOOTSTRAP = /usr/local/Cellar/go1.4
+# automatic
++D = $(patsubst %/,%,$(dir $+))
+# automatic
++F = $(notdir $+)
+# environment
+GONOPROXY = gitlab.jiagouyun.com
+# environment
+__CF_USER_TEXT_ENCODING = 0x1F5:0x0:0x0
+# default
+MAKEFILES := 
+# automatic
+<F = $(notdir $<)
+# environment
+https_proxy = http://127.0.0.1:1083
+# environment
+GOPRIVATE = gitlab.jiagouyun.com
+# environment
+PAGER = less
+# environment
+LC_ALL = C
+# automatic
+^F = $(notdir $^)
+# default
+SUFFIXES := 
+# default
+.INCLUDE_DIRS = /usr/local/include
+# environment
+MAKELEVEL := 0
+# environment
+http_proxy = http://127.0.0.1:1083
+# environment
+LANG = C
+# environment
+VSCODE_PID = 1678
+# variable set hash-table stats:
+# Load=80/1024=8%, Rehash=0, Collisions=5/104=5%
+
+# Pattern-specific Variable Values
+
+# No pattern-specific variable values.
+
+# Directories
+
+# . (device 16777220, inode 14236290): 25 files, no impossibilities.
+
+# 25 files, no impossibilities in 1 directories.
+
+# Implicit Rules
+
+# No implicit rules.
+
+# Files
+
+# Not a target:
+all:
+#  Command-line target.
+#  Implicit rule search has been done.
+#  File does not exist.
+#  File has not been updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+.SUFFIXES:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+
+# Not a target:
+Makefile:
+#  Implicit rule search has been done.
+#  Last modified 2021-06-09 16:39:36
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+.DEFAULT:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+
+check:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 2):
+	@golangci-lint run | tee lint.err
+	
+
+# files hash-table stats:
+# Load=5/1024=0%, Rehash=0, Collisions=0/17=0%
+# VPATH Search Paths
+
+# No `vpath' search paths.
+
+# No general (`VPATH' variable) search path.
+
+# # of strings in strcache: 1
+# # of strcache buffers: 1
+# strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
+# strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
+
+# Finished Make data base on Thu Jul  8 13:29:10 2021
+
+ 
+make: *** No rule to make target `all'.  Stop.
+ 
