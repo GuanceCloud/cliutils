@@ -3,9 +3,9 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016 Datadog, Inc.
 
-package tracer // import "gopkg.in/DataDog/dd-trace-go.v1/ddtrace/ext"
+package tracer
 
-// Span types have similar behaviour to "app types" and help categorize
+// Span types have similar behavior to "app types" and help categorize
 // traces in the Datadog application. They can also help fine grain agent
 // level bahviours such as obfuscation and quantization, when these are
 // enabled in the agent's configuration.
