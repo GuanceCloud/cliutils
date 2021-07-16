@@ -8,19 +8,19 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
-func WithService(name, version string) Option {
-	return func(opt *Tracer) {
-		opt.Service = name
-		opt.Version = version
-	}
-}
-
 func WithAgentAddr(host string, port int) Option {
 	addr := fmt.Sprintf("%s:%d", host, port)
 	return func(opt *Tracer) {
 		opt.Host = host
 		opt.Port = port
 		opt.addr = addr
+	}
+}
+
+func WithService(name, version string) Option {
+	return func(opt *Tracer) {
+		opt.Service = name
+		opt.Version = version
 	}
 }
 
