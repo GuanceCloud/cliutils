@@ -18,7 +18,6 @@ type spanType string
 type Config struct {
 	*nsq.Config
 	service       string
-	resource      string
 	analyticsRate float64
 	ctx           context.Context
 }
@@ -28,12 +27,6 @@ type Option func(cfg *Config)
 func WithService(service string) Option {
 	return func(cfg *Config) {
 		cfg.service = service
-	}
-}
-
-func WithResource(resource string) Option {
-	return func(cfg *Config) {
-		cfg.resource = resource
 	}
 }
 
@@ -54,7 +47,7 @@ func WithContext(ctx context.Context) Option {
 }
 
 func NewConfig(opts ...Option) *Config {
-	cfg := &Config{Config: nsq.NewConfig()}
+	cfg := &Config{}
 	for _, opt := range opts {
 		opt(cfg)
 	}

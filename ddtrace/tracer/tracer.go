@@ -1,11 +1,14 @@
 package tracer
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/nsqio/go-nsq"
+	nsqtracer "gitlab.jiagouyun.com/cloudcare-tools/cliutils/ddtrace/go-nsq"
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
 
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace"
@@ -133,5 +136,21 @@ func (this *Tracer) GinMiddleware(resource string, spanType SpanType, opts ...Op
 func (this *Tracer) Stop() {
 	if this.Enabled {
 		tracer.Stop()
+	}
+}
+
+func (this *Tracer) NewProducer(addr string, config *nsq.Config) (nsqtracer.TraceableProducer, error) {
+	if !this.Enabled {
+		return nsq.NewProducer(addr, config)
+	} else {
+		return nsqtracer.NewProducer(addr, config, nsqtracer.WithService(this.Service), nsqtracer.WithContext(context.Background()))
+	}
+}
+
+func (this *Tracer) NewConsumer(topic string, channel string, config *nsq.Config) (nsqtracer.TraceableConsumer, error) {
+	if !this.Enabled {
+		return nsq.NewConsumer(topic, channel, config)
+	} else {
+		return nsqtracer.NewConsumer(topic, channel, config, nsqtracer.WithService(this.Service), nsqtracer.WithContext(context.Background()))
 	}
 }

@@ -39,9 +39,9 @@ func TestProducer(t *testing.T) {
 	tracer.Start(tracer.WithAgentAddr("10.200.7.21:9529"))
 	defer tracer.Stop()
 
-	config := NewConfig(WithService("producer_with_trace_test"), WithResource("nsq_producer"), WithContext(context.Background()))
+	config := nsq.NewConfig()
 	config.LocalAddr, _ = net.ResolveTCPAddr("tcp", "127.0.0.1:0")
-	producer, err := NewProducer(nsqdTcpAddr, config)
+	producer, err := NewProducer(nsqdTcpAddr, config, WithService("producer_with_trace_test"), WithContext(context.Background()))
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
@@ -96,9 +96,9 @@ func TestConsumer(t *testing.T) {
 	tracer.Start(tracer.WithAgentAddr("10.200.7.21:9529"))
 	defer tracer.Stop()
 
-	config := NewConfig(WithService("consumer_with_trace_test"), WithResource("nsq_consumer"), WithContext(context.Background()))
+	config := nsq.NewConfig()
 	config.LocalAddr, _ = net.ResolveTCPAddr("tcp", "127.0.0.1:0")
-	consumer, err := NewConsumer(topic, channel, config)
+	consumer, err := NewConsumer(topic, channel, config, WithService("consumer_with_trace_test"), WithContext(context.Background()))
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
@@ -112,7 +112,7 @@ func TestConsumer(t *testing.T) {
 
 	consumer.ChangeMaxInFlight(123)
 
-	consumer.AddHandler(Middleware(config, &ConsumerHandler{}))
+	consumer.AddHandler(consumer.Middleware(&ConsumerHandler{}, "nsq_consumer"))
 
 	if err = consumer.ConnectToNSQD(nsqdTcpAddr); err != nil {
 		log.Fatalln(err.Error())
