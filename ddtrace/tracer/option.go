@@ -2,8 +2,10 @@ package tracer
 
 import (
 	"fmt"
+	"time"
 
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 type Option func(t *Tracer)
@@ -42,10 +44,18 @@ func WithLogger(logger ddtrace.Logger) Option {
 	}
 }
 
-// func WithFinishTime(t time.Time) tracer.FinishOption {
-// 	return tracer.FinishTime(t)
-// }
+func WithFinishTime(finish time.Time) tracer.FinishOption {
+	return tracer.FinishTime(finish)
+}
 
-// func WithError(err error) tracer.FinishOption {
-// 	return tracer.WithError(err)
-// }
+func WithError(err error) tracer.FinishOption {
+	return tracer.WithError(err)
+}
+
+func WithNoDebugStack() tracer.FinishOption {
+	return tracer.NoDebugStack()
+}
+
+func WithStackFrames(n, skip uint) tracer.FinishOption {
+	return tracer.StackFrames(n, skip)
+}
