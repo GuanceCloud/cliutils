@@ -36,7 +36,7 @@ func TestCache(t *testing.T) {
 	l := lua.NewState()
 	defer l.Close()
 
-	RegisterCacheFuncs(l)
+	// RegisterCacheFuncs(l)
 	if err := l.DoString(luaCode); err != nil {
 		t.Error(err)
 	}
