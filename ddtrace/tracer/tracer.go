@@ -25,13 +25,13 @@ func (ddl DDLog) Log(msg string) { // use exist logger for ddtrace log
 }
 
 type Tracer struct {
-	Enabled bool   `toml:"enabled", yaml:"enabled"`
-	Host    string `toml:"host", yaml:"host"`
-	Port    int    `toml:"port", yaml:"port"`
+	Enabled bool   `toml:"enabled" yaml:"enabled"`
+	Host    string `toml:"host" yaml:"host"`
+	Port    int    `toml:"port" yaml:"port"`
 	addr    string
-	Service string `toml:"service", yaml:"service"`
-	Version string `toml:"version", yaml:"version"`
-	Debug   bool   `toml:"debug", yaml:"debug"`
+	Service string `toml:"service" yaml:"service"`
+	Version string `toml:"version" yaml:"version"`
+	Debug   bool   `toml:"debug" yaml:"debug"`
 	env     string
 	logger  ddtrace.Logger
 }
@@ -47,7 +47,7 @@ func loadConfig(tracer *Tracer, opts ...Option) {
 	for _, opt := range opts {
 		opt(tracer)
 	}
-	tracer.addr = fmt.Sprint("%s:%d")
+	tracer.addr = fmt.Sprintf("%s:%d", tracer.Host, tracer.Port)
 }
 
 func (this *Tracer) Start(opts ...Option) {
@@ -88,10 +88,12 @@ func (this *Tracer) FinishSpan(span tracer.Span, opts ...ddtrace.FinishOption) {
 	}
 }
 
-func (this *Tracer) Inject(span ddtrace.Span, header http.Header) {
+func (this *Tracer) Inject(span ddtrace.Span, header http.Header) error {
 	if this.Enabled && span != nil {
-		tracer.Inject(span.Context(), tracer.HTTPHeadersCarrier(header))
+		return tracer.Inject(span.Context(), tracer.HTTPHeadersCarrier(header))
 	}
+
+	return nil
 }
 
 func (this *Tracer) GinMiddleware(resource string, spanType SpanType, opts ...Option) gin.HandlerFunc {
@@ -99,36 +101,36 @@ func (this *Tracer) GinMiddleware(resource string, spanType SpanType, opts ...Op
 		return func(c *gin.Context) {
 			c.Next()
 		}
-	} else {
-		loadConfig(this, opts...)
+	}
 
-		return func(c *gin.Context) {
-			ssopts := []ddtrace.StartSpanOption{
-				tracer.ServiceName(this.Service),
-				tracer.ResourceName(resource),
-				tracer.SpanType(string(spanType)),
-				tracer.Tag(ext.HTTPMethod, c.Request.Method),
-				tracer.Tag(ext.HTTPURL, c.Request.URL.Path),
-				tracer.Measured(),
-			}
-			if spanctx, err := tracer.Extract(tracer.HTTPHeadersCarrier(c.Request.Header)); err == nil {
-				ssopts = append(ssopts, tracer.ChildOf(spanctx))
-			}
+	loadConfig(this, opts...)
 
-			span, ctx := tracer.StartSpanFromContext(c.Request.Context(), "http.request", ssopts...)
-			defer span.Finish()
+	return func(c *gin.Context) {
+		ssopts := []ddtrace.StartSpanOption{
+			tracer.ServiceName(this.Service),
+			tracer.ResourceName(resource),
+			tracer.SpanType(string(spanType)),
+			tracer.Tag(ext.HTTPMethod, c.Request.Method),
+			tracer.Tag(ext.HTTPURL, c.Request.URL.Path),
+			tracer.Measured(),
+		}
+		if spanctx, err := tracer.Extract(tracer.HTTPHeadersCarrier(c.Request.Header)); err == nil {
+			ssopts = append(ssopts, tracer.ChildOf(spanctx))
+		}
 
-			c.Request = c.Request.WithContext(ctx)
-			c.Next()
+		span, ctx := tracer.StartSpanFromContext(c.Request.Context(), "http.request", ssopts...)
+		defer span.Finish()
 
-			status := c.Writer.Status()
-			span.SetTag(ext.HTTPCode, strconv.Itoa(status))
-			if status >= 500 && status < 600 {
-				span.SetTag(ext.Error, fmt.Errorf("%d: %s", status, http.StatusText(status)))
-			}
-			if len(c.Errors) > 0 {
-				span.SetTag("gin.errors", c.Errors.String())
-			}
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+
+		status := c.Writer.Status()
+		span.SetTag(ext.HTTPCode, strconv.Itoa(status))
+		if status >= 500 && status < 600 {
+			span.SetTag(ext.Error, fmt.Errorf("%d: %s", status, http.StatusText(status)))
+		}
+		if len(c.Errors) > 0 {
+			span.SetTag("gin.errors", c.Errors.String())
 		}
 	}
 }
