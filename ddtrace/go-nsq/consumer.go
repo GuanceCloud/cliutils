@@ -10,45 +10,23 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
-func Middleware(cfg *Config, handler nsq.Handler) nsq.Handler {
-	return (nsq.HandlerFunc)(func(msg *nsq.Message) error {
-		opts := []ddtrace.StartSpanOption{
-			tracer.ServiceName(cfg.service),
-			tracer.ResourceName(cfg.resource),
-			tracer.SpanType(string(spanTypeProducer)),
-		}
-		if !math.IsNaN(cfg.analyticsRate) {
-			opts = append(opts, tracer.Tag(ext.EventSampleRate, cfg.analyticsRate))
-		}
-
-		span, ctx := tracer.StartSpanFromContext(cfg.ctx, "Consumer.HandleMessage", opts...)
-		defer span.Finish()
-
-		cfg.ctx = ctx
-
-		err := handler.HandleMessage(msg)
-		if err != nil {
-			span.SetTag("HandleMessage.Error", err)
-		}
-
-		return err
-	})
-}
-
 type Consumer struct {
 	*nsq.Consumer
 	*traceHelper
 }
 
-func NewConsumer(topic string, channel string, config *Config) (*Consumer, error) {
-	consumer, err := nsq.NewConsumer(topic, channel, config.Config)
+func NewConsumer(topic string, channel string, config *nsq.Config, opts ...Option) (*Consumer, error) {
+	consumer, err := nsq.NewConsumer(topic, channel, config)
 	if err != nil {
 		return nil, err
 	}
 
+	cfg := NewConfig(opts...)
+	cfg.Config = config
+
 	return &Consumer{
 		Consumer:    consumer,
-		traceHelper: newTraceHelper(config),
+		traceHelper: newTraceHelper(cfg),
 	}, nil
 }
 
@@ -144,4 +122,29 @@ func (this *Consumer) Stop() {
 	start := time.Now()
 	this.Consumer.Stop()
 	this.traceHelper.trace(start, spanTypeConsumer, "Stop", nil)
+}
+
+func (this *Consumer) Middleware(handler nsq.Handler, resource string) nsq.Handler {
+	return (nsq.HandlerFunc)(func(msg *nsq.Message) error {
+		opts := []ddtrace.StartSpanOption{
+			tracer.ServiceName(this.traceHelper.cfg.service),
+			tracer.ResourceName(resource),
+			tracer.SpanType(string(spanTypeProducer)),
+		}
+		if !math.IsNaN(this.traceHelper.cfg.analyticsRate) {
+			opts = append(opts, tracer.Tag(ext.EventSampleRate, this.traceHelper.cfg.analyticsRate))
+		}
+
+		span, ctx := tracer.StartSpanFromContext(this.traceHelper.cfg.ctx, "Consumer.HandleMessage", opts...)
+		defer span.Finish()
+
+		this.traceHelper.cfg.ctx = ctx
+
+		err := handler.HandleMessage(msg)
+		if err != nil {
+			span.SetTag("HandleMessage.Error", err)
+		}
+
+		return err
+	})
 }
