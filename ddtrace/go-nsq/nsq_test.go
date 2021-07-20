@@ -111,7 +111,7 @@ func TestConsumer(t *testing.T) {
 
 	consumer.ChangeMaxInFlight(123)
 
-	consumer.AddHandler(consumer.Middleware(&ConsumerHandler{}, "nsq_consumer"))
+	consumer.AddHandler(&ConsumerHandler{})
 
 	if err = consumer.ConnectToNSQD(nsqdTCPAddr); err != nil {
 		log.Fatalln(err.Error())
