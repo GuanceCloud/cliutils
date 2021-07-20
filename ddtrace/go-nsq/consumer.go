@@ -136,7 +136,7 @@ func (this *Consumer) Middleware(handler nsq.Handler, resource string) nsq.Handl
 		}
 
 		span, ctx := tracer.StartSpanFromContext(this.traceHelper.cfg.ctx, "Consumer.HandleMessage", opts...)
-		defer span.Finish()
+		defer span.Finish(tracer.FinishTime(time.Now()))
 
 		this.traceHelper.cfg.ctx = ctx
 
