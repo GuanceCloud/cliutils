@@ -16,7 +16,7 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
-var l = logger.DefaultSLogger("dk_tracer")
+var l = logger.DefaultSLogger("ddtraces")
 
 type DDLog struct{}
 
