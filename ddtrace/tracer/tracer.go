@@ -83,6 +83,17 @@ func (this *Tracer) StartSpan(resource string, spanType SpanType) ddtrace.Span {
 	return tracer.StartSpan(resource, ssopts...)
 }
 
+func (this *Tracer) StartSpanFromContext(ctx context.Context, resourse, operatoin string, spanType SpanType, opts ...Option) (ddtrace.Span, context.Context) {
+	ssopts := []ddtrace.StartSpanOption{
+		tracer.ServiceName(this.Service),
+		tracer.ResourceName(resourse),
+		tracer.SpanType(string(spanType)),
+		tracer.Measured(),
+	}
+
+	return tracer.StartSpanFromContext(ctx, operatoin, ssopts...)
+}
+
 func (this *Tracer) FinishSpan(span tracer.Span, opts ...ddtrace.FinishOption) {
 	if this.Enabled && span != nil {
 		span.Finish(opts...)
@@ -119,7 +130,7 @@ func (this *Tracer) GinMiddleware(resource string, spanType SpanType, opts ...Op
 			ssopts = append(ssopts, tracer.ChildOf(spanctx))
 		}
 
-		span, ctx := tracer.StartSpanFromContext(c.Request.Context(), "http.request", ssopts...)
+		span, ctx := tracer.StartSpanFromContext(c.Request.Context(), c.Request.RequestURI, ssopts...)
 		defer span.Finish(tracer.FinishTime(time.Now()))
 
 		c.Request = c.Request.WithContext(ctx)
