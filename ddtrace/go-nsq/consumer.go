@@ -1,12 +1,10 @@
 package nsq
 
 import (
-	"math"
 	"time"
 
 	"github.com/nsqio/go-nsq"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace"
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/ext"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
@@ -108,7 +106,27 @@ func (this *Consumer) DisconnectFromNSQLookupd(addr string) error {
 
 func (this *Consumer) AddHandler(handler nsq.Handler) {
 	start := time.Now()
-	this.Consumer.AddHandler(handler)
+	this.Consumer.AddHandler(func(next nsq.Handler) nsq.Handler {
+		return nsq.HandlerFunc(func(message *nsq.Message) error {
+			opts := []ddtrace.StartSpanOption{
+				tracer.ServiceName(this.cfg.service),
+				tracer.ResourceName("nsq.Consumer.MessageHandler"),
+				tracer.SpanType(string(spanTypeProducer)),
+			}
+
+			span, ctx := tracer.StartSpanFromContext(this.cfg.ctx, "Consumer.HandleMessage", opts...)
+			defer span.Finish(tracer.FinishTime(time.Now()))
+
+			this.cfg.ctx = ctx
+
+			err := next.HandleMessage(message)
+			if err != nil {
+				span.SetTag("HandleMessage.Error", err)
+			}
+
+			return err
+		})
+	}(handler))
 	this.traceHelper.trace(start, spanTypeConsumer, "AddHandler", nil)
 }
 
@@ -122,29 +140,4 @@ func (this *Consumer) Stop() {
 	start := time.Now()
 	this.Consumer.Stop()
 	this.traceHelper.trace(start, spanTypeConsumer, "Stop", nil)
-}
-
-func (this *Consumer) Middleware(handler nsq.Handler, resource string) nsq.Handler {
-	return (nsq.HandlerFunc)(func(msg *nsq.Message) error {
-		opts := []ddtrace.StartSpanOption{
-			tracer.ServiceName(this.traceHelper.cfg.service),
-			tracer.ResourceName(resource),
-			tracer.SpanType(string(spanTypeProducer)),
-		}
-		if !math.IsNaN(this.traceHelper.cfg.analyticsRate) {
-			opts = append(opts, tracer.Tag(ext.EventSampleRate, this.traceHelper.cfg.analyticsRate))
-		}
-
-		span, ctx := tracer.StartSpanFromContext(this.traceHelper.cfg.ctx, "Consumer.HandleMessage", opts...)
-		defer span.Finish()
-
-		this.traceHelper.cfg.ctx = ctx
-
-		err := handler.HandleMessage(msg)
-		if err != nil {
-			span.SetTag("HandleMessage.Error", err)
-		}
-
-		return err
-	})
 }

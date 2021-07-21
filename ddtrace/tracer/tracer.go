@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/nsqio/go-nsq"
@@ -16,7 +17,7 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
-var l = logger.DefaultSLogger("dk_tracer")
+var l = logger.DefaultSLogger("ddtraces")
 
 type DDLog struct{}
 
@@ -119,7 +120,7 @@ func (this *Tracer) GinMiddleware(resource string, spanType SpanType, opts ...Op
 		}
 
 		span, ctx := tracer.StartSpanFromContext(c.Request.Context(), "http.request", ssopts...)
-		defer span.Finish()
+		defer span.Finish(tracer.FinishTime(time.Now()))
 
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
