@@ -83,15 +83,25 @@ func (this *Tracer) StartSpan(resource string, spanType SpanType) ddtrace.Span {
 	return tracer.StartSpan(resource, ssopts...)
 }
 
-func (this *Tracer) StartSpanFromContext(ctx context.Context, resourse, operatoin string, spanType SpanType, opts ...Option) (ddtrace.Span, context.Context) {
+func (this *Tracer) StartSpanFromContext(ctx context.Context, resource, operatoin string, spanType SpanType, opts ...Option) (ddtrace.Span, context.Context) {
+	if !this.Enabled {
+		return nil, nil
+	}
+
 	ssopts := []ddtrace.StartSpanOption{
 		tracer.ServiceName(this.Service),
-		tracer.ResourceName(resourse),
+		tracer.ResourceName(resource),
 		tracer.SpanType(string(spanType)),
 		tracer.Measured(),
 	}
 
 	return tracer.StartSpanFromContext(ctx, operatoin, ssopts...)
+}
+
+func (this *Tracer) SetTag(span tracer.Span, key string, value interface{}) {
+	if this.Enabled && span != nil {
+		span.SetTag(key, value)
+	}
 }
 
 func (this *Tracer) FinishSpan(span tracer.Span, opts ...ddtrace.FinishOption) {
@@ -139,10 +149,10 @@ func (this *Tracer) GinMiddleware(resource string, spanType SpanType, opts ...Op
 		status := c.Writer.Status()
 		span.SetTag(ext.HTTPCode, strconv.Itoa(status))
 		if status >= 500 && status < 600 {
-			span.SetTag(ext.Error, fmt.Errorf("%d: %s", status, http.StatusText(status)))
+			span.SetTag("http_request_error", fmt.Errorf("%d: %s", status, http.StatusText(status)))
 		}
 		if len(c.Errors) > 0 {
-			span.SetTag("gin.errors", c.Errors.String())
+			span.SetTag("gin_request_errors", c.Errors.String())
 		}
 	}
 }
