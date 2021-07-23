@@ -170,23 +170,23 @@ func (this *Tracer) Stop() {
 }
 
 func (this *Tracer) NewProducer(addr string, config *nsq.Config) (nsqtracer.TraceableProducer, error) {
-	if !this.Enabled {
-		return nsq.NewProducer(addr, config)
-	} else {
+	if this.Enabled {
 		return nsqtracer.NewProducer(addr, config, nsqtracer.WithService(this.Service), nsqtracer.WithContext(context.Background()))
+	} else {
+		return nsq.NewProducer(addr, config)
 	}
 }
 
 func (this *Tracer) NewConsumer(topic string, channel string, config *nsq.Config) (nsqtracer.TraceableConsumer, error) {
-	if !this.Enabled {
-		return nsq.NewConsumer(topic, channel, config)
-	} else {
+	if this.Enabled {
 		return nsqtracer.NewConsumer(topic, channel, config, nsqtracer.WithService(this.Service), nsqtracer.WithContext(context.Background()))
+	} else {
+		return nsq.NewConsumer(topic, channel, config)
 	}
 }
 
 func (this *Tracer) NewRedisClient(rdsopt *redis.Options) redistracer.TraceableClient {
-	if !this.Enabled {
+	if this.Enabled {
 		return ddtredis.NewClient(rdsopt, ddtredis.WithServiceName(this.Service))
 	} else {
 		return redis.NewClient(rdsopt)
@@ -194,7 +194,7 @@ func (this *Tracer) NewRedisClient(rdsopt *redis.Options) redistracer.TraceableC
 }
 
 func (this *Tracer) OpenDB(driverName, dataSourceName string) (*sql.DB, error) {
-	if !this.Enabled {
+	if this.Enabled {
 		ddtsql.Register(driverName, &mysql.MySQLDriver{}, ddtsql.WithServiceName(this.Service))
 
 		return ddtsql.Open(driverName, dataSourceName, ddtsql.WithServiceName(this.Service))
