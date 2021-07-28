@@ -11,6 +11,15 @@ import (
 	influxdb "github.com/influxdata/influxdb1-client/v2"
 )
 
+func parseLineProto(data []byte, precision string) error {
+	if data == nil || len(data) == 0 {
+		return fmt.Errorf("empty data")
+	}
+
+	_, err := models.ParsePointsWithPrecision(data, time.Now().UTC(), precision)
+	return err
+}
+
 func TestAdjustTags(t *testing.T) {
 	cases := []struct {
 		tags map[string]string
@@ -29,6 +38,31 @@ func TestMakeLineProtoPoint(t *testing.T) {
 		expect string
 		fail   bool
 	}{
+
+		////////////////////////////////
+		// cases: same key in field and tag
+		////////////////////////////////
+		{
+			name:   "abc",
+			fields: map[string]interface{}{"f1": 1},
+			tags:   map[string]string{"f1": "def"},
+			fail:   true,
+		},
+
+		{
+			name:   "abc",
+			fields: map[string]interface{}{"f1": 1},
+			tags:   nil,
+			opt:    &Option{Time: time.Unix(0, 123)},
+			expect: "abc f1=1i 123",
+		},
+
+		{
+			name:   "abc",
+			fields: nil, // no field
+			tags:   map[string]string{"f1": "def"},
+			fail:   true,
+		},
 
 		{ // field-val with `\n` => ok
 			name: "abc",
@@ -188,7 +222,7 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			testutil.Ok(t, err)
 			x := pt.String()
 			testutil.Equals(t, tc.expect, x)
-			testutil.Equals(t, ParseLineProto([]byte(x), "n"), nil)
+			testutil.Equals(t, parseLineProto([]byte(x), "n"), nil)
 			fmt.Printf("\n[%d]%s\n", i, x)
 		}
 	}
@@ -213,10 +247,62 @@ func TestParsePoint(t *testing.T) {
 		expect []*influxdb.Point
 		fail   bool
 	}{
-		{
+
+		{ // with comments
+			data: []byte(`abc f1=1i,f2=2,f3="abc" 123
+# some comments
+abc f1=1i,f2=2,f3="abc" 456
+							# other comments with leading spaces
+abc f1=1i,f2=2,f3="abc" 789
+
+			`),
+			opt: &Option{Time: time.Unix(0, 123)},
+			expect: []*influxdb.Point{
+				newPoint("abc",
+					nil,
+					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					time.Unix(0, 123)),
+
+				newPoint("abc",
+					nil,
+					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					time.Unix(0, 456)),
+
+				newPoint("abc",
+					nil,
+					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					time.Unix(0, 789)),
+			},
+		},
+
+		{ // same key in field and tag, dup tag comes from ExtraTags
+			data: []byte(`abc b="abc",a=1i 123`),
+			opt:  &Option{Time: time.Unix(0, 123), ExtraTags: map[string]string{"a": "456"}}, // dup tag from Option
+			fail: true,
+		},
+
+		{ // same key in tags and fields
+			data: []byte(`abc,b=abc a=1i,b="abc" 123`),
+			opt:  &Option{Time: time.Unix(0, 123)},
+			fail: true,
+		},
+
+		{ // same key in fields
+			data: []byte(`abc,b=abc a=1i,c="abc",c=f 123`),
+			opt:  &Option{Time: time.Unix(0, 123)},
+			fail: true,
+		},
+
+		{ // same key in tag
+			data: []byte(`abc,b=abc,b=xyz a=1i 123`),
+			fail: true,
+		},
+
+		{ // empty data
 			data: nil,
 			fail: true,
 		},
+
 		{
 			data: []byte(`abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc" 123`),
 			opt:  &Option{Time: time.Unix(0, 123)},
@@ -239,14 +325,14 @@ func TestParsePoint(t *testing.T) {
 			},
 		},
 
-		{
+		{ // multiple empty lines in body
 			data: []byte(`abc f1=1i,f2=2,f3="abc" 123
 
 abc f1=1i,f2=2,f3="abc" 456
 
 abc f1=1i,f2=2,f3="abc" 789
 
-			`), // multiple empty lines
+			`),
 			opt: &Option{Time: time.Unix(0, 123)},
 			expect: []*influxdb.Point{
 				newPoint("abc",
@@ -266,9 +352,9 @@ abc f1=1i,f2=2,f3="abc" 789
 			},
 		},
 
-		{
+		{ // no fields
 			fail: true,
-			data: []byte(`abc,tag1=1,tag2=2 123123`), // no fields
+			data: []byte(`abc,tag1=1,tag2=2 123123`),
 		},
 
 		{
@@ -285,11 +371,11 @@ abc f1=1i,f2=2,f3="abc" 789
 			},
 		},
 
-		{
+		{ // extra tag key with `\` suffix
 			data: []byte(`abc f1=1i,f2=2,f3="abc" 123`),
 			opt: &Option{
 				Time:      time.Unix(0, 123),
-				ExtraTags: map[string]string{`tag1\`: `1`, "tag2": `2`}, // extra tag key with `\` suffix
+				ExtraTags: map[string]string{`tag1\`: `1`, "tag2": `2`},
 			},
 			expect: []*influxdb.Point{
 				newPoint("abc",
@@ -299,11 +385,11 @@ abc f1=1i,f2=2,f3="abc" 789
 			},
 		},
 
-		{
+		{ // extra tag val with `\` suffix
 			data: []byte(`abc f1=1i,f2=2,f3="abc" 123`),
 			opt: &Option{
 				Time:      time.Unix(0, 123),
-				ExtraTags: map[string]string{`tag1`: `1,`, "tag2": `2\`, "tag3": `3`}, // extra tag val with `\` suffix
+				ExtraTags: map[string]string{`tag1`: `1,`, "tag2": `2\`, "tag3": `3`},
 			},
 			expect: []*influxdb.Point{
 				newPoint("abc",
@@ -313,11 +399,11 @@ abc f1=1i,f2=2,f3="abc" 789
 			},
 		},
 
-		{
+		{ // extra tag kv with `\`
 			data: []byte(`abc f1=1i,f2=2,f3="abc" 123`),
 			opt: &Option{
 				Time:      time.Unix(0, 123),
-				ExtraTags: map[string]string{`tag\1`: `1`, "tag2": `2\34`}, // extra tag kv with `\`
+				ExtraTags: map[string]string{`tag\1`: `1`, "tag2": `2\34`},
 			},
 			expect: []*influxdb.Point{
 				newPoint("abc",
@@ -327,12 +413,12 @@ abc f1=1i,f2=2,f3="abc" 789
 			},
 		},
 
-		{
+		{ // tag kv with `\`: missing tag value
 			fail: true,
-			data: []byte(`abc,tag1\=1,tag2=2\ f1=1i 123123`), // tag kv with `\`: missing tag value
+			data: []byte(`abc,tag1\=1,tag2=2\ f1=1i 123123`),
 		},
 
-		{
+		{ // parse with callback
 			data: []byte(`abc f1=1i,f2=2,f3="abc" 123`),
 			opt: &Option{
 				Time: time.Unix(0, 123),
@@ -366,7 +452,7 @@ abc f1=1i,f2=2,f3="abc" 789
 					exp := tc.expect[idx].String()
 					got := pt.String()
 					testutil.Equals(t, exp, got)
-					t.Logf("[pass] exp: %s, parse ok? %v", exp, ParseLineProto([]byte(exp), "n"))
+					t.Logf("[pass] exp: %s, parse ok? %v", exp, parseLineProto([]byte(exp), "n"))
 				}
 			}
 		}
@@ -422,7 +508,7 @@ abc f1=1i,f2=2,f3="abc"
 	}
 
 	for _, tc := range cases {
-		err := ParseLineProto(tc.data, tc.prec)
+		err := parseLineProto(tc.data, tc.prec)
 		if tc.fail {
 			testutil.NotOk(t, err, "")
 			t.Logf("expect error: %s", err)
