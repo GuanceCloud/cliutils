@@ -21,16 +21,33 @@ func _init() {
 	flag.Parse()
 }
 
-func TestDefaultEnvLogger(t *testing.T) {
+// test switch from default-stdout-logger to stdout-logger
+func TestLogger18(t *testing.T) {
+	l := DefaultSLogger("t18")
+	l.Debug("t18 abc123, should no color") // default-stdout-logger
+
+	if err := InitRoot(&Option{
+		Flags: OPT_DEFAULT | OPT_STDOUT,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	l = SLogger("t18")
+	l.Debug("t18 abc123") // use stdout-logger root
+}
+
+// test default env root logger
+func TestLogger17(t *testing.T) {
 	f := ".env-default-root.log"
 	defer os.Remove(f)
 	os.Setenv(EnvRootLoggerPath, f)
 
-	l := DefaultSLogger("TestDefaultEnvLogger")
+	l := DefaultSLogger("t17")
 	l.Debug("abc123")
 }
 
-func TestInitRootAndLevels(t *testing.T) {
+// test init root and levels
+func TestLogger16(t *testing.T) {
 	InitRoot(nil)
 	l := SLogger("test")
 	l.Debug("abc123")
@@ -112,7 +129,8 @@ func TestInitRootAndLevels(t *testing.T) {
 	l.Warn("warn: abc123")
 }
 
-func TestSetEnvRootLogger(t *testing.T) {
+// test env root logger
+func TestLogger15(t *testing.T) {
 	envName := "not-set"
 	if err := SetEnvRootLogger(envName, DEBUG, OPT_DEFAULT); err != nil {
 		t.Log(err)
@@ -126,14 +144,14 @@ func TestSetEnvRootLogger(t *testing.T) {
 	l.Debug("abc123")
 }
 
-func TestLogger7(t *testing.T) {
+func TestLogger14(t *testing.T) {
 	l := DefaultSLogger("test-7")
 	l.Info("info")
 	l.Warn("warn")
 	l.Error("err")
 }
 
-func TestLogger6(t *testing.T) {
+func TestLogger13(t *testing.T) {
 
 	f := func(i int) {
 		l := DefaultSLogger(fmt.Sprintf("logger-%d", i))
@@ -156,10 +174,10 @@ func TestLogger6(t *testing.T) {
 	fmt.Printf("stdout pirint...")
 }
 
-func TestLogger5(t *testing.T) {
+func TestLogger12(t *testing.T) {
 	_init()
 
-	SetStdoutRootLogger(DEBUG, OPT_DEFAULT)
+	setStdoutRootLogger(DEBUG, OPT_DEFAULT)
 	l1 := SLogger("test")
 	l1.Info("haha")
 
@@ -168,7 +186,7 @@ func TestLogger5(t *testing.T) {
 	l2.Info("haha")
 }
 
-func TestLogger4(t *testing.T) {
+func TestLogger11(t *testing.T) {
 	_init()
 	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_DEFAULT)
 
@@ -178,7 +196,7 @@ func TestLogger4(t *testing.T) {
 	l.Error("this is error msg")
 }
 
-func TestLogger3(t *testing.T) {
+func TestLogger10(t *testing.T) {
 	_init()
 	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR|OPT_RESERVED_LOGGER)
 
@@ -188,7 +206,7 @@ func TestLogger3(t *testing.T) {
 	l.Error("this is error msg")
 }
 
-func TestLogger2(t *testing.T) {
+func TestLogger9(t *testing.T) {
 	_init()
 	SetGlobalRootLogger("/tmp/x.log", DEBUG, OPT_DEFAULT)
 
@@ -198,7 +216,8 @@ func TestLogger2(t *testing.T) {
 	l.Error("this is error msg")
 }
 
-func TestRorate2(t *testing.T) {
+// another test rotate
+func TestLogger8(t *testing.T) {
 	_init()
 	MaxSize = 1
 	MaxBackups = 5
@@ -219,48 +238,7 @@ func TestRorate2(t *testing.T) {
 	fn()
 }
 
-func TestRorate(t *testing.T) {
-	_init()
-	MaxSize = 1
-	MaxBackups = 5
-
-	f := ``
-	l, err := newRotateRootLogger(f, DEBUG, OPT_SHORT_CALLER|OPT_ENC_CONSOLE)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	l1 := getSugarLogger(l, "TestRorate.1")
-	l2 := getSugarLogger(l, "TestRorate.2")
-	l3 := getSugarLogger(l, "TestRorate.3")
-	l4 := getSugarLogger(l, "TestRorate.4")
-
-	exit := make(chan interface{})
-
-	go func() {
-		for {
-			l1.Debug("this is debug msg")
-			l1.Info("this is info msg")
-			l2.Info("this is info msg")
-			l2.Debug("this is info msg")
-			l3.Info("this is info msg")
-			l3.Debug("this is info msg")
-			l4.Info("this is info msg")
-			l4.Debug("this is info msg")
-
-			select {
-			case <-exit:
-				return
-			default:
-			}
-		}
-	}()
-
-	time.Sleep(time.Second * 30)
-	close(exit)
-}
-
-func TestLogger1(t *testing.T) {
+func TestLogger7(t *testing.T) {
 	_init()
 	base := 4
 	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
@@ -310,7 +288,50 @@ func TestLogger1(t *testing.T) {
 	wg.Wait()
 }
 
-func TestColor(t *testing.T) {
+// test rotate
+func TestLogger6(t *testing.T) {
+	_init()
+	MaxSize = 1
+	MaxBackups = 5
+
+	f := ``
+	l, err := newRotateRootLogger(f, DEBUG, OPT_SHORT_CALLER|OPT_ENC_CONSOLE)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	l1 := getSugarLogger(l, "TestRorate.1")
+	l2 := getSugarLogger(l, "TestRorate.2")
+	l3 := getSugarLogger(l, "TestRorate.3")
+	l4 := getSugarLogger(l, "TestRorate.4")
+
+	exit := make(chan interface{})
+
+	go func() {
+		for {
+			l1.Debug("this is debug msg")
+			l1.Info("this is info msg")
+			l2.Info("this is info msg")
+			l2.Debug("this is info msg")
+			l3.Info("this is info msg")
+			l3.Debug("this is info msg")
+			l4.Info("this is info msg")
+			l4.Debug("this is info msg")
+
+			select {
+			case <-exit:
+				return
+			default:
+			}
+		}
+	}()
+
+	time.Sleep(time.Second * 30)
+	close(exit)
+}
+
+// test logger color
+func TestLogger5(t *testing.T) {
 	_init()
 	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
 
@@ -321,7 +342,8 @@ func TestColor(t *testing.T) {
 	l.Error("this is error message")
 }
 
-func TestStdoutGlobalLogger(t *testing.T) {
+// test stdout global logger
+func TestLogger4(t *testing.T) {
 	_init()
 	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
 
@@ -330,7 +352,8 @@ func TestStdoutGlobalLogger(t *testing.T) {
 	l.Info("this is info message")
 }
 
-func TestWinGlobalLogger(t *testing.T) {
+// test global logger under Windows
+func TestLogger3(t *testing.T) {
 	_init()
 	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_STDOUT|OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
 
@@ -340,20 +363,23 @@ func TestWinGlobalLogger(t *testing.T) {
 	l.Info("this is info message")
 }
 
-func TestGlobalLoggerNotSet(t *testing.T) {
+// test if global logger not set
+func TestLogger2(t *testing.T) {
 	_init()
 	sl := SLogger("sugar-module")
 	sl.Debugf("sugar debug msg")
 }
 
-func TestGlobalLogger(t *testing.T) {
+// test global logger
+func TestLogger1(t *testing.T) {
+
 	_init()
 	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
 
 	sl := SLogger("sugar-module")
 	sl.Debugf("sugar debug msg")
 
-	l := getLogger(defaultRootLogger, "x-module")
+	l := getLogger(root, "x-module")
 	fmt.Printf("%+#v", l)
 
 	f := zap.Duration("backoff", time.Second)
@@ -366,7 +392,7 @@ func TestGlobalLogger(t *testing.T) {
 		zap.Int("attempt", 4))
 }
 
-func TestLogger(t *testing.T) {
+func TestLogger0(t *testing.T) {
 	_init()
 	rl, err := newRootLogger(*flagLogFile, INFO, OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
 	if err != nil {
