@@ -40,6 +40,17 @@ func TestMakeLineProtoPoint(t *testing.T) {
 	}{
 
 		////////////////////////////////
+		// cases: nil field, not allowed
+		////////////////////////////////
+		{
+			name:   "abc",
+			fields: map[string]interface{}{"f1": 1, "f2": nil},
+			tags:   map[string]string{"t1": "def"},
+			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+			fail:   true,
+		},
+
+		////////////////////////////////
 		// cases: same key in field and tag
 		////////////////////////////////
 		{
