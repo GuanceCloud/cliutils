@@ -1,408 +1,228 @@
 package logger
 
 import (
-	"flag"
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"os"
-	"sync"
 	"testing"
-	"time"
-
-	"go.uber.org/zap"
 
 	tu "gitlab.jiagouyun.com/cloudcare-tools/cliutils/testutil"
 )
 
-var (
-	flagLogFile = flag.String("f", "/dev/null", "log file path")
-)
+func BenchmarkMuitiLogs(b *testing.B) {
 
-func _init() {
-	flag.Parse()
-}
-
-// test switch from default-stdout-logger to stdout-logger
-func TestLogger18(t *testing.T) {
-	l := DefaultSLogger("t18")
-	l.Debug("t18 abc123, should no color") // default-stdout-logger
-
-	if err := InitRoot(&Option{
-		Flags: OPT_DEFAULT | OPT_STDOUT,
-	}); err != nil {
-		t.Fatal(err)
+	opt := &Option{
+		Path:  "/dev/null",
+		Level: INFO,
+		Flags: OPT_ENC_CONSOLE | OPT_SHORT_CALLER,
 	}
 
-	l = SLogger("t18")
-	l.Debug("t18 abc123") // use stdout-logger root
+	if err := InitRoot(opt); err != nil {
+		b.Fatal(err)
+	}
+
+	for i := 0; i < b.N; i++ {
+
+		l := SLogger(fmt.Sprintf("bench-multi-%d", i))
+
+		l.Debug("debug message")
+		l.Info("info message")
+		l.Warn("warn message")
+
+		l.Debugf("debugf message: %s", "hello debug")
+		l.Infof("info message: %s", "hello info")
+		l.Warnf("warn message: %s", "hello warn")
+	}
 }
 
-// test default env root logger
-func TestLogger17(t *testing.T) {
-	f := ".env-default-root.log"
-	defer os.Remove(f)
-	os.Setenv(EnvRootLoggerPath, f)
+func BenchmarkBasic(b *testing.B) {
+	opt := &Option{
+		Path:  "/dev/null",
+		Level: INFO,
+		Flags: OPT_ENC_CONSOLE | OPT_SHORT_CALLER,
+	}
 
-	l := DefaultSLogger("t17")
-	l.Debug("abc123")
+	if err := InitRoot(opt); err != nil {
+		b.Fatal(err)
+	}
+
+	l := SLogger("bench")
+	for i := 0; i < b.N; i++ {
+		l.Debug("debug message")
+		l.Info("info message")
+		l.Warn("warn message")
+
+		l.Debugf("debugf message: %s", "hello debug")
+		l.Infof("info message: %s", "hello info")
+		l.Warnf("warn message: %s", "hello warn")
+	}
 }
 
-// test init root and levels
-func TestLogger16(t *testing.T) {
-	InitRoot(nil)
-	l := SLogger("test")
-	l.Debug("abc123")
-
-	Reset()
-
-	err := InitRoot(&Option{
-		Level: "undefined",
-	})
-	tu.NotOk(t, err, "")
-	t.Log(err)
-
-	Reset()
-
-	err = InitRoot(&Option{
-		Level: "", // no level, default DEBUG
-	})
-	tu.Ok(t, err)
-	l.Debug("no level, default debug")
-
-	Reset()
-	err = InitRoot(&Option{
-		Level: WARN,
-	})
-	tu.Ok(t, err)
-	l = SLogger("test-level-warn")
-	l.Info("info: abc123")
-	l.Warn("warn: abc123")
-
-	Reset()
-	err = InitRoot(&Option{
-		Level: ERROR,
-	})
-	tu.Ok(t, err)
-	l = SLogger("test-level-warn")
-	l.Info("info: abc123")
-	l.Warn("warn: abc123")
-	l.Error("warn: abc123")
-
-	Reset()
-	err = InitRoot(&Option{
-		Level: DPANIC,
-	})
-	tu.Ok(t, err)
-	l = SLogger("test-level-dpanic")
-	l.Info("info: abc123")
-	l.Warn("warn: abc123")
-	l.DPanic("panic: abc123")
-
-	Reset()
-	os.Setenv("test-env", ".test.log")
-	defer os.Remove(".test.log")
-	err = InitRoot(&Option{
-		Env:   "test-env",
+func TestTotalSLoggers(t *testing.T) {
+	opt := &Option{
+		Path:  "abc.log",
 		Level: DEBUG,
-	})
-
-	tu.Ok(t, err)
-	l = SLogger("test-level-fatal")
-	l.Info("info: abc123")
-	l.Warn("warn: abc123")
-
-	Reset()
-	err = InitRoot(&Option{
-		Level: FATAL,
-	})
-	tu.Ok(t, err)
-	l = SLogger("test-level-fatal")
-	l.Info("info: abc123")
-	l.Warn("warn: abc123")
-
-	Reset()
-	err = InitRoot(&Option{
-		Level: PANIC,
-	})
-	tu.Ok(t, err)
-	l = SLogger("test-level-panic")
-	l.Info("info: abc123")
-	l.Warn("warn: abc123")
-}
-
-// test env root logger
-func TestLogger15(t *testing.T) {
-	envName := "not-set"
-	if err := SetEnvRootLogger(envName, DEBUG, OPT_DEFAULT); err != nil {
-		t.Log(err)
+		Flags: OPT_DEFAULT,
 	}
 
-	envName = "try-set"
-	os.Setenv(envName, ".abc.log")
-	defer os.Remove(".abc.log")
-	SetEnvRootLogger(envName, DEBUG, OPT_DEFAULT)
-	l := SLogger("test")
-	l.Debug("abc123")
-}
-
-func TestLogger14(t *testing.T) {
-	l := DefaultSLogger("test-7")
-	l.Info("info")
-	l.Warn("warn")
-	l.Error("err")
-}
-
-func TestLogger13(t *testing.T) {
-
-	f := func(i int) {
-		l := DefaultSLogger(fmt.Sprintf("logger-%d", i))
-		l.Debugf("[%d] debug msg", i)
-		l.Infof("[%d] info msg", i)
-		l.Warnf("[%d] warn msg", i)
-	}
-
-	wg := sync.WaitGroup{}
-	wg.Add(100)
-	for i := 0; i < 100; i++ {
-		go func(i int) {
-			defer wg.Done()
-			f(i)
-		}(i)
-	}
-
-	wg.Wait()
-
-	fmt.Printf("stdout pirint...")
-}
-
-func TestLogger12(t *testing.T) {
-	_init()
-
-	setStdoutRootLogger(DEBUG, OPT_DEFAULT)
-	l1 := SLogger("test")
-	l1.Info("haha")
-
-	SetGlobalRootLogger("/tmp/x.log", DEBUG, OPT_DEFAULT)
-	l2 := SLogger("test")
-	l2.Info("haha")
-}
-
-func TestLogger11(t *testing.T) {
-	_init()
-	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_DEFAULT)
-
-	l := SLogger("test")
-	l.Debug("this is debug msg")
-	l.Info("this is info msg")
-	l.Error("this is error msg")
-}
-
-func TestLogger10(t *testing.T) {
-	_init()
-	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR|OPT_RESERVED_LOGGER)
-
-	l := SLogger("test")
-	l.Debug("this is debug msg")
-	l.Info("this is info msg")
-	l.Error("this is error msg")
-}
-
-func TestLogger9(t *testing.T) {
-	_init()
-	SetGlobalRootLogger("/tmp/x.log", DEBUG, OPT_DEFAULT)
-
-	l := SLogger("test")
-	l.Debug("this is debug msg")
-	l.Info("this is info msg")
-	l.Error("this is error msg")
-}
-
-// another test rotate
-func TestLogger8(t *testing.T) {
-	_init()
-	MaxSize = 1
-	MaxBackups = 5
-	f := `/dev/stdout`
-	l, err := newRotateRootLogger(f, DEBUG, OPT_SHORT_CALLER|OPT_ENC_CONSOLE|OPT_COLOR)
-	if err != nil {
+	if err := InitRoot(opt); err != nil {
 		t.Fatal(err)
 	}
 
-	l1 := getSugarLogger(l, "TestRorate2")
+	n := int64(1000)
 
-	fn := func() {
-		l1.Debug("this is debug msg")
-		l1.Error("this is error msg")
-		l1.Warn("this is warn msg")
+	for i := int64(0); i < n; i++ {
+		_ = SLogger(fmt.Sprintf("slogger-%d", i))
 	}
 
-	fn()
+	// should not create new SLogger any more
+	for i := int64(0); i < n; i++ {
+		_ = SLogger(fmt.Sprintf("slogger-%d", i))
+	}
+
+	total := TotalSLoggers()
+
+	tu.Assert(t, n == total, fmt.Sprintf("%d != %d", n, total))
 }
 
-func TestLogger7(t *testing.T) {
-	_init()
-	base := 4
-	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
+func TestInitRoot(t *testing.T) {
+	cases := []struct {
+		opt         *Option
+		logs        [][2]string
+		color, fail bool
+	}{
 
-	l1 := SLogger("test")
-	l2 := SLogger("test")
+		{ // normal case
+			opt: &Option{
+				Path:  "abc.log",
+				Level: DEBUG,
+				Flags: OPT_DEFAULT,
+			},
+			logs: [][2]string{
+				[2]string{DEBUG, "abc123"},
+				[2]string{INFO, "abc123"},
+				[2]string{WARN, "abc123"},
+			},
+			color: false,
+		},
 
-	wg := sync.WaitGroup{}
+		{ // with color
+			opt: &Option{
+				Path:  "abc.log",
+				Level: DEBUG,
+				Flags: OPT_DEFAULT | OPT_COLOR,
+			},
+			logs: [][2]string{
+				[2]string{DEBUG, "abc123"},
+				[2]string{INFO, "abc123"},
+				[2]string{WARN, "abc123"},
+			},
+			color: true,
+		},
 
-	for j := 0; j < base; j++ {
-		wg.Add(2)
-		go func() {
-			i := 0
-			defer wg.Done()
-			for {
-				l1.Debugf("L1: %v", l1)
-				i++
+		{ // stdout log with path set => failed
+			opt: &Option{
+				Path:  "abc.log",
+				Level: DEBUG,
+				Flags: (OPT_DEFAULT | OPT_STDOUT),
+			},
+			logs: [][2]string{
+				[2]string{DEBUG, "abc123"},
+			},
+			fail: true,
+		},
 
-				if i%(base*8) == 0 {
-					fmt.Printf("[%d]L1: %d\n", j, i)
-				}
+		{ // stdout log with path set => failed
+			opt: &Option{
+				Level: DEBUG,
+				Flags: (OPT_DEFAULT | OPT_STDOUT | OPT_COLOR),
+			},
+			logs: [][2]string{
+				[2]string{DEBUG, "abc123"},
+			},
+			fail: false,
+		},
 
-				if i > base*32 {
-					return
-				}
-			}
-		}()
-
-		go func() {
-			i := 0
-			defer wg.Done()
-			for {
-				l2.Debugf("L2: %v", l2)
-				i++
-
-				if i%(base*8) == 0 {
-					fmt.Printf("[%d]L2: %d\n", j, i) //nolint:govet
-				}
-
-				if i > base*32 {
-					return
-				}
-			}
-		}()
+		{ // no flags
+			opt: &Option{
+				Path:  "abc.log",
+				Level: DEBUG,
+				Flags: OPT_ROTATE | OPT_ENC_CONSOLE,
+			},
+			logs: [][2]string{
+				[2]string{DEBUG, "abc123"},
+				[2]string{INFO, "abc123"},
+				[2]string{WARN, "abc123"},
+			},
+			color: false,
+		},
 	}
 
-	wg.Wait()
-}
+	for idx, c := range cases {
 
-// test rotate
-func TestLogger6(t *testing.T) {
-	_init()
-	MaxSize = 1
-	MaxBackups = 5
+		t.Logf("[%d] testing...", idx)
+		err := InitRoot(c.opt)
+		l := SLogger(fmt.Sprintf("case-%d", idx))
+		if c.fail {
+			tu.NotOk(t, err, "")
+			t.Logf("[%d] expected failing", idx)
+			continue
+		}
 
-	f := ``
-	l, err := newRotateRootLogger(f, DEBUG, OPT_SHORT_CALLER|OPT_ENC_CONSOLE)
-	if err != nil {
-		t.Fatal(err)
-	}
+		tu.Ok(t, err)
 
-	l1 := getSugarLogger(l, "TestRorate.1")
-	l2 := getSugarLogger(l, "TestRorate.2")
-	l3 := getSugarLogger(l, "TestRorate.3")
-	l4 := getSugarLogger(l, "TestRorate.4")
-
-	exit := make(chan interface{})
-
-	go func() {
-		for {
-			l1.Debug("this is debug msg")
-			l1.Info("this is info msg")
-			l2.Info("this is info msg")
-			l2.Debug("this is info msg")
-			l3.Info("this is info msg")
-			l3.Debug("this is info msg")
-			l4.Info("this is info msg")
-			l4.Debug("this is info msg")
-
-			select {
-			case <-exit:
-				return
+		for _, arr := range c.logs {
+			switch arr[0] {
+			case DEBUG:
+				l.Debug(arr[1])
+			case INFO:
+				l.Info(arr[1])
+			case WARN:
+				l.Warn(arr[1])
+			case ERROR:
+				l.Error(arr[1])
 			default:
+				l.Debug(arr[1])
 			}
 		}
-	}()
 
-	time.Sleep(time.Second * 30)
-	close(exit)
+		Reset()
+		if c.opt.Flags&OPT_STDOUT == 0 {
+			tu.Equals(t, len(c.logs), logLines(c.opt.Path))
+			tu.Equals(t, c.color, colorExits(c.opt.Path))
+			showLog(c.opt.Path)
+			os.Remove(c.opt.Path)
+		}
+	}
 }
 
-// test logger color
-func TestLogger5(t *testing.T) {
-	_init()
-	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER|OPT_COLOR)
-
-	l := SLogger("test")
-	l.Debug("this is debug message")
-	l.Info("this is info message")
-	l.Warn("this is warn message")
-	l.Error("this is error message")
-}
-
-// test stdout global logger
-func TestLogger4(t *testing.T) {
-	_init()
-	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
-
-	l := SLogger("test")
-	l.Debug("this is debug message")
-	l.Info("this is info message")
-}
-
-// test global logger under Windows
-func TestLogger3(t *testing.T) {
-	_init()
-	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_STDOUT|OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
-
-	l := SLogger("test")
-
-	l.Debug("this is debug message")
-	l.Info("this is info message")
-}
-
-// test if global logger not set
-func TestLogger2(t *testing.T) {
-	_init()
-	sl := SLogger("sugar-module")
-	sl.Debugf("sugar debug msg")
-}
-
-// test global logger
-func TestLogger1(t *testing.T) {
-
-	_init()
-	SetGlobalRootLogger(*flagLogFile, DEBUG, OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
-
-	sl := SLogger("sugar-module")
-	sl.Debugf("sugar debug msg")
-
-	l := getLogger(root, "x-module")
-	fmt.Printf("%+#v", l)
-
-	f := zap.Duration("backoff", time.Second)
-	fmt.Println(f)
-
-	l.Info("failed to fetch URL",
-		// Structured context as strongly typed Field values.
-		zap.String("url", "baidu.com"),
-		zap.Int("attempt", 3),
-		zap.Int("attempt", 4))
-}
-
-func TestLogger0(t *testing.T) {
-	_init()
-	rl, err := newRootLogger(*flagLogFile, INFO, OPT_ENC_CONSOLE|OPT_SHORT_CALLER)
+func showLog(f string) {
+	logdata, err := ioutil.ReadFile(f)
 	if err != nil {
 		panic(err)
 	}
 
-	sl := getSugarLogger(rl, "testing")
-	sl.Debug("test message")
-	sl.Info("this is info msg: ", "info msg")
+	fmt.Println("--------------------")
+	fmt.Println(string(logdata))
+}
 
-	l := getLogger(rl, "debug")
-	l.Debug("this is debug: ", zap.Int("int", 42))
+func colorExits(f string) bool {
+	logdata, err := ioutil.ReadFile(f)
+	if err != nil {
+		panic(err)
+	}
+
+	// there should be `[0m` in log files if color enabled
+	return bytes.Contains(logdata, []byte("[0m"))
+}
+
+func logLines(f string) int {
+
+	logdata, err := ioutil.ReadFile(f)
+	if err != nil {
+		panic(err)
+	}
+
+	return len(bytes.Split(logdata, []byte("\n"))) - 1
 }
