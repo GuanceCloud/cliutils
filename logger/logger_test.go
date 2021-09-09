@@ -59,12 +59,52 @@ func BenchmarkBasic(b *testing.B) {
 	}
 }
 
-func TestTotalSLoggers(t *testing.T) {
+func TestLogAppend(t *testing.T) {
+
+	Reset()
+
+	f := "TestLogAppend.log"
 	opt := &Option{
-		Path:  "abc.log",
+		Path:  f,
 		Level: DEBUG,
 		Flags: OPT_DEFAULT,
 	}
+
+	defer os.Remove(f)
+
+	if err := InitRoot(opt); err != nil {
+		t.Fatal(err)
+	}
+
+	l := SLogger("test1")
+	l.Debug("abc123")
+
+	Close()
+
+	if err := InitRoot(opt); err != nil {
+		t.Fatal(err)
+	}
+
+	l = SLogger("test1")
+	l.Debug("abc123")
+
+	Close()
+
+	tu.Equals(t, 2, logLines(opt.Path))
+}
+
+func TestTotalSLoggers(t *testing.T) {
+
+	Reset()
+
+	f := "TestTotalSLoggers"
+	opt := &Option{
+		Path:  f,
+		Level: DEBUG,
+		Flags: OPT_DEFAULT,
+	}
+
+	defer os.Remove(f)
 
 	if err := InitRoot(opt); err != nil {
 		t.Fatal(err)
@@ -87,15 +127,17 @@ func TestTotalSLoggers(t *testing.T) {
 }
 
 func TestInitRoot(t *testing.T) {
+
+	Reset()
+
 	cases := []struct {
 		opt         *Option
 		logs        [][2]string
 		color, fail bool
 	}{
-
 		{ // normal case
 			opt: &Option{
-				Path:  "abc.log",
+				Path:  "0.log",
 				Level: DEBUG,
 				Flags: OPT_DEFAULT,
 			},
@@ -109,7 +151,7 @@ func TestInitRoot(t *testing.T) {
 
 		{ // with color
 			opt: &Option{
-				Path:  "abc.log",
+				Path:  "1.log",
 				Level: DEBUG,
 				Flags: OPT_DEFAULT | OPT_COLOR,
 			},
@@ -123,7 +165,7 @@ func TestInitRoot(t *testing.T) {
 
 		{ // stdout log with path set => failed
 			opt: &Option{
-				Path:  "abc.log",
+				Path:  "2.log",
 				Level: DEBUG,
 				Flags: (OPT_DEFAULT | OPT_STDOUT),
 			},
@@ -146,7 +188,7 @@ func TestInitRoot(t *testing.T) {
 
 		{ // no flags
 			opt: &Option{
-				Path:  "abc.log",
+				Path:  "3.log",
 				Level: DEBUG,
 				Flags: OPT_ROTATE | OPT_ENC_CONSOLE,
 			},
@@ -162,6 +204,7 @@ func TestInitRoot(t *testing.T) {
 	for idx, c := range cases {
 
 		t.Logf("[%d] testing...", idx)
+
 		err := InitRoot(c.opt)
 		l := SLogger(fmt.Sprintf("case-%d", idx))
 		if c.fail {
@@ -187,8 +230,9 @@ func TestInitRoot(t *testing.T) {
 			}
 		}
 
-		Reset()
+		Reset() // reset root logger
 		if c.opt.Flags&OPT_STDOUT == 0 {
+			t.Logf("case %d on file: %s", idx, c.opt.Path)
 			tu.Equals(t, len(c.logs), logLines(c.opt.Path))
 			tu.Equals(t, c.color, colorExits(c.opt.Path))
 			showLog(c.opt.Path)
@@ -221,7 +265,7 @@ func logLines(f string) int {
 
 	logdata, err := ioutil.ReadFile(f)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("ReadFile(%s) failed: %s", f, err))
 	}
 
 	return len(bytes.Split(logdata, []byte("\n"))) - 1
