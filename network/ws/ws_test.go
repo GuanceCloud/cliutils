@@ -105,7 +105,7 @@ func TestWSServer(t *testing.T) {
 
 			for {
 				if err := c.cli.WriteMessage(websocket.TextMessage, []byte(c.id)); err != nil {
-					t.Fatalf("client write failed: %s", err.Error())
+					t.Errorf("client write failed: %s", err.Error())
 				}
 
 				total++

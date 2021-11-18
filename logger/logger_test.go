@@ -131,11 +131,39 @@ func TestInitRoot(t *testing.T) {
 	Reset()
 
 	cases := []struct {
+		name        string
 		opt         *Option
 		logs        [][2]string
 		color, fail bool
 	}{
-		{ // normal case
+		{
+			name: "stdout-log-no-color",
+			opt: &Option{
+				Level: INFO,
+				Flags: (OPT_DEFAULT | OPT_STDOUT),
+			},
+			logs: [][2]string{
+				[2]string{INFO, "stdout info log"},
+				[2]string{DEBUG, "stdout debug log"},
+			},
+			fail: false,
+		},
+
+		{
+			name: "stdout-log-with-color",
+			opt: &Option{
+				Level: INFO,
+				Flags: (OPT_DEFAULT | OPT_STDOUT | OPT_COLOR),
+			},
+			logs: [][2]string{
+				[2]string{INFO, "stdout info log with color"},
+				[2]string{DEBUG, "stdout debug log with color"},
+			},
+			fail: false,
+		},
+
+		{
+			name: "normal case",
 			opt: &Option{
 				Path:  "0.log",
 				Level: DEBUG,
@@ -149,7 +177,8 @@ func TestInitRoot(t *testing.T) {
 			color: false,
 		},
 
-		{ // with color
+		{
+			name: "with color",
 			opt: &Option{
 				Path:  "1.log",
 				Level: DEBUG,
@@ -163,7 +192,8 @@ func TestInitRoot(t *testing.T) {
 			color: true,
 		},
 
-		{ // stdout log with path set => failed
+		{
+			name: "stdout log with path set",
 			opt: &Option{
 				Path:  "2.log",
 				Level: DEBUG,
@@ -175,18 +205,8 @@ func TestInitRoot(t *testing.T) {
 			fail: true,
 		},
 
-		{ // stdout log with path set => failed
-			opt: &Option{
-				Level: DEBUG,
-				Flags: (OPT_DEFAULT | OPT_STDOUT | OPT_COLOR),
-			},
-			logs: [][2]string{
-				[2]string{DEBUG, "abc123"},
-			},
-			fail: false,
-		},
-
-		{ // no flags
+		{
+			name: "no flags",
 			opt: &Option{
 				Path:  "3.log",
 				Level: DEBUG,
@@ -202,42 +222,41 @@ func TestInitRoot(t *testing.T) {
 	}
 
 	for idx, c := range cases {
-
-		t.Logf("[%d] testing...", idx)
-
-		err := InitRoot(c.opt)
-		l := SLogger(fmt.Sprintf("case-%d", idx))
-		if c.fail {
-			tu.NotOk(t, err, "")
-			t.Logf("[%d] expected failing", idx)
-			continue
-		}
-
-		tu.Ok(t, err)
-
-		for _, arr := range c.logs {
-			switch arr[0] {
-			case DEBUG:
-				l.Debug(arr[1])
-			case INFO:
-				l.Info(arr[1])
-			case WARN:
-				l.Warn(arr[1])
-			case ERROR:
-				l.Error(arr[1])
-			default:
-				l.Debug(arr[1])
+		t.Run(c.name, func(t *testing.T) {
+			err := InitRoot(c.opt)
+			l := SLogger(fmt.Sprintf("case-%d", idx))
+			if c.fail {
+				tu.NotOk(t, err, "")
+				t.Logf("[%d] expected failing", idx)
+				return
 			}
-		}
 
-		Reset() // reset root logger
-		if c.opt.Flags&OPT_STDOUT == 0 {
-			t.Logf("case %d on file: %s", idx, c.opt.Path)
-			tu.Equals(t, len(c.logs), logLines(c.opt.Path))
-			tu.Equals(t, c.color, colorExits(c.opt.Path))
-			showLog(c.opt.Path)
-			os.Remove(c.opt.Path)
-		}
+			tu.Ok(t, err)
+
+			for _, arr := range c.logs {
+				switch arr[0] {
+				case DEBUG:
+					l.Debug(arr[1])
+				case INFO:
+					l.Info(arr[1])
+				case WARN:
+					l.Warn(arr[1])
+				case ERROR:
+					l.Error(arr[1])
+				default:
+					l.Debug(arr[1])
+				}
+			}
+
+			Reset() // reset root logger
+			if c.opt.Flags&OPT_STDOUT == 0 {
+				t.Logf("case %d on file: %s", idx, c.opt.Path)
+				tu.Equals(t, len(c.logs), logLines(c.opt.Path))
+				tu.Equals(t, c.color, colorExits(c.opt.Path))
+				showLog(c.opt.Path)
+				os.Remove(c.opt.Path)
+			}
+		})
 	}
 }
 
