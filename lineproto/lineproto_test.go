@@ -73,7 +73,7 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			fields: map[string]interface{}{"f1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
 			opt: &Option{
-				DisabledFieldKyes: []string{"f1"},
+				DisabledFieldKeys: []string{"f1"},
 			},
 
 			fail: true,
@@ -85,7 +85,7 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			fields: map[string]interface{}{"f1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
 			opt: &Option{
-				DisabledTagKyes: []string{"t2"},
+				DisabledTagKeys: []string{"t2"},
 			},
 
 			fail: true,
@@ -476,14 +476,14 @@ func TestParsePoint(t *testing.T) {
 		{
 			name: `with disabled field`,
 			data: []byte(`abc,t1=1,t2=2 f1=1i,f2=2,f3="abc" 123`),
-			opt:  &Option{DisabledFieldKyes: []string{"f1"}},
+			opt:  &Option{DisabledFieldKeys: []string{"f1"}},
 			fail: true,
 		},
 
 		{
 			name: `with disabled tags`,
 			data: []byte(`abc,t1=1,t2=2 f1=1i,f2=2,f3="abc" 123`),
-			opt:  &Option{DisabledTagKyes: []string{"t1"}},
+			opt:  &Option{DisabledTagKeys: []string{"t1"}},
 			fail: true,
 		},
 
