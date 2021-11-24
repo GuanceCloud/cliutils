@@ -66,6 +66,31 @@ func TestMakeLineProtoPoint(t *testing.T) {
 		expect string
 		fail   bool
 	}{
+
+		{
+			tname:  `with disabled field keys`,
+			name:   "abc",
+			fields: map[string]interface{}{"f1": 1, "f2": uint64(32)},
+			tags:   map[string]string{"t1": "abc", "t2": "32"},
+			opt: &Option{
+				DisabledFieldKyes: []string{"f1"},
+			},
+
+			fail: true,
+		},
+
+		{
+			tname:  `with disabled tag keys`,
+			name:   "abc",
+			fields: map[string]interface{}{"f1": 1, "f2": uint64(32)},
+			tags:   map[string]string{"t1": "abc", "t2": "32"},
+			opt: &Option{
+				DisabledTagKyes: []string{"t2"},
+			},
+
+			fail: true,
+		},
+
 		{
 			tname:  `int exceed int64-max under non-strict mode`,
 			name:   "abc",
@@ -448,6 +473,19 @@ func TestParsePoint(t *testing.T) {
 		expect []*influxdb.Point
 		fail   bool
 	}{
+		{
+			name: `with disabled field`,
+			data: []byte(`abc,t1=1,t2=2 f1=1i,f2=2,f3="abc" 123`),
+			opt:  &Option{DisabledFieldKyes: []string{"f1"}},
+			fail: true,
+		},
+
+		{
+			name: `with disabled tags`,
+			data: []byte(`abc,t1=1,t2=2 f1=1i,f2=2,f3="abc" 123`),
+			opt:  &Option{DisabledTagKyes: []string{"t1"}},
+			fail: true,
+		},
 
 		{
 			name: `exceed max tags`,
