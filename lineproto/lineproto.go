@@ -14,9 +14,13 @@ import (
 )
 
 type Option struct {
-	Time               time.Time
-	Precision          string
-	ExtraTags          map[string]string
+	Time      time.Time
+	Precision string
+	ExtraTags map[string]string
+
+	DisabledTagKyes   []string
+	DisabledFieldKyes []string
+
 	Strict             bool
 	Callback           func(models.Point) (models.Point, error)
 	MaxTags, MaxFields int
@@ -31,6 +35,24 @@ var (
 		Time:      time.Now().UTC(),
 	}
 )
+
+func (opt *Option) checkField(f string) error {
+	for _, x := range opt.DisabledFieldKyes {
+		if f == x {
+			return fmt.Errorf("field key `%s' disabled", f)
+		}
+	}
+	return nil
+}
+
+func (opt *Option) checkTag(t string) error {
+	for _, x := range opt.DisabledTagKyes {
+		if t == x {
+			return fmt.Errorf("tag key `%s' disabled", t)
+		}
+	}
+	return nil
+}
 
 func ParsePoints(data []byte, opt *Option) ([]*influxdb.Point, error) {
 	if len(data) == 0 {
@@ -169,6 +191,10 @@ func checkPoint(p models.Point, opt *Option) error {
 		if strings.Contains(k, ".") {
 			return fmt.Errorf("invalid field key `%s': found `.'", k)
 		}
+
+		if err := opt.checkField(k); err != nil {
+			return err
+		}
 	}
 
 	// check if dup keys in fields
@@ -191,6 +217,10 @@ func checkPoint(p models.Point, opt *Option) error {
 	for _, t := range tags {
 		if bytes.IndexByte(t.Key, byte('.')) != -1 {
 			return fmt.Errorf("invalid tag key `%s': found `.'", string(t.Key))
+		}
+
+		if err := opt.checkTag(string(t.Key)); err != nil {
+			return err
 		}
 	}
 
@@ -226,6 +256,10 @@ func trimSuffixAll(s, sfx string) string {
 func checkField(k string, v interface{}, opt *Option) (interface{}, error) {
 	if strings.Contains(k, ".") {
 		return nil, fmt.Errorf("invalid field key `%s': found `.'", k)
+	}
+
+	if err := opt.checkField(k); err != nil {
+		return nil, err
 	}
 
 	switch x := v.(type) {
@@ -289,6 +323,10 @@ func checkTags(tags map[string]string, opt *Option) error {
 		// not recoverable if `.' exists!
 		if strings.Contains(k, ".") {
 			return fmt.Errorf("invalid tag key `%s': found `.'", k)
+		}
+
+		if err := opt.checkTag(k); err != nil {
+			return err
 		}
 	}
 
