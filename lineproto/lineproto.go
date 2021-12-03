@@ -3,7 +3,6 @@ package lineproto
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"math"
 	"reflect"
 	"strings"
@@ -276,7 +275,6 @@ func checkField(k string, v interface{}, opt *Option) (interface{}, error) {
 			//    `abc,tag=1 f1=32u`
 			// expected is:
 			//    `abc,tag=1 f1=32i`
-			log.Printf("convert %d to int64", x)
 			return int64(x), nil
 		}
 
