@@ -3,7 +3,6 @@ package lineproto
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"math"
 	"reflect"
 	"strings"
@@ -18,8 +17,8 @@ type Option struct {
 	Precision string
 	ExtraTags map[string]string
 
-	DisabledTagKyes   []string
-	DisabledFieldKyes []string
+	DisabledTagKeys   []string
+	DisabledFieldKeys []string
 
 	Strict             bool
 	Callback           func(models.Point) (models.Point, error)
@@ -37,7 +36,7 @@ var (
 )
 
 func (opt *Option) checkField(f string) error {
-	for _, x := range opt.DisabledFieldKyes {
+	for _, x := range opt.DisabledFieldKeys {
 		if f == x {
 			return fmt.Errorf("field key `%s' disabled", f)
 		}
@@ -46,7 +45,7 @@ func (opt *Option) checkField(f string) error {
 }
 
 func (opt *Option) checkTag(t string) error {
-	for _, x := range opt.DisabledTagKyes {
+	for _, x := range opt.DisabledTagKeys {
 		if t == x {
 			return fmt.Errorf("tag key `%s' disabled", t)
 		}
@@ -276,7 +275,6 @@ func checkField(k string, v interface{}, opt *Option) (interface{}, error) {
 			//    `abc,tag=1 f1=32u`
 			// expected is:
 			//    `abc,tag=1 f1=32i`
-			log.Printf("convert %d to int64", x)
 			return int64(x), nil
 		}
 

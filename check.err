@@ -1,0 +1,629 @@
+service/service.go:153:12: Error return value of `cmd.Output` is not checked (errcheck)
+	cmd.Output() // ignore stop error: service may not install before
+	          ^
+service/service.go:19:3: commentFormatting: put a space between `//` and comment text (gocritic)
+		/////////////////////////////////////////////////////////////////////////////////////////
+		^
+service/service.go:35:3: commentFormatting: put a space between `//` and comment text (gocritic)
+		/////////////////////////////////////////////////////////////////////////////////////////
+		^
+service/service.go:123:9: G204: Subprocess launched with function call as argument or cmd arguments (gosec)
+	cmd := exec.Command(`stop`, []string{s.Name}...)
+	       ^
+service/service.go:140:9: G204: Subprocess launched with function call as argument or cmd arguments (gosec)
+		cmd = exec.Command(`start`, []string{s.Name}...)
+		      ^
+service/service.go:152:9: G204: Subprocess launched with function call as argument or cmd arguments (gosec)
+	cmd := exec.Command(`systemctl`, []string{`stop`, s.Name}...)
+	       ^
+service/service.go:110: unnecessary leading newline (whitespace)
+func (s *Service) installAndStart() error {
+
+service/service.go:150: unnecessary leading newline (whitespace)
+func (s *Service) systemdInstall() error {
+
+service/service.go:200: unnecessary leading newline (whitespace)
+func (s *Service) Install() error {
+
+service/service.go:124:5: ineffectual assignment to err (ineffassign)
+	_, err := cmd.Output()
+	   ^
+network/port.go:42:41: mnd: Magic number: 10, in <argument> detected (gomnd)
+	port, err = strconv.ParseInt(parts[1], 10, 16)
+	                                       ^
+testutil/http_test.go:34:20: response body must be closed (bodyclose)
+	_, err := http.Get("http://:12345/route1")
+	                  ^
+testutil/http_test.go:39:20: response body must be closed (bodyclose)
+	_, err = http.Post("http://:12345/route2", "", nil)
+	                  ^
+prom2metrics_test.go:29:7: `data2` is unused (deadcode)
+const data2 = `
+      ^
+prom2metrics_test.go:76:7: `data3` is unused (deadcode)
+const data3 = `
+      ^
+prom2metrics.go:14:1: commentFormatting: put a space between `//` and comment text (gocritic)
+/// prometheus 数据转行协议 metrics
+^
+prom2metrics_test.go:90:2: commentedOutCode: may want to remove commented-out code (gocritic)
+	// data := strings.NewReader(data2)
+	^
+prom2metrics.go:152: unnecessary trailing newline (whitespace)
+
+}
+prom2metrics.go:170:23: mnd: Magic number: 2, in <condition> detected (gomnd)
+	if len(nameBlocks) > 2 {
+	                     ^
+luascript/cron.go:40:20: Error return value of `luastate.DoString` is not checked (errcheck)
+		luastate.DoString(code)
+		                 ^
+luascript/cron.go:61:20: Error return value of `luastate.DoString` is not checked (errcheck)
+		luastate.DoString(code)
+		                 ^
+luascript/script.go:156:21: Error return value of `luastate.DoString` is not checked (errcheck)
+			luastate.DoString(code)
+			                 ^
+luascript/script_test.go:78:10: Error return value is not checked (errcheck)
+	SendData(p)
+	        ^
+luascript/script_test.go:152:16: Error return value of `json.Unmarshal` is not checked (errcheck)
+	json.Unmarshal([]byte(value), &x)
+	              ^
+luascript/cron.go:31:1: paramTypeCombine: func(code string, schedule string) (err error) could be replaced with func(code, schedule string) (err error) (gocritic)
+func (c *LuaCron) AddLua(code string, schedule string) (err error) {
+^
+luascript/cron.go:45:1: paramTypeCombine: func(file string, schedule string) (err error) could be replaced with func(file, schedule string) (err error) (gocritic)
+func (c *LuaCron) AddLuaFromFile(file string, schedule string) (err error) {
+^
+luascript/cron.go:53:5: sloppyReassign: re-assignment to `err` can be replaced with `err := CheckLuaCode(code)` (gocritic)
+	if err = CheckLuaCode(code); err != nil {
+	   ^
+luascript/lua.go:76:3: emptyFallthrough: remove empty case containing only fallthrough to default case (gocritic)
+		fallthrough
+		^
+luascript/lua.go:11:2: typeSwitchVar: 3 cases can benefit from type switch with assignment (gocritic)
+	switch value.(type) {
+	^
+luascript/script_test.go:181:3: singleCaseSwitch: should rewrite switch statement to if statement (gocritic)
+		switch m[k].(type) {
+		^
+luascript/lua.go:30:1: cyclomatic complexity 18 of func `ToLValue` is high (> 15) (gocyclo)
+func ToLValue(l *lua.LState, value interface{}) lua.LValue {
+^
+luascript/json.go:16:6: func JsonEncode should be JSONEncode (golint)
+func JsonEncode(value lua.LValue) (string, error) {
+     ^
+luascript/script_test.go:91:56: exported func NewPointData returns unexported type *gitlab.jiagouyun.com/cloudcare-tools/cliutils/luascript.pointData, which can be annoying to use (golint)
+func NewPointData(name string, pts []*influxdb.Point) (*pointData, error) {
+                                                       ^
+luascript/json.go:95:2: naked return in func `MarshalJSON` with 56 lines of code (nakedret)
+	return
+	^
+luascript/script.go:57:43: mnd: Magic number: 2, in <argument> detected (gomnd)
+		dataChan:  make(chan LuaData, workerNum*2),
+		                                        ^
+luascript/lua.go:15:10: S1034(related information): could eliminate this type assertion (gosimple)
+		return value.(lua.LNumber)
+		       ^
+luascript/lua.go:17:10: S1034(related information): could eliminate this type assertion (gosimple)
+		return value.(lua.LBool)
+		       ^
+luascript/lua.go:19:10: S1034(related information): could eliminate this type assertion (gosimple)
+		val := value.(*lua.LTable)
+		       ^
+luascript/module/crypto.go:328:6: `md5Fn` is unused (deadcode)
+func md5Fn(L *lua.LState) int {
+     ^
+luascript/module/crypto.go:349:6: `sha1Fn` is unused (deadcode)
+func sha1Fn(L *lua.LState) int {
+     ^
+luascript/module/crypto.go:370:6: `sha256Fn` is unused (deadcode)
+func sha256Fn(L *lua.LState) int {
+     ^
+luascript/module/crypto.go:391:6: `sha512Fn` is unused (deadcode)
+func sha512Fn(L *lua.LState) int {
+     ^
+luascript/module/crypto.go:74: 74-93 lines are duplicate of `luascript/module/crypto.go:328-347` (dupl)
+func crc32Fn(L *lua.LState) int {
+	h := crc32.NewIEEE()
+	s := lua.LVAsString(L.Get(1))
+	raw := lua.LVAsBool(L.Get(2))
+	_, err := h.Write([]byte(s))
+	if err != nil {
+		L.Push(lua.LNil)
+		L.Push(lua.LString(err.Error()))
+		return 2
+	}
+
+	var result string
+	if !raw {
+		result = hex.EncodeToString(h.Sum(nil))
+	} else {
+		result = string(h.Sum(nil))
+	}
+	L.Push(lua.LString(result))
+	return 1
+}
+luascript/module/connect_pool.go:48:16: Error return value of `io.WriteString` is not checked (errcheck)
+	io.WriteString(h, s)
+	              ^
+luascript/module/connect_pool.go:50:17: Error return value of `io.WriteString` is not checked (errcheck)
+		io.WriteString(h, a)
+		              ^
+luascript/module/log.go:17:10: Error return value of `lg.Write` is not checked (errcheck)
+	lg.Write(logformat(L, " [info ] "))
+	        ^
+luascript/module/log.go:22:10: Error return value of `lg.Write` is not checked (errcheck)
+	lg.Write(logformat(L, " [debug] "))
+	        ^
+luascript/module/log.go:27:10: Error return value of `lg.Write` is not checked (errcheck)
+	lg.Write(logformat(L, " [warn ] "))
+	        ^
+luascript/module/mongo.go:32:14: Error return value of `m.Disconnect` is not checked (errcheck)
+	m.Disconnect(context.Background())
+	            ^
+luascript/module/crypto.go:125:7: string `des-cbc` has 2 occurrences, make it a constant (goconst)
+	case "des-cbc":
+	     ^
+luascript/module/crypto.go:140:7: string `aes-cbc` has 2 occurrences, make it a constant (goconst)
+	case "aes-cbc":
+	     ^
+luascript/module/crypto.go:106:7: string `des-ecb` has 2 occurrences, make it a constant (goconst)
+	case "des-ecb":
+	     ^
+luascript/module/cache.go:13:24: captLocal: `L' should not be capitalized (gocritic)
+func (c *LuaCache) get(L *lua.LState) int {
+                       ^
+luascript/module/cache.go:37:24: captLocal: `L' should not be capitalized (gocritic)
+func (c *LuaCache) set(L *lua.LState) int {
+                       ^
+luascript/module/cache.go:42:25: captLocal: `L' should not be capitalized (gocritic)
+func (c *LuaCache) list(L *lua.LState) int {
+                        ^
+luascript/module/cache.go:21:2: typeSwitchVar: 4 cases can benefit from type switch with assignment (gocritic)
+	switch value.(type) {
+	^
+luascript/module/crypto.go:165:2: commentedOutCode: may want to remove commented-out code (gocritic)
+	// options := L.ToInt(4)
+	^
+luascript/module/crypto.go:266:2: commentedOutCode: may want to remove commented-out code (gocritic)
+	// options := L.ToInt(4)
+	^
+luascript/module/http.go:161:3: assignOp: replace `i = i + 1` with `i++` (gocritic)
+		i = i + 1
+		^
+luascript/module/http.go:209:3: singleCaseSwitch: should rewrite switch statement to if statement (gocritic)
+		switch reqQuery := options.RawGet(lua.LString("query")).(type) {
+		^
+luascript/module/http.go:225:3: singleCaseSwitch: should rewrite switch statement to if statement (gocritic)
+		switch reqBody := body.(type) {
+		^
+luascript/module/mongo.go:105:3: typeSwitchVar: 3 cases can benefit from type switch with assignment (gocritic)
+		switch v.(type) {
+		^
+luascript/module/mongo.go:127:3: typeSwitchVar: 6 cases can benefit from type switch with assignment (gocritic)
+		switch v.(type) {
+		^
+luascript/module/regex.go:145:9: appendAssign: append result not assigned to the same slice (gocritic)
+		buf = append(b1, replace.String...)
+		      ^
+luascript/module/regex.go:59:5: emptyStringTest: replace `len(str) == 0` with `str == ""` (gocritic)
+	if len(str) == 0 && len(pattern) == 0 {
+	   ^
+luascript/module/regex.go:87:5: weakCond: suspicious `positions == nil || (len(positions) > 1 && positions[2] < 0)`; nil check may not be enough, check for len (gocritic)
+	if positions == nil || (len(positions) > 1 && positions[2] < 0) {
+	   ^
+luascript/module/regex.go:302:5: yodaStyleExpr: consider to change order in expression to i <= 0 (gocritic)
+	if 0 > i {
+	   ^
+luascript/module/sql.go:207:1: cyclomatic complexity 21 of func `sqlToArbitraryValue` is high (> 15) (gocyclo)
+func sqlToArbitraryValue(l *lua.LState, i interface{}) lua.LValue {
+^
+luascript/module/regex.go:143: File is not `gofmt`-ed with `-s` (gofmt)
+			b2 = append(b2, buf[index2:len(buf)]...)
+luascript/module/http.go:41:7: const `luaHttpResponseTypeName` should be `luaHTTPResponseTypeName` (golint)
+const luaHttpResponseTypeName = "http.response"
+      ^
+luascript/module/http.go:49:6: func NewHttpModule should be NewHTTPModule (golint)
+func NewHttpModule(client *http.Client) *httpModule {
+     ^
+luascript/module/http.go:53:6: func NewHttpModuleWithDo should be NewHTTPModuleWithDo (golint)
+func NewHttpModuleWithDo(do func(req *http.Request) (*http.Response, error)) *httpModule {
+     ^
+luascript/module/http.go:156:25: error strings should not be capitalized or end with punctuation or a newline (golint)
+			errs[i] = errors.New("Request must be a table")
+			                     ^
+luascript/module/http.go:186:9: `if` block ends with a `return` statement, so drop this `else` and outdent its block (golint)
+	} else {
+	       ^
+luascript/module/http.go:275:6: type `luaHttpResponse` should be `luaHTTPResponse` (golint)
+type luaHttpResponse struct {
+     ^
+luascript/module/module.go:63:6: func RegisterJsonFuncs should be RegisterJSONFuncs (golint)
+func RegisterJsonFuncs(l *lua.LState) {
+     ^
+luascript/module/module.go:72:6: func RegisterXmlFuncs should be RegisterXMLFuncs (golint)
+func RegisterXmlFuncs(l *lua.LState) {
+     ^
+luascript/module/regex.go:227:2: should replace `md.pos += 1` with `md.pos++` (golint)
+	md.pos += 1
+	^
+luascript/module/regex.go:296:3: should replace `i -= 1` with `i--` (golint)
+		i -= 1
+		^
+luascript/module/sql.go:11:2: a blank import should be only in a main or test package, or have a comment justifying it (golint)
+	_ "github.com/denisenkom/go-mssqldb"
+	^
+luascript/module/connect_pool.go:4:2: G501: Blocklisted import crypto/md5: weak cryptographic primitive (gosec)
+	"crypto/md5"
+	^
+luascript/module/connect_pool.go:47:7: G401: Use of weak cryptographic primitive (gosec)
+	h := md5.New()
+	     ^
+luascript/module/crypto.go:33:2: G502: Blocklisted import crypto/des: weak cryptographic primitive (gosec)
+	"crypto/des"
+	^
+luascript/module/crypto.go:35:2: G501: Blocklisted import crypto/md5: weak cryptographic primitive (gosec)
+	"crypto/md5"
+	^
+luascript/module/crypto.go:36:2: G505: Blocklisted import crypto/sha1: weak cryptographic primitive (gosec)
+	"crypto/sha1"
+	^
+luascript/module/crypto.go:107:17: G401: Use of weak cryptographic primitive (gosec)
+		block, err := des.NewCipher([]byte(key))
+		              ^
+luascript/module/crypto.go:126:17: G401: Use of weak cryptographic primitive (gosec)
+		block, err := des.NewCipher([]byte(key))
+		              ^
+luascript/module/module.go:99:38: `ouput` is a misspelling of `output` (misspell)
+func RegisterLogFuncs(l *lua.LState, ouput io.Writer) {
+                                     ^
+luascript/module/module.go:100:16: `ouput` is a misspelling of `output` (misspell)
+	log := lualog{ouput}
+	              ^
+luascript/module/json.go:151:2: naked return in func `MarshalJSON` with 56 lines of code (nakedret)
+	return
+	^
+luascript/module/redis.go:133:17: Using the variable on range scope `i` in function literal (scopelint)
+					L.ArgError(i, "only string or number index allowed in table")
+					           ^
+luascript/module/redis.go:143:17: Using the variable on range scope `i` in function literal (scopelint)
+					L.ArgError(i, "only string or number value allowed in table")
+					           ^
+luascript/module/crypto.go:136:47: unnecessary conversion (unconvert)
+		mode := cipher.NewCBCDecrypter(block, []byte(iv))
+		                                            ^
+luascript/module/crypto.go:141:37: unnecessary conversion (unconvert)
+		block, err := aes.NewCipher([]byte(key))
+		                                  ^
+luascript/module/crypto.go:151:47: unnecessary conversion (unconvert)
+		mode := cipher.NewCBCDecrypter(block, []byte(iv))
+		                                            ^
+luascript/module/mongo.go:98:20: `mongoGetTable` - `l` is unused (unparam)
+func mongoGetTable(l *lua.LState, tb *lua.LTable) map[string]interface{} {
+                   ^
+luascript/module/regex.go:291: unnecessary trailing newline (whitespace)
+
+}
+luascript/module/xml.go:41: unnecessary trailing newline (whitespace)
+
+}
+luascript/module/cache.go:38:31: mnd: Magic number: 2, in <argument> detected (gomnd)
+	c.Store(L.ToString(1), L.Get(2))
+	                             ^
+luascript/module/crypto.go:77:28: mnd: Magic number: 2, in <argument> detected (gomnd)
+	raw := lua.LVAsBool(L.Get(2))
+	                          ^
+luascript/module/crypto.go:164:30: mnd: Magic number: 3, in <argument> detected (gomnd)
+	key := lua.LVAsString(L.Get(3))
+	                            ^
+luascript/module/crypto.go:166:29: mnd: Magic number: 4, in <argument> detected (gomnd)
+	iv := lua.LVAsString(L.Get(4))
+	                           ^
+luascript/module/crypto.go:167:28: mnd: Magic number: 5, in <argument> detected (gomnd)
+	raw := lua.LVAsBool(L.Get(5))
+	                          ^
+luascript/module/crypto.go:265:30: mnd: Magic number: 3, in <argument> detected (gomnd)
+	key := lua.LVAsString(L.Get(3))
+	                            ^
+luascript/module/crypto.go:267:29: mnd: Magic number: 4, in <argument> detected (gomnd)
+	iv := lua.LVAsString(L.Get(4))
+	                           ^
+luascript/module/crypto.go:268:28: mnd: Magic number: 5, in <argument> detected (gomnd)
+	raw := lua.LVAsBool(L.Get(5))
+	                          ^
+luascript/module/crypto.go:292:30: mnd: Magic number: 3, in <argument> detected (gomnd)
+	key := lua.LVAsString(L.Get(3))
+	                            ^
+luascript/module/crypto.go:293:28: mnd: Magic number: 4, in <argument> detected (gomnd)
+	raw := lua.LVAsBool(L.Get(4))
+	                          ^
+luascript/module/csv.go:44:39: mnd: Magic number: 64, in <argument> detected (gomnd)
+			if n, err := strconv.ParseFloat(v, 64); err == nil {
+			                                   ^
+luascript/module/regex.go:66:19: mnd: Magic number: 4, in <condition> detected (gomnd)
+	if L.GetTop() == 4 {
+	                 ^
+luascript/module/regex.go:175:19: mnd: Magic number: 2, in <condition> detected (gomnd)
+		if len(match) > 2 { // has captures
+		                ^
+luascript/module/regex.go:197:19: mnd: Magic number: 2, in <condition> detected (gomnd)
+		if len(match) > 2 { // has captures
+		                ^
+luascript/module/crypto.go:61:10: mnd: Magic number: 2, in <return> detected (gomnd)
+		return 2
+		       ^
+luascript/module/crypto.go:82:10: mnd: Magic number: 2, in <return> detected (gomnd)
+		return 2
+		       ^
+luascript/module/crypto.go:180:10: mnd: Magic number: 2, in <return> detected (gomnd)
+		return 2
+		       ^
+luascript/module/regex.go:112:5: S1009: should omit nil check; len() for nil slices is defined as zero (gosimple)
+	if matches == nil || len(matches) == 0 {
+	   ^
+luascript/module/crypto.go:225:3: shadow: declaration of "data" shadows declaration at line 215 (govet)
+		data := PKCS5Padding(data, bs)
+		^
+luascript/module/crypto.go:242:3: shadow: declaration of "data" shadows declaration at line 215 (govet)
+		data := PKCS5Padding(data, block.BlockSize())
+		^
+luascript/module/crypto.go:252:3: shadow: declaration of "data" shadows declaration at line 215 (govet)
+		data := PKCS5Padding(data, block.BlockSize())
+		^
+luascript/module/xml.go:26:3: shadow: declaration of "err" shadows declaration at line 16 (govet)
+		err := json.Unmarshal(jsonBuff.Bytes(), &value)
+		^
+luascript/module/sql.go:120:30: rows.Err must be checked (rowserrcheck)
+	rows, err := client.DB.Query(query, args...)
+	                            ^
+logio/writer.go:161:22: Error return value of `defaultOption.SetLog` is not checked (errcheck)
+	defaultOption.SetLog()
+	                    ^
+logio/writer.go:109:7: string `debug` has 2 occurrences, make it a constant (goconst)
+	case `debug`, `info`, `warn`, `error`, `fatal`:
+	     ^
+logio/writer.go:112:13: string `DEBUG` has 2 occurrences, make it a constant (goconst)
+		o.Level = `DEBUG`
+		          ^
+logio/writer.go:147:30: func parameter `disableJsonFmt` should be `disableJSONFmt` (golint)
+func SetLog(f, level string, disableJsonFmt, disableLongFileName bool) {
+                             ^
+logio/writer.go:184:9: `if` block ends with a `return` statement, so drop this `else` and outdent its block (golint)
+	} else {
+	       ^
+logio/writer.go:287:7: var `traceId` should be `traceID` (golint)
+		var traceId string
+		    ^
+logio/writer.go:181:24: func `(*rotateWriter).logFiles` is unused (unused)
+func (w *rotateWriter) logFiles(all bool) []string {
+                       ^
+logio/writer.go:44:42: mnd: Magic number: 32, in <argument> detected (gomnd)
+	defaultRotateSize = int64(1024 * 1024 * 32)
+	                                        ^
+logio/writer.go:232:79: mnd: Magic number: 0644, in <argument> detected (gomnd)
+	o.rw.fp, err = os.OpenFile(o.rw.filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	                                                                             ^
+logio/writer.go:209:9: shadow: declaration of "err" shadows declaration at line 199 (govet)
+	if fi, err := os.Stat(o.rw.filename); err == nil {
+	       ^
+logio/writer.go:189:6: ST1003: func fmtTs should be fmtTS (stylecheck)
+func fmtTs(t time.Time) string {
+     ^
+network/ws/ws_test.go:23:2: `__df_wsurl` is unused (deadcode)
+	__df_wsurl = url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", __wsip, __wsport), Path: __wsupath}
+	^
+lineproto/lineproto_test.go:480: 480-506 lines are duplicate of `lineproto/lineproto_test.go:565-591` (dupl)
+		{
+			name: `with comments`,
+			data: []byte(`abc f1=1i,f2=2,f3="abc" 123
+# some comments
+abc f1=1i,f2=2,f3="abc" 456
+							# other comments with leading spaces
+abc f1=1i,f2=2,f3="abc" 789
+
+			`),
+			opt: &Option{Time: time.Unix(0, 123)},
+			expect: []*influxdb.Point{
+				newPoint("abc",
+					nil,
+					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					time.Unix(0, 123)),
+
+				newPoint("abc",
+					nil,
+					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					time.Unix(0, 456)),
+
+				newPoint("abc",
+					nil,
+					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					time.Unix(0, 789)),
+			},
+		},
+lineproto/lineproto_test.go:565: 565-591 lines are duplicate of `lineproto/lineproto_test.go:480-506` (dupl)
+		{
+			name: `multiple empty lines in body`,
+			data: []byte(`abc f1=1i,f2=2,f3="abc" 123
+
+abc f1=1i,f2=2,f3="abc" 456
+
+abc f1=1i,f2=2,f3="abc" 789
+
+			`),
+			opt: &Option{Time: time.Unix(0, 123)},
+			expect: []*influxdb.Point{
+				newPoint("abc",
+					nil,
+					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					time.Unix(0, 123)),
+
+				newPoint("abc",
+					nil,
+					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					time.Unix(0, 456)),
+
+				newPoint("abc",
+					nil,
+					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					time.Unix(0, 789)),
+			},
+		},
+network/ws/ws_test.go:43:18: Error return value is not checked (errcheck)
+		SendMsgToClient([]byte(fmt.Sprintf("your are %s", c.RemoteAddr().String())), c)
+		               ^
+logger/logger.go:390:12: Error return value of `root.Sync` is not checked (errcheck)
+		root.Sync()
+		         ^
+network/ws/ws_test.go:31: Function 'TestWSServer' has too many statements (53 > 50) (funlen)
+func TestWSServer(t *testing.T) {
+logger/logger_test.go:129: Function 'TestInitRoot' is too long (131 > 100) (funlen)
+func TestInitRoot(t *testing.T) {
+lineproto/lineproto_test.go:58: Function 'TestMakeLineProtoPoint' is too long (370 > 100) (funlen)
+func TestMakeLineProtoPoint(t *testing.T) {
+lineproto/lineproto_test.go:431: Function 'TestParsePoint' is too long (299 > 100) (funlen)
+func TestParsePoint(t *testing.T) {
+logger/logger.go:85:1: don't use `init` function (gochecknoinits)
+func init() {
+^
+network/http/gin.go:68:25: string `OPTIONS` has 2 occurrences, make it a constant (goconst)
+	if c.Request.Method == "OPTIONS" {
+	                       ^
+network/http/gin.go:149:49: string `gzip` has 2 occurrences, make it a constant (goconst)
+	if c.Request.Header.Get("Content-Encoding") == "gzip" {
+	                                               ^
+network/ws/epoll_bsd.go:74:15: badCall: no-op append call, probably missing arguments (gocritic)
+				changes = append(changes)
+				          ^
+network/ws/ws.go:175:12: elseif: can replace 'else {if cond {}}' with 'else if cond {}' (gocritic)
+				} else {
+				       ^
+network/ws/ws_test.go:115:12: elseif: can replace 'else {if cond {}}' with 'else if cond {}' (gocritic)
+				} else {
+				       ^
+network/http/err.go:102:2: typeSwitchVar: 2 cases can benefit from type switch with assignment (gocritic)
+	switch err.(type) {
+	^
+network/http/err.go:117:2: typeSwitchVar: 2 cases can benefit from type switch with assignment (gocritic)
+	switch err.(type) {
+	^
+logger/logger.go:311:1: cyclomatic complexity 19 of func `newRootLogger` is high (> 15) (gocyclo)
+func newRootLogger(fpath, level string, options int) (*zap.Logger, error) {
+^
+lineproto/lineproto.go:89:1: cyclomatic complexity 16 of func `MakeLineProtoPoint` is high (> 15) (gocyclo)
+func MakeLineProtoPoint(name string,
+^
+logger/logger_test.go:146: File is not `gofmt`-ed with `-s` (gofmt)
+				[2]string{INFO, "stdout info log"},
+				[2]string{DEBUG, "stdout debug log"},
+lineproto/lineproto.go:164: File is not `gofmt`-ed with `-s` (gofmt)
+	for k, _ := range fs {
+network/ws/epoll_bsd.go:19:17: exported func MkEpoll returns unexported type *gitlab.jiagouyun.com/cloudcare-tools/cliutils/network/ws.epoll, which can be annoying to use (golint)
+func MkEpoll() (*epoll, error) {
+                ^
+network/ws/ws.go:8:2: a blank import should be only in a main or test package, or have a comment justifying it (golint)
+	_ "net/http/pprof"
+	^
+network/ws/ws_test.go:20:2: don't use underscores in Go names; var `__wsip` should be `_Wsip` (golint)
+	__wsip     = `0.0.0.0`
+	^
+network/ws/ws_test.go:21:2: don't use underscores in Go names; var `__wsport` should be `_Wsport` (golint)
+	__wsport   = 54321
+	^
+network/ws/ws_test.go:22:2: don't use underscores in Go names; var `__wsupath` should be `_Wsupath` (golint)
+	__wsupath  = "/wstest"
+	^
+network/ws/ws_test.go:25:2: don't use underscores in Go names; var `__fcliCnt` should be `_FcliCnt` (golint)
+	__fcliCnt   = flag.Int("cli-cnt", 128, ``)
+	^
+network/ws/ws_test.go:26:2: don't use underscores in Go names; var `__ftestTime` should be `_FtestTime` (golint)
+	__ftestTime = flag.Duration("test-time", time.Minute, ``)
+	^
+network/ws/ws_test.go:28:2: don't use underscores in Go names; var `__wg` should be `_Wg` (golint)
+	__wg = sync.WaitGroup{}
+	^
+network/ws/ws_test.go:36:2: don't use underscores in Go names; var `df_srv` should be `dfSrv` (golint)
+	df_srv, err := NewServer(dfwsurl, __wsupath)
+	^
+network/ws/ws_test.go:82:3: don't use underscores in Go names; var `dw_wsurl` should be `dwWsurl` (golint)
+		dw_wsurl := url.URL{
+		^
+network/ws/ws_test.go:89:3: don't use underscores in Go names; var `dk_cli` should be `dkCli` (golint)
+		dk_cli, _, err := websocket.DefaultDialer.Dial(dw_wsurl.String(), nil)
+		^
+network/http/gin.go:31:2: const `XTraceId` should be `XTraceID` (golint)
+	XTraceId       = "X-Trace-Id"
+	^
+lineproto/lineproto.go:133:10: if block ends with a return statement, so drop this else and outdent its block (move short variable declaration to its own line if necessary) (golint)
+		} else {
+		       ^
+lineproto/lineproto.go:148:9: `if` block ends with a `return` statement, so drop this `else` and outdent its block (golint)
+	} else {
+	       ^
+logger/logger.go:159:9: if block ends with a return statement, so drop this else and outdent its block (move short variable declaration to its own line if necessary) (golint)
+	} else {
+	       ^
+network/http/gin.go:6:2: G501: Blocklisted import crypto/md5: weak cryptographic primitive (gosec)
+	"crypto/md5"
+	^
+logger/logger.go:179:13: G306: Expect WriteFile permissions to be 0600 or less (gosec)
+		if err := ioutil.WriteFile(fpath, nil, 0700); err != nil {
+		          ^
+network/ws/ws.go:72:34: `conn` can be `io.Writer` (interfacer)
+func SendMsgToClient(msg []byte, conn net.Conn) error {
+                                 ^
+logger/logger_test.go:226:20: Using the variable on range scope `c` in function literal (scopelint)
+			err := InitRoot(c.opt)
+			                ^
+logger/logger_test.go:227:40: Using the variable on range scope `idx` in function literal (scopelint)
+			l := SLogger(fmt.Sprintf("case-%d", idx))
+			                                    ^
+logger/logger_test.go:228:7: Using the variable on range scope `c` in function literal (scopelint)
+			if c.fail {
+			   ^
+logger/logger_test.go:230:37: Using the variable on range scope `idx` in function literal (scopelint)
+				t.Logf("[%d] expected failing", idx)
+				                                ^
+logger/logger_test.go:236:24: Using the variable on range scope `c` in function literal (scopelint)
+			for _, arr := range c.logs {
+			                    ^
+logger/logger_test.go:253:35: Using the variable on range scope `idx` in function literal (scopelint)
+				t.Logf("case %d on file: %s", idx, c.opt.Path)
+				                              ^
+lineproto/lineproto_test.go:53:23: Using the variable on range scope `tc` in function literal (scopelint)
+			testutil.Equals(t, tc.y, adjustKV(tc.x))
+			                   ^
+lineproto/lineproto_test.go:415:34: Using the variable on range scope `tc` in function literal (scopelint)
+			pt, err := MakeLineProtoPoint(tc.name, tc.tags, tc.fields, tc.opt)
+			                              ^
+lineproto/lineproto_test.go:417:7: Using the variable on range scope `tc` in function literal (scopelint)
+			if tc.fail {
+			   ^
+lineproto/lineproto_test.go:419:37: Using the variable on range scope `i` in function literal (scopelint)
+				t.Logf("[%d] expect error: %s", i, err)
+				                                ^
+logger/logger.go:174:46: mnd: Magic number: 0700, in <argument> detected (gomnd)
+		if err := os.MkdirAll(filepath.Dir(fpath), 0700); err != nil {
+		                                           ^
+logger/logger.go:244:70: mnd: Magic number: 0644, in <argument> detected (gomnd)
+	return os.OpenFile(u.Path[1:], os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	                                                                    ^
+network/ws/epoll_bsd.go:39:39: mnd: Magic number: 1e9, in <argument> detected (gomnd)
+		ts:          syscall.NsecToTimespec(1e9),
+		                                    ^
+network/ws/ws.go:152:39: mnd: Magic number: 100, in <argument> detected (gomnd)
+			connections, err := s.epoller.Wait(100)
+			                                   ^
+network/http/err.go:129:1: printf-like formatting function 'httpResp' should be named 'httpRespf' (goprintffuncname)
+func (he *HttpError) httpResp(c *gin.Context, format string, args ...interface{}) {
+^
+lineproto/lineproto_test.go:16:5: S1009: should omit nil check; len() for nil slices is defined as zero (gosimple)
+	if data == nil || len(data) == 0 {
+	   ^
+network/ws/ws_test.go:63:3: S1023: redundant `return` statement (gosimple)
+		return
+		^
+logger/logger.go:286:2: ineffectual assignment to lvl (ineffassign)
+	lvl := zap.InfoLevel
+	^
