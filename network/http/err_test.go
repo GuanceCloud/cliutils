@@ -2,6 +2,7 @@ package http
 
 import (
 	"errors"
+	"fmt"
 	nhttp "net/http"
 	"testing"
 
@@ -20,6 +21,7 @@ func TestHTTPErr(t *testing.T) {
 
 	g.GET("/err", func(c *gin.Context) { HttpErr(c, errTest) })
 	g.GET("/err2", func(c *gin.Context) { HttpErr(c, errTest2) })
+	g.GET("/err3", func(c *gin.Context) { HttpErr(c, fmt.Errorf("500 error")) })
 	g.GET("/errf", func(c *gin.Context) { HttpErrf(c, errTest, "%s: %s", "this is a test error", "ignore me") })
 	g.GET("/ok", func(c *gin.Context) { errOK.HttpBody(c, map[string]interface{}{"data1": 1, "data2": "abc"}) })
 	g.GET("/okbody", func(c *gin.Context) { errOK.HttpBody(c, nil) })

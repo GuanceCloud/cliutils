@@ -6,10 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/testutil"
-
 	"github.com/influxdata/influxdb1-client/models"
 	influxdb "github.com/influxdata/influxdb1-client/v2"
+	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/testutil"
 )
 
 func parseLineProto(data []byte, precision string) error {
@@ -66,6 +65,30 @@ func TestMakeLineProtoPoint(t *testing.T) {
 		expect string
 		fail   bool
 	}{
+
+		{
+			tname:  `enable point in metric point`,
+			name:   "abc",
+			fields: map[string]interface{}{"f.1": 1, "f2": uint64(32)},
+			tags:   map[string]string{"t.1": "abc", "t2": "32"},
+			opt: &Option{
+				IsMetric: true,
+				Time:     time.Unix(0, 123),
+			},
+			expect: "abc,t.1=abc,t2=32 f.1=1i,f2=32i 123",
+		},
+
+		{
+			tname:  `enable point in metric point`,
+			name:   "abc",
+			fields: map[string]interface{}{"f.1": 1, "f2": uint64(32)},
+			tags:   map[string]string{"t1": "abc", "t2": "32"},
+			opt: &Option{
+				IsMetric: true,
+				Time:     time.Unix(0, 123),
+			},
+			expect: "abc,t1=abc,t2=32 f.1=1i,f2=32i 123",
+		},
 
 		{
 			tname:  `with disabled field keys`,
