@@ -72,8 +72,8 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			fields: map[string]interface{}{"f.1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t.1": "abc", "t2": "32"},
 			opt: &Option{
-				IsMetric: true,
-				Time:     time.Unix(0, 123),
+				EnablePointInKey: true,
+				Time:             time.Unix(0, 123),
 			},
 			expect: "abc,t.1=abc,t2=32 f.1=1i,f2=32i 123",
 		},
@@ -84,8 +84,8 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			fields: map[string]interface{}{"f.1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
 			opt: &Option{
-				IsMetric: true,
-				Time:     time.Unix(0, 123),
+				EnablePointInKey: true,
+				Time:             time.Unix(0, 123),
 			},
 			expect: "abc,t1=abc,t2=32 f.1=1i,f2=32i 123",
 		},
