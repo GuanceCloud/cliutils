@@ -59,6 +59,57 @@ func BenchmarkBasic(b *testing.B) {
 	}
 }
 
+func TestEnvLogPath(t *testing.T) {
+	cases := []struct {
+		name    string
+		envPath string
+		msg     string
+		fail    bool
+	}{
+
+		{
+			name:    "stdout",
+			envPath: "",
+			msg:     "this is debug log",
+		},
+
+		{
+			name:    "windows-nul",
+			envPath: "nul",
+		},
+
+		{
+			name:    "unix-null",
+			envPath: "/dev/null",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			Reset()
+			os.Clearenv()
+
+			if err := os.Setenv("LOGGER_PATH", tc.envPath); err != nil {
+				t.Fatal(err)
+			}
+
+			opt := &Option{Path: "" /* path not set, use env only */}
+
+			err := InitRoot(opt)
+			if tc.fail {
+				tu.Assert(t, err != nil, "")
+				t.Logf("expect error: %s", err)
+			} else {
+				tu.Equals(t, nil, err)
+			}
+
+			l := SLogger(tc.name)
+			l.Debug(tc.msg)
+		})
+	}
+}
+
 func TestLogAppend(t *testing.T) {
 
 	Reset()
