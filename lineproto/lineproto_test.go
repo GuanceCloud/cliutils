@@ -67,6 +67,18 @@ func TestMakeLineProtoPoint(t *testing.T) {
 	}{
 
 		{
+			tname:  `empty measurement name`,
+			name:   "", // empty
+			fields: map[string]interface{}{"f.1": 1, "f2": uint64(32)},
+			tags:   map[string]string{"t.1": "abc", "t2": "32"},
+			opt: &Option{
+				EnablePointInKey: true,
+				Time:             time.Unix(0, 123),
+			},
+			fail: true,
+		},
+
+		{
 			tname:  `enable point in metric point`,
 			name:   "abc",
 			fields: map[string]interface{}{"f.1": 1, "f2": uint64(32)},

@@ -110,6 +110,11 @@ func MakeLineProtoPoint(name string,
 	tags map[string]string,
 	fields map[string]interface{},
 	opt *Option) (*influxdb.Point, error) {
+
+	if name == "" {
+		return nil, fmt.Errorf("empty measurement name")
+	}
+
 	if opt == nil {
 		opt = DefaultOption
 	}
