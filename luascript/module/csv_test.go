@@ -7,7 +7,7 @@ import (
 )
 
 func TestCsv(t *testing.T) {
-	var lucCode = `
+	lucCode := `
 	csv_str = "name,year,address\nAA,22, NewYork\nBB, 21, Seattle"
 	print("csv test:", csv_str)
 	csv_table = csv_decode(csv_str)

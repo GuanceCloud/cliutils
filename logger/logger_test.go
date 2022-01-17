@@ -2,6 +2,7 @@ package logger
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -11,7 +12,6 @@ import (
 )
 
 func BenchmarkMuitiLogs(b *testing.B) {
-
 	opt := &Option{
 		Path:  "/dev/null",
 		Level: INFO,
@@ -23,7 +23,6 @@ func BenchmarkMuitiLogs(b *testing.B) {
 	}
 
 	for i := 0; i < b.N; i++ {
-
 		l := SLogger(fmt.Sprintf("bench-multi-%d", i))
 
 		l.Debug("debug message")
@@ -59,55 +58,62 @@ func BenchmarkBasic(b *testing.B) {
 	}
 }
 
-func TestEnvLogPath(t *testing.T) {
-	cases := []struct {
-		name    string
-		envPath string
-		msg     string
-		fail    bool
-	}{
-
-		{
-			name:    "stdout",
-			envPath: "",
-			msg:     "this is debug log",
-		},
-
-		{
-			name:    "windows-nul",
-			envPath: "nul",
-		},
-
-		{
-			name:    "unix-null",
-			envPath: "/dev/null",
-		},
+func TestJsonLogging(t *testing.T) {
+	opt := &Option{
+		Path:  "abc.json",
+		Level: DEBUG,
+		Flags: OPT_SHORT_CALLER | OPT_ROTATE,
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-
-			Reset()
-			os.Clearenv()
-
-			if err := os.Setenv("LOGGER_PATH", tc.envPath); err != nil {
-				t.Fatal(err)
-			}
-
-			opt := &Option{Path: "" /* path not set, use env only */}
-
-			err := InitRoot(opt)
-			if tc.fail {
-				tu.Assert(t, err != nil, "")
-				t.Logf("expect error: %s", err)
-			} else {
-				tu.Equals(t, nil, err)
-			}
-
-			l := SLogger(tc.name)
-			l.Debug(tc.msg)
-		})
+	if err := InitRoot(opt); err != nil {
+		t.Fatal(err)
 	}
+
+	l := SLogger("json")
+	l.Debug("this is the json message with short path")
+	showLog(opt.Path)
+
+	// check json elements
+	j, err := ioutil.ReadFile(opt.Path)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var logdata map[string]string
+
+	if err := json.Unmarshal(j, &logdata); err != nil {
+		t.Error(err)
+	}
+
+	for _, k := range []string{
+		NameKeyMod,
+		NameKeyMsg,
+		NameKeyLevel,
+		NameKeyTime,
+		NameKeyPos,
+	} {
+		_, ok := logdata[k]
+		tu.Assert(t, ok, "%s not exist")
+	}
+
+	Reset()
+
+	opt1 := &Option{
+		Path:  "abc.log",
+		Level: DEBUG,
+		Flags: OPT_ENC_CONSOLE | OPT_ROTATE,
+	}
+
+	if err := InitRoot(opt1); err != nil {
+		t.Fatal(err)
+	}
+
+	l2 := SLogger("log")
+	l2.Debug("this is the raw message with full path")
+	showLog(opt1.Path)
+
+	os.Remove(opt.Path)
+	os.Remove(opt1.Path)
 }
 
 func TestEnvLogPath(t *testing.T) {
@@ -117,18 +123,15 @@ func TestEnvLogPath(t *testing.T) {
 		msg     string
 		fail    bool
 	}{
-
 		{
 			name:    "stdout",
 			envPath: "",
 			msg:     "this is debug log",
 		},
-
 		{
 			name:    "windows-nul",
 			envPath: "nul",
 		},
-
 		{
 			name:    "unix-null",
 			envPath: "/dev/null",
@@ -137,7 +140,6 @@ func TestEnvLogPath(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			Reset()
 			os.Clearenv()
 
@@ -162,7 +164,6 @@ func TestEnvLogPath(t *testing.T) {
 }
 
 func TestLogAppend(t *testing.T) {
-
 	Reset()
 
 	f := "TestLogAppend.log"
@@ -179,7 +180,7 @@ func TestLogAppend(t *testing.T) {
 	}
 
 	l := SLogger("test1")
-	l.Debug("abc123")
+	l.Debug("this is the first time logging")
 
 	Close()
 
@@ -188,15 +189,15 @@ func TestLogAppend(t *testing.T) {
 	}
 
 	l = SLogger("test1")
-	l.Debug("abc123")
+	l.Debug("this is the second append logging")
 
 	Close()
 
 	tu.Equals(t, 2, logLines(opt.Path))
+	showLog(opt.Path)
 }
 
 func TestTotalSLoggers(t *testing.T) {
-
 	Reset()
 
 	f := "TestTotalSLoggers"
@@ -229,7 +230,6 @@ func TestTotalSLoggers(t *testing.T) {
 }
 
 func TestInitRoot(t *testing.T) {
-
 	Reset()
 
 	cases := []struct {
@@ -245,8 +245,8 @@ func TestInitRoot(t *testing.T) {
 				Flags: (OPT_DEFAULT | OPT_STDOUT),
 			},
 			logs: [][2]string{
-				[2]string{INFO, "stdout info log"},
-				[2]string{DEBUG, "stdout debug log"},
+				{INFO, "stdout info log"},
+				{DEBUG, "stdout debug log"},
 			},
 			fail: false,
 		},
@@ -258,8 +258,8 @@ func TestInitRoot(t *testing.T) {
 				Flags: (OPT_DEFAULT | OPT_STDOUT | OPT_COLOR),
 			},
 			logs: [][2]string{
-				[2]string{INFO, "stdout info log with color"},
-				[2]string{DEBUG, "stdout debug log with color"},
+				{INFO, "stdout info log with color"},
+				{DEBUG, "stdout debug log with color"},
 			},
 			fail: false,
 		},
@@ -272,9 +272,9 @@ func TestInitRoot(t *testing.T) {
 				Flags: OPT_DEFAULT,
 			},
 			logs: [][2]string{
-				[2]string{DEBUG, "abc123"},
-				[2]string{INFO, "abc123"},
-				[2]string{WARN, "abc123"},
+				{DEBUG, "abc123"},
+				{INFO, "abc123"},
+				{WARN, "abc123"},
 			},
 			color: false,
 		},
@@ -287,9 +287,9 @@ func TestInitRoot(t *testing.T) {
 				Flags: OPT_DEFAULT | OPT_COLOR,
 			},
 			logs: [][2]string{
-				[2]string{DEBUG, "abc123"},
-				[2]string{INFO, "abc123"},
-				[2]string{WARN, "abc123"},
+				{DEBUG, "abc123"},
+				{INFO, "abc123"},
+				{WARN, "abc123"},
 			},
 			color: true,
 		},
@@ -302,7 +302,7 @@ func TestInitRoot(t *testing.T) {
 				Flags: (OPT_DEFAULT | OPT_STDOUT),
 			},
 			logs: [][2]string{
-				[2]string{DEBUG, "abc123"},
+				{DEBUG, "abc123"},
 			},
 			fail: true,
 		},
@@ -315,9 +315,9 @@ func TestInitRoot(t *testing.T) {
 				Flags: OPT_ROTATE | OPT_ENC_CONSOLE,
 			},
 			logs: [][2]string{
-				[2]string{DEBUG, "abc123"},
-				[2]string{INFO, "abc123"},
-				[2]string{WARN, "abc123"},
+				{DEBUG, "abc123"},
+				{INFO, "abc123"},
+				{WARN, "abc123"},
 			},
 			color: false,
 		},
@@ -362,13 +362,14 @@ func TestInitRoot(t *testing.T) {
 	}
 }
 
+//nolint:forbidigo
 func showLog(f string) {
 	logdata, err := ioutil.ReadFile(f)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println("--------------------")
+	fmt.Printf("---------- %s ----------\n", f)
 	fmt.Println(string(logdata))
 }
 
@@ -383,7 +384,6 @@ func colorExits(f string) bool {
 }
 
 func logLines(f string) int {
-
 	logdata, err := ioutil.ReadFile(f)
 	if err != nil {
 		panic(fmt.Sprintf("ReadFile(%s) failed: %s", f, err))

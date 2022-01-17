@@ -55,7 +55,7 @@ def`,
 }
 
 func TestMakeLineProtoPoint(t *testing.T) {
-	var cases = []struct {
+	cases := []struct {
 		tname  string // test name
 		name   string
 		tags   map[string]string
@@ -163,7 +163,8 @@ func TestMakeLineProtoPoint(t *testing.T) {
 				ExtraTags: map[string]string{
 					"etag1": "1",
 					"etag2": "2",
-				}},
+				},
+			},
 
 			fail: true,
 		},
@@ -180,7 +181,8 @@ func TestMakeLineProtoPoint(t *testing.T) {
 				ExtraTags: map[string]string{
 					"etag1": "1",
 					"etag2": "2",
-				}},
+				},
+			},
 
 			fail: true,
 		},
@@ -198,7 +200,8 @@ func TestMakeLineProtoPoint(t *testing.T) {
 				ExtraTags: map[string]string{
 					"etag1": "1",
 					"etag2": "2",
-				}},
+				},
+			},
 
 			fail: false,
 		},
@@ -215,7 +218,8 @@ func TestMakeLineProtoPoint(t *testing.T) {
 				ExtraTags: map[string]string{
 					"etag1": "1",
 					"etag2": "2",
-				}},
+				},
+			},
 
 			fail: false,
 		},
@@ -315,7 +319,8 @@ func TestMakeLineProtoPoint(t *testing.T) {
 123`,
 				`tag
 2`: `def
-456\`},
+456\`,
+			},
 			fields: map[string]interface{}{"f1": 123},
 			opt:    &Option{Time: time.Unix(0, 123), Strict: false},
 			expect: "abc,tag\\ 2=def\\ 456,tag1=abc\\ 123 f1=123i 123",
@@ -330,7 +335,8 @@ func TestMakeLineProtoPoint(t *testing.T) {
 123`,
 				`tag
 2`: `def
-456\`},
+456\`,
+			},
 			fields: map[string]interface{}{"f1": 123},
 			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
 			fail:   true,
@@ -451,11 +457,13 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			fields: map[string]interface{}{
 				"f1": `aaa
 	bbb
-			ccc`},
+			ccc`,
+			},
 			opt: &Option{Time: time.Unix(0, 123), Strict: true},
 			expect: `abc,tag1=val1 f1="aaa
 	bbb
-			ccc" 123`},
+			ccc" 123`,
+		},
 	}
 
 	for i, tc := range cases {
@@ -489,7 +497,7 @@ func TestParsePoint(t *testing.T) {
 		return pt
 	}
 
-	var cases = []struct {
+	cases := []struct {
 		name   string
 		data   []byte
 		opt    *Option
@@ -792,7 +800,7 @@ abc f1=1i,f2=2,f3="abc" 789
 }
 
 func TestParseLineProto(t *testing.T) {
-	var cases = []struct {
+	cases := []struct {
 		data []byte
 		prec string
 		fail bool

@@ -7,7 +7,7 @@ import (
 )
 
 func TestMongoModule(t *testing.T) {
-	var luaCode = `
+	luaCode := `
 	for i=1, 10000 do
 		print("mongo test")
 		conn = mongo_connect("mongodb://10.100.64.106:30002/?connect=direct")

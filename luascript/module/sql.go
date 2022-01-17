@@ -10,9 +10,8 @@ import (
 
 	_ "github.com/denisenkom/go-mssqldb"
 	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/lib/pq"
-
 	"github.com/junhsieh/goexamples/fieldbinding/fieldbinding"
+	_ "github.com/lib/pq"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -47,7 +46,7 @@ func (s *sqlClient) close() {
 }
 
 func sqlConnect(L *lua.LState) int {
-	var ud = L.NewUserData()
+	ud := L.NewUserData()
 	var dn, dsn string // driverName, dataSourceName
 	var err error
 
@@ -123,6 +122,13 @@ func sqlQuery(L *lua.LState) int {
 		L.Push(lua.LString(err.Error()))
 		return 2
 	}
+
+	if err := rows.Err(); err != nil {
+		L.Push(lua.LNil)
+		L.Push(lua.LString(err.Error()))
+		return 2
+	}
+
 	defer rows.Close()
 
 	fb := fieldbinding.NewFieldBinding()

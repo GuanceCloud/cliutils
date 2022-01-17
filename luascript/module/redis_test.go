@@ -7,7 +7,7 @@ import (
 )
 
 func TestRedis(t *testing.T) {
-	var luaCode = `
+	luaCode := `
 	for i=1, 10000 do
 		print("redis test")
 

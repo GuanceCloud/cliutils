@@ -6,18 +6,16 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	nhttp "net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
-
 	tu "gitlab.jiagouyun.com/cloudcare-tools/cliutils/testutil"
 )
 
 func TestBytesBody(t *testing.T) {
-	errOK := NewNamespaceErr(nil, nhttp.StatusOK, "")
+	errOK := NewNamespaceErr(nil, http.StatusOK, "")
 	bytesBody := "this is bytes response body"
 
 	router := gin.New()
@@ -54,11 +52,11 @@ func TestBytesBody(t *testing.T) {
 }
 
 func TestHTTPErr(t *testing.T) {
-	errTest := NewNamespaceErr(errors.New("test error"), nhttp.StatusForbidden, "testing")
-	errOK := NewNamespaceErr(nil, nhttp.StatusOK, "")
+	errTest := NewNamespaceErr(errors.New("test error"), http.StatusForbidden, "testing")
+	errOK := NewNamespaceErr(nil, http.StatusOK, "")
 
 	DefaultNamespace = "testing2"
-	errTest2 := NewErr(errors.New("test error2"), nhttp.StatusForbidden)
+	errTest2 := NewErr(errors.New("test error2"), http.StatusForbidden)
 
 	router := gin.New()
 	g := router.Group("")
@@ -80,13 +78,13 @@ func TestHTTPErr(t *testing.T) {
 		HttpErr(c, err)
 	})
 
-	srv := nhttp.Server{
+	srv := http.Server{
 		Addr:    ":8090",
 		Handler: router,
 	}
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != nhttp.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			t.Log(err)
 		}
 	}()
@@ -160,7 +158,6 @@ func TestHTTPErr(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run("", func(t *testing.T) {
-
 			resp, err := http.Get(tc.u)
 			if err != nil {
 				t.Logf("get error: %s, ignored", err)

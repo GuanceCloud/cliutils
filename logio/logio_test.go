@@ -59,7 +59,6 @@ func TestNoBackup(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-
 	o := Option{
 		Path:       `/tmp/option-log`,
 		Level:      `DEBUG`,
@@ -110,7 +109,6 @@ func TestLog(t *testing.T) {
 }
 
 func TestJsonFormatLog(t *testing.T) {
-
 	o := Option{
 		Path:       `/tmp/option-log`,
 		Level:      `DEBUG`,

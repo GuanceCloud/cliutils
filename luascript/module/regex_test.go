@@ -7,7 +7,7 @@ import (
 )
 
 func TestRegexModule(t *testing.T) {
-	var lucCode = `
+	lucCode := `
 	print("regex test:")
 
 	-- quote ----------

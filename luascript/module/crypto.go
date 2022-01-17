@@ -168,7 +168,7 @@ func decryptFn(L *lua.LState) int {
 
 	var data []byte
 	var err error
-	//if options&RawData == 0 {
+	// if options&RawData == 0 {
 	if !raw {
 		data, err = hex.DecodeString(s)
 	} else {

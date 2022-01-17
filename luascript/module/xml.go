@@ -30,7 +30,6 @@ func xmlDecode(L *lua.LState) int {
 
 		return jsonDecodeValue(L, value), nil
 	}()
-
 	if err != nil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString(err.Error()))
@@ -38,5 +37,4 @@ func xmlDecode(L *lua.LState) int {
 	}
 	L.Push(value)
 	return 1
-
 }

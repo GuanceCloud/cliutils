@@ -11,7 +11,7 @@ import (
 )
 
 func TestScript(t *testing.T) {
-	var luaCode = `
+	luaCode := `
 function handle(points)
 	table.insert(points,
 		{
@@ -93,7 +93,7 @@ func NewPointData(name string, pts []*influxdb.Point) (*pointData, error) {
 		return nil, errors.New("name doesnot empty")
 	}
 
-	var p = pointData{
+	p := pointData{
 		name:   name,
 		data:   []map[string]interface{}{},
 		intlog: map[string][]string{},

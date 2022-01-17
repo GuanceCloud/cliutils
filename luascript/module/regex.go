@@ -140,7 +140,7 @@ func reGsubDoReplace(str string, info []replaceInfo) string {
 		b2 := []byte("")
 		index2 := offset + replace.Indicies[1]
 		if index2 <= len(buf) {
-			b2 = append(b2, buf[index2:len(buf)]...)
+			b2 = append(b2, buf[index2:]...)
 		}
 		buf = append(b1, replace.String...)
 		buf = append(buf, b2...)
@@ -288,7 +288,6 @@ func reMatch(L *lua.LState) int {
 		}
 		return nsubs - 1
 	}
-
 }
 
 func luaIndex2StringIndex(str string, i int, start bool) int {

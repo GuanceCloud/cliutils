@@ -6,7 +6,7 @@ import (
 )
 
 func TestCron(t *testing.T) {
-	var luaCode = `
+	luaCode := `
 	print("---------- lua ---------")
 	`
 

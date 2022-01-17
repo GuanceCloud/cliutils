@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	lua "github.com/yuin/gopher-lua"
-
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/luascript/module"
 )

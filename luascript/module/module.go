@@ -32,7 +32,7 @@ func RegisterAllFuncs(l *lua.LState, cache *LuaCache, logOutput io.Writer) {
 }
 
 func RegisterHTTPFuncs(l *lua.LState) {
-	var hc = NewHttpModule(&http.Client{})
+	hc := NewHttpModule(&http.Client{})
 	l.SetGlobal("http_request", l.NewFunction(hc.request))
 
 	mt := l.NewTypeMetatable(luaHttpResponseTypeName)
@@ -96,8 +96,8 @@ func RegisterCacheFuncs(l *lua.LState, c *LuaCache) {
 	l.SetGlobal("cache_list", l.NewFunction(c.list))
 }
 
-func RegisterLogFuncs(l *lua.LState, ouput io.Writer) {
-	log := lualog{ouput}
+func RegisterLogFuncs(l *lua.LState, output io.Writer) {
+	log := lualog{output}
 	l.SetGlobal("log_info", l.NewFunction(log.logInfo))
 	l.SetGlobal("log_debug", l.NewFunction(log.logDebug))
 	l.SetGlobal("log_warn", l.NewFunction(log.logWarn))

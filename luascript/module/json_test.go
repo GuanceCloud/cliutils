@@ -7,7 +7,7 @@ import (
 )
 
 func TestJson(t *testing.T) {
-	var lucCode = `
+	lucCode := `
 	json_str = '{ "hostname":"ubuntu18.04LTS", "date":"2019年12月10日 星期二 11时14分47秒 CST", "ip":["127.0.0.1","192.168.0.1","172.16.0.1"] }'
 
 	print("json test: ", json_str)
