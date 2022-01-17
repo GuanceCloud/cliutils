@@ -7,7 +7,7 @@ import (
 )
 
 func TestCache(t *testing.T) {
-	var luaCode = `
+	luaCode := `
 	print("cache test:")
 
 	cache_set("AAA", "hello,world")

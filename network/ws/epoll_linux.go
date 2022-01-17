@@ -34,7 +34,8 @@ func (e *epoll) Add(conn net.Conn) error {
 	err := unix.EpollCtl(e.fd, syscall.EPOLL_CTL_ADD, fd,
 		&unix.EpollEvent{
 			Events: unix.POLLIN | unix.POLLHUP,
-			Fd:     int32(fd)})
+			Fd:     int32(fd),
+		})
 	if err != nil {
 		return err
 	}
@@ -77,7 +78,6 @@ func (e *epoll) Wait(cnt int) ([]net.Conn, error) {
 
 func (e *epoll) Close() error {
 	for _, c := range e.connections {
-
 		l.Debugf("remove cli %s", c.RemoteAddr().String())
 
 		if err := c.Close(); err != nil {

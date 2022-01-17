@@ -1,7 +1,9 @@
 package http
 
 import (
-	"crypto/md5" //nolint:gosec
+
+	// nolint:gosec
+	"crypto/md5"
 	"fmt"
 	"log"
 	"net/http"

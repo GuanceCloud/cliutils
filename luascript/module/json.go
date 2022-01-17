@@ -48,7 +48,6 @@ func jsonDecode(L *lua.LState) int {
 		}
 		return jsonDecodeValue(L, value), nil
 	}()
-
 	if err != nil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString(err.Error()))

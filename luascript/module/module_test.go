@@ -7,7 +7,7 @@ import (
 )
 
 func TestAliyunOSSExample(t *testing.T) {
-	var luaCode = `
+	luaCode := `
 	ak, sk = "AccessKeyXXXXXXX", "SecretKeyXXXXXXXX"
 
 	-- /BucketName/ObjectName/ObjectName..

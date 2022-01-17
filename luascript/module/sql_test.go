@@ -7,7 +7,7 @@ import (
 )
 
 func TestSQL(t *testing.T) {
-	var luaCode = `
+	luaCode := `
 	for i=1, 10000 do
 		print("mysql test")
 		conn, err = sql_connect("mysql", "root:123456@tcp(10.100.64.106:33306)/db123?charset=utf8")

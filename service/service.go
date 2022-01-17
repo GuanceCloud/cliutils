@@ -108,7 +108,6 @@ func (s *Service) genInit() error {
 }
 
 func (s *Service) installAndStart() error {
-
 	switch s.Type {
 	case TypeUpstart:
 		return s.upstartInstall()
@@ -122,6 +121,9 @@ func (s *Service) installAndStart() error {
 func (s *Service) upstartInstall() error {
 	cmd := exec.Command(`stop`, []string{s.Name}...)
 	_, err := cmd.Output()
+	if err != nil {
+		return err
+	}
 
 	data, err := ioutil.ReadFile(s.upstart)
 	if err != nil {
@@ -148,7 +150,6 @@ func (s *Service) upstartInstall() error {
 }
 
 func (s *Service) systemdInstall() error {
-
 	cmd := exec.Command(`systemctl`, []string{`stop`, s.Name}...)
 	cmd.Output() // ignore stop error: service may not install before
 
@@ -198,7 +199,6 @@ func (s *Service) systemdInstall() error {
 }
 
 func (s *Service) Install() error {
-
 	if err := s.genInit(); err != nil {
 		return err
 	}

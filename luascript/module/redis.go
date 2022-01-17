@@ -33,7 +33,7 @@ func (r *redisClient) close() {
 }
 
 func redisConnect(L *lua.LState) int {
-	var ud = L.NewUserData()
+	ud := L.NewUserData()
 	opt := L.CheckTable(1)
 
 	host := "127.0.0.1"
@@ -92,7 +92,7 @@ func redisConnect(L *lua.LState) int {
 	if client, ok := connPool.load(joinKey(host, port, passwd)); ok {
 		ud.Value = client
 	} else {
-		var client = newRedisClient(host, port, passwd, dbindex)
+		client := newRedisClient(host, port, passwd, dbindex)
 		ud.Value = client
 		connPool.store(joinKey(host, port, passwd), client)
 	}

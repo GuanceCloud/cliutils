@@ -7,7 +7,7 @@ import (
 )
 
 func TestCrypto(t *testing.T) {
-	var luaCode = `
+	luaCode := `
 	print("crypto test")
 
 	print("----------- base64 ------------")

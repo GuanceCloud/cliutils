@@ -12,7 +12,6 @@ import (
 
 	"github.com/gobwas/ws"
 	"github.com/gorilla/websocket"
-
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 )
 
@@ -76,7 +75,6 @@ func TestWSServer(t *testing.T) {
 	// datakit as ws proxy client
 	dkclis := []*wscli{}
 	for i := 0; i < ncli; i++ {
-
 		cliid := cliutils.XID("id_")
 
 		dw_wsurl := url.URL{
@@ -98,7 +96,9 @@ func TestWSServer(t *testing.T) {
 
 	// ws-cli send msg to ws-server
 	for i := 0; i < ncli; i++ {
-		go func(i int) {
+		go func(t *testing.T, i int) {
+			t.Helper()
+
 			total := 0
 			c := dkclis[i]
 			defer __wg.Done()
@@ -127,7 +127,7 @@ func TestWSServer(t *testing.T) {
 				default:
 				}
 			}
-		}(i)
+		}(t, i)
 	}
 
 	time.Sleep(*__ftestTime)

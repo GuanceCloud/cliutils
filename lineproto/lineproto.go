@@ -26,15 +26,13 @@ type Option struct {
 	MaxTags, MaxFields int
 }
 
-var (
-	DefaultOption = &Option{
-		Strict:    true,
-		Precision: "n",
-		MaxTags:   256,
-		MaxFields: 1024,
-		Time:      time.Now().UTC(),
-	}
-)
+var DefaultOption = &Option{
+	Strict:    true,
+	Precision: "n",
+	MaxTags:   256,
+	MaxFields: 1024,
+	Time:      time.Now().UTC(),
+}
 
 func (opt *Option) checkField(f string) error {
 	for _, x := range opt.DisabledFieldKeys {
@@ -112,7 +110,6 @@ func MakeLineProtoPoint(name string,
 	tags map[string]string,
 	fields map[string]interface{},
 	opt *Option) (*influxdb.Point, error) {
-
 	if opt == nil {
 		opt = DefaultOption
 	}
@@ -183,7 +180,7 @@ func checkPoint(p models.Point, opt *Option) error {
 		return fmt.Errorf("exceed max field count(%d), got %d tags", opt.MaxFields, len(fs))
 	}
 
-	for k, _ := range fs {
+	for k := range fs {
 		if p.HasTag([]byte(k)) {
 			return fmt.Errorf("same key `%s' in tag and field", k)
 		}
@@ -233,7 +230,7 @@ func checkTagFieldSameKey(tags map[string]string, fields map[string]interface{})
 		return nil
 	}
 
-	for k, _ := range tags {
+	for k := range tags {
 		if _, ok := fields[k]; ok {
 			return fmt.Errorf("same key `%s' in tag and field", k)
 		}

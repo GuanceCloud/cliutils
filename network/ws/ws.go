@@ -12,7 +12,6 @@ import (
 
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
-
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/logger"
 )
@@ -26,7 +25,7 @@ type Server struct {
 	Path string
 	Bind string
 
-	MsgHandler func(*Server, net.Conn, []byte, ws.OpCode) error //server msg handler
+	MsgHandler func(*Server, net.Conn, []byte, ws.OpCode) error // server msg handler
 	AddCli     func(w http.ResponseWriter, r *http.Request)
 
 	uptime time.Time
@@ -38,7 +37,6 @@ type Server struct {
 }
 
 func NewServer(bind, path string) (s *Server, err error) {
-
 	s = &Server{
 		Path: path,
 		Bind: bind,
@@ -59,7 +57,6 @@ func NewServer(bind, path string) (s *Server, err error) {
 }
 
 func (s *Server) AddConnection(conn net.Conn) error {
-
 	if err := s.epoller.Add(conn); err != nil {
 		l.Errorf("epoll.Add() error: %s", err.Error())
 		conn.Close()
@@ -83,7 +80,6 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) Start() {
-
 	l = logger.SLogger("ws")
 
 	// remove resources limitations
@@ -140,7 +136,6 @@ func (s *Server) Start() {
 
 func (s *Server) startEpoll() {
 	for {
-
 		select {
 		case <-s.exit.Wait():
 			l.Debug("epoll exit.")
@@ -156,13 +151,11 @@ func (s *Server) startEpoll() {
 			}
 
 			for _, conn := range connections {
-
 				if conn == nil {
 					break
 				}
 
 				if data, opcode, err := wsutil.ReadClientData(conn); err != nil {
-
 					l.Debugf("ReadClientData: %s", err.Error())
 
 					if err := s.epoller.Remove(conn); err != nil {
@@ -171,10 +164,8 @@ func (s *Server) startEpoll() {
 
 					l.Debugf("close cli %s", conn.RemoteAddr().String())
 					conn.Close()
-
 				} else {
 					if s.MsgHandler != nil {
-
 						if err := s.MsgHandler(s, conn, data, opcode); err != nil {
 							l.Error("s.handler() error: %s", err.Error())
 						}

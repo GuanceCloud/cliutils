@@ -186,7 +186,7 @@ func (w *rotateWriter) logFiles(all bool) []string {
 	}
 }
 
-func fmtTs(t time.Time) string {
+func fmtTS(t time.Time) string {
 	return fmt.Sprintf("%04d-%02d-%02d_%02d:%02d:%02d",
 		t.Year(), t.Month(), t.Day(),
 		t.Hour(), t.Minute(), t.Second())
@@ -211,7 +211,7 @@ func (o *Option) rotate() error {
 			goto __open_file
 		} else {
 			// 切分出另一个日志
-			backupName := o.rw.filename + `-` + fmtTs(o.rw.beginAt) + `-` + fmtTs(time.Now())
+			backupName := o.rw.filename + `-` + fmtTS(o.rw.beginAt) + `-` + fmtTS(time.Now())
 			if err := os.Rename(o.rw.filename, backupName); err != nil {
 				return err
 			}
@@ -229,7 +229,7 @@ func (o *Option) rotate() error {
 	}
 
 __open_file:
-	o.rw.fp, err = os.OpenFile(o.rw.filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	o.rw.fp, err = os.OpenFile(o.rw.filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o644)
 	if err != nil {
 		return err
 	}

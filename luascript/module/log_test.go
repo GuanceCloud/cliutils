@@ -8,7 +8,7 @@ import (
 )
 
 func TestLog(t *testing.T) {
-	var luaCode = `
+	luaCode := `
 	function test()
 		print("hello")
 	end

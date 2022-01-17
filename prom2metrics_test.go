@@ -26,6 +26,7 @@ cpu_usage_user{cpu="cpu1"} 0.702106318955865
 cpu_usage_user{cpu="cpu2"} 2.0161290322588776
 cpu_usage_user{cpu="cpu3"} 1.5045135406226022
 `
+
 const data2 = `
 # HELP confluence_user_logout_count User Logout Count
 # TYPE confluence_user_logout_count counter

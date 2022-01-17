@@ -11,7 +11,6 @@ import (
 )
 
 func BenchmarkAllMiddlewares(b *testing.B) {
-
 	cases := []struct {
 		name string
 		ms   []gin.HandlerFunc

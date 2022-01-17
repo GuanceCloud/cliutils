@@ -33,7 +33,7 @@ func (m *mongoClient) close() {
 }
 
 func mongoConnect(L *lua.LState) int {
-	var ud = L.NewUserData()
+	ud := L.NewUserData()
 	var uri string
 	var err error
 
@@ -96,7 +96,7 @@ func mongoQuery(L *lua.LState) int {
 }
 
 func mongoGetTable(l *lua.LState, tb *lua.LTable) map[string]interface{} {
-	var m = make(map[string]interface{}, tb.Len())
+	m := make(map[string]interface{}, tb.Len())
 	tb.ForEach(func(k, v lua.LValue) {
 		k1, ok := k.(lua.LString)
 		if !ok {

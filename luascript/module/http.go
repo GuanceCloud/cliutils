@@ -244,7 +244,6 @@ func (h *httpModule) doRequest(L *lua.LState, method string, url string, options
 
 	defer res.Body.Close()
 	body, err := ioutil.ReadAll(res.Body)
-
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +253,6 @@ func (h *httpModule) doRequest(L *lua.LState, method string, url string, options
 
 func (h *httpModule) doRequestAndPush(L *lua.LState, method string, url string, options *lua.LTable) int {
 	response, err := h.doRequest(L, method, url, options)
-
 	if err != nil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString(fmt.Sprintf("%s", err)))

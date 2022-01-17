@@ -7,7 +7,7 @@ import (
 )
 
 func TestXml(t *testing.T) {
-	var lucCode = `
+	lucCode := `
         xml_str ="<booklist><book>100</book><book>100.5</book><book>200</book></booklist>"
 	print("xml test:", xml_str)
 	xml_table = xml_decode(xml_str)
