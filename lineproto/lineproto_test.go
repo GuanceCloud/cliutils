@@ -67,14 +67,104 @@ func TestMakeLineProtoPoint(t *testing.T) {
 	}{
 
 		{
+			tname: `64k-field-value-length`,
+			name:  "some",
+			fields: map[string]interface{}{
+				"key": func() string {
+					const str = "1234567890"
+					var out string
+					for {
+						out += str
+						if len(out) > 64*1024 {
+							break
+						}
+					}
+					return out
+				}(),
+			},
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.MaxFieldValueLen = 0
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+
+			expect: fmt.Sprintf(`some key="%s" 123`, func() string {
+				const str = "1234567890"
+				var out string
+				for {
+					out += str
+					if len(out) > 64*1024 {
+						break
+					}
+				}
+				return out
+			}()),
+		},
+
+		{
+			tname:  `max-field-value-length`,
+			name:   "some",
+			fields: map[string]interface{}{"key": "too-long-field-value-123"},
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.MaxFieldValueLen = 2
+				return opt
+			}(),
+			fail: true,
+		},
+
+		{
+			tname:  `max-field-key-length`,
+			name:   "some",
+			fields: map[string]interface{}{"too-long-field-key": "123"},
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.MaxFieldKeyLen = 2
+				return opt
+			}(),
+			fail: true,
+		},
+
+		{
+			tname:  `max-tag-value-length`,
+			name:   "some",
+			fields: map[string]interface{}{"f1": 1},
+			tags:   map[string]string{"key": "too-long-tag-value-123"},
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.MaxTagValueLen = 2
+				return opt
+			}(),
+			fail: true,
+		},
+
+		{
+			tname:  `max tag key length`,
+			name:   "some",
+			fields: map[string]interface{}{"f1": 1},
+			tags:   map[string]string{"too-long-tag-key": "123"},
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.MaxTagKeyLen = 2
+				return opt
+			}(),
+			fail: true,
+		},
+
+		{
 			tname:  `empty measurement name`,
 			name:   "", // empty
 			fields: map[string]interface{}{"f.1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t.1": "abc", "t2": "32"},
-			opt: &Option{
-				EnablePointInKey: true,
-				Time:             time.Unix(0, 123),
-			},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				opt.EnablePointInKey = true
+				return opt
+			}(),
+
 			fail: true,
 		},
 
@@ -83,10 +173,14 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f.1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t.1": "abc", "t2": "32"},
-			opt: &Option{
-				EnablePointInKey: true,
-				Time:             time.Unix(0, 123),
-			},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				opt.EnablePointInKey = true
+				return opt
+			}(),
+
 			expect: "abc,t.1=abc,t2=32 f.1=1i,f2=32i 123",
 		},
 
@@ -95,10 +189,13 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f.1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
-			opt: &Option{
-				EnablePointInKey: true,
-				Time:             time.Unix(0, 123),
-			},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				opt.EnablePointInKey = true
+				return opt
+			}(),
 			expect: "abc,t1=abc,t2=32 f.1=1i,f2=32i 123",
 		},
 
@@ -107,9 +204,12 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
-			opt: &Option{
-				DisabledFieldKeys: []string{"f1"},
-			},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.DisabledFieldKeys = []string{"f1"}
+				return opt
+			}(),
 
 			fail: true,
 		},
@@ -119,9 +219,12 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
-			opt: &Option{
-				DisabledTagKeys: []string{"t2"},
-			},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.DisabledTagKeys = []string{"t2"}
+				return opt
+			}(),
 
 			fail: true,
 		},
@@ -131,9 +234,12 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1, "f2": uint64(32)},
 			expect: "abc f1=1i,f2=32i 123", // f2 dropped
-			opt: &Option{
-				Time: time.Unix(0, 123),
-			},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
 
 			fail: false,
 		},
@@ -143,9 +249,12 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1, "f2": uint64(math.MaxInt64) + 1},
 			expect: "abc f1=1i 123", // f2 dropped
-			opt: &Option{
-				Time: time.Unix(0, 123),
-			},
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				opt.Strict = false
+				return opt
+			}(),
 
 			fail: false,
 		},
@@ -154,10 +263,12 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			tname:  `int exceed int64-max under strict mode`,
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1, "f2": uint64(math.MaxInt64) + 1},
-			opt: &Option{
-				Time:   time.Unix(0, 123),
-				Strict: true,
-			},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
 
 			fail: true,
 		},
@@ -167,16 +278,18 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1, "f2": "3"},
 			tags:   map[string]string{"t1": "def", "t2": "abc"},
-			opt: &Option{
-				Time:      time.Unix(0, 123),
-				Strict:    true,
-				MaxTags:   3,
-				MaxFields: 1,
-				ExtraTags: map[string]string{
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				opt.MaxTags = 3
+				opt.MaxFields = 1
+				opt.ExtraTags = map[string]string{
 					"etag1": "1",
 					"etag2": "2",
-				},
-			},
+				}
+				return opt
+			}(),
 
 			fail: true,
 		},
@@ -186,15 +299,17 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1},
 			tags:   map[string]string{"t1": "def", "t2": "abc"},
-			opt: &Option{
-				Time:    time.Unix(0, 123),
-				Strict:  true,
-				MaxTags: 3,
-				ExtraTags: map[string]string{
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				opt.MaxTags = 3
+				opt.ExtraTags = map[string]string{
 					"etag1": "1",
 					"etag2": "2",
-				},
-			},
+				}
+				return opt
+			}(),
 
 			fail: true,
 		},
@@ -205,15 +320,17 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			fields: map[string]interface{}{"f1": 1},
 			tags:   map[string]string{"t1": "def", "t2": "abc"},
 			expect: "abc,etag1=1,etag2=2,t1=def,t2=abc f1=1i 123",
-			opt: &Option{
-				Time:    time.Unix(0, 123),
-				Strict:  true,
-				MaxTags: 4,
-				ExtraTags: map[string]string{
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				opt.MaxTags = 4
+				opt.ExtraTags = map[string]string{
 					"etag1": "1",
 					"etag2": "2",
-				},
-			},
+				}
+				return opt
+			}(),
 
 			fail: false,
 		},
@@ -223,15 +340,17 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1},
 			expect: "abc,etag1=1,etag2=2 f1=1i 123",
-			opt: &Option{
-				Time:    time.Unix(0, 123),
-				Strict:  true,
-				MaxTags: 4,
-				ExtraTags: map[string]string{
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				opt.MaxTags = 4
+				opt.ExtraTags = map[string]string{
 					"etag1": "1",
 					"etag2": "2",
-				},
-			},
+				}
+				return opt
+			}(),
 
 			fail: false,
 		},
@@ -241,8 +360,13 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1, "f2": nil},
 			tags:   map[string]string{"t1": "def", "t2": "abc"},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: true, MaxTags: 1},
-			fail:   true,
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				opt.MaxTags = 1
+				return opt
+			}(),
+			fail: true,
 		},
 
 		{
@@ -250,8 +374,13 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1, "f2": nil},
 			tags:   map[string]string{"t1": "def"},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: true, MaxFields: 1},
-			fail:   true,
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				opt.MaxFields = 1
+				return opt
+			}(),
+			fail: true,
 		},
 
 		{
@@ -259,6 +388,7 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1.a": 1},
 			tags:   map[string]string{"t1.a": "def"},
+			opt:    NewDefaultOption(),
 			fail:   true,
 		},
 
@@ -267,6 +397,7 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1.a": 1},
 			tags:   map[string]string{"t1": "def"},
+			opt:    NewDefaultOption(),
 			fail:   true,
 		},
 
@@ -275,6 +406,7 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1, "f2": nil},
 			tags:   map[string]string{"t1.a": "def"},
+			opt:    NewDefaultOption(),
 			fail:   true,
 		},
 
@@ -283,8 +415,12 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1, "f2": nil},
 			tags:   map[string]string{"t1": "def"},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
-			fail:   true,
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+			fail: true,
 		},
 
 		{
@@ -292,6 +428,7 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1},
 			tags:   map[string]string{"f1": "def"},
+			opt:    NewDefaultOption(),
 			fail:   true,
 		},
 
@@ -300,7 +437,11 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1},
 			tags:   nil,
-			opt:    &Option{Time: time.Unix(0, 123)},
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
 			expect: "abc f1=1i 123",
 		},
 
@@ -309,6 +450,7 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			fields: nil,
 			tags:   map[string]string{"f1": "def"},
+			opt:    NewDefaultOption(),
 			fail:   true,
 		},
 
@@ -317,7 +459,12 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:  "abc",
 			fields: map[string]interface{}{"f1": `abc
 123`},
-			opt: &Option{Time: time.Unix(0, 123), Strict: false},
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				opt.Strict = false
+				return opt
+			}(),
 			expect: `abc f1="abc
 123" 123`,
 			fail: false,
@@ -334,7 +481,12 @@ func TestMakeLineProtoPoint(t *testing.T) {
 456\`,
 			},
 			fields: map[string]interface{}{"f1": 123},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: false},
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				opt.Strict = false
+				return opt
+			}(),
 			expect: "abc,tag\\ 2=def\\ 456,tag1=abc\\ 123 f1=123i 123",
 			fail:   false,
 		},
@@ -350,27 +502,39 @@ func TestMakeLineProtoPoint(t *testing.T) {
 456\`,
 			},
 			fields: map[string]interface{}{"f1": 123},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
-			fail:   true,
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+			fail: true,
 		},
 
 		{
-			tname:  ``,
+			tname:  `ok case`,
 			name:   "abc",
 			tags:   nil,
 			fields: map[string]interface{}{"f1": 123},
-			opt:    &Option{Time: time.Unix(0, 123)},
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
 			expect: "abc f1=123i 123",
 			fail:   false,
 		},
 
 		{
-			tname:  `tag keey with backslash`,
+			tname:  `tag key with backslash`,
 			name:   "abc",
 			tags:   map[string]string{"tag1": "val1", `tag2\`: `val2\`},
 			fields: map[string]interface{}{"f1": 123},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
-			fail:   true,
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+			fail: true,
 		},
 
 		{
@@ -378,7 +542,13 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			tags:   map[string]string{"tag1": "val1", `tag2\`: `val2\`},
 			fields: map[string]interface{}{"f1": 123},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: false},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				opt.Strict = false
+				return opt
+			}(),
 			expect: "abc,tag1=val1,tag2=val2 f1=123i 123",
 			fail:   false,
 		},
@@ -388,7 +558,13 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			tags:   map[string]string{"tag1": "val1", `tag2\`: `val2\`},
 			fields: map[string]interface{}{"f1": 123},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+
 			expect: "abc,tag1=val1,tag2=val2 f1=123i 123",
 			fail:   true,
 		},
@@ -398,7 +574,13 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`},
 			fields: map[string]interface{}{"f1": 123, "f2": nil},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+
 			expect: "abc,tag1=val1,tag2=val2 f1=123i 123",
 			fail:   true,
 		},
@@ -408,7 +590,13 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`},
 			fields: map[string]interface{}{"f1": 123, "f2": map[string]interface{}{"a": "b"}},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+
 			expect: "abc,tag1=val1,tag2=val2 f1=123i 123",
 			fail:   true,
 		},
@@ -418,7 +606,13 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`},
 			fields: map[string]interface{}{"f1": 123, "f2": struct{ a string }{a: "abc"}},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+
 			expect: "abc,tag1=val1,tag2=val2 f1=123i 123",
 			fail:   true,
 		},
@@ -428,7 +622,14 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc",
 			tags:   map[string]string{"tag1": "val1", `tag2\`: `val2\`},
 			fields: map[string]interface{}{"f1": 123, "f2": nil},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: false},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				opt.Strict = false
+				return opt
+			}(),
+
 			expect: "abc,tag1=val1,tag2=val2 f1=123i 123",
 			fail:   false,
 		},
@@ -438,7 +639,13 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc≈≈≈≈øøππ†®",
 			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`},
 			fields: map[string]interface{}{"f1": 123},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+
 			expect: "abc≈≈≈≈øøππ†®,tag1=val1,tag2=val2 f1=123i 123",
 			fail:   false,
 		},
@@ -448,16 +655,27 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			name:   "abc≈≈≈≈øøππ†®",
 			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`, "tag3": `ºª•¶§∞¢£`},
 			fields: map[string]interface{}{"f1": 123, "f2": "¡™£¢∞§¶•ªº"},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+
 			expect: `abc≈≈≈≈øøππ†®,tag1=val1,tag2=val2,tag3=ºª•¶§∞¢£ f1=123i,f2="¡™£¢∞§¶•ªº" 123`,
 			fail:   false,
 		},
 
 		{
-			tname:  `missing field`,
-			name:   "abc≈≈≈≈øøππ†®",
-			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`, "tag3": `ºª•¶§∞¢£`},
-			opt:    &Option{Time: time.Unix(0, 123), Strict: true},
+			tname: `missing field`,
+			name:  "abc≈≈≈≈øøππ†®",
+			tags:  map[string]string{"tag1": "val1", `tag2`: `val2`, "tag3": `ºª•¶§∞¢£`},
+
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+
 			expect: `abc≈≈≈≈øøππ†®,tag1=val1,tag2=val2,tag3=ºª•¶§∞¢£ f1=123i,f2="¡™£¢∞§¶•ªº" 123`,
 			fail:   true,
 		},
@@ -471,7 +689,12 @@ func TestMakeLineProtoPoint(t *testing.T) {
 	bbb
 			ccc`,
 			},
-			opt: &Option{Time: time.Unix(0, 123), Strict: true},
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+
 			expect: `abc,tag1=val1 f1="aaa
 	bbb
 			ccc" 123`,
@@ -496,6 +719,18 @@ func TestMakeLineProtoPoint(t *testing.T) {
 	}
 }
 
+func _65kStr() string {
+	const str = "1234567890abcdef"
+	var out string
+	for {
+		out += str
+		if len(out) > 64*1024 {
+			break
+		}
+	}
+	return out
+}
+
 func TestParsePoint(t *testing.T) {
 	newPoint := func(m string,
 		tags map[string]string,
@@ -516,6 +751,25 @@ func TestParsePoint(t *testing.T) {
 		expect []*influxdb.Point
 		fail   bool
 	}{
+
+		{
+			name: `65k-field`,
+			data: []byte(fmt.Sprintf(`abc f1="%s" 123`, _65kStr())),
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.MaxFieldValueLen = 0
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+
+			expect: []*influxdb.Point{
+				newPoint("abc",
+					nil,
+					map[string]interface{}{"f1": _65kStr()},
+					time.Unix(0, 123)),
+			},
+		},
+
 		{
 			name: `with disabled field`,
 			data: []byte(`abc,t1=1,t2=2 f1=1i,f2=2,f3="abc" 123`),
