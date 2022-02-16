@@ -8,16 +8,18 @@ import (
 
 	"github.com/influxdata/influxdb1-client/models"
 	influxdb "github.com/influxdata/influxdb1-client/v2"
+	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/testutil"
 )
 
-func parseLineProto(data []byte, precision string) error {
+func parseLineProto(t *testing.T, data []byte, precision string) (models.Points, error) {
+	t.Helper()
+
 	if data == nil || len(data) == 0 {
-		return fmt.Errorf("empty data")
+		return nil, fmt.Errorf("empty data")
 	}
 
-	_, err := models.ParsePointsWithPrecision(data, time.Now().UTC(), precision)
-	return err
+	return models.ParsePointsWithPrecision(data, time.Now().UTC(), precision)
 }
 
 func TestAdjustTags(t *testing.T) {
@@ -712,23 +714,12 @@ func TestMakeLineProtoPoint(t *testing.T) {
 				testutil.Ok(t, err)
 				x := pt.String()
 				testutil.Equals(t, tc.expect, x)
-				testutil.Equals(t, parseLineProto([]byte(x), "n"), nil)
+				_, err := parseLineProto(t, []byte(x), "n")
+				testutil.Equals(t, err, nil)
 				fmt.Printf("\n[%d]%s\n", i, x)
 			}
 		})
 	}
-}
-
-func _65kStr() string {
-	const str = "1234567890abcdef"
-	var out string
-	for {
-		out += str
-		if len(out) > 64*1024 {
-			break
-		}
-	}
-	return out
 }
 
 func TestParsePoint(t *testing.T) {
@@ -744,6 +735,9 @@ func TestParsePoint(t *testing.T) {
 		return pt
 	}
 
+	__32mbString := cliutils.CreateRandomString(32 * 1024 * 1024)
+	__65kbString := cliutils.CreateRandomString(65 * 1024)
+
 	cases := []struct {
 		name   string
 		data   []byte
@@ -751,10 +745,26 @@ func TestParsePoint(t *testing.T) {
 		expect []*influxdb.Point
 		fail   bool
 	}{
+		{
+			name: `32mb-field`,
+			data: []byte(fmt.Sprintf(`abc f1="%s" 123`, __32mbString)),
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.MaxFieldValueLen = 32 * 1024 * 1024
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
 
+			expect: []*influxdb.Point{
+				newPoint("abc",
+					nil,
+					map[string]interface{}{"f1": __32mbString},
+					time.Unix(0, 123)),
+			},
+		},
 		{
 			name: `65k-field`,
-			data: []byte(fmt.Sprintf(`abc f1="%s" 123`, _65kStr())),
+			data: []byte(fmt.Sprintf(`abc f1="%s" 123`, __65kbString)),
 			opt: func() *Option {
 				opt := NewDefaultOption()
 				opt.MaxFieldValueLen = 0
@@ -765,7 +775,7 @@ func TestParsePoint(t *testing.T) {
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					nil,
-					map[string]interface{}{"f1": _65kStr()},
+					map[string]interface{}{"f1": __65kbString},
 					time.Unix(0, 123)),
 			},
 		},
@@ -1054,10 +1064,32 @@ abc f1=1i,f2=2,f3="abc" 789
 
 				for idx, pt := range pts {
 					if len(tc.expect) > 0 {
-						exp := tc.expect[idx].String()
+						_ = idx
+						//exp := tc.expect[idx].String()
 						got := pt.String()
-						testutil.Equals(t, exp, got)
-						t.Logf("[pass] exp: %s, parse ok? %v", exp, parseLineProto([]byte(exp), "n"))
+
+						pts, err := parseLineProto(t, []byte(got), "n")
+						if err != nil {
+							t.Logf("parseLineProto failed")
+							continue
+						}
+
+						for _, pt := range pts {
+							fields, err := pt.Fields()
+							testutil.Ok(t, err)
+
+							for k, v := range fields {
+								switch x := v.(type) {
+								case string:
+									t.Logf("%s: %s", k, cliutils.StringTrim(x, 32))
+								default:
+									t.Logf("%s: %v", k, x)
+								}
+							}
+
+						}
+
+						//t.Logf("[pass] exp: %s, parse ok? %v", exp, err)
 					}
 				}
 			}
@@ -1066,11 +1098,15 @@ abc f1=1i,f2=2,f3="abc" 789
 }
 
 func TestParseLineProto(t *testing.T) {
+	__32mbString := cliutils.CreateRandomString(32 * 1024 * 1024)
+	__65kbString := cliutils.CreateRandomString(65 * 1024)
+
 	cases := []struct {
-		data []byte
-		prec string
-		fail bool
-		name string
+		data  []byte
+		prec  string
+		fail  bool
+		name  string
+		check func(pts models.Points) error
 	}{
 		{
 			name: `nil data`,
@@ -1089,20 +1125,20 @@ func TestParseLineProto(t *testing.T) {
 		{
 			name: `with multiple empty lines`,
 			data: []byte(`abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
-abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
-abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
+		abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
+		abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
 
-`),
+		`),
 			prec: "n",
 		},
 
 		{
 			name: `missing field`,
 			data: []byte(`abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
-abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
-abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
-abc
-`),
+		abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
+		abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
+		abc
+		`),
 			prec: "n",
 			fail: true,
 		},
@@ -1110,22 +1146,86 @@ abc
 		{
 			name: `missing tag`,
 			data: []byte(`abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
-abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
-abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc" 123456789
-abc f1=1i,f2=2,f3="abc"
-`),
+			abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
+			abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc" 123456789
+			abc f1=1i,f2=2,f3="abc"
+			`),
+			prec: "n",
+		},
+
+		{
+			name: `65kb-field-key`,
+			data: []byte(fmt.Sprintf(`abc,tag1=1,tag2=2 "%s"="hello" 123`, func() string {
+				return __65kbString
+			}())),
+
+			fail: true,
+			prec: "n",
+		},
+
+		{
+			name: `65kb-tag-key`,
+			data: []byte(fmt.Sprintf(`abc,tag1=1,%s=2 f1="hello" 123`, func() string {
+				return __65kbString
+			}())),
+
+			fail: true,
+			prec: "n",
+		},
+
+		{
+			name: `65kb-measurement-name`,
+			data: []byte(fmt.Sprintf(`%s,tag1=1,t2=2 f1="hello" 123`, func() string {
+				return __65kbString
+			}())),
+
+			fail: true,
+			prec: "n",
+		},
+
+		{
+			name: `32mb-field`,
+			data: []byte(fmt.Sprintf(`abc,tag1=1,tag2=2 f3="%s" 123`, func() string {
+				return __32mbString
+			}())),
+
+			check: func(pts models.Points) error {
+				if len(pts) != 1 {
+					return fmt.Errorf("expect only 1 point, got %d", len(pts))
+				}
+
+				fields, err := pts[0].Fields()
+				if err != nil {
+					return err
+				}
+
+				if v, ok := fields["f3"]; !ok {
+					return fmt.Errorf("field f3 missing")
+				} else {
+					if v != __32mbString {
+						return fmt.Errorf("field f3 not expected")
+					}
+				}
+				return nil
+			},
+
 			prec: "n",
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := parseLineProto(tc.data, tc.prec)
+			pts, err := parseLineProto(t, tc.data, tc.prec)
+
 			if tc.fail {
 				testutil.NotOk(t, err, "")
-				t.Logf("expect error: %s", err)
+				t.Logf("expect error: %s", cliutils.LeftStringTrim(err.Error(), 64))
 			} else {
 				testutil.Ok(t, err)
+			}
+
+			if tc.check != nil {
+				testutil.Ok(t, tc.check(pts))
 			}
 		})
 	}
