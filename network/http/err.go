@@ -22,7 +22,7 @@ type HttpError struct {
 	HttpCode int    `json:"-"`
 }
 
-type bodyResp struct {
+type BodyResp struct {
 	*HttpError
 	Message string      `json:"message,omitempty"`
 	Content interface{} `json:"content,omitempty"`
@@ -64,7 +64,7 @@ func (he *HttpError) HttpBodyPretty(c *gin.Context, body interface{}) {
 		return
 	}
 
-	resp := &bodyResp{
+	resp := &BodyResp{
 		HttpError: he,
 		Content:   body,
 	}
@@ -92,7 +92,7 @@ func (he *HttpError) HttpBody(c *gin.Context, body interface{}) {
 	case []byte:
 		bodyBytes = x
 	default:
-		resp := &bodyResp{
+		resp := &BodyResp{
 			HttpError: he,
 			Content:   body,
 		}
@@ -137,7 +137,7 @@ func HttpErrf(c *gin.Context, err error, format string, args ...interface{}) {
 }
 
 func (he *HttpError) httpResp(c *gin.Context, format string, args ...interface{}) {
-	resp := &bodyResp{
+	resp := &BodyResp{
 		HttpError: he,
 	}
 
