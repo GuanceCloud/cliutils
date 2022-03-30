@@ -79,22 +79,22 @@ func (rl *RateLimiterImpl) UpdateRate(rate float64) {
 
 type apiHandler func(http.ResponseWriter, *http.Request, ...interface{}) (interface{}, error)
 
-func HTTPAPIWrapper(plugins *WrapPlugins, next apiHandler, any ...interface{}) func(*gin.Context) {
+func HTTPAPIWrapper(p *WrapPlugins, next apiHandler, any ...interface{}) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var start time.Time
 		var m *APIMetric
 
-		if plugins.Reporter != nil {
+		if p != nil && p.Reporter != nil {
 			start = time.Now()
 			m = &APIMetric{
 				API: c.Request.URL.Path + "@" + c.Request.Method,
 			}
 		}
 
-		if plugins.Limiter != nil {
-			if plugins.Limiter.IsLimited(c.Writer, c.Request) {
+		if p != nil && p.Limiter != nil {
+			if p.Limiter.IsLimited(c.Writer, c.Request) {
 				HttpErr(c, ErrTooManyRequest)
-				plugins.Limiter.LimitReadchedCallback(c.Writer, c.Request)
+				p.Limiter.LimitReadchedCallback(c.Writer, c.Request)
 				if m != nil {
 					m.StatusCode = ErrTooManyRequest.HttpCode
 					m.Limited = true
@@ -116,8 +116,8 @@ func HTTPAPIWrapper(plugins *WrapPlugins, next apiHandler, any ...interface{}) f
 		}
 
 	feed:
-		if m != nil {
-			plugins.Reporter.Report(m)
+		if p != nil && m != nil {
+			p.Reporter.Report(m)
 		}
 	}
 }
