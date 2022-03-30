@@ -31,7 +31,7 @@ func TestHTTPWrapperWithMetricReporter(t *testing.T) {
 	r := gin.New()
 
 	limitRate := 10
-	lmt := NewRateLimiter(float64(limitRate))
+	lmt := NewAPIRateLimiter(float64(limitRate))
 
 	testHandler := func(http.ResponseWriter, *http.Request, ...interface{}) (interface{}, error) {
 		return nil, nil
@@ -106,7 +106,7 @@ func TestHTTPWrapperWithRateLimit(t *testing.T) {
 	r := gin.New()
 
 	limitRate := 10
-	lmt := NewRateLimiter(float64(limitRate))
+	lmt := NewAPIRateLimiter(float64(limitRate))
 
 	testHandler := func(http.ResponseWriter, *http.Request, ...interface{}) (interface{}, error) {
 		return nil, nil

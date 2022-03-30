@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/didip/tollbooth/v6"
-	"github.com/didip/tollbooth/v6/limiter"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,18 +13,6 @@ var (
 	HttpOK            = NewErr(nil, http.StatusOK)
 	EnableTracing     bool
 )
-
-// RateLimiter used to define API request rate limiter
-type RateLimiter interface {
-	// detect if rate limit reached
-	IsLimited(http.ResponseWriter, *http.Request) bool
-
-	// If rate limited, do anything what you want(cache the request, or do nothing)
-	LimitReadchedCallback(http.ResponseWriter, *http.Request)
-
-	// Update rate limite exclusively
-	UpdateRate(float64)
-}
 
 type APIMetric struct {
 	API        string
@@ -41,40 +27,9 @@ type APIMetricReporter interface {
 }
 
 type WrapPlugins struct {
-	Limiter  RateLimiter
+	Limiter  APIRateLimiter
 	Reporter APIMetricReporter
 	//Tracer   Tracer
-}
-
-// RateLimiterImpl is default implemented of RateLimiter based on tollbooth
-type RateLimiterImpl struct {
-	*limiter.Limiter
-}
-
-func NewRateLimiter(rate float64) *RateLimiterImpl {
-	return &RateLimiterImpl{
-		Limiter: tollbooth.NewLimiter(rate, &limiter.ExpirableOptions{
-			DefaultExpirationTTL: time.Second,
-		}).SetBurst(1),
-	}
-}
-
-func (rl *RateLimiterImpl) IsLimited(w http.ResponseWriter, r *http.Request) bool {
-	if rl.Limiter == nil {
-		return false
-	}
-
-	return tollbooth.LimitByRequest(rl.Limiter, w, r) != nil
-}
-
-// LimitReadchedCallback do nothing, just drop the request
-func (rl *RateLimiterImpl) LimitReadchedCallback(w http.ResponseWriter, r *http.Request) {
-	// do nothing
-}
-
-// UpdateRate update limite rate exclusively
-func (rl *RateLimiterImpl) UpdateRate(rate float64) {
-	rl.Limiter.SetMax(rate)
 }
 
 type apiHandler func(http.ResponseWriter, *http.Request, ...interface{}) (interface{}, error)
@@ -91,10 +46,14 @@ func HTTPAPIWrapper(p *WrapPlugins, next apiHandler, any ...interface{}) func(*g
 			}
 		}
 
+		f := func(r *http.Request) string {
+			return ""
+		}
+
 		if p != nil && p.Limiter != nil {
-			if p.Limiter.IsLimited(c.Writer, c.Request) {
+			if p.Limiter.RequestLimited(c.Request, f) {
 				HttpErr(c, ErrTooManyRequest)
-				p.Limiter.LimitReadchedCallback(c.Writer, c.Request)
+				p.Limiter.LimitReadchedCallback(c.Request)
 				if m != nil {
 					m.StatusCode = ErrTooManyRequest.HttpCode
 					m.Limited = true
