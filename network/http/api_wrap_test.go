@@ -42,7 +42,7 @@ func TestHTTPWrapperWithMetricReporter(t *testing.T) {
 		stats: map[string]*apiStat{},
 	}
 
-	plg := &Plugins{
+	plg := &WrapPlugins{
 		Limiter:  lmt,
 		Reporter: reporter,
 	}
@@ -112,7 +112,7 @@ func TestHTTPWrapperWithRateLimit(t *testing.T) {
 		return nil, nil
 	}
 
-	r.GET("/test", HTTPAPIWrapper(&Plugins{
+	r.GET("/test", HTTPAPIWrapper(&WrapPlugins{
 		Limiter: lmt,
 	}, testHandler))
 

@@ -78,6 +78,33 @@ func (he *HttpError) HttpBodyPretty(c *gin.Context, body interface{}) {
 	c.Data(he.HttpCode, `application/json`, j)
 }
 
+func (he *HttpError) WriteBody(c *gin.Context, obj interface{}) {
+	if obj == nil {
+		c.Status(he.HttpCode)
+		return
+	}
+
+	var bodyBytes []byte
+	var contentType string
+	var err error
+
+	switch x := obj.(type) {
+	case []byte:
+		bodyBytes = x
+	default:
+		contentType = `application/json`
+
+		bodyBytes, err = json.Marshal(obj)
+		if err != nil {
+			undefinedErr(err).httpResp(c, "%s: %+#v", "json.Marshal() failed", obj)
+			return
+		}
+	}
+
+	c.Data(he.HttpCode, contentType, bodyBytes)
+}
+
+// HttpBody Deprecated, use WriteBody
 func (he *HttpError) HttpBody(c *gin.Context, body interface{}) {
 	if body == nil {
 		c.Status(he.HttpCode)

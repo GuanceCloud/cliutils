@@ -40,7 +40,7 @@ type APIMetricReporter interface {
 	Report(*APIMetric) // report these metrics
 }
 
-type Plugins struct {
+type WrapPlugins struct {
 	Limiter  RateLimiter
 	Reporter APIMetricReporter
 	//Tracer   Tracer
@@ -79,7 +79,7 @@ func (rl *RateLimiterImpl) UpdateRate(rate float64) {
 
 type apiHandler func(http.ResponseWriter, *http.Request, ...interface{}) (interface{}, error)
 
-func HTTPAPIWrapper(plugins *Plugins, next apiHandler, any ...interface{}) func(*gin.Context) {
+func HTTPAPIWrapper(plugins *WrapPlugins, next apiHandler, any ...interface{}) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var start time.Time
 		var m *APIMetric
