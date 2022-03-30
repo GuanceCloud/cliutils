@@ -107,7 +107,7 @@ func HTTPAPIWrapper(plugins *WrapPlugins, next apiHandler, any ...interface{}) f
 		if res, err := next(c.Writer, c.Request, any...); err != nil {
 			HttpErr(c, err)
 		} else {
-			HttpOK.HttpBody(c, res)
+			HttpOK.WriteBody(c, res)
 		}
 
 		if m != nil {
