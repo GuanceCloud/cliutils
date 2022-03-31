@@ -18,15 +18,6 @@ type apiStat struct {
 	costTotal time.Duration
 }
 
-type reporterMock struct {
-	ch    chan *APIMetric
-	stats map[string]*apiStat
-}
-
-func (r *reporterMock) Report(m *APIMetric) {
-	r.ch <- m
-}
-
 func TestHTTPWrapperWithMetricReporter(t *testing.T) {
 	r := gin.New()
 
@@ -37,34 +28,16 @@ func TestHTTPWrapperWithMetricReporter(t *testing.T) {
 		return nil, nil
 	}
 
-	reporter := &reporterMock{
-		ch:    make(chan *APIMetric),
-		stats: map[string]*apiStat{},
-	}
-
 	plg := &WrapPlugins{
 		Limiter:  lmt,
-		Reporter: reporter,
+		Reporter: &ReporterImpl{},
 	}
 
-	chexit := make(chan interface{})
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-
 	go func() {
 		defer wg.Done()
-		for {
-			select {
-			case m := <-reporter.ch:
-				if _, ok := reporter.stats[m.API]; !ok {
-					reporter.stats[m.API] = &apiStat{total: 1, costTotal: m.Latency}
-				} else {
-					reporter.stats[m.API].total++
-				}
-			case <-chexit:
-				return
-			}
-		}
+		StartReporter()
 	}()
 
 	r.GET("/test", HTTPAPIWrapper(plg, testHandler))
@@ -77,7 +50,7 @@ func TestHTTPWrapperWithMetricReporter(t *testing.T) {
 	var resp *http.Response
 	var err error
 	var body []byte
-	for i := 0; i < limitRate*2; i++ { // this should exceed max limit and got a 429 status code
+	for i := 0; i < limitRate*1000; i++ { // this should exceed max limit and got a 429 status code
 		resp, err = http.Get(fmt.Sprintf("%s/test", ts.URL))
 		if err != nil {
 			t.Error(err)
@@ -93,13 +66,16 @@ func TestHTTPWrapperWithMetricReporter(t *testing.T) {
 
 	tu.Equals(t, resp.StatusCode, 429)
 	t.Logf("%s", string(body))
-	close(chexit)
-	wg.Wait()
 
-	for k, v := range reporter.stats {
-		tu.Equals(t, v.total, 20)
+	stats := GetStats()
+	for k, v := range stats {
+		tu.Assert(t, v.Total == limitRate*1000, "expect %d == %d", v.Total, limitRate)
+		tu.Assert(t, v.Limited > 0 && v.Status4XX > 0, "expect %d == %d", v.Total, limitRate)
 		t.Logf("%s: %+#v", k, v)
 	}
+
+	StopReporter()
+	wg.Wait()
 }
 
 func TestHTTPWrapperWithRateLimit(t *testing.T) {

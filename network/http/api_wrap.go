@@ -14,18 +14,6 @@ var (
 	EnableTracing     bool
 )
 
-type APIMetric struct {
-	API        string
-	Latency    time.Duration
-	StatusCode int
-	Limited    bool
-}
-
-// APIMetric used to collects API metrics during API handing
-type APIMetricReporter interface {
-	Report(*APIMetric) // report these metrics
-}
-
 type WrapPlugins struct {
 	Limiter  APIRateLimiter
 	Reporter APIMetricReporter
