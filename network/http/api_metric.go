@@ -136,7 +136,7 @@ func StartReporter() {
 			case 4:
 				v.Status4XX++
 			case 5:
-				v.Status4XX++
+				v.Status5XX++
 			}
 		}
 	}
