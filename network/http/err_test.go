@@ -70,7 +70,8 @@ func TestHTTPErr(t *testing.T) {
 	g.GET("/err2", func(c *gin.Context) { HttpErr(c, errTest2) })
 	g.GET("/err3", func(c *gin.Context) { HttpErr(c, fmt.Errorf("500 error")) })
 	g.GET("/errf", func(c *gin.Context) { HttpErrf(c, errTest, "%s: %s", "this is a test error", "ignore me") })
-	g.GET("/ok", func(c *gin.Context) { errOK.HttpBody(c, okbody) })
+	g.GET("/ok", func(c *gin.Context) { errOK.WriteBody(c, okbody) })
+	g.GET("/ok2", func(c *gin.Context) { errOK.HttpBody(c, okbody) })
 	g.GET("/oknilbody", func(c *gin.Context) { errOK.HttpBody(c, nil) })
 	g.GET("/errmsg", func(c *gin.Context) { err := Error(errTest, "this is a error with specific message"); HttpErr(c, err) })
 	g.GET("/errfmsg", func(c *gin.Context) {
@@ -137,11 +138,23 @@ func TestHTTPErr(t *testing.T) {
 		{
 			u: "http://localhost:8090/ok",
 			expect: func() string {
+				j, err := json.Marshal(okbody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return string(j)
+			}(),
+		},
+
+		{
+			u: "http://localhost:8090/ok2",
+			expect: func() string {
 				x := struct {
 					Content interface{} `json:"content"`
 				}{
 					Content: okbody,
 				}
+
 				j, err := json.Marshal(x)
 				if err != nil {
 					t.Fatal(err)
@@ -157,11 +170,15 @@ func TestHTTPErr(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		t.Run("", func(t *testing.T) {
+		t.Run(tc.u, func(t *testing.T) {
 			resp, err := http.Get(tc.u)
 			if err != nil {
 				t.Logf("get error: %s, ignored", err)
 				return
+			}
+
+			for k, v := range resp.Header {
+				t.Logf("%s: %v", k, v)
 			}
 
 			if resp.Body != nil {
