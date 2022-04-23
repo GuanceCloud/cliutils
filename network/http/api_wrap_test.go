@@ -22,7 +22,7 @@ func TestHTTPWrapperWithMetricReporter(t *testing.T) {
 	r := gin.New()
 
 	limitRate := 10
-	lmt := NewAPIRateLimiter(float64(limitRate))
+	lmt := NewAPIRateLimiter(float64(limitRate), DefaultRequestKey)
 
 	testHandler := func(http.ResponseWriter, *http.Request, ...interface{}) (interface{}, error) {
 		return nil, nil
@@ -51,7 +51,7 @@ func TestHTTPWrapperWithMetricReporter(t *testing.T) {
 	var err error
 	var body []byte
 	for i := 0; i < limitRate*1000; i++ { // this should exceed max limit and got a 429 status code
-		resp, err = http.Get(fmt.Sprintf("%s/test", ts.URL))
+		resp, err = http.Get(fmt.Sprintf("%s/test?token=12345", ts.URL))
 		if err != nil {
 			t.Error(err)
 		}
@@ -82,7 +82,7 @@ func TestHTTPWrapperWithRateLimit(t *testing.T) {
 	r := gin.New()
 
 	limitRate := 10
-	lmt := NewAPIRateLimiter(float64(limitRate))
+	lmt := NewAPIRateLimiter(float64(limitRate), DefaultRequestKey)
 
 	testHandler := func(http.ResponseWriter, *http.Request, ...interface{}) (interface{}, error) {
 		return nil, nil
