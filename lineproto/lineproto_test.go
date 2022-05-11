@@ -111,9 +111,10 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			opt: func() *Option {
 				opt := NewDefaultOption()
 				opt.MaxFieldValueLen = 2
+				opt.Time = time.Unix(0, 123)
 				return opt
 			}(),
-			fail: true,
+			expect: "some key=\"to\" 123",
 		},
 
 		{
@@ -123,9 +124,10 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			opt: func() *Option {
 				opt := NewDefaultOption()
 				opt.MaxFieldKeyLen = 2
+				opt.Time = time.Unix(0, 123)
 				return opt
 			}(),
-			fail: true,
+			expect: "some to=\"123\" 123",
 		},
 
 		{
@@ -136,9 +138,10 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			opt: func() *Option {
 				opt := NewDefaultOption()
 				opt.MaxTagValueLen = 2
+				opt.Time = time.Unix(0, 123)
 				return opt
 			}(),
-			fail: true,
+			expect: "some,key=to f1=1i 123",
 		},
 
 		{
@@ -149,9 +152,10 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			opt: func() *Option {
 				opt := NewDefaultOption()
 				opt.MaxTagKeyLen = 2
+				opt.Time = time.Unix(0, 123)
 				return opt
 			}(),
-			fail: true,
+			expect: "some,to=123 f1=1i 123",
 		},
 
 		{
@@ -284,7 +288,7 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			opt: func() *Option {
 				opt := NewDefaultOption()
 				opt.Time = time.Unix(0, 123)
-				opt.MaxTags = 3
+				opt.MaxTags = 2
 				opt.MaxFields = 1
 				opt.ExtraTags = map[string]string{
 					"etag1": "1",
@@ -292,8 +296,7 @@ func TestMakeLineProtoPoint(t *testing.T) {
 				}
 				return opt
 			}(),
-
-			fail: true,
+			expect: "abc,etag1=1,etag2=2 f1=1i 123", // f2 dropped,
 		},
 
 		{
@@ -305,15 +308,15 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			opt: func() *Option {
 				opt := NewDefaultOption()
 				opt.Time = time.Unix(0, 123)
-				opt.MaxTags = 3
+				opt.MaxTags = 2
 				opt.ExtraTags = map[string]string{
 					"etag1": "1",
 					"etag2": "2",
 				}
+				opt.Time = time.Unix(0, 123)
 				return opt
 			}(),
-
-			fail: true,
+			expect: "abc,etag1=1,etag2=2 f1=1i 123",
 		},
 
 		{
@@ -374,15 +377,16 @@ func TestMakeLineProtoPoint(t *testing.T) {
 		{
 			tname:  `exceed max field`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1, "f2": nil},
+			fields: map[string]interface{}{"f1": 1, "f2": 2},
 			tags:   map[string]string{"t1": "def"},
 			opt: func() *Option {
 				opt := NewDefaultOption()
 				opt.Time = time.Unix(0, 123)
 				opt.MaxFields = 1
+				opt.Time = time.Unix(0, 123)
 				return opt
 			}(),
-			fail: true,
+			expect: "abc,t1=def f1=1i 123",
 		},
 
 		{
@@ -428,10 +432,14 @@ func TestMakeLineProtoPoint(t *testing.T) {
 		{
 			tname:  `same key in field and tag`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1},
+			fields: map[string]interface{}{"f1": 1, "f2": 2},
 			tags:   map[string]string{"f1": "def"},
-			opt:    NewDefaultOption(),
-			fail:   true,
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+			expect: "abc,f1=def f2=2i 123",
 		},
 
 		{
