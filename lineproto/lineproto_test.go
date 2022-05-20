@@ -56,16 +56,17 @@ def`,
 	}
 }
 
-func TestMakeLineProtoPoint(t *testing.T) {
+func TestMakeLineProtoPointWithWarnings(t *testing.T) {
 	cases := []struct {
-		tname  string // test name
-		name   string
-		tags   map[string]string
-		fields map[string]interface{}
-		ts     time.Time
-		opt    *Option
-		expect string
-		fail   bool
+		tname     string // test name
+		name      string
+		tags      map[string]string
+		fields    map[string]interface{}
+		ts        time.Time
+		opt       *Option
+		expect    string
+		warnTypes []string
+		fail      bool
 	}{
 
 		{
@@ -114,7 +115,8 @@ func TestMakeLineProtoPoint(t *testing.T) {
 				opt.Time = time.Unix(0, 123)
 				return opt
 			}(),
-			expect: "some key=\"to\" 123",
+			expect:    "some key=\"to\" 123",
+			warnTypes: []string{WarnMaxFieldValueLen},
 		},
 
 		{
@@ -127,7 +129,8 @@ func TestMakeLineProtoPoint(t *testing.T) {
 				opt.Time = time.Unix(0, 123)
 				return opt
 			}(),
-			expect: "some to=\"123\" 123",
+			expect:    "some to=\"123\" 123",
+			warnTypes: []string{WarnMaxFieldKeyLen},
 		},
 
 		{
@@ -141,7 +144,22 @@ func TestMakeLineProtoPoint(t *testing.T) {
 				opt.Time = time.Unix(0, 123)
 				return opt
 			}(),
-			expect: "some,key=to f1=1i 123",
+			warnTypes: []string{WarnMaxTagValueLen},
+			expect:    "some,key=to f1=1i 123",
+		},
+		{
+			tname:  `disable-string-field`,
+			name:   "some",
+			fields: map[string]interface{}{"f1": 1, "f2": "this is a string"},
+			tags:   map[string]string{"key": "string"},
+			opt: func() *Option {
+				opt := NewDefaultOption()
+				opt.DisableStringField = true
+				opt.Time = time.Unix(0, 123)
+				return opt
+			}(),
+			warnTypes: []string{WarnInvalidFieldValueType},
+			expect:    "some,key=string f1=1i 123",
 		},
 
 		{
@@ -155,7 +173,8 @@ func TestMakeLineProtoPoint(t *testing.T) {
 				opt.Time = time.Unix(0, 123)
 				return opt
 			}(),
-			expect: "some,to=123 f1=1i 123",
+			warnTypes: []string{WarnMaxTagKeyLen},
+			expect:    "some,to=123 f1=1i 123",
 		},
 
 		{
@@ -239,8 +258,7 @@ func TestMakeLineProtoPoint(t *testing.T) {
 			tname:  `int exceed int64-max under non-strict mode`,
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1, "f2": uint64(32)},
-			expect: "abc f1=1i,f2=32i 123", // f2 dropped
-
+			expect: "abc f1=1i,f2=32i 123",
 			opt: func() *Option {
 				opt := NewDefaultOption()
 				opt.Time = time.Unix(0, 123)
@@ -251,10 +269,11 @@ func TestMakeLineProtoPoint(t *testing.T) {
 		},
 
 		{
-			tname:  `int exceed int64-max under non-strict mode`,
-			name:   "abc",
-			fields: map[string]interface{}{"f1": 1, "f2": uint64(math.MaxInt64) + 1},
-			expect: "abc f1=1i 123", // f2 dropped
+			tname:     `int exceed int64-max under non-strict mode`,
+			name:      "abc",
+			fields:    map[string]interface{}{"f1": 1, "f2": uint64(math.MaxInt64) + 1},
+			expect:    "abc f1=1i 123", // f2 dropped
+			warnTypes: []string{WarnMaxFieldValueInt},
 			opt: func() *Option {
 				opt := NewDefaultOption()
 				opt.Time = time.Unix(0, 123)
@@ -296,15 +315,16 @@ func TestMakeLineProtoPoint(t *testing.T) {
 				}
 				return opt
 			}(),
-			expect: "abc,etag1=1,etag2=2 f1=1i 123", // f2 dropped,
+			warnTypes: []string{WarnMaxTags, WarnMaxFields},
+			expect:    "abc,etag1=1,etag2=2 f1=1i 123", // f2 dropped,
 		},
 
 		{
-			tname:  `extra tags exceed max tags`,
-			name:   "abc",
-			fields: map[string]interface{}{"f1": 1},
-			tags:   map[string]string{"t1": "def", "t2": "abc"},
-
+			tname:     `extra tags exceed max tags`,
+			name:      "abc",
+			fields:    map[string]interface{}{"f1": 1},
+			tags:      map[string]string{"t1": "def", "t2": "abc"},
+			warnTypes: []string{WarnMaxTags},
 			opt: func() *Option {
 				opt := NewDefaultOption()
 				opt.Time = time.Unix(0, 123)
@@ -371,7 +391,8 @@ func TestMakeLineProtoPoint(t *testing.T) {
 				opt.MaxTags = 1
 				return opt
 			}(),
-			fail: true,
+			warnTypes: []string{WarnMaxTags},
+			fail:      true,
 		},
 
 		{
@@ -386,7 +407,8 @@ func TestMakeLineProtoPoint(t *testing.T) {
 				opt.Time = time.Unix(0, 123)
 				return opt
 			}(),
-			expect: "abc,t1=def f1=1i 123",
+			warnTypes: []string{WarnMaxFields},
+			expect:    "abc,t1=def f1=1i 123",
 		},
 
 		{
@@ -439,7 +461,8 @@ func TestMakeLineProtoPoint(t *testing.T) {
 				opt.Time = time.Unix(0, 123)
 				return opt
 			}(),
-			expect: "abc,f1=def f2=2i 123",
+			warnTypes: []string{WarnSameTagFieldKey},
+			expect:    "abc,f1=def f2=2i 123",
 		},
 
 		{
@@ -713,8 +736,26 @@ func TestMakeLineProtoPoint(t *testing.T) {
 
 	for i, tc := range cases {
 		t.Run(tc.tname, func(t *testing.T) {
-			pt, err := MakeLineProtoPoint(tc.name, tc.tags, tc.fields, tc.opt)
+			pt, warnings, err := MakeLineProtoPointWithWarnings(tc.name, tc.tags, tc.fields, tc.opt)
 
+			if len(tc.warnTypes) == 0 {
+				testutil.Equals(t, 0, len(warnings))
+			}
+			for _, warnType := range tc.warnTypes {
+				isFound := false
+				for _, w := range warnings {
+					if w.WarningType == warnType {
+						isFound = true
+						break
+					}
+				}
+				if isFound {
+					continue
+				} else {
+					t.Fail()
+					t.Logf("[%d]: expected warning type %s, but not found", i, warnType)
+				}
+			}
 			if tc.fail {
 				testutil.NotOk(t, err, "")
 				t.Logf("[%d] expect error: %s", i, err)
