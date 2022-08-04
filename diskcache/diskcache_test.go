@@ -18,6 +18,8 @@ func TestPutGet(t *testing.T) {
 		t.Error(err)
 	}
 
+	defer c.Close()
+
 	str := "hello world"
 	if err := c.Put([]byte(str)); err != nil {
 		t.Error(err)
@@ -36,14 +38,16 @@ func TestPutGet(t *testing.T) {
 func TestDropDuringGet(t *testing.T) {
 	os.RemoveAll(".TestDropDuringGet")
 	c, err := Open(".TestDropDuringGet", &Option{
-		BatchSize: 4 * 1024 * 1024,
-		Capacity:  12 * 1024 * 1024,
+		BatchSize: 1 * 1024 * 1024,
+		Capacity:  2 * 1024 * 1024,
 	})
 
 	if err != nil {
 		t.Error(err)
 		return
 	}
+
+	defer c.Close()
 
 	sample := bytes.Repeat([]byte("hello"), 7351)
 	wg := sync.WaitGroup{}
@@ -68,7 +72,7 @@ func TestDropDuringGet(t *testing.T) {
 	i := 0
 	eof := 0
 	for {
-		time.Sleep(time.Millisecond * 10)
+		time.Sleep(time.Millisecond * 100)
 		if err := c.Get(func(x []byte) error {
 			assert.Equal(t, []byte(sample), x)
 			if i%32 == 0 {
@@ -77,10 +81,10 @@ func TestDropDuringGet(t *testing.T) {
 			return nil
 		}); err != nil {
 			if errors.Is(err, ErrEOF) {
-				t.Logf("read: %s", err)
+				t.Logf("[%s] read: %s", time.Now(), err)
 				time.Sleep(time.Second)
 				eof++
-				if eof > 10 {
+				if eof > 5 {
 					return
 				}
 			} else {
@@ -108,6 +112,8 @@ func TestDropBatch(t *testing.T) {
 		return
 	}
 
+	defer c.Close()
+
 	sample := bytes.Repeat([]byte("hello"), 7351)
 	for {
 		if err := c.Put(sample); err != nil {
@@ -121,7 +127,6 @@ func TestDropBatch(t *testing.T) {
 }
 
 func TestConcurrentPutGet(t *testing.T) {
-
 	os.RemoveAll(".TestConcurrentPutGet")
 	c, err := Open(".TestConcurrentPutGet", &Option{
 		BatchSize: 4 * 1024 * 1024,
@@ -132,6 +137,8 @@ func TestConcurrentPutGet(t *testing.T) {
 		t.Error(err)
 		return
 	}
+
+	defer c.Close()
 
 	t.Logf("files: %+#v", c.dataFiles)
 
@@ -146,6 +153,7 @@ func TestConcurrentPutGet(t *testing.T) {
 			defer wg.Done()
 			nput := 0
 			exceed100ms := 0
+
 			for {
 				start := time.Now()
 				if err := c.Put(sample); err != nil {
@@ -155,12 +163,13 @@ func TestConcurrentPutGet(t *testing.T) {
 				cost := time.Since(start)
 				if cost > 100*time.Millisecond {
 					exceed100ms++
-					t.Logf("[%d] <<<<<<<<<< Put %d(%dth) bytes cost: %s(%.3f%%)", idx, len(sample), i, cost, 100.0*float64(exceed100ms)/float64(nput))
+					t.Logf("[%d] <<<<<<<<<< Put %d(%dth) bytes cost: %s(%.3f%%)",
+						idx, len(sample), i, cost, 100.0*float64(exceed100ms)/float64(nput))
 				}
 
 				nput++
 
-				if nput > 1000000 {
+				if nput > 1000 {
 					t.Logf("[%d] Put exit", idx)
 					return
 				}
@@ -225,6 +234,8 @@ func TestRotate(t *testing.T) {
 		t.Error(err)
 		return
 	}
+
+	defer c.Close()
 
 	origFileCnt := len(c.dataFiles)
 

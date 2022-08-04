@@ -3,10 +3,15 @@ package diskcache
 import (
 	"fmt"
 	"os"
+	"time"
 )
 
 // open next read file.
 func (c *DiskCache) switchNextFile() error {
+
+	c.rwlock.Lock()
+	defer c.rwlock.Unlock()
+
 	if len(c.dataFiles) == 0 {
 		return nil
 		//c.curReadfile = c.curWriteFile
@@ -14,7 +19,7 @@ func (c *DiskCache) switchNextFile() error {
 		c.curReadfile = c.dataFiles[0]
 	}
 
-	l.Debugf("&&&&&&&&&&&&&&&&&&&&&&& read datafile: %s => %+#v\n", c.curReadfile, c.dataFiles)
+	l.Infof("&&&&&&&&&&&&&&&&&&&&&&& read datafile: %s => %+#v\n", c.curReadfile, c.dataFiles)
 	fd, err := os.OpenFile(c.curReadfile, os.O_RDONLY, c.opt.FilePerms)
 	if err != nil {
 		return fmt.Errorf("under switchNextFile, OpenFile: %w, datafile: %+#v, ", err, c.dataFiles)
@@ -43,6 +48,7 @@ func (c *DiskCache) openWriteFile() error {
 		return fmt.Errorf("under openWriteFile, OpenFile: %w", err)
 	}
 
+	c.wfdCreated = time.Now()
 	c.wfd = wfd
 	return nil
 }
