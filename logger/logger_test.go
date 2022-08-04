@@ -58,6 +58,33 @@ func BenchmarkBasic(b *testing.B) {
 	}
 }
 
+func TestLoggerSideEffect(t *testing.T) {
+	type abc struct {
+		i int
+	}
+
+	opt := &Option{
+		Level: INFO,
+		Flags: OPT_DEFAULT,
+	}
+
+	f := func(x *abc) string {
+		x.i++
+		return fmt.Sprintf("%d", x.i)
+	}
+
+	if err := InitRoot(opt); err != nil {
+		t.Error(err)
+	}
+
+	l := SLogger("TestLoggerSideEffect")
+
+	x := &abc{}
+	l.Debugf("%+#v", f(x)) // under info level, on debug, the f() still effected
+
+	tu.Equals(t, 1, x.i)
+}
+
 func TestJsonLogging(t *testing.T) {
 	opt := &Option{
 		Path:  "abc.json",
