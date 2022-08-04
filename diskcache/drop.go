@@ -3,6 +3,7 @@ package diskcache
 import "os"
 
 func (c *DiskCache) dropBatch() error {
+
 	if len(c.dataFiles) > 0 {
 		fname := c.dataFiles[0]
 
@@ -20,7 +21,12 @@ func (c *DiskCache) dropBatch() error {
 			}
 
 			c.size -= fi.Size()
+
+			c.rwlock.Lock()
+			defer c.rwlock.Unlock()
+
 			c.dataFiles = c.dataFiles[1:]
+
 			l.Debugf("----------------------- drop datafile(%dth): %s(%d) => %+#v, size: %d\n",
 				c.droppedBatch, fname, fi.Size(), c.dataFiles, c.size)
 			c.droppedBatch++

@@ -30,11 +30,14 @@ var (
 	l = logger.DefaultSLogger("diskcache")
 
 	defaultOpt = &Option{
-		NoSync:      false,
-		BatchSize:   64 * 1024 * 1024,
-		MaxDataSize: 32 * 1024 * 1024,
-		DirPerms:    0750,
-		FilePerms:   0640,
+		NoSync: false,
+
+		BatchSize:   20 * 1024 * 1024,
+		MaxDataSize: 10 * 1024 * 1024,
+		Capacity:    5 * 1024 * 1024 * 1024,
+
+		DirPerms:  0750,
+		FilePerms: 0640,
 	}
 )
 
@@ -49,7 +52,7 @@ type DiskCache struct {
 	wfd *os.File // write fd
 	rfd *os.File // read fd
 
-	lastPut time.Time
+	wfdCreated time.Time
 
 	rotateCount  int
 	droppedBatch int
@@ -57,7 +60,9 @@ type DiskCache struct {
 	size         int64
 	curBatchSize int64
 
-	lock *sync.Mutex
+	wlock  *sync.Mutex
+	rlock  *sync.Mutex
+	rwlock *sync.RWMutex
 
 	opt *Option
 }
@@ -88,7 +93,10 @@ func Open(path string, opt *Option) (*DiskCache, error) {
 		path:         path,
 		opt:          opt,
 		curWriteFile: filepath.Join(path, "data"),
-		lock:         &sync.Mutex{},
+
+		wlock:  &sync.Mutex{},
+		rlock:  &sync.Mutex{},
+		rwlock: &sync.RWMutex{},
 	}
 
 	if c.opt == nil {
@@ -154,10 +162,10 @@ func Open(path string, opt *Option) (*DiskCache, error) {
 	return c, nil
 }
 
-// Reset clear current DiskCache.
-func (c *DiskCache) Reset() error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+// Close reclame fd resources
+func (c *DiskCache) Close() error {
+	c.rwlock.Lock()
+	defer c.rwlock.Unlock()
 
 	if c.rfd != nil {
 		if err := c.rfd.Close(); err != nil {
@@ -170,30 +178,13 @@ func (c *DiskCache) Reset() error {
 			return err
 		}
 	}
-
-	c.dataFiles = nil
-	c.curWriteFile = ""
-	c.curReadfile = ""
-
-	c.rotateCount = 0
-	c.droppedBatch = 0
-
-	c.size = 0
-	c.curBatchSize = 0
-
-	if err := os.Remove(c.path); err != nil {
-		return err
-	}
-
 	return nil
 }
 
 // Put write @data to disk cache, if reached batch size, a new batch is rotated.
 func (c *DiskCache) Put(data []byte) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	c.lastPut = time.Now()
+	c.wlock.Lock()
+	defer c.wlock.Unlock()
 
 	if c.opt.Capacity > 0 && c.size+int64(len(data)) > c.opt.Capacity {
 		if err := c.dropBatch(); err != nil {
@@ -202,6 +193,7 @@ func (c *DiskCache) Put(data []byte) error {
 	}
 
 	if int64(len(data)) > c.opt.MaxDataSize {
+		l.Warnf("too large data: %d > %d", len(data), c.opt.MaxDataSize)
 		return ErrTooLargeData
 	}
 
@@ -242,17 +234,19 @@ type Fn func([]byte) error
 // if any error occurred during call @fn, the reading data is
 // ignored, and will not read again
 func (c *DiskCache) Get(fn Fn) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.rlock.Lock()
+	defer c.rlock.Unlock()
 
 	// wakeup sleeping write file, rotate it for successing reading!
-	if time.Since(c.lastPut) > time.Second*3 && c.curBatchSize > 0 {
+	if time.Since(c.wfdCreated) > time.Second*3 && c.curBatchSize > 0 {
 		l.Debugf("####################### wakeup %s(%d bytes), global size: %d\n", c.curWriteFile, c.curBatchSize, c.size)
-		if err := c.rotate(); err != nil {
+		if err := func() error {
+			c.wlock.Lock()
+			defer c.wlock.Unlock()
+			return c.rotate()
+		}(); err != nil {
 			return err
 		}
-
-		time.Sleep(time.Second * 1)
 	}
 
 	if c.rfd == nil {

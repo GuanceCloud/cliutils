@@ -12,6 +12,8 @@ import (
 
 // rotate to next new file, append to reading list
 func (c *DiskCache) rotate() error {
+	l.Debugf("try rotate...")
+
 	eof := make([]byte, dataHeaderLen)
 	binary.LittleEndian.PutUint32(eof, eofHint)
 
@@ -46,9 +48,12 @@ func (c *DiskCache) rotate() error {
 	}
 
 	os.Rename(c.curWriteFile, newfile)
+
+	c.rwlock.Lock()
+	defer c.rwlock.Unlock()
 	c.dataFiles = append(c.dataFiles, newfile)
 	sort.Strings(c.dataFiles)
-	l.Debugf("+++++++++++++++++++++++ add datafile: %s => %s | %+#v\n", c.curWriteFile, newfile, c.dataFiles)
+	l.Infof("+++++++++++++++++++++++ add datafile: %s => %s | %+#v\n", c.curWriteFile, newfile, c.dataFiles)
 
 	// reopen new write file
 	if err := c.openWriteFile(); err != nil {
@@ -60,6 +65,10 @@ func (c *DiskCache) rotate() error {
 
 // after file read on EOF, remove the file
 func (c *DiskCache) removeCurrentReadingFile() error {
+
+	c.rwlock.Lock()
+	defer c.rwlock.Unlock()
+
 	if c.rfd != nil {
 		if err := c.rfd.Close(); err != nil {
 			return err
@@ -77,7 +86,7 @@ func (c *DiskCache) removeCurrentReadingFile() error {
 
 	if len(c.dataFiles) > 0 {
 		c.dataFiles = c.dataFiles[1:] // first file removed
-		l.Debugf("----------------------- remove datafile: %s => %+#v\n", c.curReadfile, c.dataFiles)
+		l.Infof("----------------------- remove datafile: %s => %+#v\n", c.curReadfile, c.dataFiles)
 	}
 
 	return nil
