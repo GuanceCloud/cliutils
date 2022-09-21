@@ -103,7 +103,7 @@ func TestDropDuringGet(t *testing.T) {
 func TestDropBatch(t *testing.T) {
 	os.RemoveAll(".TestDropBatch")
 	c, err := Open(".TestDropBatch", &Option{
-		BatchSize: 4 * 1024 * 1024, // 1MB
+		BatchSize: 4 * 1024 * 1024,
 		Capacity:  32 * 1024 * 1024,
 	})
 

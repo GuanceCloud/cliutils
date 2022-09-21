@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 	tu "gitlab.jiagouyun.com/cloudcare-tools/cliutils/testutil"
 )
 
@@ -49,6 +50,52 @@ func TestBytesBody(t *testing.T) {
 	}
 
 	tu.Equals(t, bytesBody, string(b))
+}
+
+func TestNoSniff(t *testing.T) {
+
+	errOK := NewNamespaceErr(nil, http.StatusOK, "")
+	bytesBody := "this is bytes response body"
+
+	router := gin.New()
+	g := router.Group("")
+	g.GET("/bytes-body", func(c *gin.Context) {
+		c.Writer.Header().Set("Content-Type", "application/octet-stream")
+		c.Writer.Header().Set("X-Latest-Time", fmt.Sprintf("%s", time.Now()))
+		errOK.HttpBody(c, []byte(bytesBody))
+	})
+
+	g.GET("/obj-body", func(c *gin.Context) {
+		errOK.HttpBody(c, map[string]string{})
+	})
+
+	g.GET("/err-body", func(c *gin.Context) {
+		HttpErr(c, fmt.Errorf("mocked error"))
+	})
+
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+	time.Sleep(time.Second)
+
+	// --------------------
+
+	for _, x := range []string{
+		"/bytes-body", "/obj-body", "/err-body",
+	} {
+		t.Run(x, func(t *testing.T) {
+			resp, err := http.Get(fmt.Sprintf("%s%s", ts.URL, x))
+			if err != nil {
+				t.Error(err)
+			}
+			assert.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+			for k, _ := range resp.Header {
+				t.Logf("%s: %s", k, resp.Header.Get(k))
+			}
+			body, _ := ioutil.ReadAll(resp.Body)
+			t.Logf("body: %s", body)
+			resp.Body.Close()
+		})
+	}
 }
 
 func TestHTTPErr(t *testing.T) {
