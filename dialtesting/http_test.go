@@ -1,11 +1,14 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package dialtesting
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
-
-	//"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -25,7 +28,6 @@ var httpCases = []struct {
 	fail      bool
 	reasonCnt int
 }{
-
 	{
 		fail:      false,
 		reasonCnt: 0,
@@ -180,7 +182,7 @@ var httpCases = []struct {
 			Frequency:  "1s",
 			AdvanceOptions: &HTTPAdvanceOption{
 				RequestBody: &HTTPOptBody{
-					BodyType: "None", //"application/json",
+					BodyType: "None", // "application/json",
 					Body:     `{"key": "value"}`,
 				},
 			},
@@ -360,7 +362,6 @@ var httpCases = []struct {
 			SuccessWhen: []*HTTPSuccess{
 				{
 					Header: map[string][]*SuccessOption{
-
 						"Cache-Control": {
 							{MatchRegex: `max-ag=\d`}, // expect fail: max-age
 						},
@@ -517,11 +518,9 @@ func TestDialHTTP(t *testing.T) {
 		if len(reasons) != c.reasonCnt {
 			t.Errorf("case %s expect %d reasons, but got %d reasons:\n\t%s",
 				c.t.Name, c.reasonCnt, len(reasons), strings.Join(reasons, "\n\t"))
-		} else {
-			if len(reasons) > 0 {
-				t.Logf("case %s reasons:\n\t%s",
-					c.t.Name, strings.Join(reasons, "\n\t"))
-			}
+		} else if len(reasons) > 0 {
+			t.Logf("case %s reasons:\n\t%s",
+				c.t.Name, strings.Join(reasons, "\n\t"))
 		}
 	}
 }
@@ -550,8 +549,8 @@ func proxyHandler(t *testing.T, target string) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
-		director := func(req *http.Request) {
-			req = c.Request
+		director := func(req *http.Request) { //nolint:staticcheck
+			req = c.Request //nolint: staticcheck
 
 			req.URL.Scheme = remote.Scheme
 			req.URL.Host = remote.Host

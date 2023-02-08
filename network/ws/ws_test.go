@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package ws
 
 import (
@@ -59,7 +64,6 @@ func TestWSServer(t *testing.T) {
 		if err := df_srv.AddConnection(conn); err != nil {
 			l.Error(err)
 		}
-		return
 	}
 
 	go df_srv.Start()
@@ -112,10 +116,8 @@ func TestWSServer(t *testing.T) {
 				if _, resp, err := c.cli.ReadMessage(); err != nil {
 					_ = resp
 					t.Log(err)
-				} else {
-					if total%(ncli/2) == 0 {
-						l.Debugf("%s", string(resp))
-					}
+				} else if total%(ncli/2) == 0 {
+					l.Debugf("%s", string(resp))
 				}
 
 				time.Sleep(time.Millisecond)

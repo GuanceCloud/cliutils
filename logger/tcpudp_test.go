@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package logger
 
 import (
@@ -21,7 +26,8 @@ func serve(t *testing.T,
 	expectLogCnt int,
 	proto string,
 	listen string,
-	ch chan interface{}) (listener, error) {
+	ch chan interface{},
+) (listener, error) {
 	t.Helper()
 	switch proto {
 	case "udp":

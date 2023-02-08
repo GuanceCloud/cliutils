@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package lineproto
 
 import (
@@ -15,7 +20,7 @@ import (
 func parseLineProto(t *testing.T, data []byte, precision string) (models.Points, error) {
 	t.Helper()
 
-	if data == nil || len(data) == 0 {
+	if len(data) == 0 {
 		return nil, fmt.Errorf("empty data")
 	}
 
@@ -68,7 +73,6 @@ func TestMakeLineProtoPointWithWarnings(t *testing.T) {
 		warnTypes []string
 		fail      bool
 	}{
-
 		{
 			tname: `64k-field-value-length`,
 			name:  "some",
@@ -775,7 +779,8 @@ func TestParsePoint(t *testing.T) {
 	newPoint := func(m string,
 		tags map[string]string,
 		fields map[string]interface{},
-		ts ...time.Time) *influxdb.Point {
+		ts ...time.Time,
+	) *influxdb.Point {
 		pt, err := influxdb.NewPoint(m, tags, fields, ts...)
 		if err != nil {
 			t.Fatal(err) // should never been here
@@ -1114,7 +1119,7 @@ abc f1=1i,f2=2,f3="abc" 789
 				for idx, pt := range pts {
 					if len(tc.expect) > 0 {
 						_ = idx
-						//exp := tc.expect[idx].String()
+
 						got := pt.String()
 
 						pts, err := parseLineProto(t, []byte(got), "n")
@@ -1135,10 +1140,7 @@ abc f1=1i,f2=2,f3="abc" 789
 									t.Logf("%s: %v", k, x)
 								}
 							}
-
 						}
-
-						//t.Logf("[pass] exp: %s, parse ok? %v", exp, err)
 					}
 				}
 			}
@@ -1250,10 +1252,8 @@ func TestParseLineProto(t *testing.T) {
 
 				if v, ok := fields["f3"]; !ok {
 					return fmt.Errorf("field f3 missing")
-				} else {
-					if v != __32mbString {
-						return fmt.Errorf("field f3 not expected")
-					}
+				} else if v != __32mbString {
+					return fmt.Errorf("field f3 not expected")
 				}
 				return nil
 			},

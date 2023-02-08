@@ -1,7 +1,12 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package cache
 
 import (
-	//"os"
+	// "os"
 
 	"strings"
 	"sync"
@@ -25,8 +30,6 @@ func TestPut(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			//cache, err := New(os.TempDir(), 0)
-
 			cache, err := New("abc", 0)
 			if err != nil {
 				t.Error(err)
@@ -135,7 +138,6 @@ func TestConcurrentPutGet(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			var wg sync.WaitGroup
 
 			cache, err := New("abc", 0)
@@ -171,17 +173,14 @@ func TestConcurrentPutGet(t *testing.T) {
 					defer wg.Done()
 					tick := time.NewTicker(time.Millisecond * 200)
 					defer tick.Stop()
-					for {
-						select {
-						case <-tick.C:
-							start := time.Now()
-							if err := cache.Get(func(data []byte) error {
-								t.Logf("get data(%d bytes), cost: %s", len(data), time.Since(start))
-								return nil
-							}); err != nil {
-								t.Logf("Get: %s", err)
-								return
-							}
+					for range tick.C {
+						start := time.Now()
+						if err := cache.Get(func(data []byte) error {
+							t.Logf("get data(%d bytes), cost: %s", len(data), time.Since(start))
+							return nil
+						}); err != nil {
+							t.Logf("Get: %s", err)
+							return
 						}
 					}
 				}()
@@ -230,7 +229,6 @@ func TestConcurrentPut(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			var wg sync.WaitGroup
 
 			cache, err := New("abc", 0)
@@ -285,8 +283,6 @@ func TestGet(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			//cache, err := New(os.TempDir(), 0)
-
 			cache, err := New("abc", 0)
 			if err != nil {
 				t.Error(err)
