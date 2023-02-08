@@ -1,3 +1,9 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
+// Package cache wraps wal to handle local disk cache.
 package cache
 
 import (
@@ -21,7 +27,7 @@ type Cache struct {
 	cap, size uint64
 }
 
-func New(path string, cap uint64) (*Cache, error) {
+func New(path string, capacity uint64) (*Cache, error) {
 	l, err := wal.Open(path, &wal.Options{NoCopy: true, LogFormat: wal.JSON})
 	if err != nil {
 		return nil, err
@@ -31,7 +37,7 @@ func New(path string, cap uint64) (*Cache, error) {
 		l:    l,
 		path: path,
 		lock: &sync.Mutex{},
-		cap:  cap,
+		cap:  capacity,
 	}, nil
 }
 

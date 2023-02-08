@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package http
 
 import (
@@ -23,7 +28,7 @@ func TestBytesBody(t *testing.T) {
 	g := router.Group("")
 	g.GET("/bytes-body", func(c *gin.Context) {
 		c.Writer.Header().Set("Content-Type", "application/octet-stream")
-		c.Writer.Header().Set("X-Latest-Time", fmt.Sprintf("%s", time.Now()))
+		c.Writer.Header().Set("X-Latest-Time", time.Now().String())
 		errOK.HttpBody(c, []byte(bytesBody))
 	})
 
@@ -53,7 +58,6 @@ func TestBytesBody(t *testing.T) {
 }
 
 func TestNoSniff(t *testing.T) {
-
 	errOK := NewNamespaceErr(nil, http.StatusOK, "")
 	bytesBody := "this is bytes response body"
 
@@ -61,7 +65,7 @@ func TestNoSniff(t *testing.T) {
 	g := router.Group("")
 	g.GET("/bytes-body", func(c *gin.Context) {
 		c.Writer.Header().Set("Content-Type", "application/octet-stream")
-		c.Writer.Header().Set("X-Latest-Time", fmt.Sprintf("%s", time.Now()))
+		c.Writer.Header().Set("X-Latest-Time", time.Now().String())
 		errOK.HttpBody(c, []byte(bytesBody))
 	})
 
@@ -88,7 +92,7 @@ func TestNoSniff(t *testing.T) {
 				t.Error(err)
 			}
 			assert.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
-			for k, _ := range resp.Header {
+			for k := range resp.Header {
 				t.Logf("%s: %s", k, resp.Header.Get(k))
 			}
 			body, _ := ioutil.ReadAll(resp.Body)
@@ -132,8 +136,8 @@ func TestHTTPErr(t *testing.T) {
 	}
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			t.Log(err)
+		if e := srv.ListenAndServe(); e != nil && errors.Is(e, http.ErrServerClosed) {
+			t.Log(e)
 		}
 	}()
 

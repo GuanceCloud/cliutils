@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package http
 
 import (
@@ -20,7 +25,7 @@ func TestSign(t *testing.T) {
 		Sign:              "",
 	}
 
-	r, err := http.NewRequest(`POST`, `http://1.2.3.4:1234/v1/api`, nil)
+	r, err := http.NewRequest(`POST`, `http://1.2.3.4:1234/v1/api`, http.NoBody)
 	if err != nil {
 		t.Fatal(err)
 	}

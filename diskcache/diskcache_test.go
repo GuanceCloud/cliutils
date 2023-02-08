@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package diskcache
 
 import (
@@ -41,7 +46,6 @@ func TestDropDuringGet(t *testing.T) {
 		BatchSize: 1 * 1024 * 1024,
 		Capacity:  2 * 1024 * 1024,
 	})
-
 	if err != nil {
 		t.Error(err)
 		return
@@ -74,7 +78,7 @@ func TestDropDuringGet(t *testing.T) {
 	for {
 		time.Sleep(time.Millisecond * 100)
 		if err := c.Get(func(x []byte) error {
-			assert.Equal(t, []byte(sample), x)
+			assert.Equal(t, sample, x)
 			if i%32 == 0 {
 				t.Logf(">>>>>>>>>> Get %d bytes", len(x))
 			}
@@ -85,7 +89,7 @@ func TestDropDuringGet(t *testing.T) {
 				time.Sleep(time.Second)
 				eof++
 				if eof > 5 {
-					return
+					break
 				}
 			} else {
 				t.Logf("%s", err)
@@ -97,7 +101,7 @@ func TestDropDuringGet(t *testing.T) {
 		i++
 	}
 
-	wg.Done()
+	wg.Wait()
 }
 
 func TestDropBatch(t *testing.T) {
@@ -106,7 +110,6 @@ func TestDropBatch(t *testing.T) {
 		BatchSize: 4 * 1024 * 1024,
 		Capacity:  32 * 1024 * 1024,
 	})
-
 	if err != nil {
 		t.Error(err)
 		return
@@ -132,7 +135,6 @@ func TestConcurrentPutGet(t *testing.T) {
 		BatchSize: 4 * 1024 * 1024,
 		Capacity:  1024 * 1024 * 1024,
 	})
-
 	if err != nil {
 		t.Error(err)
 		return
@@ -164,7 +166,7 @@ func TestConcurrentPutGet(t *testing.T) {
 				if cost > 100*time.Millisecond {
 					exceed100ms++
 					t.Logf("[%d] <<<<<<<<<< Put %d(%dth) bytes cost: %s(%.3f%%)",
-						idx, len(sample), i, cost, 100.0*float64(exceed100ms)/float64(nput))
+						idx, len(sample), idx, cost, 100.0*float64(exceed100ms)/float64(nput))
 				}
 
 				nput++
@@ -190,13 +192,13 @@ func TestConcurrentPutGet(t *testing.T) {
 				nget++
 				start := time.Now()
 				if err := c.Get(func(x []byte) error {
-					assert.Equal(t, []byte(sample), x)
+					assert.Equal(t, sample, x)
 					readBytes += len(x)
 
 					cost := time.Since(start)
 					if cost > 100*time.Millisecond {
 						exceed100ms++
-						t.Logf("[%d] >>>>>>>>>> Get %d(%dth) bytes cost: %s(%.3f%%)", idx, len(sample), i, cost, 100.0*float64(exceed100ms)/float64(nget))
+						t.Logf("[%d] >>>>>>>>>> Get %d(%dth) bytes cost: %s(%.3f%%)", idx, len(sample), idx, cost, 100.0*float64(exceed100ms)/float64(nget))
 					}
 
 					return nil
@@ -206,7 +208,7 @@ func TestConcurrentPutGet(t *testing.T) {
 						time.Sleep(time.Second)
 						eof++
 						if eof >= 10 {
-							return
+							break
 						}
 					} else {
 						t.Logf("[%d]: %s", idx, err)
@@ -224,12 +226,10 @@ func TestConcurrentPutGet(t *testing.T) {
 }
 
 func TestRotate(t *testing.T) {
-
 	os.RemoveAll(".TestRotate")
 	c, err := Open(".TestRotate", &Option{
 		BatchSize: 1024 * 1024, // 1MB
 	})
-
 	if err != nil {
 		t.Error(err)
 		return
@@ -259,7 +259,7 @@ func TestRotate(t *testing.T) {
 
 	readBytes := 0
 	fn := func(x []byte) error {
-		assert.Equal(t, []byte(sample), x)
+		assert.Equal(t, sample, x)
 		readBytes += len(x)
 		return nil
 	}
@@ -270,7 +270,7 @@ func TestRotate(t *testing.T) {
 		}
 
 		if err := c.Get(fn); err != nil {
-			if err == ErrEOF {
+			if errors.Is(err, ErrEOF) {
 				t.Logf("read EOF")
 				return
 			} else {

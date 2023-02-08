@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package dialtesting
 
 import (
@@ -66,7 +71,6 @@ func TestWebsocket(t *testing.T) {
 		}
 
 		err := c.t.Run()
-
 		if err != nil {
 			if c.fail == false {
 				t.Errorf("case %s failed: %s", c.t.Name, err)
@@ -84,17 +88,15 @@ func TestWebsocket(t *testing.T) {
 		if len(reasons) != c.reasonCnt {
 			t.Errorf("case %s expect %d reasons, but got %d reasons:\n\t%s",
 				c.t.Name, c.reasonCnt, len(reasons), strings.Join(reasons, "\n\t"))
-		} else {
-			if len(reasons) > 0 {
-				t.Logf("case %s reasons:\n\t%s",
-					c.t.Name, strings.Join(reasons, "\n\t"))
-			}
+		} else if len(reasons) > 0 {
+			t.Logf("case %s reasons:\n\t%s",
+				c.t.Name, strings.Join(reasons, "\n\t"))
 		}
 	}
 }
 
 func websocketServer() *httptest.Server {
-	var upgrader = websocket.Upgrader{}
+	upgrader := websocket.Upgrader{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// username, password, ok := r.BasicAuth()
 		// fmt.Println(username, password, ok)
@@ -116,7 +118,6 @@ func websocketServer() *httptest.Server {
 				break
 			}
 		}
-
 	}))
 
 	return ts

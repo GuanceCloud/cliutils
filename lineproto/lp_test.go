@@ -1,14 +1,20 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package lineproto
 
 import (
 	"fmt"
-	influxdb "github.com/influxdata/influxdb1-client/v2"
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/testutil"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	influxdb "github.com/influxdata/influxdb1-client/v2"
+	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
+	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/testutil"
 )
 
 func TestUnsafeBytesToString(t *testing.T) {
@@ -80,8 +86,7 @@ func TestPointString(t *testing.T) {
 }
 
 func TestParse(t *testing.T) {
-
-	var lines = `
+	lines := `
 
 
 error,t1=tag1,t2=tag2 f1=1.0,f2=2i,f3="abc"
@@ -128,7 +133,6 @@ func BenchmarkParse(b *testing.B) {
 		},
 
 		{
-
 			name: "parse-multi-long-with-32k-field",
 			data: []byte(strings.Join([]string{
 				fmt.Sprintf(`foo,tag1=%s,tag2=%s f1=1,f2="%s",f3=3i 1625823259000000`, cliutils.CreateRandomString(100), cliutils.CreateRandomString(100), cliutils.CreateRandomString(32*1024)),
@@ -143,7 +147,6 @@ func BenchmarkParse(b *testing.B) {
 
 	for _, tc := range cases {
 		b.Run(tc.name+"-New", func(b *testing.B) {
-
 			for i := 0; i < b.N; i++ {
 				pts, err := ParseWithOptionSetter(tc.data, tc.optSetters...)
 				if err != nil {
@@ -166,7 +169,6 @@ func BenchmarkParse(b *testing.B) {
 }
 
 func TestNewLineEncoder(t *testing.T) {
-
 	cases := []struct {
 		name string
 		pts  []struct {
@@ -235,7 +237,6 @@ func TestNewLineEncoder(t *testing.T) {
 	var point *Point
 	for _, tc := range cases {
 		for _, pt := range tc.pts {
-
 			newPoint, err := NewPoint(pt.measurement,
 				pt.tags,
 				pt.fields,
@@ -252,7 +253,6 @@ func TestNewLineEncoder(t *testing.T) {
 
 			bts, _ := encoder.Bytes()
 			fmt.Println(len(bts))
-
 		}
 	}
 
@@ -287,7 +287,6 @@ func TestNewLineEncoder(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Printf("%q\n", str)
-
 }
 
 func TestEncode(t *testing.T) {
@@ -348,7 +347,6 @@ func TestEncode(t *testing.T) {
 		t.Run(tc.name+"-New", func(t *testing.T) {
 			pts := make([]*Point, 0, len(tc.pts))
 			for _, pt := range tc.pts {
-
 				newPoint, err := NewPoint(pt.measurement,
 					pt.tags,
 					pt.fields,
@@ -469,7 +467,6 @@ func BenchmarkEncode(b *testing.B) {
 			encoder := NewLineEncoder()
 
 			for i := 0; i < b.N; i++ {
-
 				for _, pt := range tc.pts {
 					newPoint, err := NewPoint(pt.measurement,
 						pt.tags,
@@ -486,17 +483,13 @@ func BenchmarkEncode(b *testing.B) {
 						b.Error(err)
 						return
 					}
-
 				}
-
 			}
-
 		})
 
 		b.Run(tc.name+"-Old", func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				for _, pt := range tc.pts {
-
 					oldPoint, err := influxdb.NewPoint(pt.measurement,
 						pt.tags,
 						pt.fields,
@@ -579,7 +572,6 @@ func TestLineEncoderBytesWithoutLn(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			encoder := NewLineEncoder()
 
 			for _, pt := range tc.pts {

@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package dialtesting
 
 import (
@@ -7,17 +12,17 @@ import (
 )
 
 var tcpCases = []struct {
-	t         *TcpTask
+	t         *TCPTask
 	fail      bool
 	reasonCnt int
 }{
 	{
 		fail:      false,
 		reasonCnt: 0,
-		t: &TcpTask{
-			SuccessWhen: []*TcpSuccess{
+		t: &TCPTask{
+			SuccessWhen: []*TCPSuccess{
 				{
-					ResponseTime: []*TcpResponseTime{{
+					ResponseTime: []*TCPResponseTime{{
 						Target: "10s",
 					}},
 				},
@@ -28,10 +33,10 @@ var tcpCases = []struct {
 	{
 		fail:      false,
 		reasonCnt: 1,
-		t: &TcpTask{
-			SuccessWhen: []*TcpSuccess{
+		t: &TCPTask{
+			SuccessWhen: []*TCPSuccess{
 				{
-					ResponseTime: []*TcpResponseTime{{
+					ResponseTime: []*TCPResponseTime{{
 						Target: "1us",
 					}},
 				},
@@ -87,11 +92,9 @@ func TestTcp(t *testing.T) {
 		if len(reasons) != c.reasonCnt {
 			t.Errorf("case %s expect %d reasons, but got %d reasons:\n\t%s",
 				c.t.Name, c.reasonCnt, len(reasons), strings.Join(reasons, "\n\t"))
-		} else {
-			if len(reasons) > 0 {
-				t.Logf("case %s reasons:\n\t%s",
-					c.t.Name, strings.Join(reasons, "\n\t"))
-			}
+		} else if len(reasons) > 0 {
+			t.Logf("case %s reasons:\n\t%s",
+				c.t.Name, strings.Join(reasons, "\n\t"))
 		}
 	}
 }

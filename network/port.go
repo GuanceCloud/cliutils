@@ -1,3 +1,9 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
+// Package network wraps basic network related implements.
 package network
 
 import (
@@ -18,7 +24,11 @@ func PortInUse(ipport string, timeout time.Duration) bool {
 
 	log.Printf("[debug] port %s used under TCP", ipport)
 
-	defer c.Close()
+	defer func() {
+		if err := c.Close(); err != nil {
+			_ = err // pass
+		}
+	}()
 	return true
 }
 

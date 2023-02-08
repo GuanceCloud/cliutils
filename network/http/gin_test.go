@@ -1,9 +1,13 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package http
 
 import (
 	"io"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -99,7 +103,7 @@ func TestMiddlewares(t *testing.T) {
 		Formatter: GinLogFormmatter,
 	}))
 
-	os.Setenv("MAX_REQUEST_BODY_LEN", "4")
+	t.Setenv("MAX_REQUEST_BODY_LEN", "4")
 	Init()
 
 	v1 := r.Group("/v1")

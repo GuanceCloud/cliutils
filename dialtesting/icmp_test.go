@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package dialtesting
 
 import (
@@ -6,17 +11,17 @@ import (
 )
 
 var icmpCases = []struct {
-	t         *IcmpTask
+	t         *ICMPTask
 	fail      bool
 	reasonCnt int
 }{
 	{
 		fail:      false,
 		reasonCnt: 0,
-		t: &IcmpTask{
+		t: &ICMPTask{
 			Host:        "localhost",
 			PacketCount: 5,
-			SuccessWhen: []*IcmpSuccess{
+			SuccessWhen: []*ICMPSuccess{
 				{
 					ResponseTime: []*ResponseTimeSucess{
 						{
@@ -33,10 +38,10 @@ var icmpCases = []struct {
 	{
 		fail:      false,
 		reasonCnt: 0,
-		t: &IcmpTask{
+		t: &ICMPTask{
 			Host:        "::1",
 			PacketCount: 5,
-			SuccessWhen: []*IcmpSuccess{
+			SuccessWhen: []*ICMPSuccess{
 				{
 					ResponseTime: []*ResponseTimeSucess{
 						{
@@ -64,7 +69,6 @@ func TestIcmp(t *testing.T) {
 		}
 
 		err := c.t.Run()
-
 		if err != nil {
 			if c.fail == false {
 				t.Errorf("case %s failed: %s", c.t.Name, err)
@@ -82,11 +86,9 @@ func TestIcmp(t *testing.T) {
 		if len(reasons) != c.reasonCnt {
 			t.Errorf("case %s expect %d reasons, but got %d reasons:\n\t%s",
 				c.t.Name, c.reasonCnt, len(reasons), strings.Join(reasons, "\n\t"))
-		} else {
-			if len(reasons) > 0 {
-				t.Logf("case %s reasons:\n\t%s",
-					c.t.Name, strings.Join(reasons, "\n\t"))
-			}
+		} else if len(reasons) > 0 {
+			t.Logf("case %s reasons:\n\t%s",
+				c.t.Name, strings.Join(reasons, "\n\t"))
 		}
 	}
 }
