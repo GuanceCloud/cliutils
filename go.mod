@@ -1,4 +1,4 @@
-module gitlab.jiagouyun.com/cloudcare-tools/cliutils
+module github.com/GuanceCloud/cliutils
 
 go 1.18
 

@@ -11,9 +11,9 @@ import (
 	"testing"
 	T "testing"
 
+	"github.com/GuanceCloud/cliutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 )
 
 func TestCheckMeasurement(t *testing.T) {

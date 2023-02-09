@@ -96,7 +96,7 @@ pt := NewPointV2(name []byte, kvs KVs, opts... Option)
 
 ```go
 import (
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/point"
+	"github.com/GuanceCloud/cliutils/point"
 )
 
 enc := GetEncoder(WithEncEncoding(Protobuf),
@@ -119,7 +119,7 @@ for _, buf := range bufs {
 
 ```golang
 import (
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/point"
+	"github.com/GuanceCloud/cliutils/point"
 )
 
 dec := GetDecoder(WithDecEncoding(Protobuf)) // set encoding to protobuf

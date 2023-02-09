@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GuanceCloud/cliutils"
 	"github.com/gobwas/ws"
 	"github.com/gorilla/websocket"
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 )
 
 var (

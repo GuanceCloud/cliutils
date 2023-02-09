@@ -11,7 +11,7 @@ import (
 	mrand "math/rand" //nolint:gosec
 	"time"
 
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
+	"github.com/GuanceCloud/cliutils"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 

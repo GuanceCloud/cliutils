@@ -13,8 +13,8 @@ import (
 	T "testing"
 	"time"
 
+	"github.com/GuanceCloud/cliutils"
 	"github.com/stretchr/testify/assert"
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 )
 
 func getNFields(n int) map[string]interface{} {

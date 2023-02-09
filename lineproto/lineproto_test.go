@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GuanceCloud/cliutils"
+	"github.com/GuanceCloud/cliutils/testutil"
 	"github.com/influxdata/influxdb1-client/models"
 	influxdb "github.com/influxdata/influxdb1-client/v2"
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/testutil"
 )
 
 func parseLineProto(t *testing.T, data []byte, precision string) (models.Points, error) {

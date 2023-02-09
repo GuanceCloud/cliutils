@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GuanceCloud/cliutils"
+	"github.com/GuanceCloud/cliutils/testutil"
 	influxdb "github.com/influxdata/influxdb1-client/v2"
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils/testutil"
 )
 
 func TestUnsafeBytesToString(t *testing.T) {

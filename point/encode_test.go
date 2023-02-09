@@ -11,9 +11,9 @@ import (
 	T "testing"
 	"time"
 
+	"github.com/GuanceCloud/cliutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.jiagouyun.com/cloudcare-tools/cliutils"
 	"google.golang.org/protobuf/proto"
 )
 
