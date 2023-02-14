@@ -13,6 +13,7 @@ import (
 	T "testing"
 	"time"
 
+	"github.com/influxdata/influxdb1-client/models"
 	"github.com/stretchr/testify/assert"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
@@ -181,9 +182,9 @@ func TestInfluxTags(t *T.T) {
 
 func TestPointLineProtocol(t *T.T) {
 	cases := []struct {
-		name   string
-		pt     *Point
-		pb     bool
+		name string
+		pt   *Point
+		//pb     bool
 		prec   Precision
 		expect string
 	}{
@@ -199,7 +200,7 @@ func TestPointLineProtocol(t *T.T) {
 				t.Logf("pt: %+#v", pt)
 				return pt
 			}(),
-			expect: "abc f1=1i 123",
+			expect: `abc f1=1i,status="unknown" 123`,
 		},
 
 		{
@@ -212,7 +213,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: "abc f1=1i 12",
+			expect: `abc f1=1i,status="unknown" 12`,
 		},
 
 		{
@@ -225,7 +226,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: "abc f1=1i 12345",
+			expect: `abc f1=1i,status="unknown" 12345`,
 		},
 
 		{
@@ -237,7 +238,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: "abc f1=1i 12345678",
+			expect: `abc f1=1i,status="unknown" 12345678`,
 		},
 
 		{
@@ -249,7 +250,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: "abc f1=1i 12345678",
+			expect: `abc f1=1i,status="unknown" 12345678`,
 		},
 
 		{
@@ -261,7 +262,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: "abc f1=1i 1",
+			expect: `abc f1=1i,status="unknown" 1`,
 		},
 
 		{
@@ -273,7 +274,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: "abc f1=1i 2",
+			expect: `abc f1=1i,status="unknown" 2`,
 		},
 
 		{
@@ -285,13 +286,13 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: "abc f1=1i 1", // 7199 not reached 2hour
+			expect: `abc f1=1i,status="unknown" 1`, // 7199 not reached 2hour
 		},
 
 		// pb point
 		{
 			name: "pb-point",
-			pb:   true,
+			//pb:   true,
 			prec: NS,
 			pt: func() *Point {
 				pt, err := NewPoint("abc",
@@ -309,7 +310,7 @@ func TestPointLineProtocol(t *T.T) {
 
 		{
 			name: "pb-point-with-binary-data",
-			pb:   true,
+			//pb:   true,
 			prec: NS,
 			pt: func() *Point {
 				pt, err := NewPoint("abc",
@@ -325,11 +326,28 @@ func TestPointLineProtocol(t *T.T) {
 			}(),
 			expect: `abc,t1=v1 f1="abc123" 1`,
 		},
+
+		{
+			name: `string-field-with-newline`,
+			prec: NS,
+			pt: NewPointV2([]byte(`abc`), append(NewTags(map[string]string{"tag1": "v1"}),
+				NewKVs(map[string]any{"f1": `message
+with
+new
+line`})...), WithTime(time.Unix(0, 123))),
+			expect: `abc,tag1=v1 f1="message
+with
+new
+line" 123`,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
 			assert.Equal(t, tc.expect, tc.pt.LineProto(tc.prec))
+
+			_, err := models.ParsePointsWithPrecision([]byte(tc.expect), time.Now(), "n")
+			assert.NoError(t, err)
 		})
 	}
 }

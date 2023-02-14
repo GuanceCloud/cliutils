@@ -904,6 +904,20 @@ abc f1=1i,f2=2,f3="abc" 789
 					time.Unix(0, 123)),
 			},
 		},
+
+		{
+			name: `parse-field-with-new-line`,
+			data: []byte(`abc f1="data
+with
+new
+line" 123`),
+			expect: []*influxdb.Point{
+				newPoint(`abc`, nil, map[string]any{`f1`: `data
+with
+new
+line`}, time.Unix(0, 123)),
+			},
+		},
 	}
 
 	for _, tc := range cases {
