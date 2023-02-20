@@ -17,17 +17,17 @@ func TestSyncEnv(t *testing.T) {
 	cases := []struct {
 		name   string
 		envs   map[string]string
-		expect *Option
+		expect *DiskCache
 	}{
 		{
 			name: "env_diskcache_max_data_size",
 			envs: map[string]string{
 				"ENV_DISKCACHE_MAX_DATA_SIZE": "123",
 			},
-			expect: func() *Option {
-				opt := defaultOpt()
-				opt.MaxDataSize = int64(123)
-				return opt
+			expect: func() *DiskCache {
+				c := defaultInstance()
+				c.maxDataSize = int32(123)
+				return c
 			}(),
 		},
 
@@ -38,12 +38,12 @@ func TestSyncEnv(t *testing.T) {
 				"ENV_DISKCACHE_BATCH_SIZE":    "234",
 				"ENV_DISKCACHE_CAPACITY":      "1.2",
 			},
-			expect: func() *Option {
-				opt := defaultOpt()
-				opt.MaxDataSize = int64(123)
-				opt.BatchSize = int64(234)
-				opt.Capacity = 0
-				return opt
+			expect: func() *DiskCache {
+				c := defaultInstance()
+				c.maxDataSize = int32(123)
+				c.batchSize = int64(234)
+				c.capacity = 0
+				return c
 			}(),
 		},
 
@@ -55,13 +55,13 @@ func TestSyncEnv(t *testing.T) {
 				"ENV_DISKCACHE_CAPACITY":      "1234567890",
 				"ENV_DISKCACHE_NO_SYNC":       "foo-bar",
 			},
-			expect: func() *Option {
-				opt := defaultOpt()
-				opt.MaxDataSize = int64(123)
-				opt.BatchSize = int64(234)
-				opt.Capacity = int64(1234567890)
-				opt.NoSync = true
-				return opt
+			expect: func() *DiskCache {
+				c := defaultInstance()
+				c.maxDataSize = int32(123)
+				c.batchSize = int64(234)
+				c.capacity = int64(1234567890)
+				c.noSync = true
+				return c
 			}(),
 		},
 	}
@@ -75,10 +75,10 @@ func TestSyncEnv(t *testing.T) {
 				}
 			}
 
-			opt := defaultOpt()
-			opt.syncEnv()
-			assert.Equal(t, fmt.Sprintf("%v", tc.expect), fmt.Sprintf("%v", opt))
-			t.Logf("opt: %+#v", tc.expect)
+			c := defaultInstance()
+			c.syncEnv()
+			assert.Equal(t, fmt.Sprintf("%v", tc.expect), fmt.Sprintf("%v", c))
+			t.Logf("c: %+#v", tc.expect)
 		})
 	}
 }

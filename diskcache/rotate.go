@@ -61,7 +61,7 @@ func (c *DiskCache) rotate() error {
 	c.dataFiles = append(c.dataFiles, newfile)
 	sort.Strings(c.dataFiles)
 
-	l.Debugf("+++++++++++++++++++++++ add datafile: %s => %s | %+#v",
+	l.Debugf("add datafile: %s => %s | %+#v",
 		c.curWriteFile, newfile, c.dataFiles)
 
 	// reopen new write file
@@ -94,7 +94,7 @@ func (c *DiskCache) removeCurrentReadingFile() error {
 
 	if len(c.dataFiles) > 0 {
 		c.dataFiles = c.dataFiles[1:] // first file removed
-		l.Debugf("----------------------- remove datafile: %s => %+#v",
+		l.Debugf("remove datafile: %s => %+#v",
 			c.curReadfile, c.dataFiles)
 	}
 

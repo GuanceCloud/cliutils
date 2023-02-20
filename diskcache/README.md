@@ -38,10 +38,15 @@ data
 ```golang
 import "github.com/GuanceCloud/diskcache"
 
-c, err := diskcache.Open(".TestDropBatch", &Option{
-	BatchSize: 4 * 1024 * 1024, // each cache file set to ~4MB
-	Capacity:  32 * 1024 * 1024, // max disk usge limited to ~32MB
-	}}
+// Create new cache under /some/path
+c, err := diskcache.Open(WithPath("/some/path"))
+
+// Create new cache under /some/path, set batch size to 4MB
+c, err := diskcache.Open(WithPath("/some/path"), WithBatchSize(4*1024*1024))
+
+// Create new cache under /some/path, set cache capacity to 1GB
+c, err := diskcache.Open(WithPath("/some/path"), WithCapacity(1024*1024*1024))
+
 if err != nil {
 	log.Printf(err)
 	return

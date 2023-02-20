@@ -22,9 +22,9 @@ func (c *DiskCache) switchNextFile() error {
 		c.curReadfile = c.dataFiles[0]
 	}
 
-	l.Debugf("&&&&&&&&&&&&&&&&&&&&&&& read datafile: %s => %+#v",
+	l.Debugf("read datafile: %s => %+#v",
 		c.curReadfile, c.dataFiles)
-	fd, err := os.OpenFile(c.curReadfile, os.O_RDONLY, c.opt.FilePerms)
+	fd, err := os.OpenFile(c.curReadfile, os.O_RDONLY, c.filePerms)
 	if err != nil {
 		return fmt.Errorf("under switchNextFile, OpenFile: %w, datafile: %+#v, ", err, c.dataFiles)
 	}
@@ -47,7 +47,7 @@ func (c *DiskCache) openWriteFile() error {
 	}
 
 	// write append fd, always write to the same-name file
-	wfd, err := os.OpenFile(c.curWriteFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, c.opt.FilePerms)
+	wfd, err := os.OpenFile(c.curWriteFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, c.filePerms)
 	if err != nil {
 		return fmt.Errorf("under openWriteFile, OpenFile: %w", err)
 	}

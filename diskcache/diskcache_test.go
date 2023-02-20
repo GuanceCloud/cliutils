@@ -18,7 +18,7 @@ import (
 
 func TestPutGet(t *testing.T) {
 	os.RemoveAll(".TestPutGet")
-	c, err := Open(".TestPutGet", nil)
+	c, err := Open(WithPath(".TestPutGet"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -38,14 +38,15 @@ func TestPutGet(t *testing.T) {
 	}); err != nil {
 		t.Logf("get: %s", err)
 	}
+
+	t.Logf("metric: %s", c.Metrics().LineProto())
 }
 
 func TestDropDuringGet(t *testing.T) {
 	os.RemoveAll(".TestDropDuringGet")
-	c, err := Open(".TestDropDuringGet", &Option{
-		BatchSize: 1 * 1024 * 1024,
-		Capacity:  2 * 1024 * 1024,
-	})
+	c, err := Open(WithPath(".TestDropDuringGet"),
+		WithBatchSize(1*1024*1024),
+		WithCapacity(2*1024*1024))
 	if err != nil {
 		t.Error(err)
 		return
@@ -102,14 +103,15 @@ func TestDropDuringGet(t *testing.T) {
 	}
 
 	wg.Wait()
+
+	t.Logf("metric: %s", c.Metrics().LineProto())
 }
 
 func TestDropBatch(t *testing.T) {
 	os.RemoveAll(".TestDropBatch")
-	c, err := Open(".TestDropBatch", &Option{
-		BatchSize: 4 * 1024 * 1024,
-		Capacity:  32 * 1024 * 1024,
-	})
+	c, err := Open(WithPath(".TestDropBatch"),
+		WithBatchSize(4*1024*1024),
+		WithCapacity(32*1024*1024))
 	if err != nil {
 		t.Error(err)
 		return
@@ -124,17 +126,18 @@ func TestDropBatch(t *testing.T) {
 		}
 
 		if c.droppedBatch > 3 {
-			return
+			break
 		}
 	}
+
+	t.Logf("metric: %s", c.Metrics().LineProto())
 }
 
 func TestConcurrentPutGet(t *testing.T) {
 	os.RemoveAll(".TestConcurrentPutGet")
-	c, err := Open(".TestConcurrentPutGet", &Option{
-		BatchSize: 4 * 1024 * 1024,
-		Capacity:  1024 * 1024 * 1024,
-	})
+	c, err := Open(WithPath(".TestConcurrentPutGet"),
+		WithBatchSize(4*1024*1024),
+		WithCapacity(1024*1024*1024))
 	if err != nil {
 		t.Error(err)
 		return
@@ -223,13 +226,13 @@ func TestConcurrentPutGet(t *testing.T) {
 	}
 
 	wg.Wait()
+
+	t.Logf("metric: %s", c.Metrics().LineProto())
 }
 
 func TestRotate(t *testing.T) {
 	os.RemoveAll(".TestRotate")
-	c, err := Open(".TestRotate", &Option{
-		BatchSize: 1024 * 1024, // 1MB
-	})
+	c, err := Open(WithPath(".TestRotate"), WithBatchSize(1024*1024))
 	if err != nil {
 		t.Error(err)
 		return
@@ -281,4 +284,6 @@ func TestRotate(t *testing.T) {
 	}
 
 	t.Logf("total read bytes: %d", readBytes)
+
+	t.Logf("metric: %s", c.Metrics().LineProto())
 }
