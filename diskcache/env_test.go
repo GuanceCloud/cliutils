@@ -6,7 +6,6 @@
 package diskcache
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
@@ -20,7 +19,7 @@ func TestSyncEnv(t *testing.T) {
 		expect *DiskCache
 	}{
 		{
-			name: "env_diskcache_max_data_size",
+			name: "env-diskcache-max-data-size",
 			envs: map[string]string{
 				"ENV_DISKCACHE_MAX_DATA_SIZE": "123",
 			},
@@ -32,7 +31,7 @@ func TestSyncEnv(t *testing.T) {
 		},
 
 		{
-			name: "env_bad_capacity",
+			name: "env-bad-capacity",
 			envs: map[string]string{
 				"ENV_DISKCACHE_MAX_DATA_SIZE": "123",
 				"ENV_DISKCACHE_BATCH_SIZE":    "234",
@@ -48,7 +47,7 @@ func TestSyncEnv(t *testing.T) {
 		},
 
 		{
-			name: "env_all",
+			name: "env-all",
 			envs: map[string]string{
 				"ENV_DISKCACHE_MAX_DATA_SIZE": "123",
 				"ENV_DISKCACHE_BATCH_SIZE":    "234",
@@ -77,8 +76,7 @@ func TestSyncEnv(t *testing.T) {
 
 			c := defaultInstance()
 			c.syncEnv()
-			assert.Equal(t, fmt.Sprintf("%v", tc.expect), fmt.Sprintf("%v", c))
-			t.Logf("c: %+#v", tc.expect)
+			assert.Equal(t, tc.expect.String(), c.String())
 		})
 	}
 }

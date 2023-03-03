@@ -8,11 +8,24 @@ package diskcache
 import (
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type CacheOption func(c *DiskCache)
 
-// WithBatchSize file size, default 64MB.
+// WithWakeup set duration on wakeup(default 3s), this wakeup time
+// used to shift current-writing-file to ready-to-reading-file.
+// NOTE: without wakeup, current-writing-file maybe not read-avaiable
+// for a long time.
+func WithWakeup(wakeup time.Duration) CacheOption {
+	return func(c *DiskCache) {
+		if int64(wakeup) > 0 {
+			c.wakeup = wakeup
+		}
+	}
+}
+
+// WithBatchSize set file size, default 64MB.
 func WithBatchSize(size int64) CacheOption {
 	return func(c *DiskCache) {
 		c.batchSize = size
@@ -30,6 +43,13 @@ func WithMaxDataSize(size int32) CacheOption {
 func WithCapacity(size int64) CacheOption {
 	return func(c *DiskCache) {
 		c.capacity = size
+	}
+}
+
+// WithExtraCapacity add capacity to existing cache.
+func WithExtraCapacity(size int64) CacheOption {
+	return func(c *DiskCache) {
+		c.capacity += size
 	}
 }
 

@@ -11,6 +11,45 @@ import (
 	"time"
 )
 
+// switch to next file remembered in .pos file
+func (c *DiskCache) loadUnfinishedFile() error {
+	if _, err := os.Stat(c.pos.fname); err != nil {
+		return nil // .pos file not exist
+	}
+
+	pos, err := posFromFile(c.pos.fname)
+	if err != nil {
+		return fmt.Errorf("posFromFile: %w", err)
+	}
+
+	// check file's healty
+	if _, err := os.Stat(string(pos.Name)); err != nil { // not exist
+		c.pos.reset()
+		return nil
+	}
+
+	// invalid .pos, ignored
+	if pos.Seek <= 0 {
+		return nil
+	}
+
+	fd, err := os.OpenFile(string(pos.Name), os.O_RDONLY, c.filePerms)
+	if err != nil {
+		return fmt.Errorf("OpenFile: %w", err)
+	}
+
+	if _, err := fd.Seek(pos.Seek, 0); err != nil {
+		return fmt.Errorf("Seek(%q: %d, 0): %w", pos.Name, pos.Seek, err)
+	}
+
+	c.rfd = fd
+	c.curReadfile = string(pos.Name)
+	c.pos.Name = pos.Name
+	c.pos.Seek = pos.Seek
+
+	return nil
+}
+
 // open next read file.
 func (c *DiskCache) switchNextFile() error {
 	c.rwlock.Lock()
@@ -22,14 +61,18 @@ func (c *DiskCache) switchNextFile() error {
 		c.curReadfile = c.dataFiles[0]
 	}
 
-	l.Debugf("read datafile: %s => %+#v",
-		c.curReadfile, c.dataFiles)
+	l.Debugf("read datafile: %s => %+#v", c.curReadfile, c.dataFiles)
 	fd, err := os.OpenFile(c.curReadfile, os.O_RDONLY, c.filePerms)
 	if err != nil {
 		return fmt.Errorf("under switchNextFile, OpenFile: %w, datafile: %+#v, ", err, c.dataFiles)
 	}
 
 	c.rfd = fd
+
+	c.pos.Name = []byte(c.curReadfile)
+	c.pos.Seek = 0
+	c.pos.dumpFile()
+
 	return nil
 }
 
