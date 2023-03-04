@@ -77,6 +77,14 @@ func TestSyncEnv(t *testing.T) {
 			c := defaultInstance()
 			c.syncEnv()
 			assert.Equal(t, tc.expect.String(), c.String())
+
+			t.Cleanup(func() {
+				for k, _ := range tc.envs {
+					if err := os.Unsetenv(k); err != nil {
+						t.Error(err)
+					}
+				}
+			})
 		})
 	}
 }

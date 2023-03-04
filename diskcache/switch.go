@@ -61,7 +61,7 @@ func (c *DiskCache) switchNextFile() error {
 		c.curReadfile = c.dataFiles[0]
 	}
 
-	l.Debugf("read datafile: %s => %+#v", c.curReadfile, c.dataFiles)
+	l.Debugf("read datafile: %s...", c.curReadfile)
 	fd, err := os.OpenFile(c.curReadfile, os.O_RDONLY, c.filePerms)
 	if err != nil {
 		return fmt.Errorf("under switchNextFile, OpenFile: %w, datafile: %+#v, ", err, c.dataFiles)

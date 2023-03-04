@@ -31,14 +31,6 @@ func (c *DiskCache) rotate() error {
 	// rotate file
 	var newfile string
 	if len(c.dataFiles) == 0 {
-		// Reset pos to avoid invalid position
-		//
-		// Why: here the filename roll back to zero(the new `data.000'), if the .pos remembered
-		// the old `data.000' seek position, and at the same time, c.Close() or process crashed,
-		// the .pos's seek is invalid(point to old data.000), it do not point the the new data.000.
-		//
-		// After reset, the .pos's Seek reset to -1 and destroyed.
-		c.pos.reset()
 		newfile = filepath.Join(c.path, fmt.Sprintf("data.%032d", 0)) // first rotate file
 	} else {
 		// parse last file's name, i.e., `data.000003', the new rotate file is `data.000004`
@@ -69,8 +61,7 @@ func (c *DiskCache) rotate() error {
 	c.dataFiles = append(c.dataFiles, newfile)
 	sort.Strings(c.dataFiles)
 
-	l.Debugf("add datafile: %s => %s | %+#v",
-		c.curWriteFile, newfile, c.dataFiles)
+	l.Debugf("add datafile: %s => %s", c.curWriteFile, newfile)
 
 	// reopen new write file
 	if err := c.openWriteFile(); err != nil {

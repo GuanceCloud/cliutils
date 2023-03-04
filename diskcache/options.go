@@ -28,28 +28,36 @@ func WithWakeup(wakeup time.Duration) CacheOption {
 // WithBatchSize set file size, default 64MB.
 func WithBatchSize(size int64) CacheOption {
 	return func(c *DiskCache) {
-		c.batchSize = size
+		if size > 0 {
+			c.batchSize = size
+		}
 	}
 }
 
 // WithMaxDataSize set max single data size, default 32MB.
 func WithMaxDataSize(size int32) CacheOption {
 	return func(c *DiskCache) {
-		c.maxDataSize = size
+		if size > 0 {
+			c.maxDataSize = size
+		}
 	}
 }
 
 // WithCapacity set cache capacity, default unlimited.
 func WithCapacity(size int64) CacheOption {
 	return func(c *DiskCache) {
-		c.capacity = size
+		if size > 0 {
+			c.capacity = size
+		}
 	}
 }
 
 // WithExtraCapacity add capacity to existing cache.
 func WithExtraCapacity(size int64) CacheOption {
 	return func(c *DiskCache) {
-		c.capacity += size
+		if c.capacity+size > 0 {
+			c.capacity += size
+		}
 	}
 }
 
@@ -77,7 +85,6 @@ func WithFilePermission(perms os.FileMode) CacheOption {
 // WithPath set disk dirname.
 func WithPath(x string) CacheOption {
 	return func(c *DiskCache) {
-		// TODO: check path here
 		c.path = filepath.Clean(x)
 	}
 }
