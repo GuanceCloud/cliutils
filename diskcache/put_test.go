@@ -16,6 +16,47 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func BenchmarkNosyncPutGet(b *T.B) {
+	p := b.TempDir()
+	c, err := Open(WithPath(p), WithNoSync(true), WithBatchSize(1024*1024*4), WithCapacity(4*1024*1024*1024))
+	require.NoError(b, err)
+
+	_1mb := make([]byte, 1024*1024)
+	_1kb := make([]byte, 1024)
+	_512kb := make([]byte, 1024*512)
+
+	b.Run(`put-1mb`, func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			c.Put(_1mb)
+		}
+	})
+
+	b.Run(`put-1kb`, func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			c.Put(_1kb)
+		}
+	})
+
+	b.Run(`put-512kb`, func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			c.Put(_512kb)
+		}
+	})
+
+	b.Run(`get`, func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			c.Get(func(_ []byte) error { return nil })
+		}
+	})
+
+	m := c.Metrics()
+	b.Logf(m.LineProto())
+
+	b.Cleanup(func() {
+		assert.NoError(b, c.Close())
+	})
+}
+
 func BenchmarkPutGet(b *T.B) {
 	p := b.TempDir()
 	c, err := Open(WithPath(p), WithBatchSize(1024*1024*4), WithCapacity(4*1024*1024*1024))

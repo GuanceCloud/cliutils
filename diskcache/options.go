@@ -62,6 +62,9 @@ func WithExtraCapacity(size int64) CacheOption {
 }
 
 // WithNoSync enable/disable sync on cache write.
+//
+// without sync, the write performace 60~80 times faster for 512KB/1MB put,
+// for smaller put will get more faster(1kb for 4000+ times).
 func WithNoSync(on bool) CacheOption {
 	return func(c *DiskCache) {
 		c.noSync = on
