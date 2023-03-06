@@ -15,7 +15,7 @@ type CacheOption func(c *DiskCache)
 
 // WithWakeup set duration on wakeup(default 3s), this wakeup time
 // used to shift current-writing-file to ready-to-reading-file.
-// NOTE: without wakeup, current-writing-file maybe not read-avaiable
+// NOTE: without wakeup, current-writing-file maybe not read-available
 // for a long time.
 func WithWakeup(wakeup time.Duration) CacheOption {
 	return func(c *DiskCache) {
@@ -63,7 +63,7 @@ func WithExtraCapacity(size int64) CacheOption {
 
 // WithNoSync enable/disable sync on cache write.
 //
-// without sync, the write performace 60~80 times faster for 512KB/1MB put,
+// without sync, the write performance 60~80 times faster for 512KB/1MB put,
 // for smaller put will get more faster(1kb for 4000+ times).
 func WithNoSync(on bool) CacheOption {
 	return func(c *DiskCache) {

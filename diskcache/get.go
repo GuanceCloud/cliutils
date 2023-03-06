@@ -21,9 +21,7 @@ type Fn func([]byte) error
 // Get is safe to call concurrently with other operations and will
 // block until all other operations finish.
 func (c *DiskCache) Get(fn Fn) error {
-	var (
-		nbytes int
-	)
+	var nbytes int
 
 	c.rlock.Lock()
 	defer c.rlock.Unlock()
@@ -38,7 +36,6 @@ func (c *DiskCache) Get(fn Fn) error {
 
 	// wakeup sleeping write file, rotate it for succession reading!
 	if time.Since(c.wfdCreated) > c.wakeup && c.curBatchSize > 0 {
-
 		l.Debugf("wakeup %s(%d bytes), global size: %d", c.curWriteFile, c.curBatchSize, c.size)
 
 		if err := func() error {
@@ -63,15 +60,9 @@ retry:
 
 	hdr := make([]byte, dataHeaderLen)
 	if n, err := c.rfd.Read(hdr); err != nil {
-		pos, _err := c.rfd.Seek(0, 1)
-		if _err != nil {
-			return fmt.Errorf("rfd.Seek: %w", _err)
-		}
-		return fmt.Errorf("rfd.Read(%s/pos: %d): %w", c.curReadfile, pos, err)
-
-		if n != dataHeaderLen {
-			return ErrBadHeader
-		}
+		return fmt.Errorf("rfd.Read(%s): %w", c.curReadfile, err)
+	} else if n != dataHeaderLen {
+		return ErrBadHeader
 	}
 
 	nbytes = int(binary.LittleEndian.Uint32(hdr[0:]))
@@ -99,7 +90,7 @@ retry:
 
 	if n, err := c.rfd.Read(databuf); err != nil {
 		return err
-	} else if n != int(nbytes) {
+	} else if n != nbytes {
 		return ErrUnexpectedReadSize
 	}
 

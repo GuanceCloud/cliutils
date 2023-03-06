@@ -14,7 +14,6 @@ import (
 )
 
 func TestPutGet(t *T.T) {
-
 	t.Run(`clean-pos-on-eof`, func(t *T.T) {
 		p := t.TempDir()
 		c, err := Open(WithPath(p))

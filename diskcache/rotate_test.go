@@ -63,7 +63,6 @@ func TestX(t *T.T) {
 }
 
 func TestRotate(t *T.T) {
-
 	t.Run("rotate", func(t *T.T) {
 		p := t.TempDir()
 		c, err := Open(WithPath(p), WithBatchSize(1024*1024))

@@ -157,7 +157,9 @@ func (c *DiskCache) Close() error {
 	}
 
 	if c.flock != nil {
-		c.flock.Unlock()
+		if err := c.flock.Unlock(); err != nil {
+			l.Errorf("Unlock: %s, ignored", err)
+		}
 	}
 
 	if c.wfd != nil {

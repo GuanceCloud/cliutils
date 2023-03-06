@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 )
 
 type pos struct {
@@ -26,7 +27,7 @@ func (p *pos) String() string {
 }
 
 func posFromFile(fname string) (*pos, error) {
-	bin, err := ioutil.ReadFile(fname)
+	bin, err := ioutil.ReadFile(filepath.Clean(fname))
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +82,7 @@ func (p *pos) dumpFile() error {
 	if data, err := p.MarshalBinary(); err != nil {
 		return err
 	} else {
-		return ioutil.WriteFile(p.fname, data, 0600)
+		return ioutil.WriteFile(p.fname, data, 0o600)
 	}
 }
 

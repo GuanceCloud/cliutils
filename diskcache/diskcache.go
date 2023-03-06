@@ -81,13 +81,11 @@ type DiskCache struct {
 }
 
 func (c *DiskCache) String() string {
-
 	c.rwlock.Lock()
 	defer c.rwlock.Unlock()
 
-	n := len(c.dataFiles)
-
-	if n > 10 {
+	// if there too many files(>10), only print file count
+	if n := len(c.dataFiles); n > 10 {
 		return fmt.Sprintf("%s/[size: %d][files: %d][maxDataSize: %d][batchSize: %d][capacity: %d][dataFiles: %d]",
 			c.path, c.size, len(c.dataFiles), c.maxDataSize, c.batchSize, c.capacity, n,
 		)

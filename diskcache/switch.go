@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// switch to next file remembered in .pos file
+// switch to next file remembered in .pos file.
 func (c *DiskCache) loadUnfinishedFile() error {
 	if _, err := os.Stat(c.pos.fname); err != nil {
 		return nil // .pos file not exist
@@ -24,7 +24,10 @@ func (c *DiskCache) loadUnfinishedFile() error {
 
 	// check file's healty
 	if _, err := os.Stat(string(pos.Name)); err != nil { // not exist
-		c.pos.reset()
+		if err := c.pos.reset(); err != nil {
+			l.Errorf("pos.reset: %s, ignored", err)
+		}
+
 		return nil
 	}
 
@@ -71,7 +74,9 @@ func (c *DiskCache) switchNextFile() error {
 
 	c.pos.Name = []byte(c.curReadfile)
 	c.pos.Seek = 0
-	c.pos.dumpFile()
+	if err := c.pos.dumpFile(); err != nil {
+		return err
+	}
 
 	return nil
 }
