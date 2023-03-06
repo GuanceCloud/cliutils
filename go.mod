@@ -19,7 +19,7 @@ require (
 	github.com/tidwall/wal v1.1.7
 	go.uber.org/zap v1.15.0
 	golang.org/x/net v0.0.0-20220722155237-a158d28d115b
-	golang.org/x/sys v0.0.0-20220825204002-c680a09ffe64
+	golang.org/x/sys v0.5.0
 	gopkg.in/CodapeWild/dd-trace-go.v1 v1.35.17
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
@@ -39,6 +39,7 @@ require (
 	github.com/go-playground/validator/v10 v10.4.1 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
+	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/influxdata/line-protocol/v2 v2.2.1 // indirect

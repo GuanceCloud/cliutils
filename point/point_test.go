@@ -184,7 +184,7 @@ func TestPointLineProtocol(t *T.T) {
 	cases := []struct {
 		name string
 		pt   *Point
-		//pb     bool
+
 		prec   Precision
 		expect string
 	}{
@@ -292,7 +292,7 @@ func TestPointLineProtocol(t *T.T) {
 		// pb point
 		{
 			name: "pb-point",
-			//pb:   true,
+			// pb:   true,
 			prec: NS,
 			pt: func() *Point {
 				pt, err := NewPoint("abc",
@@ -310,7 +310,7 @@ func TestPointLineProtocol(t *T.T) {
 
 		{
 			name: "pb-point-with-binary-data",
-			//pb:   true,
+			// pb:   true,
 			prec: NS,
 			pt: func() *Point {
 				pt, err := NewPoint("abc",
