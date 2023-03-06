@@ -6,8 +6,6 @@
 package diskcache
 
 import (
-	"fmt"
-
 	"github.com/GuanceCloud/cliutils/point"
 )
 
@@ -17,8 +15,7 @@ func (c *DiskCache) Metrics() *point.Point {
 	defer c.rlock.Unlock()
 
 	tags := map[string]string{
-		"path":   c.path,
-		"nosync": fmt.Sprintf("%v", c.noSync),
+		"path": c.path,
 	}
 
 	gcnt, pcnt := c.getCount, c.putCount
@@ -31,20 +28,20 @@ func (c *DiskCache) Metrics() *point.Point {
 	}
 
 	fields := map[string]any{
-		"size":           c.size,
-		"data_files":     len(c.dataFiles),
 		"cur_batch_size": c.curBatchSize,
-		"rotate_count":   c.rotateCount,
+		"data_files":     len(c.dataFiles),
 		"dropped_batch":  c.droppedBatch,
 		"get":            c.getCount,
-		"put":            c.putCount,
 		"get_bytes":      c.getBytes,
-		"nosync":         c.noSync,
-		"nopos":          c.noPos,
-		"nolock":         c.noLock,
-		"put_bytes":      c.putBytes,
 		"get_cost_avg":   c.getCost / int64(gcnt),
+		"nolock":         c.noLock,
+		"nopos":          c.noPos,
+		"nosync":         c.noSync,
+		"put":            c.putCount,
+		"put_bytes":      c.putBytes,
 		"put_cost_avg":   c.putCost / int64(pcnt),
+		"rotate_count":   c.rotateCount,
+		"size":           c.size,
 	}
 
 	return point.NewPointV2([]byte("diskcache"),

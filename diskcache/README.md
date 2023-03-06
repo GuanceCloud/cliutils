@@ -86,3 +86,32 @@ log.Println(m.LineProto()) // get line-protocol format of metrics
 | ENV_DISKCACHE_NO_SYNC       | 禁用磁盘写入的 sync 同步，默认不开启。一旦开启，可能导致磁盘数据丢失问题                    |
 | ENV_DISKCACHE_NO_LOCK       | 禁用文件目录夹锁。默认是加锁状态，一旦不加锁，在同一个目录多开（`Open`）可能导致文件混乱    |
 | ENV_DISKCACHE_NO_POS        | 禁用磁盘写入位置记录，默认带有位置记录。一旦不记录，程序重启会导致部分数据重复消费（`Get`） |
+
+## Cache 指标
+
+指标集名称 `diskcache`
+
+### Tags
+
+| Tag | Descrition |
+|--- |--- |
+| `path` | Cache 目录 |
+
+### Metrics
+
+| Metric           | Descrition                                                                 | Type | Unit  |
+|---               | --- |--- |--- |
+| `cur_batch_size` | batch 大小                                                                 | int  | B     |
+| `data_files`     | 当前未消费（Get()）文件个数                                                | int  | count |
+| `dropped_batch`  | 因达到最大存储大小而丢弃的文件次数（也即文件个数，一次只会 drop 一个文件） | int  | count |
+| `get`            | `Get` 次数                                                                 | int  | count |
+| `get_bytes`      | `Get` 返回的总字节数                                                       | int  | B     |
+| `get_cost_avg`   | `Get` 平均耗时                                                             | int  | ns    |
+| `nolock`         | .lock 开关状态                                                             | bool | -     |
+| `nopos`          | .pos 开关状态                                                              | bool | -     |
+| `nosync`         | 是否每次写入都执行 sync                                                    | bool | -     |
+| `put`            | `Put` 次数                                                                 | int  | count |
+| `put_bytes`      | `Put` 总字节数                                                             | int  | B     |
+| `put_cost_avg`   | `Put` 平均耗时                                                             | int  | ns    |
+| `rotate_count`   | rotate 次数（每个分片文件写完即 rotate 一次）                              | int  | count |
+| `size`           | 当前 cache 总大小，含 *data* 文件以及其它未读取文件（*data.000..*）        | int  | B     |
