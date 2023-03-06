@@ -72,10 +72,12 @@ func (c *DiskCache) switchNextFile() error {
 
 	c.rfd = fd
 
-	c.pos.Name = []byte(c.curReadfile)
-	c.pos.Seek = 0
-	if err := c.pos.dumpFile(); err != nil {
-		return err
+	if !c.noPos {
+		c.pos.Name = []byte(c.curReadfile)
+		c.pos.Seek = 0
+		if err := c.pos.dumpFile(); err != nil {
+			return err
+		}
 	}
 
 	return nil

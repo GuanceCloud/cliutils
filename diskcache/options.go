@@ -13,6 +13,24 @@ import (
 
 type CacheOption func(c *DiskCache)
 
+// WithNoLock set .lock on or off.
+// .lock used to exclude Open() on same path.
+func WithNoLock(on bool) CacheOption {
+	return func(c *DiskCache) {
+		c.noLock = on
+	}
+}
+
+// WithNoPos set .pos on or off.
+// .pos used to remember last Get position of cache, without
+// .pos, if process stop and restart, some already-Get data will
+// re-Get in the new process.
+func WithNoPos(on bool) CacheOption {
+	return func(c *DiskCache) {
+		c.noPos = on
+	}
+}
+
 // WithWakeup set duration on wakeup(default 3s), this wakeup time
 // used to shift current-writing-file to ready-to-reading-file.
 // NOTE: without wakeup, current-writing-file maybe not read-available

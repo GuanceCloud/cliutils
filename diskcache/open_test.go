@@ -8,6 +8,7 @@ package diskcache
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	T "testing"
 	"time"
 
@@ -15,7 +16,52 @@ import (
 )
 
 func TestOpen(t *T.T) {
-	t.Run("open-with-flock", func(t *T.T) {
+
+	t.Run("reopen-with-or-without-pos", func(t *T.T) {
+		p := t.TempDir()
+
+		// lock then no-lock
+		c, err := Open(WithPath(p))
+		assert.NoError(t, err)
+		assert.NoError(t, c.Close())
+
+		c2, err := Open(WithPath(p), WithNoPos(true))
+		assert.NoError(t, err)
+		assert.NoError(t, c2.Close())
+
+		// no-lock then lock
+		c, err = Open(WithPath(p), WithNoPos(true))
+		assert.NoError(t, err)
+		assert.NoError(t, c.Close())
+
+		c2, err = Open(WithPath(p))
+		assert.NoError(t, err)
+		assert.NoError(t, c2.Close())
+	})
+
+	t.Run("reopen-with-or-without-lock", func(t *T.T) {
+		p := t.TempDir()
+
+		// lock then no-lock
+		c, err := Open(WithPath(p))
+		assert.NoError(t, err)
+		assert.NoError(t, c.Close())
+
+		c2, err := Open(WithPath(p), WithNoLock(true))
+		assert.NoError(t, err)
+		assert.NoError(t, c2.Close())
+
+		// no-lock then lock
+		c, err = Open(WithPath(p), WithNoLock(true))
+		assert.NoError(t, err)
+		assert.NoError(t, c.Close())
+
+		c2, err = Open(WithPath(p))
+		assert.NoError(t, err)
+		assert.NoError(t, c2.Close())
+	})
+
+	t.Run("open-with-lock", func(t *T.T) {
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
 		assert.NoError(t, err)
@@ -54,15 +100,16 @@ func TestOpen(t *T.T) {
 
 		// hold the cache for 5 seconds
 		go func() {
-			time.Sleep(time.Second * 5)
+			time.Sleep(time.Second * 2)
 			assert.NoError(t, c.Close())
+			t.Logf("c Closed")
 		}()
 
 		var c2 *DiskCache
 		for { // retry until ok
 			c2, err = Open(WithPath(p))
 			if err != nil {
-				t.Logf("[expected] Open: %q", err)
+				t.Logf("[expected] Open: %q, path: %s", err, p)
 				time.Sleep(time.Second)
 			} else {
 				break
@@ -71,9 +118,31 @@ func TestOpen(t *T.T) {
 
 		t.Cleanup(func() {
 			assert.NoError(t, c2.Close())
-			os.RemoveAll(p)
 		})
 	})
+
+	t.Run("multi-open-wihout-lock", func(t *T.T) {
+		p := t.TempDir()
+		c, err := Open(WithPath(p), WithNoLock(true))
+		assert.NoError(t, err)
+
+		var wg sync.WaitGroup
+
+		wg.Add(1)
+		// hold the cache for 5 seconds
+		go func() {
+			defer wg.Done()
+			time.Sleep(time.Second * 5)
+			assert.NoError(t, c.Close())
+		}()
+
+		c2, err := Open(WithPath(p), WithNoLock(true))
+		assert.NoError(t, err) // no error on re-Open() without lock
+		defer c2.Close()
+
+		wg.Wait()
+	})
+
 }
 
 func TestClose(t *T.T) {

@@ -6,6 +6,7 @@
 package diskcache
 
 import (
+	"errors"
 	"os"
 	T "testing"
 
@@ -65,6 +66,67 @@ func TestPutGet(t *T.T) {
 			c.Close()
 			os.RemoveAll(p)
 		})
+	})
+
+	t.Run(`get-without-pos`, func(t *T.T) {
+		p := t.TempDir()
+
+		kbdata := make([]byte, 1024)
+
+		c, err := Open(WithPath(p), WithNoPos(true))
+		assert.NoError(t, err)
+
+		for i := 0; i < 10; i++ { // write 10kb
+			require.NoError(t, c.Put(kbdata), "cache: %s", c)
+		}
+
+		// force rotate
+		assert.NoError(t, c.rotate())
+
+		// read 2 cache
+		assert.NoError(t, c.Get(func(data []byte) error {
+			assert.Len(t, data, len(kbdata))
+			return nil
+		}))
+
+		assert.NoError(t, c.Get(func(data []byte) error {
+			assert.Len(t, data, len(kbdata))
+			return nil
+		}))
+
+		// close the cache for next re-Open()
+		assert.NoError(t, c.Close())
+
+		m := c.Metrics()
+		t.Logf("metric: %s", m.LineProto())
+		t.Logf("cache: %s", c)
+
+		c2, err := Open(WithPath(p), WithNoPos(true))
+		assert.NoError(t, err)
+		defer c2.Close()
+
+		require.Lenf(t, c2.dataFiles, 1, "cache: %s", c2)
+
+		var ncached int
+		for {
+			if err := c2.Get(func(_ []byte) error {
+				ncached++
+				return nil
+			}); err != nil {
+				if errors.Is(err, ErrEOF) {
+					t.Logf("cache EOF")
+					break
+				} else {
+					assert.NoError(t, err)
+				}
+			}
+		}
+
+		m = c2.Metrics()
+		t.Logf("metric: %s", m.LineProto())
+
+		// without .pos, still got 10 cache
+		assert.Equal(t, 10, ncached, "cache: %s", c2)
 	})
 
 	t.Run(`get-with-pos`, func(t *T.T) {

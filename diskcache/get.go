@@ -73,9 +73,11 @@ retry:
 		}
 
 		// clear .pos
-		if err := c.pos.reset(); err != nil {
-			l.Errorf("pos reset: %s", err)
-			return err
+		if !c.noPos {
+			if err := c.pos.reset(); err != nil {
+				l.Errorf("pos reset: %s", err)
+				return err
+			}
 		}
 
 		// reopen next file to read
@@ -95,9 +97,11 @@ retry:
 	}
 
 	// update seek position
-	c.pos.Seek += int64(dataHeaderLen + nbytes)
-	if err := c.pos.dumpFile(); err != nil {
-		return err
+	if !c.noPos {
+		c.pos.Seek += int64(dataHeaderLen + nbytes)
+		if err := c.pos.dumpFile(); err != nil {
+			return err
+		}
 	}
 
 	if fn != nil {

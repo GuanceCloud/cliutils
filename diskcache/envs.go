@@ -32,4 +32,8 @@ func (c *DiskCache) syncEnv() {
 	if v, ok := os.LookupEnv("ENV_DISKCACHE_NO_SYNC"); ok && v != "" {
 		c.noSync = true
 	}
+
+	if v, ok := os.LookupEnv("ENV_DISKCACHE_NO_POS"); ok && v != "" {
+		c.noPos = true
+	}
 }

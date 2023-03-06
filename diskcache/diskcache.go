@@ -66,7 +66,9 @@ type DiskCache struct {
 	dirPerms, filePerms os.FileMode
 
 	// NoSync if enabled, may cause data missing, default false
-	noSync bool
+	noSync,
+	noPos,
+	noLock bool
 
 	// metrics related
 	rotateCount,
@@ -86,12 +88,12 @@ func (c *DiskCache) String() string {
 
 	// if there too many files(>10), only print file count
 	if n := len(c.dataFiles); n > 10 {
-		return fmt.Sprintf("%s/[size: %d][files: %d][maxDataSize: %d][batchSize: %d][capacity: %d][dataFiles: %d]",
-			c.path, c.size, len(c.dataFiles), c.maxDataSize, c.batchSize, c.capacity, n,
+		return fmt.Sprintf("%s/[size: %d][nosync: %v][nopos: %v][files: %d][maxDataSize: %d][batchSize: %d][capacity: %d][dataFiles: %d]",
+			c.path, c.size, c.noSync, c.noPos, len(c.dataFiles), c.maxDataSize, c.batchSize, c.capacity, n,
 		)
 	} else {
-		return fmt.Sprintf("%s/[size: %d][files: %d][maxDataSize: %d][batchSize: %d][capacity: %d][dataFiles: %v]",
-			c.path, c.size, len(c.dataFiles), c.maxDataSize, c.batchSize, c.capacity, c.dataFiles,
+		return fmt.Sprintf("%s/[size: %d][nosync: %v][nopos: %v][files: %d][maxDataSize: %d][batchSize: %d][capacity: %d][dataFiles: %v]",
+			c.path, c.size, c.noSync, c.noPos, len(c.dataFiles), c.maxDataSize, c.batchSize, c.capacity, c.dataFiles,
 		)
 	}
 }

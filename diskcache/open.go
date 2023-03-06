@@ -84,18 +84,22 @@ func (c *DiskCache) doOpen() error {
 	}
 
 	// disable open multiple times
-	fl := flock.New(filepath.Join(c.path, ".lock"))
-	if ok, err := fl.TryLock(); err != nil {
-		return err
-	} else {
-		if !ok {
-			return fmt.Errorf("lock failed")
+	if !c.noLock {
+		fl := flock.New(filepath.Join(c.path, ".lock"))
+		if ok, err := fl.TryLock(); err != nil {
+			return fmt.Errorf("TryLock: %w", err)
+		} else {
+			if !ok {
+				return fmt.Errorf("lock failed")
+			}
+			c.flock = fl
 		}
-		c.flock = fl
 	}
 
-	// use `.pos' file to remember the reading position.
-	c.pos.fname = filepath.Join(c.path, ".pos")
+	if !c.noPos {
+		// use `.pos' file to remember the reading position.
+		c.pos.fname = filepath.Join(c.path, ".pos")
+	}
 	c.curWriteFile = filepath.Join(c.path, "data")
 
 	c.syncEnv()
@@ -106,35 +110,39 @@ func (c *DiskCache) doOpen() error {
 	}
 
 	// list files under @path
-	arr := []string{}
-	if err := filepath.Walk(c.path, func(path string, fi os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+	if err := filepath.Walk(c.path,
+		func(path string, fi os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
 
-		if fi.IsDir() {
+			if fi.IsDir() {
+				return nil
+			}
+
+			switch filepath.Base(path) {
+			case ".lock", ".pos", "data": // ignore them
+			default:
+				l.Infof("find file %s", path)
+				c.size += fi.Size()
+				c.dataFiles = append(c.dataFiles, path)
+			}
+
 			return nil
-		}
-
-		c.size += fi.Size()
-
-		arr = append(arr, path)
-		return nil
-	}); err != nil {
+		}); err != nil {
 		return err
 	}
 
-	sort.Strings(arr)
-	if len(arr) > 1 && arr[0] == c.curWriteFile {
-		c.dataFiles = arr[1:] // ignore first writing file, we do not read file `data` if data.000001/0000002/... exists
-	}
+	sort.Strings(c.dataFiles) // make file-name sorted for FIFO Get()
 
 	// first get, try load .pos
-	if err := c.loadUnfinishedFile(); err != nil {
-		l.Errorf("load history faied: %s", err)
-		return err
-	} else {
-		l.Infof("load pos %s", c.pos)
+	if !c.noPos {
+		if err := c.loadUnfinishedFile(); err != nil {
+			l.Errorf("load history faied: %s", err)
+			return err
+		} else {
+			l.Infof("load pos %s", c.pos)
+		}
 	}
 
 	l.Infof("init %d datafiles", len(c.dataFiles))
@@ -156,9 +164,11 @@ func (c *DiskCache) Close() error {
 		c.rfd = nil
 	}
 
-	if c.flock != nil {
-		if err := c.flock.Unlock(); err != nil {
-			l.Errorf("Unlock: %s, ignored", err)
+	if !c.noLock {
+		if c.flock != nil {
+			if err := c.flock.Unlock(); err != nil {
+				l.Errorf("Unlock: %s, ignored", err)
+			}
 		}
 	}
 

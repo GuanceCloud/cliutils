@@ -53,6 +53,7 @@ func TestSyncEnv(t *testing.T) {
 				"ENV_DISKCACHE_BATCH_SIZE":    "234",
 				"ENV_DISKCACHE_CAPACITY":      "1234567890",
 				"ENV_DISKCACHE_NO_SYNC":       "foo-bar",
+				"ENV_DISKCACHE_NO_POS":        "on",
 			},
 			expect: func() *DiskCache {
 				c := defaultInstance()
@@ -60,6 +61,7 @@ func TestSyncEnv(t *testing.T) {
 				c.batchSize = int64(234)
 				c.capacity = int64(1234567890)
 				c.noSync = true
+				c.noPos = true
 				return c
 			}(),
 		},
