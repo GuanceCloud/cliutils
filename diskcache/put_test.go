@@ -226,6 +226,8 @@ func TestPutOnCapacityReached(t *T.T) {
 
 		m := c.Metrics()
 		t.Logf("metric: %s", m.LineProto())
+		fs := m.Fields()
+		assert.True(t, fs.Get([]byte(`dropped_batch`)).GetI() > 0)
 	})
 
 	t.Run(`reach-capacity-concurrent-put`, func(t *T.T) {
@@ -275,5 +277,7 @@ func TestPutOnCapacityReached(t *T.T) {
 
 		m := c.Metrics()
 		t.Logf("metric: %s", m.LineProto())
+		fs := m.Fields()
+		assert.True(t, fs.Get([]byte(`dropped_batch`)).GetI() > 0)
 	})
 }
