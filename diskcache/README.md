@@ -93,8 +93,8 @@ log.Println(m.LineProto()) // get line-protocol format of metrics
 
 ### Tags
 
-| Tag | Descrition |
-|--- |--- |
+| Tag    | Descrition |
+| ---    | ---        |
 | `path` | Cache 目录 |
 
 ### Metrics
