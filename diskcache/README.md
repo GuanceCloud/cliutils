@@ -93,15 +93,16 @@ log.Println(m.LineProto()) // get line-protocol format of metrics
 
 ### Tags
 
-| Tag | Descrition |
-|--- |--- |
+| Tag    | Descrition |
+| ---    | ---        |
 | `path` | Cache 目录 |
 
 ### Metrics
 
 | Metric           | Descrition                                                                 | Type | Unit  |
-|---               | --- |--- |--- |
-| `cur_batch_size` | batch 大小                                                                 | int  | B     |
+| ---              | ---                                                                        | ---  | ---   |
+| `batch_size`     | batch 大小                                                                 | int  | B     |
+| `cur_batch_size` | 当前写入文件的大小                                                         | int  | B     |
 | `data_files`     | 当前未消费（Get()）文件个数                                                | int  | count |
 | `dropped_batch`  | 因达到最大存储大小而丢弃的文件次数（也即文件个数，一次只会 drop 一个文件） | int  | count |
 | `get`            | `Get` 次数                                                                 | int  | count |
@@ -115,3 +116,20 @@ log.Println(m.LineProto()) // get line-protocol format of metrics
 | `put_cost_avg`   | `Put` 平均耗时                                                             | int  | ns    |
 | `rotate_count`   | rotate 次数（每个分片文件写完即 rotate 一次）                              | int  | count |
 | `size`           | 当前 cache 总大小，含 *data* 文件以及其它未读取文件（*data.000..*）        | int  | B     |
+
+## 性能估算
+
+测试环境：
+
+- Model Name            : MacBook Pro
+- Model Identifier      : MacBookPro18,1
+- Chip                  : Apple M1 Pro
+- Total Number of Cores : 10 (8 performance and 2 efficiency)
+- Memory                : 16 GB
+
+目前大概测试下来，只写入情况，单线程写入和单线程写入的性能差不多（只有写入，没有读取），分别写入 3kb 和 1MB 大小的数据，其写入能达到 25MB 左右。但是混合情况下的多线程读写，写入性能急剧下降，只有 1.8MB 不到，读取性能只有 2MB 左右。
+
+## 后续改进预案
+
+- [ ] 支持一次 `Get()/Put()` 多个数据，提高加锁的数据吞吐量
+- [ ] 支持 `Get()` 出错时重试机制（`WithErrorRetry(n)`）
