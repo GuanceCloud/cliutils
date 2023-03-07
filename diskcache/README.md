@@ -100,8 +100,9 @@ log.Println(m.LineProto()) // get line-protocol format of metrics
 ### Metrics
 
 | Metric           | Descrition                                                                 | Type | Unit  |
-|---               | --- |--- |--- |
-| `cur_batch_size` | batch 大小                                                                 | int  | B     |
+| ---              | ---                                                                        | ---  | ---   |
+| `batch_size`     | batch 大小                                                                 | int  | B     |
+| `cur_batch_size` | 当前写入文件的大小                                                         | int  | B     |
 | `data_files`     | 当前未消费（Get()）文件个数                                                | int  | count |
 | `dropped_batch`  | 因达到最大存储大小而丢弃的文件次数（也即文件个数，一次只会 drop 一个文件） | int  | count |
 | `get`            | `Get` 次数                                                                 | int  | count |

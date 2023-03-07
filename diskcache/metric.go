@@ -28,6 +28,7 @@ func (c *DiskCache) Metrics() *point.Point {
 	}
 
 	fields := map[string]any{
+		"batch_size":     c.batchSize,
 		"cur_batch_size": c.curBatchSize,
 		"data_files":     len(c.dataFiles),
 		"dropped_batch":  c.droppedBatch,

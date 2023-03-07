@@ -6,9 +6,9 @@
 package diskcache
 
 import (
-	"bytes"
 	"errors"
 	"sync"
+	"sync/atomic"
 	T "testing"
 	"time"
 
@@ -99,15 +99,17 @@ func BenchmarkPutGet(b *T.B) {
 }
 
 func TestConcurrentPutGet(t *T.T) {
-	p := t.TempDir()
-	c, err := Open(WithPath(p), WithBatchSize(4*1024*1024), WithCapacity(1024*1024*1024))
+	var (
+		p      = t.TempDir()
+		mb     = int64(1024 * 1024)
+		sample = make([]byte, 5*7351)
+		eof    = 0
+	)
+
+	c, err := Open(WithPath(p), WithBatchSize(4*mb), WithCapacity(128*mb))
 	assert.NoError(t, err)
 
 	defer c.Close()
-
-	t.Logf("files: %+#v", c.dataFiles)
-
-	sample := bytes.Repeat([]byte("hello"), 7351)
 
 	wg := sync.WaitGroup{}
 	concurrency := 4
@@ -140,7 +142,6 @@ func TestConcurrentPutGet(t *T.T) {
 		go fnPut(i)
 	}
 
-	eof := 0
 	fnGet := func(idx int) {
 		defer wg.Done()
 		nget := 0
@@ -187,5 +188,92 @@ func TestConcurrentPutGet(t *T.T) {
 	t.Logf("metric: %s", c.Metrics().LineProto())
 	t.Cleanup(func() {
 		assert.NoError(t, c.Close())
+	})
+}
+
+func TestPutOnCapacityReached(t *T.T) {
+	t.Run(`reach-capacity-single-put`, func(t *T.T) {
+		var (
+			mb       = int64(1024 * 1024)
+			p        = t.TempDir()
+			capacity = 32 * mb
+			large    = make([]byte, mb)
+			small    = make([]byte, 1024*3)
+			maxPut   = 4 * capacity
+		)
+
+		t.Logf("path: %s", p)
+
+		c, err := Open(WithPath(p), WithCapacity(capacity), WithBatchSize(4*mb))
+		assert.NoError(t, err)
+
+		defer c.Close()
+
+		n := 0
+		for {
+			switch n % 2 {
+			case 0:
+				c.Put(small)
+			case 1:
+				c.Put(large)
+			}
+			n++
+
+			if c.putBytes > maxPut {
+				break
+			}
+		}
+
+		m := c.Metrics()
+		t.Logf("metric: %s", m.LineProto())
+	})
+
+	t.Run(`reach-capacity-concurrent-put`, func(t *T.T) {
+		var (
+			mb       = int64(1024 * 1024)
+			p        = t.TempDir()
+			capacity = 128 * mb
+			large    = make([]byte, mb)
+			small    = make([]byte, 1024*3)
+			maxPut   = 4 * capacity
+			wg       sync.WaitGroup
+		)
+
+		t.Logf("path: %s", p)
+
+		c, err := Open(WithPath(p), WithCapacity(capacity), WithBatchSize(4*mb))
+		assert.NoError(t, err)
+
+		defer c.Close()
+
+		total := int64(0)
+
+		wg.Add(10)
+		for i := 0; i < 10; i++ {
+			go func() {
+				defer wg.Done()
+				n := 0
+				for {
+					switch n % 2 {
+					case 0:
+						c.Put(small)
+						atomic.AddInt64(&total, 1024*3)
+					case 1:
+						c.Put(large)
+						atomic.AddInt64(&total, mb)
+					}
+					n++
+
+					if atomic.LoadInt64(&total) > maxPut {
+						return
+					}
+				}
+			}()
+		}
+
+		wg.Wait()
+
+		m := c.Metrics()
+		t.Logf("metric: %s", m.LineProto())
 	})
 }

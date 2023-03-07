@@ -31,7 +31,9 @@ func (c *DiskCache) Get(fn Fn) error {
 	c.getCount++
 	defer func() {
 		c.getCost += int64(time.Since(start))
-		c.getBytes += int64(nbytes)
+		if nbytes != EOFHint {
+			c.getBytes += int64(nbytes)
+		}
 	}()
 
 	// wakeup sleeping write file, rotate it for succession reading!
