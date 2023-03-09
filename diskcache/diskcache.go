@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils/logger"
-	"github.com/gofrs/flock"
 )
 
 const (
@@ -53,9 +52,7 @@ type DiskCache struct {
 	wlock, // used to exclude concurrent Put.
 	rlock *sync.Mutex // used to exclude concurrent Get.
 	rwlock *sync.Mutex // used to exclude switch/rotate/drop/Close
-
-	flock *flock.Flock
-	pos   *pos
+	pos *pos
 
 	curBatchSize,
 	batchSize,
