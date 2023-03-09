@@ -31,7 +31,7 @@ func (c *DiskCache) Get(fn Fn) error {
 	c.getCount++
 	defer func() {
 		c.getCost += int64(time.Since(start))
-		if nbytes != EOFHint {
+		if uint32(nbytes) != EOFHint {
 			c.getBytes += int64(nbytes)
 		}
 	}()
@@ -69,7 +69,7 @@ retry:
 
 	nbytes = int(binary.LittleEndian.Uint32(hdr[0:]))
 
-	if nbytes == EOFHint { // EOF
+	if uint32(nbytes) == EOFHint { // EOF
 		if err := c.removeCurrentReadingFile(); err != nil {
 			return fmt.Errorf("removeCurrentReadingFile: %w", err)
 		}
