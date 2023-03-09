@@ -3,6 +3,9 @@
 // This product includes software developed at Guance Cloud (https://www.guance.com/).
 // Copyright 2021-present Guance, Inc.
 
+//go:build !windows
+// +build !windows
+
 package ws
 
 // See https://github.com/eranyanay/1m-go-websockets/blob/master/4_optimize_gobwas/epoll.go

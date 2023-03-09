@@ -3,6 +3,9 @@
 // This product includes software developed at Guance Cloud (https://www.guance.com/).
 // Copyright 2021-present Guance, Inc.
 
+//go:build linux && darwin
+// +build linux,darwin
+
 // Package system used to wrap basic system related settings.
 package system
 
