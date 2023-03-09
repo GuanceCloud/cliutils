@@ -19,7 +19,7 @@ import (
 
 const (
 	dataHeaderLen = 4
-	EOFHint       = 0xdeadbeef
+	EOFHint       = uint32(0xdeadbeef)
 )
 
 var (

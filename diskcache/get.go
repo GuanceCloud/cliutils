@@ -21,7 +21,7 @@ type Fn func([]byte) error
 // Get is safe to call concurrently with other operations and will
 // block until all other operations finish.
 func (c *DiskCache) Get(fn Fn) error {
-	var nbytes int
+	var nbytes uint32
 
 	c.rlock.Lock()
 	defer c.rlock.Unlock()
@@ -67,7 +67,7 @@ retry:
 		return ErrBadHeader
 	}
 
-	nbytes = int(binary.LittleEndian.Uint32(hdr[0:]))
+	nbytes = binary.LittleEndian.Uint32(hdr[0:])
 
 	if nbytes == EOFHint { // EOF
 		if err := c.removeCurrentReadingFile(); err != nil {
@@ -94,7 +94,7 @@ retry:
 
 	if n, err := c.rfd.Read(databuf); err != nil {
 		return err
-	} else if n != nbytes {
+	} else if uint32(n) != nbytes {
 		return ErrUnexpectedReadSize
 	}
 
