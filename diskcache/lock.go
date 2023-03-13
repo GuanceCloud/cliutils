@@ -86,7 +86,6 @@ func pidAlive(pid int) bool {
 		case "operation not permitted":
 			return true
 		default:
-			l.Infof("Signal: %s", err) // such as `os: process already released'
 			return false
 		}
 	} else {

@@ -12,6 +12,7 @@ import (
 
 var (
 	droppedBatchVec,
+	droppedBytesVec,
 	rotateVec,
 	removeVec,
 	putVec,
@@ -56,6 +57,15 @@ func setupMetrics() {
 			Namespace: ns,
 			Name:      "put_latency",
 			Help:      "Put() time cost(micro-second)",
+		},
+		labels,
+	)
+
+	droppedBytesVec = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: ns,
+			Name:      "dropped_bytes_total",
+			Help:      "dropped bytes during Put() when capacity reached.",
 		},
 		labels,
 	)
@@ -161,6 +171,7 @@ func setupMetrics() {
 
 	metrics.MustRegister(
 		droppedBatchVec,
+		droppedBytesVec,
 		rotateVec,
 		putVec,
 		getVec,
@@ -180,6 +191,7 @@ func setupMetrics() {
 func register(reg *prometheus.Registry) {
 	reg.MustRegister(
 		droppedBatchVec,
+		droppedBytesVec,
 		rotateVec,
 		putVec,
 		getVec,
@@ -195,6 +207,7 @@ func register(reg *prometheus.Registry) {
 
 func resetMetrics() {
 	droppedBatchVec.Reset()
+	droppedBytesVec.Reset()
 	rotateVec.Reset()
 	putVec.Reset()
 	getVec.Reset()

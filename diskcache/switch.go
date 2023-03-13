@@ -25,7 +25,7 @@ func (c *DiskCache) loadUnfinishedFile() error {
 	// check file's healty
 	if _, err := os.Stat(string(pos.Name)); err != nil { // not exist
 		if err := c.pos.reset(); err != nil {
-			l.Errorf("pos.reset: %s, ignored", err)
+			return err
 		}
 
 		return nil
@@ -64,7 +64,6 @@ func (c *DiskCache) switchNextFile() error {
 		c.curReadfile = c.dataFiles[0]
 	}
 
-	l.Debugf("read datafile: %s...", c.curReadfile)
 	fd, err := os.OpenFile(c.curReadfile, os.O_RDONLY, c.filePerms)
 	if err != nil {
 		return fmt.Errorf("under switchNextFile, OpenFile: %w, datafile: %+#v, ", err, c.dataFiles)

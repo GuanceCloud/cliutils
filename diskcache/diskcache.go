@@ -12,8 +12,6 @@ import (
 	"os"
 	"sync"
 	"time"
-
-	"github.com/GuanceCloud/cliutils/logger"
 )
 
 const (
@@ -29,8 +27,6 @@ var (
 	ErrInvalidDataFileName       = errors.New("invalid datafile name")
 	ErrInvalidDataFileNameSuffix = errors.New("invalid datafile name suffix")
 	ErrBadHeader                 = errors.New("bad header")
-
-	l = logger.DefaultSLogger("diskcache")
 )
 
 // DiskCache is the representation of a disk cache.

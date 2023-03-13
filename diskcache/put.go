@@ -33,7 +33,6 @@ func (c *DiskCache) Put(data []byte) error {
 	}
 
 	if c.maxDataSize > 0 && int32(len(data)) > c.maxDataSize {
-		l.Warnf("too large data: %d > %d", len(data), c.maxDataSize)
 		return ErrTooLargeData
 	}
 

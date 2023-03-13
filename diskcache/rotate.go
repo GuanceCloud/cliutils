@@ -17,11 +17,11 @@ import (
 
 // rotate to next new file, append to reading list.
 func (c *DiskCache) rotate() error {
-	l.Debugf("try rotate...")
 
 	defer func() {
 		rotateVec.WithLabelValues(c.labels...).Inc()
 		sizeVec.WithLabelValues(c.labels...).Add(float64(dataHeaderLen))
+		datafilesVec.WithLabelValues(c.labels...).Set(float64(len(c.dataFiles)))
 	}()
 
 	eof := make([]byte, dataHeaderLen)
@@ -66,8 +66,6 @@ func (c *DiskCache) rotate() error {
 	c.dataFiles = append(c.dataFiles, newfile)
 	sort.Strings(c.dataFiles)
 
-	l.Debugf("add datafile: %s => %s", c.curWriteFile, newfile)
-
 	// reopen new write file
 	if err := c.openWriteFile(); err != nil {
 		return err
@@ -103,8 +101,6 @@ func (c *DiskCache) removeCurrentReadingFile() error {
 
 	if len(c.dataFiles) > 0 {
 		c.dataFiles = c.dataFiles[1:] // first file removed
-		l.Debugf("remove datafile: %s => %+#v",
-			c.curReadfile, c.dataFiles)
 	}
 
 	return nil
