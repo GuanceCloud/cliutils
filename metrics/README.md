@@ -121,6 +121,7 @@ datakit_lasterr{message="I got some error message",source="my-module"} 1.6785317
 import (
     "github.com/prometheus/common/expfmt"
     "github.com/prometheus/client_golang/prometheus"
+    "github.com/GuanceCloud/cliutils/metrics"
 )
 
 dwAPILatencyVec = prometheuse.NewSummaryVec(
@@ -141,15 +142,13 @@ reg.MustRegister(dwAPILatencyVec)
 // 塞进去一个指标
 dwAPILatencyVec.WithLabelValues("/v1/write/metric", "Status OK").Observe(float64(time.Since(start)))
 
-
 // 获取 reg 上所有指标
 mfs, err := reg.Gather()
 
-buf := bytes.NewBuffer(nil)
-for _, mf := range mfs {
-    expfmt.MetricFamilyToText(buf, mf)
-}
-
 // 此处即可看到 /metrics 接口返回的效果
-fmt.Println(buf.String())
+fmt.Println(metrics.MetricFamily2Text(mfs))
 ```
+
+## 使用用例
+
+参见 [diskcache 的指标暴露实现](https://github.com/GuanceCloud/cliutils/blob/main/diskcache/metric.go)。

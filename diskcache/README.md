@@ -87,6 +87,12 @@ log.Println(m.LineProto()) // get line-protocol format of metrics
 | ENV_DISKCACHE_NO_LOCK       | 禁用文件目录夹锁。默认是加锁状态，一旦不加锁，在同一个目录多开（`Open`）可能导致文件混乱    |
 | ENV_DISKCACHE_NO_POS        | 禁用磁盘写入位置记录，默认带有位置记录。一旦不记录，程序重启会导致部分数据重复消费（`Get`） |
 
+
+## Prometheus 指标
+
+待补充
+
+<!--
 ## Cache 指标
 
 指标集名称 `diskcache`
@@ -116,6 +122,7 @@ log.Println(m.LineProto()) // get line-protocol format of metrics
 | `put_cost_avg`   | `Put` 平均耗时                                                             | int  | ns    |
 | `rotate_count`   | rotate 次数（每个分片文件写完即 rotate 一次）                              | int  | count |
 | `size`           | 当前 cache 总大小，含 *data* 文件以及其它未读取文件（*data.000..*）        | int  | B     |
+-->
 
 ## 性能估算
 
