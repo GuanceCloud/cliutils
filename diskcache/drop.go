@@ -31,10 +31,9 @@ func (c *DiskCache) dropBatch() error {
 
 			c.dataFiles = c.dataFiles[1:]
 
-			l.Debugf("drop datafile %s(%d) size: %d\n",
-				fname, fi.Size(), c.size)
-
 			droppedBatchVec.WithLabelValues(c.labels...).Inc()
+			droppedBytesVec.WithLabelValues(c.labels...).Add(float64(fi.Size()))
+			sizeVec.WithLabelValues(c.labels...).Add(float64(-fi.Size()))
 		}
 	}
 

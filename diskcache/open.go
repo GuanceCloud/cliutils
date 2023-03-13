@@ -12,8 +12,6 @@ import (
 	"sort"
 	"sync"
 	"time"
-
-	"github.com/GuanceCloud/cliutils/logger"
 )
 
 // Open init and create a new disk cache. We can set other options with various options.
@@ -75,7 +73,6 @@ func (c *DiskCache) setupLabels() {
 }
 
 func (c *DiskCache) doOpen() error {
-	l = logger.SLogger("diskcache")
 
 	if c.dirPerms == 0 {
 		c.dirPerms = 0o755
@@ -90,9 +87,6 @@ func (c *DiskCache) doOpen() error {
 	}
 
 	if int64(c.maxDataSize) > c.batchSize {
-		l.Warnf("reset MaxDataSize from %d to %d",
-			c.maxDataSize, c.batchSize/2)
-
 		// reset max-data-size to half of batch size
 		c.maxDataSize = int32(c.batchSize / 2)
 	}
@@ -140,7 +134,6 @@ func (c *DiskCache) doOpen() error {
 			switch filepath.Base(path) {
 			case ".lock", ".pos", "data": // ignore them
 			default:
-				l.Infof("find file %s", path)
 				c.size += fi.Size()
 				c.dataFiles = append(c.dataFiles, path)
 			}
@@ -155,14 +148,9 @@ func (c *DiskCache) doOpen() error {
 	// first get, try load .pos
 	if !c.noPos {
 		if err := c.loadUnfinishedFile(); err != nil {
-			l.Errorf("load history faied: %s", err)
 			return err
-		} else {
-			l.Infof("load pos %s", c.pos)
 		}
 	}
-
-	l.Infof("init %d datafiles", len(c.dataFiles))
 
 	return nil
 }
@@ -179,7 +167,6 @@ func (c *DiskCache) Close() error {
 	}()
 
 	if c.rfd != nil {
-		l.Info("closing rfd...")
 
 		if err := c.rfd.Close(); err != nil {
 			return err
@@ -190,13 +177,12 @@ func (c *DiskCache) Close() error {
 	if !c.noLock {
 		if c.flock != nil {
 			if err := c.flock.unlock(); err != nil {
-				l.Errorf("Unlock: %s, ignored", err)
+				return err
 			}
 		}
 	}
 
 	if c.wfd != nil {
-		l.Info("closing wfd...")
 
 		if err := c.wfd.Close(); err != nil {
 			return err

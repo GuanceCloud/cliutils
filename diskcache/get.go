@@ -39,8 +39,6 @@ func (c *DiskCache) Get(fn Fn) error {
 
 	// wakeup sleeping write file, rotate it for succession reading!
 	if time.Since(c.wfdCreated) > c.wakeup && c.curBatchSize > 0 {
-		l.Debugf("wakeup %s(%d bytes), global size: %d", c.curWriteFile, c.curBatchSize, c.size)
-
 		if err := func() error {
 			c.wlock.Lock()
 			defer c.wlock.Unlock()
@@ -78,7 +76,6 @@ retry:
 		// clear .pos
 		if !c.noPos {
 			if err := c.pos.reset(); err != nil {
-				l.Errorf("pos reset: %s", err)
 				return err
 			}
 		}
