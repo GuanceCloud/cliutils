@@ -60,8 +60,7 @@ func defaultInstance() *DiskCache {
 }
 
 func (c *DiskCache) setupLabels() {
-
-	// NOTE: make them sorted. In Prometheus outputed text, these
+	// NOTE: make them sorted. In Prometheus outputted text, these
 	// label-keys are sorted.
 	c.labels = append(
 		c.labels,
@@ -180,7 +179,6 @@ func (c *DiskCache) Close() error {
 	}()
 
 	if c.rfd != nil {
-
 		l.Info("closing rfd...")
 
 		if err := c.rfd.Close(); err != nil {
@@ -198,7 +196,6 @@ func (c *DiskCache) Close() error {
 	}
 
 	if c.wfd != nil {
-
 		l.Info("closing wfd...")
 
 		if err := c.wfd.Close(); err != nil {

@@ -211,7 +211,6 @@ func TestConcurrentPutGet(t *T.T) {
 }
 
 func TestPutOnCapacityReached(t *T.T) {
-
 	t.Run(`reach-capacity-single-put`, func(t *T.T) {
 		var (
 			mb       = int64(1024 * 1024)

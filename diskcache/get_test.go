@@ -51,7 +51,6 @@ func TestPutGet(t *T.T) {
 	})
 
 	t.Run("put-get", func(t *T.T) {
-
 		reg := prometheus.NewRegistry()
 		register(reg)
 

@@ -19,7 +19,6 @@ import (
 )
 
 func TestDropBatch(t *T.T) {
-
 	reg := prometheus.NewRegistry()
 	register(reg)
 
@@ -63,7 +62,6 @@ func TestDropBatch(t *T.T) {
 }
 
 func TestDropDuringGet(t *T.T) {
-
 	reg := prometheus.NewRegistry()
 	register(reg)
 

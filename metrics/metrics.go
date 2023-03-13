@@ -93,7 +93,9 @@ func GetMetric(mfs []*dto.MetricFamily, name string, idx int) *dto.Metric {
 func MetricFamily2Text(mfs []*dto.MetricFamily) string {
 	buf := bytes.NewBuffer(nil)
 	for _, mf := range mfs {
-		expfmt.MetricFamilyToText(buf, mf)
+		if _, err := expfmt.MetricFamilyToText(buf, mf); err != nil {
+			return ""
+		}
 	}
 	return buf.String()
 }

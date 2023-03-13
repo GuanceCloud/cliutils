@@ -92,6 +92,5 @@ func TestMetric(t *T.T) {
 		t.Cleanup(func() {
 			resetMetrics()
 		})
-
 	})
 }

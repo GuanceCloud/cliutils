@@ -14,7 +14,6 @@ import (
 // Put is safe to call concurrently with other operations and will
 // block until all other operations finish.
 func (c *DiskCache) Put(data []byte) error {
-
 	start := time.Now() // count time before lock
 
 	c.wlock.Lock()

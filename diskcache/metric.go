@@ -31,7 +31,7 @@ var (
 )
 
 func setupMetrics() {
-	var labels = []string{
+	labels := []string{
 		// NOTE: make them sorted.
 		"batch_size",
 		"capacity",
@@ -176,7 +176,7 @@ func setupMetrics() {
 		putLatencyVec)
 }
 
-// register to specified registry for testing
+// register to specified registry for testing.
 func register(reg *prometheus.Registry) {
 	reg.MustRegister(
 		droppedBatchVec,
