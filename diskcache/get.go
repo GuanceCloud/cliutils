@@ -28,11 +28,12 @@ func (c *DiskCache) Get(fn Fn) error {
 
 	start := time.Now()
 
-	c.getCount++
 	defer func() {
-		c.getCost += int64(time.Since(start))
+		getVec.WithLabelValues(c.labels...).Inc()
+		getLatencyVec.WithLabelValues(c.labels...).Observe(float64(time.Since(start) / time.Microsecond))
+
 		if nbytes != EOFHint {
-			c.getBytes += int64(nbytes)
+			getBytesVec.WithLabelValues(c.labels...).Add(float64(nbytes))
 		}
 	}()
 

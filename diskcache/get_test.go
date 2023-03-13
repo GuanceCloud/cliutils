@@ -10,12 +10,17 @@ import (
 	"os"
 	T "testing"
 
+	"github.com/GuanceCloud/cliutils/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPutGet(t *T.T) {
 	t.Run(`clean-pos-on-eof`, func(t *T.T) {
+		reg := prometheus.NewRegistry()
+		register(reg)
+
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
 		assert.NoError(t, err)
@@ -34,14 +39,22 @@ func TestPutGet(t *T.T) {
 
 		t.Logf("pos: %s", pos)
 
-		t.Logf("metric: %s", c.Metrics().LineProto())
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+
+		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 		t.Cleanup(func() {
 			c.Close()
+			resetMetrics()
 		})
 	})
 
 	t.Run("put-get", func(t *T.T) {
+
+		reg := prometheus.NewRegistry()
+		register(reg)
+
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
 		assert.NoError(t, err)
@@ -60,7 +73,9 @@ func TestPutGet(t *T.T) {
 			t.Logf("get: %s", err)
 		}
 
-		t.Logf("metric: %s", c.Metrics().LineProto())
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 		t.Cleanup(func() {
 			c.Close()
@@ -69,6 +84,9 @@ func TestPutGet(t *T.T) {
 	})
 
 	t.Run(`get-without-pos`, func(t *T.T) {
+		reg := prometheus.NewRegistry()
+		register(reg)
+
 		p := t.TempDir()
 
 		kbdata := make([]byte, 1024)
@@ -97,9 +115,9 @@ func TestPutGet(t *T.T) {
 		// close the cache for next re-Open()
 		assert.NoError(t, c.Close())
 
-		m := c.Metrics()
-		t.Logf("metric: %s", m.LineProto())
-		t.Logf("cache: %s", c)
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 		c2, err := Open(WithPath(p), WithNoPos(true))
 		assert.NoError(t, err)
@@ -122,8 +140,9 @@ func TestPutGet(t *T.T) {
 			}
 		}
 
-		m = c2.Metrics()
-		t.Logf("metric: %s", m.LineProto())
+		mfs, err = reg.Gather()
+		require.NoError(t, err)
+		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 		// without .pos, still got 10 cache
 		assert.Equal(t, 10, ncached, "cache: %s", c2)

@@ -10,6 +10,8 @@ import (
 	"errors"
 	T "testing"
 
+	"github.com/GuanceCloud/cliutils/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,26 +60,35 @@ func TestRotate(t *T.T) {
 
 		t.Cleanup(func() {
 			assert.NoError(t, c.Close())
+			resetMetrics()
 		})
 	})
 
 	t.Run("rotate", func(t *T.T) {
+		reg := prometheus.NewRegistry()
+		register(reg)
+
 		p := t.TempDir()
-		c, err := Open(WithPath(p), WithBatchSize(1024*1024))
+		batchSize := int64(1024 * 1024)
+		c, err := Open(WithPath(p), WithBatchSize(batchSize))
 		if err != nil {
 			t.Error(err)
 			return
 		}
 
 		origFileCnt := len(c.dataFiles)
+		maxRotate := 3
 
 		t.Logf("files: %+#v", c.dataFiles)
 
-		maxRotate := 3
 		sample := bytes.Repeat([]byte("hello"), 1000) // 5kb
+		total := 0
 		for {
 			require.NoError(t, c.Put(sample), "cache: %s", c)
-			if c.rotateCount >= maxRotate {
+			total += len(sample)
+
+			// generate 3 batches
+			if int64(total) > int64(maxRotate)*batchSize {
 				break
 			}
 		}
@@ -101,7 +112,6 @@ func TestRotate(t *T.T) {
 			if err := c.Get(fn); err != nil {
 				if errors.Is(err, ErrEOF) {
 					t.Logf("read EOF")
-					return
 				} else {
 					t.Error(err)
 				}
@@ -110,10 +120,14 @@ func TestRotate(t *T.T) {
 		}
 
 		t.Logf("total read bytes: %d", readBytes)
-		t.Logf("metric: %s", c.Metrics().LineProto())
+
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+		t.Logf("metrics \n%s", metrics.MetricFamily2Text(mfs))
 
 		t.Cleanup(func() {
 			assert.NoError(t, c.Close())
+			resetMetrics()
 		})
 	})
 }

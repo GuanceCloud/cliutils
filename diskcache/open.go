@@ -31,6 +31,10 @@ func Open(opts ...CacheOption) (*DiskCache, error) {
 		return nil, err
 	}
 
+	defer func() {
+		openTimeVec.WithLabelValues(c.labels...).Set(float64(time.Now().Unix()))
+	}()
+
 	return c, nil
 }
 
@@ -53,6 +57,22 @@ func defaultInstance() *DiskCache {
 			Name: nil,
 		},
 	}
+}
+
+func (c *DiskCache) setupLabels() {
+
+	// NOTE: make them sorted. In Prometheus outputed text, these
+	// label-keys are sorted.
+	c.labels = append(
+		c.labels,
+		fmt.Sprintf("%d", c.batchSize),
+		fmt.Sprintf("%d", c.capacity),
+		fmt.Sprintf("%d", c.maxDataSize),
+		fmt.Sprintf("%v", c.noLock),
+		fmt.Sprintf("%v", c.noPos),
+		fmt.Sprintf("%v", c.noSync),
+		c.path,
+	)
 }
 
 func (c *DiskCache) doOpen() error {
@@ -99,6 +119,8 @@ func (c *DiskCache) doOpen() error {
 	c.curWriteFile = filepath.Join(c.path, "data")
 
 	c.syncEnv()
+
+	c.setupLabels()
 
 	// write append fd, always write to the same-name file
 	if err := c.openWriteFile(); err != nil {
@@ -152,6 +174,10 @@ func (c *DiskCache) doOpen() error {
 func (c *DiskCache) Close() error {
 	c.rwlock.Lock()
 	defer c.rwlock.Unlock()
+
+	defer func() {
+		lastCloseTimeVec.WithLabelValues(c.labels...).Set(float64(time.Now().Unix()))
+	}()
 
 	if c.rfd != nil {
 
