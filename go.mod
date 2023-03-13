@@ -23,7 +23,6 @@ require (
 )
 
 require (
-	github.com/gofrs/flock v0.8.1
 	github.com/influxdata/line-protocol/v2 v2.2.1
 	github.com/prometheus/client_golang v1.14.0
 	google.golang.org/protobuf v1.28.1
