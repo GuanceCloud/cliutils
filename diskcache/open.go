@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils/logger"
-	"github.com/gofrs/flock"
 )
 
 // Open init and create a new disk cache. We can set other options with various options.
@@ -85,13 +84,10 @@ func (c *DiskCache) doOpen() error {
 
 	// disable open multiple times
 	if !c.noLock {
-		fl := flock.New(filepath.Join(c.path, ".lock"))
-		if ok, err := fl.TryLock(); err != nil {
-			return fmt.Errorf("TryLock: %w", err)
+		fl := newFlock(c.path)
+		if err := fl.lock(); err != nil {
+			return fmt.Errorf("lock: %w", err)
 		} else {
-			if !ok {
-				return fmt.Errorf("lock failed")
-			}
 			c.flock = fl
 		}
 	}
@@ -158,6 +154,9 @@ func (c *DiskCache) Close() error {
 	defer c.rwlock.Unlock()
 
 	if c.rfd != nil {
+
+		l.Info("closing rfd...")
+
 		if err := c.rfd.Close(); err != nil {
 			return err
 		}
@@ -166,13 +165,16 @@ func (c *DiskCache) Close() error {
 
 	if !c.noLock {
 		if c.flock != nil {
-			if err := c.flock.Unlock(); err != nil {
+			if err := c.flock.unlock(); err != nil {
 				l.Errorf("Unlock: %s, ignored", err)
 			}
 		}
 	}
 
 	if c.wfd != nil {
+
+		l.Info("closing wfd...")
+
 		if err := c.wfd.Close(); err != nil {
 			return err
 		}

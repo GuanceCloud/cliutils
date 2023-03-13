@@ -51,5 +51,9 @@ func TestMetric(t *T.T) {
 			m.Fields().Get([]byte(`get_bytes`)).GetI())
 
 		assert.Equal(t, int64(100+dataHeaderLen+4 /*EOFHint*/), m.Fields().Get([]byte(`size`)).GetI())
+
+		t.Cleanup(func() {
+			assert.NoError(t, c.Close())
+		})
 	})
 }
