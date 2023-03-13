@@ -16,7 +16,6 @@ import (
 )
 
 func TestOpen(t *T.T) {
-
 	t.Run("reopen-with-or-without-pos", func(t *T.T) {
 		p := t.TempDir()
 
@@ -142,7 +141,6 @@ func TestOpen(t *T.T) {
 
 		wg.Wait()
 	})
-
 }
 
 func TestClose(t *T.T) {
