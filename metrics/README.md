@@ -8,7 +8,7 @@
 
 - 计数：某些操作的执行次数（如日志文件 rotate 次数）、某些物理量的计数（如字节数）
 - 耗时：某些操作的耗时
-- 报错信息：当某个模块报错时，也能通过 Prometheuse 方式来暴露，这种有点像日志。可以直接使用全局 metrics 模块提供的接口：
+- 报错信息：当某个模块报错时，也能通过 Prometheuse 方式来暴露，这种有点像日志。可以直接使用全局 metrics 模块提供的接口
 
 ## 计数（counter）
 
@@ -97,6 +97,8 @@ datakit_dataway_api_latency_count{api="/v1/write/metric",status="Status OK"}"} 1
 ```
 
 ## 报错
+
+> 报错信息的处理，还需进一步考虑一下，暂时不建议使用。
 
 ```golang
 AddLastErr("my-module", "I got some error message")
