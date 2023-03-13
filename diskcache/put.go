@@ -14,14 +14,16 @@ import (
 // Put is safe to call concurrently with other operations and will
 // block until all other operations finish.
 func (c *DiskCache) Put(data []byte) error {
+	start := time.Now() // count time before lock
+
 	c.wlock.Lock()
 	defer c.wlock.Unlock()
 
-	start := time.Now()
-
-	c.putCount++
 	defer func() {
-		c.putCost += int64(time.Since(start))
+		putVec.WithLabelValues(c.labels...).Inc()
+		putLatencyVec.WithLabelValues(c.labels...).Observe(float64(time.Since(start) / time.Microsecond))
+		sizeVec.WithLabelValues(c.labels...).Set(float64(len(data) + dataHeaderLen))
+		putBytesVec.WithLabelValues(c.labels...).Add(float64(len(data)))
 	}()
 
 	if c.capacity > 0 && c.size+int64(len(data)) > c.capacity {
@@ -61,8 +63,6 @@ func (c *DiskCache) Put(data []byte) error {
 			return err
 		}
 	}
-
-	c.putBytes += int64(len(data))
 
 	return nil
 }

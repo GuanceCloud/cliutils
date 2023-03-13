@@ -12,11 +12,16 @@ import (
 	T "testing"
 	"time"
 
+	"github.com/GuanceCloud/cliutils/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkNosyncPutGet(b *T.B) {
+	reg := prometheus.NewRegistry()
+	register(reg)
+
 	p := b.TempDir()
 	c, err := Open(WithPath(p), WithNoSync(true), WithBatchSize(1024*1024*4), WithCapacity(4*1024*1024*1024))
 	require.NoError(b, err)
@@ -49,15 +54,19 @@ func BenchmarkNosyncPutGet(b *T.B) {
 		}
 	})
 
-	m := c.Metrics()
-	b.Logf(m.LineProto())
+	mfs, err := reg.Gather()
+	require.NoError(b, err)
+	b.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 	b.Cleanup(func() {
 		assert.NoError(b, c.Close())
+		resetMetrics()
 	})
 }
 
 func BenchmarkPutGet(b *T.B) {
+	reg := prometheus.NewRegistry()
+	register(reg)
 	p := b.TempDir()
 	c, err := Open(WithPath(p), WithBatchSize(1024*1024*4), WithCapacity(4*1024*1024*1024))
 	require.NoError(b, err)
@@ -90,11 +99,14 @@ func BenchmarkPutGet(b *T.B) {
 		}
 	})
 
-	m := c.Metrics()
-	b.Logf(m.LineProto())
+	mfs, err := reg.Gather()
+	require.NoError(b, err)
+
+	b.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 	b.Cleanup(func() {
 		assert.NoError(b, c.Close())
+		resetMetrics()
 	})
 }
 
@@ -104,7 +116,10 @@ func TestConcurrentPutGet(t *T.T) {
 		mb     = int64(1024 * 1024)
 		sample = make([]byte, 5*7351)
 		eof    = 0
+		reg    = prometheus.NewRegistry()
 	)
+
+	register(reg)
 
 	c, err := Open(WithPath(p), WithBatchSize(4*mb), WithCapacity(128*mb))
 	assert.NoError(t, err)
@@ -185,9 +200,13 @@ func TestConcurrentPutGet(t *T.T) {
 
 	wg.Wait()
 
-	t.Logf("metric: %s", c.Metrics().LineProto())
+	mfs, err := reg.Gather()
+	require.NoError(t, err)
+	t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
+
 	t.Cleanup(func() {
 		assert.NoError(t, c.Close())
+		resetMetrics()
 	})
 }
 
@@ -202,32 +221,46 @@ func TestPutOnCapacityReached(t *T.T) {
 			maxPut   = 4 * capacity
 		)
 
+		reg := prometheus.NewRegistry()
+		register(reg)
+
 		t.Logf("path: %s", p)
 
 		c, err := Open(WithPath(p), WithCapacity(capacity), WithBatchSize(4*mb))
 		assert.NoError(t, err)
 
 		defer c.Close()
+		putBytes := 0
 
 		n := 0
 		for {
 			switch n % 2 {
 			case 0:
 				c.Put(small)
+				putBytes += len(small)
 			case 1:
 				c.Put(large)
+				putBytes += len(large)
 			}
 			n++
 
-			if c.putBytes > maxPut {
+			if int64(putBytes) > maxPut {
 				break
 			}
 		}
 
-		m := c.Metrics()
-		t.Logf("metric: %s", m.LineProto())
-		fs := m.Fields()
-		assert.True(t, fs.Get([]byte(`dropped_batch`)).GetI() > 0)
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+
+		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
+		m := metrics.GetMetricOnLabels(mfs, "diskcache_dropped_total", c.labels...)
+		require.NotNil(t, m)
+		assert.True(t, m.GetCounter().GetValue() > 0.0)
+
+		t.Cleanup(func() {
+			require.NoError(t, c.Close())
+			resetMetrics()
+		})
 	})
 
 	t.Run(`reach-capacity-concurrent-put`, func(t *T.T) {
@@ -240,6 +273,9 @@ func TestPutOnCapacityReached(t *T.T) {
 			maxPut   = 4 * capacity
 			wg       sync.WaitGroup
 		)
+
+		reg := prometheus.NewRegistry()
+		register(reg)
 
 		t.Logf("path: %s", p)
 
@@ -275,9 +311,18 @@ func TestPutOnCapacityReached(t *T.T) {
 
 		wg.Wait()
 
-		m := c.Metrics()
-		t.Logf("metric: %s", m.LineProto())
-		fs := m.Fields()
-		assert.True(t, fs.Get([]byte(`dropped_batch`)).GetI() > 0)
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
+
+		m := metrics.GetMetricOnLabels(mfs, "diskcache_dropped_total", c.labels...)
+		require.NotNil(t, m)
+
+		assert.True(t, m.GetCounter().GetValue() > 0.0)
+
+		t.Cleanup(func() {
+			assert.NoError(t, c.Close())
+			resetMetrics()
+		})
 	})
 }

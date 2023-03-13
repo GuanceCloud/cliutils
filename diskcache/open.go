@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils/logger"
-	"github.com/gofrs/flock"
 )
 
 // Open init and create a new disk cache. We can set other options with various options.
@@ -31,6 +30,10 @@ func Open(opts ...CacheOption) (*DiskCache, error) {
 	if err := c.doOpen(); err != nil {
 		return nil, err
 	}
+
+	defer func() {
+		openTimeVec.WithLabelValues(c.labels...).Set(float64(time.Now().Unix()))
+	}()
 
 	return c, nil
 }
@@ -54,6 +57,21 @@ func defaultInstance() *DiskCache {
 			Name: nil,
 		},
 	}
+}
+
+func (c *DiskCache) setupLabels() {
+	// NOTE: make them sorted. In Prometheus outputted text, these
+	// label-keys are sorted.
+	c.labels = append(
+		c.labels,
+		fmt.Sprintf("%d", c.batchSize),
+		fmt.Sprintf("%d", c.capacity),
+		fmt.Sprintf("%d", c.maxDataSize),
+		fmt.Sprintf("%v", c.noLock),
+		fmt.Sprintf("%v", c.noPos),
+		fmt.Sprintf("%v", c.noSync),
+		c.path,
+	)
 }
 
 func (c *DiskCache) doOpen() error {
@@ -85,13 +103,10 @@ func (c *DiskCache) doOpen() error {
 
 	// disable open multiple times
 	if !c.noLock {
-		fl := flock.New(filepath.Join(c.path, ".lock"))
-		if ok, err := fl.TryLock(); err != nil {
-			return fmt.Errorf("TryLock: %w", err)
+		fl := newFlock(c.path)
+		if err := fl.lock(); err != nil {
+			return fmt.Errorf("lock: %w", err)
 		} else {
-			if !ok {
-				return fmt.Errorf("lock failed")
-			}
 			c.flock = fl
 		}
 	}
@@ -103,6 +118,8 @@ func (c *DiskCache) doOpen() error {
 	c.curWriteFile = filepath.Join(c.path, "data")
 
 	c.syncEnv()
+
+	c.setupLabels()
 
 	// write append fd, always write to the same-name file
 	if err := c.openWriteFile(); err != nil {
@@ -157,7 +174,13 @@ func (c *DiskCache) Close() error {
 	c.rwlock.Lock()
 	defer c.rwlock.Unlock()
 
+	defer func() {
+		lastCloseTimeVec.WithLabelValues(c.labels...).Set(float64(time.Now().Unix()))
+	}()
+
 	if c.rfd != nil {
+		l.Info("closing rfd...")
+
 		if err := c.rfd.Close(); err != nil {
 			return err
 		}
@@ -166,13 +189,15 @@ func (c *DiskCache) Close() error {
 
 	if !c.noLock {
 		if c.flock != nil {
-			if err := c.flock.Unlock(); err != nil {
+			if err := c.flock.unlock(); err != nil {
 				l.Errorf("Unlock: %s, ignored", err)
 			}
 		}
 	}
 
 	if c.wfd != nil {
+		l.Info("closing wfd...")
+
 		if err := c.wfd.Close(); err != nil {
 			return err
 		}

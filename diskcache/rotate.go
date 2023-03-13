@@ -19,6 +19,11 @@ import (
 func (c *DiskCache) rotate() error {
 	l.Debugf("try rotate...")
 
+	defer func() {
+		rotateVec.WithLabelValues(c.labels...).Inc()
+		sizeVec.WithLabelValues(c.labels...).Add(float64(dataHeaderLen))
+	}()
+
 	eof := make([]byte, dataHeaderLen)
 	binary.LittleEndian.PutUint32(eof, EOFHint)
 
@@ -67,7 +72,7 @@ func (c *DiskCache) rotate() error {
 	if err := c.openWriteFile(); err != nil {
 		return err
 	}
-	c.rotateCount++
+
 	return nil
 }
 
@@ -75,6 +80,11 @@ func (c *DiskCache) rotate() error {
 func (c *DiskCache) removeCurrentReadingFile() error {
 	c.rwlock.Lock()
 	defer c.rwlock.Unlock()
+
+	defer func() {
+		sizeVec.WithLabelValues(c.labels...).Set(float64(c.size))
+		removeVec.WithLabelValues(c.labels...).Inc()
+	}()
 
 	if c.rfd != nil {
 		if err := c.rfd.Close(); err != nil {

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils/logger"
-	"github.com/gofrs/flock"
 )
 
 const (
@@ -54,9 +53,10 @@ type DiskCache struct {
 	rlock *sync.Mutex // used to exclude concurrent Get.
 	rwlock *sync.Mutex // used to exclude switch/rotate/drop/Close
 
-	flock *flock.Flock
+	flock *flock
 	pos   *pos
 
+	size,
 	curBatchSize,
 	batchSize,
 	capacity int64
@@ -70,16 +70,7 @@ type DiskCache struct {
 	noPos,
 	noLock bool
 
-	// metrics related
-	rotateCount,
-	droppedBatch,
-	getCount,
-	putCount int
-	size int64
-	getBytes,
-	putBytes,
-	getCost,
-	putCost int64
+	labels []string
 }
 
 func (c *DiskCache) String() string {

@@ -7,8 +7,11 @@
 package metrics
 
 import (
+	"bytes"
+
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
 )
 
 var reg = prometheus.NewRegistry()
@@ -84,4 +87,15 @@ func GetMetric(mfs []*dto.MetricFamily, name string, idx int) *dto.Metric {
 		}
 	}
 	return nil
+}
+
+// MetricFamily2Text convert metrics to text format.
+func MetricFamily2Text(mfs []*dto.MetricFamily) string {
+	buf := bytes.NewBuffer(nil)
+	for _, mf := range mfs {
+		if _, err := expfmt.MetricFamilyToText(buf, mf); err != nil {
+			return ""
+		}
+	}
+	return buf.String()
 }

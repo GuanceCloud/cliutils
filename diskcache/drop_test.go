@@ -12,39 +12,62 @@ import (
 	T "testing"
 	"time"
 
+	"github.com/GuanceCloud/cliutils/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDropBatch(t *T.T) {
+	reg := prometheus.NewRegistry()
+	register(reg)
+
 	p := t.TempDir()
+	capacity := int64(32 * 1024 * 1024)
 	c, err := Open(WithPath(p),
 		WithBatchSize(4*1024*1024),
-		WithCapacity(32*1024*1024))
+		WithCapacity(capacity))
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
 	sample := bytes.Repeat([]byte("hello"), 7351)
+	n := 0
 	for {
 		if err := c.Put(sample); err != nil {
 			t.Error(err)
 		}
 
-		if c.droppedBatch > 3 {
+		n++
+
+		if int64(n*len(sample)) > capacity {
 			break
 		}
 	}
 
-	t.Logf("metric: %s", c.Metrics().LineProto())
+	mfs, err := reg.Gather()
+	assert.NoError(t, err)
+
+	t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
+
+	m := metrics.GetMetricOnLabels(mfs, "diskcache_dropped_total", c.labels...)
+	require.NotNil(t, m)
+	assert.Equal(t, float64(1), m.GetCounter().GetValue())
+
 	t.Cleanup(func() {
 		assert.NoError(t, c.Close())
+		resetMetrics()
 	})
 }
 
 func TestDropDuringGet(t *T.T) {
+	reg := prometheus.NewRegistry()
+	register(reg)
+
 	p := t.TempDir()
-	c, err := Open(WithPath(p), WithBatchSize(1*1024*1024), WithCapacity(2*1024*1024))
+	capacity := int64(2 * 1024 * 1024)
+	c, err := Open(WithPath(p), WithBatchSize(1*1024*1024), WithCapacity(capacity))
 	assert.NoError(t, err)
 
 	sample := bytes.Repeat([]byte("hello"), 7351)
@@ -52,13 +75,15 @@ func TestDropDuringGet(t *T.T) {
 	wg.Add(1)
 	go func() { // fast put
 		defer wg.Done()
+		n := 0
 		for {
 			if err := c.Put(sample); err != nil {
 				t.Error(err)
 				return
 			}
+			n++
 
-			if c.droppedBatch > 2 {
+			if int64(n*len(sample)) > capacity {
 				return
 			}
 		}
@@ -94,9 +119,13 @@ func TestDropDuringGet(t *T.T) {
 
 	wg.Wait()
 
-	t.Logf("metric: %s", c.Metrics().LineProto())
+	mfs, err := reg.Gather()
+	assert.NoError(t, err)
+
+	t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 	t.Cleanup(func() {
 		assert.NoError(t, c.Close())
+		resetMetrics()
 	})
 }
