@@ -108,6 +108,8 @@ func doGatherPoints(reg prometheus.Gatherer) ([]*point.Point, error) {
 	return pts, nil
 }
 
+// GatherPoints gather all metrics in global registry, but convert these metrics
+// to point.Point.
 func GatherPoints() ([]*point.Point, error) {
 	return doGatherPoints(reg)
 }

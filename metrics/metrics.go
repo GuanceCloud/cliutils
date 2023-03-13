@@ -13,22 +13,27 @@ import (
 
 var reg = prometheus.NewRegistry()
 
-func Register(c prometheus.Collector) error {
-	return reg.Register(c)
-}
-
+// MustRegister add c to global registry and panic on any error.
 func MustRegister(c ...prometheus.Collector) {
 	reg.MustRegister(c...)
 }
 
+// Register add c to global registry.
+func Register(c prometheus.Collector) error {
+	return reg.Register(c)
+}
+
+// Unregister remove c from global registry.
 func Unregister(c prometheus.Collector) bool {
 	return reg.Unregister(c)
 }
 
+// Gather collect all metrics within global registry.
 func Gather() ([]*dto.MetricFamily, error) {
 	return reg.Gather()
 }
 
+// MustGather collect all metrics within global registry and panic on any error.
 func MustGather() []*dto.MetricFamily {
 	x, err := reg.Gather()
 	if err != nil {

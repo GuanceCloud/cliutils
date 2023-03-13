@@ -47,6 +47,7 @@ func init() {
 	MustRegister(lastErrorVec, lastErrorCountVec)
 }
 
+// ResetLastErrors cleanup all metrics within last errors.
 func ResetLastErrors() {
 	lastErrorVec.Reset()
 }

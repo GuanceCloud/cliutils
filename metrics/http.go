@@ -14,23 +14,31 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// MetricServer used to export metrics via HTTP /metrics request.
 type MetricServer struct {
-	URL    string
+	// Metrics request path.
+	URL string
+
+	// HTTP server address, default to localhost:9090.
 	Listen string
 
-	Enable           bool
+	// Enable or disable the http server.
+	Enable bool
+
+	// Enable or disable Golang related metrics in metrics URL.
 	DisableGoMetrics bool
 }
 
+// NewMetricServer create default metric server.
 func NewMetricServer() *MetricServer {
 	return &MetricServer{
 		Enable: true,
-		Listen: "localhost:9539",
+		Listen: "localhost:9090",
 		URL:    "/metrics",
 	}
 }
 
-// Start start new metric HTTP server.
+// Start create HTTP server to serving /metrics request.
 func (ms *MetricServer) Start() error {
 	if !ms.DisableGoMetrics {
 		goexporter := collectors.NewGoCollector(collectors.WithGoCollectorRuntimeMetrics(collectors.MetricsAll))
