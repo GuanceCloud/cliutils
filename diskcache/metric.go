@@ -23,25 +23,26 @@ var (
 	sizeVec,
 	openTimeVec,
 	lastCloseTimeVec,
+	capVec,
+	maxDataVec,
+	batchSizeVec,
 	datafilesVec *prometheus.GaugeVec
 
 	getLatencyVec,
 	putLatencyVec *prometheus.SummaryVec
 
 	ns = "diskcache"
-)
 
-func setupMetrics() {
-	labels := []string{
+	expLabels = []string{
 		// NOTE: make them sorted.
-		"batch_size",
-		"capacity",
-		"max_data_size",
 		"no_lock",
 		"no_pos",
 		"no_sync",
 		"path",
 	}
+)
+
+func setupMetrics() {
 
 	getLatencyVec = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
@@ -49,7 +50,7 @@ func setupMetrics() {
 			Name:      "get_latency",
 			Help:      "Get() time cost(micro-second)",
 		},
-		labels,
+		expLabels,
 	)
 
 	putLatencyVec = prometheus.NewSummaryVec(
@@ -58,7 +59,7 @@ func setupMetrics() {
 			Name:      "put_latency",
 			Help:      "Put() time cost(micro-second)",
 		},
-		labels,
+		expLabels,
 	)
 
 	droppedBytesVec = prometheus.NewCounterVec(
@@ -67,7 +68,7 @@ func setupMetrics() {
 			Name:      "dropped_bytes_total",
 			Help:      "dropped bytes during Put() when capacity reached.",
 		},
-		labels,
+		expLabels,
 	)
 
 	droppedBatchVec = prometheus.NewCounterVec(
@@ -76,7 +77,7 @@ func setupMetrics() {
 			Name:      "dropped_total",
 			Help:      "dropped files during Put() when capacity reached.",
 		},
-		labels,
+		expLabels,
 	)
 
 	rotateVec = prometheus.NewCounterVec(
@@ -85,7 +86,7 @@ func setupMetrics() {
 			Name:      "rotate_total",
 			Help:      "cache rotate count, mean file rotate from data to data.0000xxx",
 		},
-		labels,
+		expLabels,
 	)
 
 	removeVec = prometheus.NewCounterVec(
@@ -94,7 +95,7 @@ func setupMetrics() {
 			Name:      "remove_total",
 			Help:      "removed file count, if some file read EOF, remove it from un-readed list",
 		},
-		labels,
+		expLabels,
 	)
 
 	putVec = prometheus.NewCounterVec(
@@ -103,7 +104,7 @@ func setupMetrics() {
 			Name:      "put_total",
 			Help:      "cache Put() count",
 		},
-		labels,
+		expLabels,
 	)
 
 	putBytesVec = prometheus.NewCounterVec(
@@ -112,7 +113,7 @@ func setupMetrics() {
 			Name:      "put_bytes_total",
 			Help:      "cache Put() bytes count",
 		},
-		labels,
+		expLabels,
 	)
 
 	getVec = prometheus.NewCounterVec(
@@ -121,7 +122,7 @@ func setupMetrics() {
 			Name:      "get_total",
 			Help:      "cache Get() count",
 		},
-		labels,
+		expLabels,
 	)
 
 	getBytesVec = prometheus.NewCounterVec(
@@ -130,7 +131,34 @@ func setupMetrics() {
 			Name:      "get_bytes_total",
 			Help:      "cache Get() bytes count",
 		},
-		labels,
+		expLabels,
+	)
+
+	capVec = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: ns,
+			Name:      "capacity",
+			Help:      "current capacity(in bytes)",
+		},
+		expLabels,
+	)
+
+	maxDataVec = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: ns,
+			Name:      "max_data",
+			Help:      "max data to Put(in bytes), default 0",
+		},
+		expLabels,
+	)
+
+	batchSizeVec = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: ns,
+			Name:      "batch_size",
+			Help:      "data file size(in bytes)",
+		},
+		expLabels,
 	)
 
 	sizeVec = prometheus.NewGaugeVec(
@@ -139,7 +167,7 @@ func setupMetrics() {
 			Name:      "size",
 			Help:      "current cache size(in bytes)",
 		},
-		labels,
+		expLabels,
 	)
 
 	openTimeVec = prometheus.NewGaugeVec(
@@ -148,7 +176,7 @@ func setupMetrics() {
 			Name:      "open_time",
 			Help:      "current cache Open time in unix timestamp(second)",
 		},
-		labels,
+		expLabels,
 	)
 
 	lastCloseTimeVec = prometheus.NewGaugeVec(
@@ -157,7 +185,7 @@ func setupMetrics() {
 			Name:      "last_close_time",
 			Help:      "current cache last Close time in unix timestamp(second)",
 		},
-		labels,
+		expLabels,
 	)
 
 	datafilesVec = prometheus.NewGaugeVec(
@@ -166,7 +194,7 @@ func setupMetrics() {
 			Name:      "datafiles",
 			Help:      "current un-readed data files",
 		},
-		labels,
+		expLabels,
 	)
 
 	metrics.MustRegister(
@@ -180,6 +208,9 @@ func setupMetrics() {
 
 		openTimeVec,
 		lastCloseTimeVec,
+		capVec,
+		batchSizeVec,
+		maxDataVec,
 		sizeVec,
 		datafilesVec,
 
@@ -198,6 +229,9 @@ func register(reg *prometheus.Registry) {
 		putBytesVec,
 		getBytesVec,
 
+		capVec,
+		batchSizeVec,
+		maxDataVec,
 		sizeVec,
 		datafilesVec,
 
@@ -213,6 +247,9 @@ func resetMetrics() {
 	getVec.Reset()
 	putBytesVec.Reset()
 	getBytesVec.Reset()
+	capVec.Reset()
+	batchSizeVec.Reset()
+	maxDataVec.Reset()
 	sizeVec.Reset()
 	datafilesVec.Reset()
 	getLatencyVec.Reset()

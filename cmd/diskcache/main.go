@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	path             string
+	path, http       string
 	capacity         int64
 	disableGoMetrics bool
 	putLatency,
@@ -44,6 +44,7 @@ func init() {
 	flag.BoolVar(&disableGoMetrics, "disable-gom", false, "disable golang metrics")
 	flag.IntVar(&putLatency, "put-lat", 100, "put latency(ms) randome range(from 0)")
 	flag.IntVar(&getLatency, "get-lat", 100, "get latency(ms) randome range(from 0)")
+	flag.StringVar(&http, "http", "localhost:9090", "bind HTTP to serve /metrics")
 }
 
 func main() {
@@ -72,7 +73,6 @@ func getSamples() []byte {
 	}
 
 	start := r.Int() % len(dataBuf)
-	//log.Printf("get %s bytes from %s", humanize.SI(float64(n), ""), humanize.SI(float64(start), ""))
 
 	if start+n > len(dataBuf) {
 		return dataBuf[len(dataBuf)-n:] // return last n bytes
@@ -138,6 +138,7 @@ func run() {
 
 	ms := metrics.NewMetricServer()
 	ms.DisableGoMetrics = disableGoMetrics
+	ms.Listen = http
 
 	go func() {
 		if err := ms.Start(); err != nil {

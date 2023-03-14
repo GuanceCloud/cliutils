@@ -62,9 +62,6 @@ func (c *DiskCache) setupLabels() {
 	// label-keys are sorted.
 	c.labels = append(
 		c.labels,
-		fmt.Sprintf("%d", c.batchSize),
-		fmt.Sprintf("%d", c.capacity),
-		fmt.Sprintf("%d", c.maxDataSize),
 		fmt.Sprintf("%v", c.noLock),
 		fmt.Sprintf("%v", c.noPos),
 		fmt.Sprintf("%v", c.noSync),
@@ -115,6 +112,11 @@ func (c *DiskCache) doOpen() error {
 
 	c.setupLabels()
 
+	// set stable metrics
+	capVec.WithLabelValues(c.labels...).Set(float64(c.capacity))
+	maxDataVec.WithLabelValues(c.labels...).Set(float64(c.maxDataSize))
+	batchSizeVec.WithLabelValues(c.labels...).Set(float64(c.batchSize))
+
 	// write append fd, always write to the same-name file
 	if err := c.openWriteFile(); err != nil {
 		return err
@@ -132,7 +134,9 @@ func (c *DiskCache) doOpen() error {
 			}
 
 			switch filepath.Base(path) {
-			case ".lock", ".pos", "data": // ignore them
+			case ".lock", ".pos": // ignore them
+			case "data": // count on size
+				c.size += fi.Size()
 			default:
 				c.size += fi.Size()
 				c.dataFiles = append(c.dataFiles, path)
@@ -183,7 +187,6 @@ func (c *DiskCache) Close() error {
 	}
 
 	if c.wfd != nil {
-
 		if err := c.wfd.Close(); err != nil {
 			return err
 		}

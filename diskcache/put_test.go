@@ -229,7 +229,6 @@ func TestPutOnCapacityReached(t *T.T) {
 		c, err := Open(WithPath(p), WithCapacity(capacity), WithBatchSize(4*mb))
 		assert.NoError(t, err)
 
-		defer c.Close()
 		putBytes := 0
 
 		n := 0
@@ -281,8 +280,6 @@ func TestPutOnCapacityReached(t *T.T) {
 
 		c, err := Open(WithPath(p), WithCapacity(capacity), WithBatchSize(4*mb))
 		assert.NoError(t, err)
-
-		defer c.Close()
 
 		total := int64(0)
 

@@ -22,7 +22,7 @@ func (c *DiskCache) Put(data []byte) error {
 	defer func() {
 		putVec.WithLabelValues(c.labels...).Inc()
 		putLatencyVec.WithLabelValues(c.labels...).Observe(float64(time.Since(start) / time.Microsecond))
-		sizeVec.WithLabelValues(c.labels...).Set(float64(len(data) + dataHeaderLen))
+		sizeVec.WithLabelValues(c.labels...).Set(float64(c.size))
 		putBytesVec.WithLabelValues(c.labels...).Add(float64(len(data)))
 	}()
 
