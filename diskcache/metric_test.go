@@ -37,6 +37,119 @@ func getSamples(data []byte) []byte {
 	}
 }
 
+func TestPutGetMetrics(t *T.T) {
+	// test if metric size ok
+	t.Run("metrics-on-only-put", func(t *T.T) {
+		reg := prometheus.NewRegistry()
+		register(reg)
+
+		p := t.TempDir()
+		bsize := int64(100)
+		//capacity := bsize * 4
+		c, err := Open(
+			WithPath(p),
+			WithBatchSize(bsize),
+			//WithCapacity(capacity),
+		)
+		require.NoError(t, err)
+
+		data := make([]byte, bsize/2)
+
+		totalPut := 0
+		for i := 0; i < 10; i++ {
+			c.Put(data)
+			totalPut += (len(data) + dataHeaderLen)
+		}
+
+		// check if size == totalPut
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+		m := metrics.GetMetricOnLabels(mfs, "diskcache_size", c.labels...)
+		require.NotNil(t, m)
+		got := int(m.GetGauge().GetValue())
+		assert.Equal(t, totalPut, got, "c.size: %d, size-expect=%d", c.size, got-totalPut)
+
+		t.Logf("metrics:\n%s", metrics.MetricFamily2Text(mfs))
+
+		t.Cleanup(func() {
+			resetMetrics()
+			assert.NoError(t, c.Close())
+		})
+	})
+
+	t.Run("metrics-on-put-get", func(t *T.T) {
+		reg := prometheus.NewRegistry()
+		register(reg)
+
+		p := t.TempDir()
+		bsize := int64(100)
+		//capacity := bsize * 4
+		c, err := Open(
+			WithPath(p),
+			WithBatchSize(bsize),
+			//WithCapacity(capacity),
+		)
+		require.NoError(t, err)
+
+		data := make([]byte, bsize/2)
+
+		totalPut := 0
+		for i := 0; i < 10; i++ {
+			c.Put(data)
+			totalPut += len(data) // without dataHeaderLen
+		}
+
+		// force rotate
+		assert.NoError(t, c.rotate())
+
+		totalGet := 0
+		for i := 0; i < 10; i++ {
+			c.Get(func(x []byte) error {
+				totalGet += len(x)
+				return nil
+			})
+		}
+
+		c.Get(nil) // read EOF to tiger remove
+
+		// check if size == totalPut
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+		m := metrics.GetMetricOnLabels(mfs, "diskcache_size", c.labels...)
+		require.NotNil(t, m)
+		got := int(m.GetGauge().GetValue())
+		assert.Equal(t, 0, got, "c.size: %d", c.size)
+
+		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_bytes_total", c.labels...)
+		require.NotNil(t, m)
+		got = int(m.GetCounter().GetValue())
+		assert.Equal(t, totalGet, got)
+		assert.Equal(t, totalGet, totalPut)
+
+		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_total", c.labels...)
+		require.NotNil(t, m)
+		got = int(m.GetCounter().GetValue())
+		assert.Equal(t, 10, got)
+
+		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_latency", c.labels...)
+		require.NotNil(t, m)
+		got = int(m.GetSummary().GetSampleCount())
+		assert.Equal(t, 10, got)
+
+		m = metrics.GetMetricOnLabels(mfs, "diskcache_put_total", c.labels...)
+		require.NotNil(t, m)
+		got = int(m.GetCounter().GetValue())
+		assert.Equal(t, 10, got)
+
+		t.Logf("metrics:\n%s", metrics.MetricFamily2Text(mfs))
+
+		t.Cleanup(func() {
+			resetMetrics()
+			assert.NoError(t, c.Close())
+		})
+	})
+}
+
 func TestDropMetric(t *T.T) {
 	t.Skip()
 	t.Run("drop", func(t *T.T) {
@@ -47,7 +160,7 @@ func TestDropMetric(t *T.T) {
 		bsize := int64(1024)
 		capacity := bsize * 2
 
-		c, err := Open(WithPath(p), WithBatchSize(1024), WithCapacity(capacity))
+		c, err := Open(WithPath(p), WithBatchSize(bsize), WithCapacity(capacity))
 		assert.NoError(t, err)
 
 		data := make([]byte, 512)
@@ -152,7 +265,7 @@ func TestMetric(t *T.T) {
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_size", c.labels...)
 		require.NotNil(t, m)
-		assert.Equal(t, float64(100+dataHeaderLen+4 /*EOFHint*/), m.GetGauge().GetValue())
+		assert.Equal(t, float64(100+dataHeaderLen /*EOFHint*/), m.GetGauge().GetValue())
 
 		assert.NoError(t, c.Close())
 		mfs, err = metrics.Gather()
