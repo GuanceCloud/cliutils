@@ -8,6 +8,7 @@ package diskcache
 import (
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	T "testing"
 	"time"
 
@@ -280,6 +281,149 @@ func TestMetric(t *T.T) {
 
 		t.Cleanup(func() {
 			resetMetrics()
+		})
+	})
+}
+
+func TestConcurrentPutGetPerf(t *T.T) {
+	p := t.TempDir()
+	capacity := int64(1024 * 1024 * 1024)
+	data := make([]byte, 1024*1024)
+
+	t.Run("sing-put", func(t *T.T) {
+		c, err := Open(
+			WithPath(p),
+			WithCapacity(capacity),
+		)
+		require.NoError(t, err)
+
+		start := time.Now()
+		tick := time.NewTicker(time.Second)
+		defer tick.Stop()
+
+		var total int64
+		for {
+			select {
+			case <-tick.C:
+				goto end
+			default:
+				x := getSamples(data)
+				c.Put(x)
+				total += int64(len(x))
+			}
+		}
+
+	end:
+		t.Logf("write perf(%d bytes): %d bytes/ms", total, total/int64(time.Since(start)/time.Millisecond))
+
+		t.Cleanup(func() {
+			assert.NoError(t, c.Close())
+		})
+	})
+
+	t.Run("multi-put", func(t *T.T) {
+		c, err := Open(
+			WithPath(p),
+			WithCapacity(capacity),
+		)
+		require.NoError(t, err)
+
+		start := time.Now()
+		var total int64
+
+		tick := time.NewTicker(time.Second)
+		defer tick.Stop()
+
+		// 10 worker
+		wg := sync.WaitGroup{}
+		wg.Add(10)
+		for i := 0; i < 10; i++ {
+			go func() {
+				defer wg.Done()
+				for {
+					select {
+					case <-tick.C:
+						return
+					default:
+						x := getSamples(data)
+						c.Put(x)
+						atomic.AddInt64(&total, int64(len(x)))
+					}
+				}
+			}()
+		}
+
+		wg.Wait()
+
+		t.Logf("write perf(%d bytes): %d bytes/ms", total, total/int64(time.Since(start)/time.Millisecond))
+
+		t.Cleanup(func() {
+			assert.NoError(t, c.Close())
+		})
+	})
+
+	t.Run("multi-put-get", func(t *T.T) {
+		c, err := Open(
+			WithPath(p),
+			WithCapacity(capacity),
+		)
+		require.NoError(t, err)
+
+		start := time.Now()
+		var putTotal int64
+		var getTotal int64
+
+		tick := time.NewTicker(time.Second)
+		defer tick.Stop()
+
+		// put/get each 10 worker
+		wg := sync.WaitGroup{}
+		wg.Add(20)
+		for i := 0; i < 10; i++ {
+			go func() {
+				defer wg.Done()
+				for {
+					select {
+					case <-tick.C:
+						return
+					default:
+						x := getSamples(data)
+						c.Put(x)
+						atomic.AddInt64(&putTotal, int64(len(x)))
+					}
+				}
+			}()
+		}
+
+		for i := 0; i < 10; i++ {
+			go func() {
+				defer wg.Done()
+				for {
+					select {
+					case <-tick.C:
+						return
+					default:
+						if err := c.Get(func(x []byte) error {
+							atomic.AddInt64(&getTotal, int64(len(x)))
+							return nil
+						}); err != nil {
+							return
+						}
+					}
+				}
+			}()
+		}
+
+		wg.Wait()
+
+		t.Logf("write perf(%d bytes): put %d bytes/ms, get %dbytes/ms",
+			putTotal,
+			putTotal/int64(time.Since(start)/time.Millisecond),
+			getTotal/int64(time.Since(start)/time.Millisecond),
+		)
+
+		t.Cleanup(func() {
+			assert.NoError(t, c.Close())
 		})
 	})
 }

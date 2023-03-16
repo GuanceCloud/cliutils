@@ -90,39 +90,36 @@ log.Println(m.LineProto()) // get line-protocol format of metrics
 
 ## Prometheus 指标
 
-待补充
+所有指标均有如下 label：
 
-<!--
-## Cache 指标
+| label   | 取值               | 说明                                                         |
+| ---     | ---                | ---                                                          |
+| no_lock | true/false         | 是否关闭加锁功能（即允许一个 cache 目录同时被多次 `Open()`） |
+| no_pos  | true/false         | 是否关闭 pos 功能                                            |
+| no_sync | true/false         | 是否关闭同步写入功能                                         |
+| path    | cache 所在磁盘目录 | cache 所在磁盘目录                                           |
 
-指标集名称 `diskcache`
+指标列表如下：
 
-### Tags
-
-| Tag    | Descrition |
-| ---    | ---        |
-| `path` | Cache 目录 |
-
-### Metrics
-
-| Metric           | Descrition                                                                 | Type | Unit  |
-| ---              | ---                                                                        | ---  | ---   |
-| `batch_size`     | batch 大小                                                                 | int  | B     |
-| `cur_batch_size` | 当前写入文件的大小                                                         | int  | B     |
-| `data_files`     | 当前未消费（Get()）文件个数                                                | int  | count |
-| `dropped_batch`  | 因达到最大存储大小而丢弃的文件次数（也即文件个数，一次只会 drop 一个文件） | int  | count |
-| `get`            | `Get` 次数                                                                 | int  | count |
-| `get_bytes`      | `Get` 返回的总字节数                                                       | int  | B     |
-| `get_cost_avg`   | `Get` 平均耗时                                                             | int  | ns    |
-| `nolock`         | .lock 开关状态                                                             | bool | -     |
-| `nopos`          | .pos 开关状态                                                              | bool | -     |
-| `nosync`         | 是否每次写入都执行 sync                                                    | bool | -     |
-| `put`            | `Put` 次数                                                                 | int  | count |
-| `put_bytes`      | `Put` 总字节数                                                             | int  | B     |
-| `put_cost_avg`   | `Put` 平均耗时                                                             | int  | ns    |
-| `rotate_count`   | rotate 次数（每个分片文件写完即 rotate 一次）                              | int  | count |
-| `size`           | 当前 cache 总大小，含 *data* 文件以及其它未读取文件（*data.000..*）        | int  | B     |
--->
+| 指标                          | 类型    | 说明                                                           |
+| ---                           | ---     | ---                                                            |
+| diskcache_batch_size          | gauge   | HELP diskcache_batch_size data file size(in bytes)             |
+| diskcache_capacity            | gauge   | current capacity(in bytes)                                     |
+| diskcache_datafiles           | gauge   | current un-readed data files                                   |
+| diskcache_dropped_bytes_total | counter | dropped bytes during Put() when capacity reached               |
+| diskcache_dropped_total       | counter | dropped files during Put() when capacity reached               |
+| diskcache_get_bytes_total     | counter | cache Get() bytes count                                        |
+| diskcache_get_latency_sum     | summary | Get() time cost(micro-second)                                  |
+| diskcache_get_latency_count   | summary | Get() time cost(micro-second)                                  |
+| diskcache_get_total           | counter | cache Get() count                                              |
+| diskcache_max_data            | gauge   | max data to Put(in bytes), default 0                           |
+| diskcache_open_time           | gauge   | current cache Open time in unix timestamp(second)              |
+| diskcache_put_bytes_total     | counter | cache Put() bytes count                                        |
+| diskcache_put_latency_sum     | summary | Put() time cost(micro-second)                                  |
+| diskcache_put_latency_count   | summary | Put() time cost(micro-second)                                  |
+| diskcache_put_total           | counter | cache Put() count                                              |
+| diskcache_rotate_total        | counter | cache rotate count, mean file rotate from data to data.0000xxx |
+| diskcache_size                | gauge   | current cache size(in bytes)                                   |
 
 ## 性能估算
 
@@ -134,9 +131,20 @@ log.Println(m.LineProto()) // get line-protocol format of metrics
 - Total Number of Cores : 10 (8 performance and 2 efficiency)
 - Memory                : 16 GB
 
-目前大概测试下来，只写入情况，单线程写入和单线程写入的性能差不多（只有写入，没有读取），分别写入 3kb 和 1MB 大小的数据，其写入能达到 25MB 左右。但是混合情况下的多线程读写，写入性能急剧下降，只有 1.8MB 不到，读取性能只有 2MB 左右。
+> 详见测试用例 `TestConcurrentPutGetPerf`。
 
-## 后续改进预案
+单次写入的数据量在 100KB ~ 1MB 之间，分别测试单线程写入、多线程写入、多线程读写情况下的性能：
+
+| 测试情况   | worker | 性能（字节/毫秒） |
+| ---        | ---    | ---               |
+| 单线程写入 | 1      | 119708 bytes/ms   |
+| 多线程写入 | 10     | 118920 bytes/ms   |
+| 多线程读写 | 10+10  | 118920 bytes/ms   |
+
+综合下来，不管多线程读写还是单线程读写，其 IO 性能在当前的硬件上能达到 100MB/s 的速度。
+
+## TODO
 
 - [ ] 支持一次 `Get()/Put()` 多个数据，提高加锁的数据吞吐量
 - [ ] 支持 `Get()` 出错时重试机制（`WithErrorRetry(n)`）
+- [ ] 可执行程序（*cmd/diskcache*）支持查看已有（可能正在被其它进程占用）diskcache 的存储情况
