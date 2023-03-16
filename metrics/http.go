@@ -17,16 +17,16 @@ import (
 // MetricServer used to export metrics via HTTP /metrics request.
 type MetricServer struct {
 	// Metrics request path.
-	URL string
+	URL string `toml:"url" json:"url"`
 
 	// HTTP server address, default to localhost:9090.
-	Listen string
+	Listen string `toml:"url" json:"listen"`
 
 	// Enable or disable the http server.
-	Enable bool
+	Enable bool `toml:"enable" json:"enable"`
 
 	// Enable or disable Golang related metrics in metrics URL.
-	DisableGoMetrics bool
+	DisableGoMetrics bool `toml:"disable_go_metrics" json:"disable_go_metrics"`
 }
 
 // NewMetricServer create default metric server.
