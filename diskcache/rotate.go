@@ -17,28 +17,30 @@ import (
 
 // rotate to next new file, append to reading list.
 func (c *DiskCache) rotate() error {
-	l.Debugf("try rotate...")
+
+	c.rwlock.Lock()
+	defer c.rwlock.Unlock()
 
 	defer func() {
 		rotateVec.WithLabelValues(c.labels...).Inc()
-		sizeVec.WithLabelValues(c.labels...).Add(float64(dataHeaderLen))
+		sizeVec.WithLabelValues(c.labels...).Set(float64(c.size))
+		datafilesVec.WithLabelValues(c.labels...).Set(float64(len(c.dataFiles)))
 	}()
 
 	eof := make([]byte, dataHeaderLen)
 	binary.LittleEndian.PutUint32(eof, EOFHint)
-
-	if _, err := c.wfd.Write(eof); err != nil {
+	if _, err := c.wfd.Write(eof); err != nil { // append EOF to file end
 		return err
 	}
 
-	c.size += dataHeaderLen // eof hint also count to size
+	// NOTE: EOF bytes do not count to size
 
 	// rotate file
 	var newfile string
 	if len(c.dataFiles) == 0 {
 		newfile = filepath.Join(c.path, fmt.Sprintf("data.%032d", 0)) // first rotate file
 	} else {
-		// parse last file's name, i.e., `data.000003', the new rotate file is `data.000004`
+		// parse last file's name, such as `data.000003', the new rotate file is `data.000004`
 		last := c.dataFiles[len(c.dataFiles)-1]
 		arr := strings.Split(filepath.Base(last), ".")
 		if len(arr) != 2 {
@@ -49,6 +51,7 @@ func (c *DiskCache) rotate() error {
 			return ErrInvalidDataFileNameSuffix
 		}
 
+		// data.0003 -> data.0004
 		newfile = filepath.Join(c.path, fmt.Sprintf("data.%032d", x+1))
 	}
 
@@ -56,17 +59,15 @@ func (c *DiskCache) rotate() error {
 	if err := c.wfd.Close(); err != nil {
 		return err
 	}
+	c.wfd = nil
 
+	// rename data -> data.0004
 	if err := os.Rename(c.curWriteFile, newfile); err != nil {
 		return err
 	}
 
-	c.rwlock.Lock()
-	defer c.rwlock.Unlock()
 	c.dataFiles = append(c.dataFiles, newfile)
 	sort.Strings(c.dataFiles)
-
-	l.Debugf("add datafile: %s => %s", c.curWriteFile, newfile)
 
 	// reopen new write file
 	if err := c.openWriteFile(); err != nil {
@@ -84,6 +85,7 @@ func (c *DiskCache) removeCurrentReadingFile() error {
 	defer func() {
 		sizeVec.WithLabelValues(c.labels...).Set(float64(c.size))
 		removeVec.WithLabelValues(c.labels...).Inc()
+		datafilesVec.WithLabelValues(c.labels...).Set(float64(len(c.dataFiles)))
 	}()
 
 	if c.rfd != nil {
@@ -94,7 +96,7 @@ func (c *DiskCache) removeCurrentReadingFile() error {
 	}
 
 	if fi, err := os.Stat(c.curReadfile); err == nil {
-		c.size -= fi.Size()
+		c.size -= (fi.Size() - dataHeaderLen) // EOF bytes do not counted in size
 	}
 
 	if err := os.Remove(c.curReadfile); err != nil {
@@ -103,8 +105,6 @@ func (c *DiskCache) removeCurrentReadingFile() error {
 
 	if len(c.dataFiles) > 0 {
 		c.dataFiles = c.dataFiles[1:] // first file removed
-		l.Debugf("remove datafile: %s => %+#v",
-			c.curReadfile, c.dataFiles)
 	}
 
 	return nil

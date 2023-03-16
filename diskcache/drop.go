@@ -8,34 +8,37 @@ package diskcache
 import "os"
 
 func (c *DiskCache) dropBatch() error {
-	if len(c.dataFiles) > 0 {
-		fname := c.dataFiles[0]
 
-		if c.rfd != nil && c.curReadfile == fname {
-			if err := c.rfd.Close(); err != nil {
-				return err
-			}
+	c.rwlock.Lock()
+	defer c.rwlock.Unlock()
 
-			c.rfd = nil
+	if len(c.dataFiles) == 0 {
+		return nil
+	}
+
+	fname := c.dataFiles[0]
+
+	if c.rfd != nil && c.curReadfile == fname {
+		if err := c.rfd.Close(); err != nil {
+			return err
 		}
 
-		if fi, err := os.Stat(fname); err == nil {
-			if err := os.Remove(fname); err != nil {
-				return err
-			}
+		c.rfd = nil
+	}
 
-			c.size -= fi.Size()
-
-			c.rwlock.Lock()
-			defer c.rwlock.Unlock()
-
-			c.dataFiles = c.dataFiles[1:]
-
-			l.Debugf("drop datafile %s(%d) size: %d\n",
-				fname, fi.Size(), c.size)
-
-			droppedBatchVec.WithLabelValues(c.labels...).Inc()
+	if fi, err := os.Stat(fname); err == nil {
+		if err := os.Remove(fname); err != nil {
+			return err
 		}
+
+		c.size -= fi.Size()
+
+		c.dataFiles = c.dataFiles[1:]
+
+		droppedBatchVec.WithLabelValues(c.labels...).Inc()
+		droppedBytesVec.WithLabelValues(c.labels...).Add(float64(fi.Size()))
+		datafilesVec.WithLabelValues(c.labels...).Set(float64(len(c.dataFiles)))
+		sizeVec.WithLabelValues(c.labels...).Set(float64(c.size))
 	}
 
 	return nil

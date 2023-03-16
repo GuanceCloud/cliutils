@@ -21,9 +21,9 @@ func (c *DiskCache) Put(data []byte) error {
 
 	defer func() {
 		putVec.WithLabelValues(c.labels...).Inc()
-		putLatencyVec.WithLabelValues(c.labels...).Observe(float64(time.Since(start) / time.Microsecond))
-		sizeVec.WithLabelValues(c.labels...).Set(float64(len(data) + dataHeaderLen))
 		putBytesVec.WithLabelValues(c.labels...).Add(float64(len(data)))
+		putLatencyVec.WithLabelValues(c.labels...).Observe(float64(time.Since(start) / time.Microsecond))
+		sizeVec.WithLabelValues(c.labels...).Set(float64(c.size))
 	}()
 
 	if c.capacity > 0 && c.size+int64(len(data)) > c.capacity {
@@ -33,7 +33,6 @@ func (c *DiskCache) Put(data []byte) error {
 	}
 
 	if c.maxDataSize > 0 && int32(len(data)) > c.maxDataSize {
-		l.Warnf("too large data: %d > %d", len(data), c.maxDataSize)
 		return ErrTooLargeData
 	}
 
