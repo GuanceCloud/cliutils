@@ -10,6 +10,7 @@ import (
 	"bytes"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 )
@@ -24,6 +25,12 @@ func MustRegister(c ...prometheus.Collector) {
 // Register add c to global registry.
 func Register(c prometheus.Collector) error {
 	return reg.Register(c)
+}
+
+// MustAddGolangMetrics enable Golang runtime metrics.
+func MustAddGolangMetrics() {
+	goexporter := collectors.NewGoCollector(collectors.WithGoCollectorRuntimeMetrics(collectors.MetricsAll))
+	MustRegister(goexporter)
 }
 
 // Unregister remove c from global registry.

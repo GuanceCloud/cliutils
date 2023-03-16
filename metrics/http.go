@@ -10,7 +10,6 @@ package metrics
 import (
 	"net/http"
 
-	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -41,8 +40,7 @@ func NewMetricServer() *MetricServer {
 // Start create HTTP server to serving /metrics request.
 func (ms *MetricServer) Start() error {
 	if !ms.DisableGoMetrics {
-		goexporter := collectors.NewGoCollector(collectors.WithGoCollectorRuntimeMetrics(collectors.MetricsAll))
-		MustRegister(goexporter)
+		MustAddGolangMetrics()
 	}
 
 	if !ms.Enable {
@@ -53,4 +51,10 @@ func (ms *MetricServer) Start() error {
 		reg,
 		promhttp.HandlerOpts{} /*TODO: add options here*/))
 	return http.ListenAndServe(ms.Listen, nil)
+}
+
+// HTTPHandler return a http.Handler, you can apply this handler to
+// other HTTP module, such as gin.
+func HTTPHandler(opt promhttp.HandlerOpts) http.Handler {
+	return promhttp.HandlerFor(reg, opt)
 }
