@@ -1,3 +1,9 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
+//nolint:gosec
 package main
 
 import (
@@ -34,6 +40,7 @@ const (
 	GB = 1024 * 1024 * 1024
 )
 
+//nolint:gochecknoinits
 func init() {
 	flag.StringVar(&path, "path", "./disccache", "cache path")
 	flag.Int64Var(&capacity, "cap", 32, "cache capacity(GB)")
@@ -48,7 +55,6 @@ func init() {
 }
 
 func main() {
-
 	flag.Parse()
 	var err error
 
@@ -63,7 +69,7 @@ func main() {
 	run()
 }
 
-// get random bytes from dataBuf
+// get random bytes from dataBuf.
 func getSamples() []byte {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -85,7 +91,6 @@ func put(n int) {
 	wg.Add(workers)
 	for i := 0; i < workers; i++ {
 		go func() {
-
 			defer wg.Done()
 			for {
 				select {
@@ -94,7 +99,7 @@ func put(n int) {
 				default:
 					r := rand.New(rand.NewSource(time.Now().UnixNano()))
 					time.Sleep(time.Millisecond * time.Duration(r.Int()%getLatency))
-					cache.Put(getSamples())
+					cache.Put(getSamples()) //nolint:errcheck
 				}
 			}
 		}()
@@ -121,7 +126,7 @@ func get(n int) {
 						}
 					}
 				default:
-					cache.Get(func(_ []byte) error {
+					cache.Get(func(_ []byte) error { // nolint: errcheck
 						r := rand.New(rand.NewSource(time.Now().UnixNano()))
 						time.Sleep(time.Millisecond * time.Duration(r.Int()%getLatency))
 						return nil

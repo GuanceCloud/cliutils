@@ -70,7 +70,6 @@ func (c *DiskCache) setupLabels() {
 }
 
 func (c *DiskCache) doOpen() error {
-
 	if c.dirPerms == 0 {
 		c.dirPerms = 0o755
 	}
@@ -171,7 +170,6 @@ func (c *DiskCache) Close() error {
 	}()
 
 	if c.rfd != nil {
-
 		if err := c.rfd.Close(); err != nil {
 			return err
 		}

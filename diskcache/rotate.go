@@ -17,7 +17,6 @@ import (
 
 // rotate to next new file, append to reading list.
 func (c *DiskCache) rotate() error {
-
 	c.rwlock.Lock()
 	defer c.rwlock.Unlock()
 

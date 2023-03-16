@@ -8,7 +8,6 @@ package diskcache
 import "os"
 
 func (c *DiskCache) dropBatch() error {
-
 	c.rwlock.Lock()
 	defer c.rwlock.Unlock()
 

@@ -43,7 +43,6 @@ var (
 )
 
 func setupMetrics() {
-
 	getLatencyVec = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace: ns,
