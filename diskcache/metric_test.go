@@ -149,7 +149,6 @@ func TestPutGetMetrics(t *T.T) {
 }
 
 func TestMetric(t *T.T) {
-
 	t.Run("basic", func(t *T.T) {
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
