@@ -10,6 +10,7 @@ package metrics
 import (
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -53,8 +54,15 @@ func (ms *MetricServer) Start() error {
 	return http.ListenAndServe(ms.Listen, nil)
 }
 
-// HTTPHandler return a http.Handler, you can apply this handler to
-// other HTTP module, such as gin.
-func HTTPHandler(opt promhttp.HandlerOpts) http.Handler {
-	return promhttp.HandlerFor(reg, opt)
+// HTTPGinHandler wrap promhttp handler as gin hander. We can
+// attach url /metrics to a exist gin router like this:
+//
+//    router := gin.New()
+//    router.GET("/metrics", HTTPGinHandler(promhttp.HandlerOpts{}))
+//
+func HTTPGinHandler(opt promhttp.HandlerOpts) gin.HandlerFunc {
+	h := promhttp.HandlerFor(reg, opt)
+	return func(c *gin.Context) {
+		h.ServeHTTP(c.Writer, c.Request)
+	}
 }

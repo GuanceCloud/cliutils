@@ -6,6 +6,9 @@
 package metrics
 
 import (
+	"fmt"
+	"io/ioutil"
+	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	T "testing"
@@ -25,13 +28,10 @@ func TestRouteForGin(t *T.T) {
 			[]string{"api", "status"},
 		)
 
-		reg := prometheus.NewRegistry()
-		reg.MustRegister(vec)
+		MustRegister(vec)
 
 		router := gin.New()
-		router.GET("/metrics", func(c *gin.Context) {
-			HTTPHandler(promhttp.HandlerOpts{})
-		})
+		router.GET("/metrics", HTTPGinHandler(promhttp.HandlerOpts{}))
 		ts := httptest.NewServer(router)
 		defer ts.Close()
 
@@ -48,8 +48,12 @@ func TestRouteForGin(t *T.T) {
 			}
 		}
 
-		mfs, err := reg.Gather()
+		req, err := http.Get(fmt.Sprintf("%s/metrics", ts.URL))
 		assert.NoError(t, err)
-		t.Logf("\n%s", MetricFamily2Text(mfs))
+
+		body, err := ioutil.ReadAll(req.Body)
+		assert.NoError(t, err)
+
+		t.Logf("\n%s", string(body))
 	})
 }
