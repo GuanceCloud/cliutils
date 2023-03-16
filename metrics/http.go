@@ -20,7 +20,7 @@ type MetricServer struct {
 	URL string `toml:"url" json:"url"`
 
 	// HTTP server address, default to localhost:9090.
-	Listen string `toml:"url" json:"listen"`
+	Listen string `toml:"listen" json:"listen"`
 
 	// Enable or disable the http server.
 	Enable bool `toml:"enable" json:"enable"`
