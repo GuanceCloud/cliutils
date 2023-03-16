@@ -42,7 +42,7 @@ const (
 
 //nolint:gochecknoinits
 func init() {
-	flag.StringVar(&path, "path", "./disccache", "cache path")
+	flag.StringVar(&path, "path", "./diskcache", "cache path")
 	flag.Int64Var(&capacity, "cap", 32, "cache capacity(GB)")
 	flag.IntVar(&workers, "workers", 1, "concurrent Put/Get workers")
 	flag.IntVar(&sampleMax, "smax", 32768, "maximum sample size(KB)")
