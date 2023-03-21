@@ -60,7 +60,7 @@ func BenchmarkNosyncPutGet(b *T.B) {
 
 	b.Cleanup(func() {
 		assert.NoError(b, c.Close())
-		resetMetrics()
+		ResetMetrics()
 	})
 }
 
@@ -106,7 +106,7 @@ func BenchmarkPutGet(b *T.B) {
 
 	b.Cleanup(func() {
 		assert.NoError(b, c.Close())
-		resetMetrics()
+		ResetMetrics()
 	})
 }
 
@@ -206,7 +206,7 @@ func TestConcurrentPutGet(t *T.T) {
 
 	t.Cleanup(func() {
 		assert.NoError(t, c.Close())
-		resetMetrics()
+		ResetMetrics()
 	})
 }
 
@@ -258,7 +258,7 @@ func TestPutOnCapacityReached(t *T.T) {
 
 		t.Cleanup(func() {
 			require.NoError(t, c.Close())
-			resetMetrics()
+			ResetMetrics()
 		})
 	})
 
@@ -319,7 +319,7 @@ func TestPutOnCapacityReached(t *T.T) {
 
 		t.Cleanup(func() {
 			assert.NoError(t, c.Close())
-			resetMetrics()
+			ResetMetrics()
 		})
 	})
 }

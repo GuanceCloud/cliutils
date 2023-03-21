@@ -238,7 +238,8 @@ func register(reg *prometheus.Registry) {
 		putLatencyVec)
 }
 
-func resetMetrics() {
+// ResetMetrics used to cleanup exist metrics of diskcache.
+func ResetMetrics() {
 	droppedBatchVec.Reset()
 	droppedBytesVec.Reset()
 	rotateVec.Reset()

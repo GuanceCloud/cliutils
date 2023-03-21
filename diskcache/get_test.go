@@ -46,7 +46,7 @@ func TestPutGet(t *T.T) {
 
 		t.Cleanup(func() {
 			c.Close()
-			resetMetrics()
+			ResetMetrics()
 		})
 	})
 

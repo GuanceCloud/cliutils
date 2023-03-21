@@ -60,7 +60,7 @@ func TestRotate(t *T.T) {
 
 		t.Cleanup(func() {
 			assert.NoError(t, c.Close())
-			resetMetrics()
+			ResetMetrics()
 		})
 	})
 
@@ -127,7 +127,7 @@ func TestRotate(t *T.T) {
 
 		t.Cleanup(func() {
 			assert.NoError(t, c.Close())
-			resetMetrics()
+			ResetMetrics()
 		})
 	})
 }

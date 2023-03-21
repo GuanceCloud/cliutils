@@ -71,7 +71,7 @@ func TestPutGetMetrics(t *T.T) {
 		t.Logf("metrics:\n%s", metrics.MetricFamily2Text(mfs))
 
 		t.Cleanup(func() {
-			resetMetrics()
+			ResetMetrics()
 			assert.NoError(t, c.Close())
 		})
 	})
@@ -142,7 +142,7 @@ func TestPutGetMetrics(t *T.T) {
 		t.Logf("metrics:\n%s", metrics.MetricFamily2Text(mfs))
 
 		t.Cleanup(func() {
-			resetMetrics()
+			ResetMetrics()
 			assert.NoError(t, c.Close())
 		})
 	})
@@ -225,7 +225,7 @@ func TestMetric(t *T.T) {
 		require.NotNil(t, m)
 
 		t.Cleanup(func() {
-			resetMetrics()
+			ResetMetrics()
 		})
 	})
 }

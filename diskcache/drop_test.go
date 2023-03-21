@@ -57,7 +57,7 @@ func TestDropBatch(t *T.T) {
 
 	t.Cleanup(func() {
 		assert.NoError(t, c.Close())
-		resetMetrics()
+		ResetMetrics()
 	})
 }
 
@@ -126,6 +126,6 @@ func TestDropDuringGet(t *T.T) {
 
 	t.Cleanup(func() {
 		assert.NoError(t, c.Close())
-		resetMetrics()
+		ResetMetrics()
 	})
 }
