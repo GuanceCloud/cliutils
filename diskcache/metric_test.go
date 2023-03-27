@@ -38,6 +38,39 @@ func getSamples(data []byte) []byte {
 }
 
 func TestPutGetMetrics(t *T.T) {
+	t.Run("test-wakeup-count", func(t *T.T) {
+		reg := prometheus.NewRegistry()
+		register(reg)
+
+		p := t.TempDir()
+		c, err := Open(WithPath(p), WithWakeup(time.Second))
+		require.NoError(t, err)
+
+		data := make([]byte, 4)
+
+		require.NoError(t, c.Put(data))
+
+		time.Sleep(time.Second * 2)
+
+		require.NoError(t, c.Get(nil))
+
+		mfs, err := reg.Gather()
+		assert.NoError(t, err)
+
+		m := metrics.GetMetricOnLabels(mfs, "diskcache_wakeup_total", c.labels...)
+		require.NotNil(t, m)
+		require.Equal(t, 1.0, m.GetCounter().GetValue())
+
+		m = metrics.GetMetricOnLabels(mfs, "diskcache_rotate_total", c.labels...)
+		require.NotNil(t, m)
+		require.Equal(t, 1.0, m.GetCounter().GetValue())
+
+		t.Cleanup(func() {
+			ResetMetrics()
+			assert.NoError(t, c.Close())
+		})
+	})
+
 	// test if metric size ok
 	t.Run("metrics-on-only-put", func(t *T.T) {
 		reg := prometheus.NewRegistry()
@@ -138,8 +171,6 @@ func TestPutGetMetrics(t *T.T) {
 		require.NotNil(t, m)
 		got = int(m.GetCounter().GetValue())
 		assert.Equal(t, 10, got)
-
-		t.Logf("metrics:\n%s", metrics.MetricFamily2Text(mfs))
 
 		t.Cleanup(func() {
 			ResetMetrics()

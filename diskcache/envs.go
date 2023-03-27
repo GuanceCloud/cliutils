@@ -40,4 +40,8 @@ func (c *DiskCache) syncEnv() {
 	if v, ok := os.LookupEnv("ENV_DISKCACHE_NO_LOCK"); ok && v != "" {
 		c.noLock = true
 	}
+
+	if v, ok := os.LookupEnv("ENV_DISKCACHE_NO_FALLBACK_ON_ERROR"); ok && v != "" {
+		c.noFallbackOnError = true
+	}
 }

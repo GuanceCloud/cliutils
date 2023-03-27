@@ -49,12 +49,13 @@ func TestSyncEnv(t *testing.T) {
 		{
 			name: "env-all",
 			envs: map[string]string{
-				"ENV_DISKCACHE_MAX_DATA_SIZE": "123",
-				"ENV_DISKCACHE_BATCH_SIZE":    "234",
-				"ENV_DISKCACHE_CAPACITY":      "1234567890",
-				"ENV_DISKCACHE_NO_SYNC":       "foo-bar",
-				"ENV_DISKCACHE_NO_POS":        "on",
-				"ENV_DISKCACHE_NO_LOCK":       "on",
+				"ENV_DISKCACHE_MAX_DATA_SIZE":        "123",
+				"ENV_DISKCACHE_BATCH_SIZE":           "234",
+				"ENV_DISKCACHE_CAPACITY":             "1234567890",
+				"ENV_DISKCACHE_NO_SYNC":              "foo-bar",
+				"ENV_DISKCACHE_NO_POS":               "on",
+				"ENV_DISKCACHE_NO_LOCK":              "on",
+				"ENV_DISKCACHE_NO_FALLBACK_ON_ERROR": "on",
 			},
 			expect: func() *DiskCache {
 				c := defaultInstance()
@@ -64,6 +65,7 @@ func TestSyncEnv(t *testing.T) {
 				c.noSync = true
 				c.noPos = true
 				c.noLock = true
+				c.noFallbackOnError = true
 				return c
 			}(),
 		},

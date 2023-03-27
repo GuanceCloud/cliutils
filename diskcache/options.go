@@ -13,6 +13,18 @@ import (
 
 type CacheOption func(c *DiskCache)
 
+// WithNoFallbackOnError disable fallback on fn() error.
+//
+// During Get(fn(data []btye)error{...}), if fn() failed with error,
+// the next Get still get the same data from cache.
+// If fallback disabled, the next read will read new data from cache,
+// and the previous failed data skipped(and eventually dropped).
+func WithNoFallbackOnError(on bool) CacheOption {
+	return func(c *DiskCache) {
+		c.noFallbackOnError = on
+	}
+}
+
 // WithNoLock set .lock on or off.
 // .lock used to exclude Open() on same path.
 func WithNoLock(on bool) CacheOption {

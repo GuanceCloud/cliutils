@@ -8,6 +8,7 @@ package diskcache
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 	"time"
 )
 
@@ -21,7 +22,10 @@ type Fn func([]byte) error
 // Get is safe to call concurrently with other operations and will
 // block until all other operations finish.
 func (c *DiskCache) Get(fn Fn) error {
-	var nbytes int
+	var (
+		n, nbytes int
+		err       error
+	)
 
 	c.rlock.Lock()
 	defer c.rlock.Unlock()
@@ -39,8 +43,10 @@ func (c *DiskCache) Get(fn Fn) error {
 	}()
 
 	// wakeup sleeping write file, rotate it for succession reading!
-	if time.Since(c.wfdCreated) > c.wakeup && c.curBatchSize > 0 {
-		if err := func() error {
+	if time.Since(c.wfdLastWrite) > c.wakeup && c.curBatchSize > 0 {
+		wakeupVec.WithLabelValues(c.labels...).Inc()
+
+		if err = func() error {
 			c.wlock.Lock()
 			defer c.wlock.Unlock()
 			return c.rotate()
@@ -50,7 +56,7 @@ func (c *DiskCache) Get(fn Fn) error {
 	}
 
 	if c.rfd == nil {
-		if err := c.switchNextFile(); err != nil {
+		if err = c.switchNextFile(); err != nil {
 			return err
 		}
 	}
@@ -61,7 +67,7 @@ retry:
 	}
 
 	hdr := make([]byte, dataHeaderLen)
-	if n, err := c.rfd.Read(hdr); err != nil {
+	if n, err = c.rfd.Read(hdr); err != nil {
 		return fmt.Errorf("rfd.Read(%s): %w", c.curReadfile, err)
 	} else if n != dataHeaderLen {
 		return ErrBadHeader
@@ -70,19 +76,19 @@ retry:
 	nbytes = int(binary.LittleEndian.Uint32(hdr[0:]))
 
 	if nbytes == EOFHint { // EOF
-		if err := c.removeCurrentReadingFile(); err != nil {
+		if err = c.removeCurrentReadingFile(); err != nil {
 			return fmt.Errorf("removeCurrentReadingFile: %w", err)
 		}
 
 		// clear .pos
 		if !c.noPos {
-			if err := c.pos.reset(); err != nil {
+			if err = c.pos.reset(); err != nil {
 				return err
 			}
 		}
 
 		// reopen next file to read
-		if err := c.switchNextFile(); err != nil {
+		if err = c.switchNextFile(); err != nil {
 			return err
 		}
 
@@ -91,23 +97,33 @@ retry:
 
 	databuf := make([]byte, nbytes)
 
-	if n, err := c.rfd.Read(databuf); err != nil {
+	if n, err = c.rfd.Read(databuf); err != nil {
 		return err
 	} else if n != nbytes {
 		return ErrUnexpectedReadSize
 	}
 
+	if fn == nil {
+		goto __updatePos
+	}
+
+	if err = fn(databuf); err != nil {
+		// seek back
+		if !c.noFallbackOnError {
+			if _, err = c.rfd.Seek(-int64(dataHeaderLen+nbytes), io.SeekCurrent); err != nil {
+				return err
+			}
+		}
+	}
+
+__updatePos:
 	// update seek position
 	if !c.noPos {
 		c.pos.Seek += int64(dataHeaderLen + nbytes)
-		if err := c.pos.dumpFile(); err != nil {
+		if err = c.pos.dumpFile(); err != nil {
 			return err
 		}
 	}
 
-	if fn != nil {
-		return fn(databuf)
-	}
-
-	return nil
+	return err
 }

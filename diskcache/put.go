@@ -55,6 +55,7 @@ func (c *DiskCache) Put(data []byte) error {
 
 	c.curBatchSize += int64(len(data) + dataHeaderLen)
 	c.size += int64(len(data) + dataHeaderLen)
+	c.wfdLastWrite = time.Now()
 
 	// rotate new file
 	if c.curBatchSize >= c.batchSize {

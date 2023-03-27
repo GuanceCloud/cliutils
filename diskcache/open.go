@@ -62,6 +62,7 @@ func (c *DiskCache) setupLabels() {
 	// label-keys are sorted.
 	c.labels = append(
 		c.labels,
+		fmt.Sprintf("%v", c.noFallbackOnError),
 		fmt.Sprintf("%v", c.noLock),
 		fmt.Sprintf("%v", c.noPos),
 		fmt.Sprintf("%v", c.noSync),
