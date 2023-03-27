@@ -113,6 +113,7 @@ retry:
 			if _, err = c.rfd.Seek(-int64(dataHeaderLen+nbytes), io.SeekCurrent); err != nil {
 				return err
 			}
+			goto __end // do not update .pos
 		}
 	}
 
@@ -125,5 +126,6 @@ __updatePos:
 		}
 	}
 
+__end:
 	return err
 }

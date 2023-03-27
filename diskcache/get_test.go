@@ -32,6 +32,8 @@ func TestFallbackOnError(t *T.T) {
 			return fmt.Errorf("get error")
 		})
 
+		assert.Equal(t, int64(0), c.pos.Seek)
+
 		c.Get(func(x []byte) error { // nolint:errcheck
 			assert.Equal(t, data, x)
 			return nil
