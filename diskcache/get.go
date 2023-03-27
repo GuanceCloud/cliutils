@@ -12,11 +12,11 @@ import (
 	"time"
 )
 
-// Fn is the handler to eat cache from disk.
+// Fn is the handler to eat cache from diskcache.
 type Fn func([]byte) error
 
-// Get fetch new data from disk cache, then passing to @fn
-// if any error occurred during call @fn, the reading data is
+// Get fetch new data from disk cache, then passing to fn
+// if any error occurred during call fn, the reading data is
 // dropped, and will not read again.
 //
 // Get is safe to call concurrently with other operations and will

@@ -4,6 +4,16 @@
 // Copyright 2021-present Guance, Inc.
 
 // Package diskcache is a simple local-disk cache implements.
+//
+// The diskcache package is a local-disk cache, it implements following functions:
+//
+//  1. Concurrent Put()/Get().
+//  2. Recoverable last-read-position on restart.
+//  3. Exclusive Open() on same path.
+//  4. Errors during Get() are retriable.
+//  5. Auto-rotate on batch size.
+//  6. Drop in FIFO policy when max capacity reached.
+//  7. We can configure various specifics in environments without to modify options source code.
 package diskcache
 
 import (
