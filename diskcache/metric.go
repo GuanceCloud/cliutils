@@ -269,6 +269,11 @@ func ResetMetrics() {
 	putLatencyVec.Reset()
 }
 
+// Labels export cache's labels used to query prometheus metrics.
+func (c *DiskCache) Labels() []string {
+	return c.labels
+}
+
 // nolint: gochecknoinits
 func init() {
 	setupMetrics()
