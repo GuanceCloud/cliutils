@@ -274,6 +274,31 @@ func (c *DiskCache) Labels() []string {
 	return c.labels
 }
 
+func Metrics() []prometheus.Collector {
+	return []prometheus.Collector{
+		droppedBatchVec,
+		droppedBytesVec,
+		rotateVec,
+		removeVec,
+		putVec,
+		getVec,
+		putBytesVec,
+		wakeupVec,
+		getBytesVec,
+
+		sizeVec,
+		openTimeVec,
+		lastCloseTimeVec,
+		capVec,
+		maxDataVec,
+		batchSizeVec,
+		datafilesVec,
+
+		getLatencyVec,
+		putLatencyVec,
+	}
+}
+
 // nolint: gochecknoinits
 func init() {
 	setupMetrics()
