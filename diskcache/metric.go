@@ -18,6 +18,7 @@ var (
 	putVec,
 	getVec,
 	putBytesVec,
+	wakeupVec,
 	getBytesVec *prometheus.CounterVec
 
 	sizeVec,
@@ -35,6 +36,7 @@ var (
 
 	expLabels = []string{
 		// NOTE: make them sorted.
+		"no_fallback_on_error",
 		"no_lock",
 		"no_pos",
 		"no_sync",
@@ -124,6 +126,14 @@ func setupMetrics() {
 		expLabels,
 	)
 
+	wakeupVec = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: ns,
+			Name:      "wakeup_total",
+			Help:      "wakeup count on sleeping write file",
+		}, expLabels,
+	)
+
 	getBytesVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: ns,
@@ -203,6 +213,7 @@ func setupMetrics() {
 		putVec,
 		getVec,
 		putBytesVec,
+		wakeupVec,
 		getBytesVec,
 
 		openTimeVec,
@@ -226,6 +237,7 @@ func register(reg *prometheus.Registry) {
 		putVec,
 		getVec,
 		putBytesVec,
+		wakeupVec,
 		getBytesVec,
 
 		capVec,
@@ -246,6 +258,7 @@ func ResetMetrics() {
 	putVec.Reset()
 	getVec.Reset()
 	putBytesVec.Reset()
+	wakeupVec.Reset()
 	getBytesVec.Reset()
 	capVec.Reset()
 	batchSizeVec.Reset()
@@ -254,6 +267,36 @@ func ResetMetrics() {
 	datafilesVec.Reset()
 	getLatencyVec.Reset()
 	putLatencyVec.Reset()
+}
+
+// Labels export cache's labels used to query prometheus metrics.
+func (c *DiskCache) Labels() []string {
+	return c.labels
+}
+
+func Metrics() []prometheus.Collector {
+	return []prometheus.Collector{
+		droppedBatchVec,
+		droppedBytesVec,
+		rotateVec,
+		removeVec,
+		putVec,
+		getVec,
+		putBytesVec,
+		wakeupVec,
+		getBytesVec,
+
+		sizeVec,
+		openTimeVec,
+		lastCloseTimeVec,
+		capVec,
+		maxDataVec,
+		batchSizeVec,
+		datafilesVec,
+
+		getLatencyVec,
+		putLatencyVec,
+	}
 }
 
 // nolint: gochecknoinits

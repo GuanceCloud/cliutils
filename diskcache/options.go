@@ -11,10 +11,24 @@ import (
 	"time"
 )
 
+// A CacheOption used to set various options on DiskCache.
 type CacheOption func(c *DiskCache)
 
+// WithNoFallbackOnError disable fallback on fn() error.
+//
+// During Get(fn(data []btye)error{...}), if fn() failed with error,
+// the next Get still get the same data from cache.
+// If fallback disabled, the next read will read new data from cache,
+// and the previous failed data skipped(and eventually dropped).
+func WithNoFallbackOnError(on bool) CacheOption {
+	return func(c *DiskCache) {
+		c.noFallbackOnError = on
+	}
+}
+
 // WithNoLock set .lock on or off.
-// .lock used to exclude Open() on same path.
+//
+// File '.lock' used to exclude Open() on same path.
 func WithNoLock(on bool) CacheOption {
 	return func(c *DiskCache) {
 		c.noLock = on
@@ -22,9 +36,10 @@ func WithNoLock(on bool) CacheOption {
 }
 
 // WithNoPos set .pos on or off.
-// .pos used to remember last Get position of cache, without
-// .pos, if process stop and restart, some already-Get data will
-// re-Get in the new process.
+//
+// The file '.pos' used to remember last Get() position, without '.pos',
+// on process restart, some already-Get() data will Get() again in the
+// new process, this maybe not the right action we expect.
 func WithNoPos(on bool) CacheOption {
 	return func(c *DiskCache) {
 		c.noPos = on
@@ -33,6 +48,7 @@ func WithNoPos(on bool) CacheOption {
 
 // WithWakeup set duration on wakeup(default 3s), this wakeup time
 // used to shift current-writing-file to ready-to-reading-file.
+//
 // NOTE: without wakeup, current-writing-file maybe not read-available
 // for a long time.
 func WithWakeup(wakeup time.Duration) CacheOption {
@@ -84,7 +100,7 @@ func WithExtraCapacity(size int64) CacheOption {
 
 // WithNoSync enable/disable sync on cache write.
 //
-// without sync, the write performance 60~80 times faster for 512KB/1MB put,
+// NOTE: Without sync, the write performance 60~80 times faster for 512KB/1MB put,
 // for smaller put will get more faster(1kb for 4000+ times).
 func WithNoSync(on bool) CacheOption {
 	return func(c *DiskCache) {

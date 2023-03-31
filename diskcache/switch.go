@@ -7,6 +7,7 @@ package diskcache
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"time"
 )
@@ -41,7 +42,7 @@ func (c *DiskCache) loadUnfinishedFile() error {
 		return fmt.Errorf("OpenFile: %w", err)
 	}
 
-	if _, err := fd.Seek(pos.Seek, 0); err != nil {
+	if _, err := fd.Seek(pos.Seek, io.SeekStart); err != nil {
 		return fmt.Errorf("Seek(%q: %d, 0): %w", pos.Name, pos.Seek, err)
 	}
 
@@ -101,7 +102,7 @@ func (c *DiskCache) openWriteFile() error {
 		return fmt.Errorf("under openWriteFile, OpenFile: %w", err)
 	}
 
-	c.wfdCreated = time.Now()
+	c.wfdLastWrite = time.Now()
 	c.wfd = wfd
 	return nil
 }

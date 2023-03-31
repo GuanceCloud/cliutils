@@ -15,6 +15,15 @@ import (
 	"strings"
 )
 
+// Rotate force diskcache switch(rotate) from current write file(cwf) to next
+// new file, leave cwf become readble on successive Get().
+//
+// NOTE: You do not need to call Rotate() during daily usage, we export
+// that function for testing cases.
+func (c *DiskCache) Rotate() error {
+	return c.rotate()
+}
+
 // rotate to next new file, append to reading list.
 func (c *DiskCache) rotate() error {
 	c.rwlock.Lock()

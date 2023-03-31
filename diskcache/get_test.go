@@ -7,6 +7,7 @@ package diskcache
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	T "testing"
 
@@ -15,6 +16,65 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestFallbackOnError(t *T.T) {
+	t.Run(`fallback-on-error`, func(t *T.T) {
+		p := t.TempDir()
+		c, err := Open(WithPath(p))
+		assert.NoError(t, err)
+
+		data := make([]byte, 100)
+		assert.NoError(t, c.Put(data))
+
+		assert.NoError(t, c.rotate())
+
+		c.Get(func(_ []byte) error { //nolint: errcheck
+			return fmt.Errorf("get error")
+		})
+
+		assert.Equal(t, int64(0), c.pos.Seek)
+
+		c.Get(func(x []byte) error { // nolint:errcheck
+			assert.Equal(t, data, x)
+			return nil
+		})
+	})
+
+	t.Run(`fallback-on-eof-error`, func(t *T.T) {
+		p := t.TempDir()
+		c, err := Open(WithPath(p))
+		assert.NoError(t, err)
+
+		// while on EOF, Fn error ignored
+		assert.ErrorIs(t, c.Get(func(_ []byte) error {
+			return fmt.Errorf("get error")
+		}), ErrEOF)
+
+		// still got EOF
+		assert.ErrorIs(t, c.Get(func(x []byte) error {
+			return nil
+		}), ErrEOF)
+	})
+
+	t.Run(`no-fallback-on-error`, func(t *T.T) {
+		p := t.TempDir()
+		c, err := Open(WithPath(p), WithNoFallbackOnError(true))
+		assert.NoError(t, err)
+
+		data := make([]byte, 100)
+		assert.NoError(t, c.Put(data))
+
+		assert.NoError(t, c.rotate())
+
+		c.Get(func(_ []byte) error {
+			return fmt.Errorf("get error")
+		})
+
+		assert.ErrorIs(t, c.Get(func(x []byte) error {
+			return nil
+		}), ErrEOF)
+	})
+}
 
 func TestPutGet(t *T.T) {
 	t.Run(`clean-pos-on-eof`, func(t *T.T) {
