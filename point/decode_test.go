@@ -22,9 +22,33 @@ func TestDecode(t *testing.T) {
 		fn       DecodeFn
 		fnErr    bool
 		expectLP []string
-		opts     []DecoderOption
-		fail     bool
+
+		opts    []DecoderOption
+		ptsOpts []Option
+
+		fail bool
 	}{
+		{
+			name: "decode-json",
+			data: []byte(`[ { "measurement": "abc",  "tags": {"t1": "val1"}, "fields": {"f1": 123, "f2": 3.14}, "time":123} ]`),
+			expectLP: []string{
+				`abc,t1=val1 f1=123,f2=3.14 123`,
+			},
+
+			opts: []DecoderOption{WithDecEncoding(JSON)},
+		},
+
+		{
+			name: "decode-metric-json",
+			data: []byte(`[ { "measurement": "abc",  "tags": {"t1": "val1"}, "fields": {"f1": 123, "f2": 3.14, "f-str": "hello"}, "time":123} ]`),
+			expectLP: []string{
+				`abc,t1=val1 f1=123,f2=3.14 123`,
+			},
+			ptsOpts: DefaultMetricOptions(),
+
+			opts: []DecoderOption{WithDecEncoding(JSON)},
+		},
+
 		{
 			name:     "lp",
 			data:     []byte(`abc,tag1=v1,tag2=v2 f1=1i,f2=2 123`),
@@ -148,7 +172,7 @@ func TestDecode(t *testing.T) {
 			dec := GetDecoder(opts...)
 			defer PutDecoder(dec)
 
-			pts, err := dec.Decode(tc.data)
+			pts, err := dec.Decode(tc.data, tc.ptsOpts...)
 			if tc.fail {
 				assert.Error(t, err, "decode %s got pts: %+#v", tc.data, pts)
 				t.Logf("expect error: %s", err)
@@ -161,11 +185,11 @@ func TestDecode(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			t.Logf("[ok] %q", tc.data)
-
 			assert.Equal(t, len(pts), len(tc.expectLP))
 			for idx := range pts {
 				assert.Equal(t, tc.expectLP[idx], pts[idx].LineProto())
+
+				t.Logf("point: %s", pts[idx].Pretty())
 			}
 
 			if tc.fn != nil {
@@ -205,6 +229,21 @@ func BenchmarkDecode(b *testing.B) {
 		data, _ := enc.Encode(pts)
 
 		d := GetDecoder(WithDecEncoding(Protobuf))
+		defer PutDecoder(d)
+
+		b.Logf("decode %d pb", len(data[0]))
+		for i := 0; i < b.N; i++ {
+			d.Decode(data[0])
+		}
+	})
+
+	b.Run("bench-decode-json", func(b *testing.B) {
+		enc := GetEncoder(WithEncEncoding(JSON))
+		defer PutEncoder(enc)
+
+		data, _ := enc.Encode(pts)
+
+		d := GetDecoder(WithDecEncoding(JSON))
 		defer PutDecoder(d)
 
 		b.Logf("decode %d pb", len(data[0]))
