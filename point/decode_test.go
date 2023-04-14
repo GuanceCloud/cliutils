@@ -39,6 +39,72 @@ func TestDecode(t *testing.T) {
 		},
 
 		{
+			name: "decode-json-with-precision-s",
+			data: []byte(`[ { "measurement": "abc",  "tags": {"t1": "val1"}, "fields": {"f1": 123, "f2": 3.14}, "time":123} ]`),
+			expectLP: []string{
+				`abc,t1=val1 f1=123,f2=3.14 123000000000`,
+			},
+
+			opts:    []DecoderOption{WithDecEncoding(JSON)},
+			ptsOpts: []Option{WithPrecision(S)},
+		},
+
+		{
+			name: "decode-json-with-precision-ms",
+			data: []byte(`[ { "measurement": "abc",  "tags": {"t1": "val1"}, "fields": {"f1": 123, "f2": 3.14}, "time":123} ]`),
+			expectLP: []string{
+				`abc,t1=val1 f1=123,f2=3.14 123000000`,
+			},
+
+			opts:    []DecoderOption{WithDecEncoding(JSON)},
+			ptsOpts: []Option{WithPrecision(MS)},
+		},
+
+		{
+			name: "decode-json-with-precision-us",
+			data: []byte(`[ { "measurement": "abc",  "tags": {"t1": "val1"}, "fields": {"f1": 123, "f2": 3.14}, "time":123} ]`),
+			expectLP: []string{
+				`abc,t1=val1 f1=123,f2=3.14 123000`,
+			},
+
+			opts:    []DecoderOption{WithDecEncoding(JSON)},
+			ptsOpts: []Option{WithPrecision(US)},
+		},
+
+		{
+			name: "decode-json-with-precision-m",
+			data: []byte(`[ { "measurement": "abc",  "tags": {"t1": "val1"}, "fields": {"f1": 123, "f2": 3.14}, "time":123} ]`),
+			expectLP: []string{
+				`abc,t1=val1 f1=123,f2=3.14 7380000000000`,
+			},
+
+			opts:    []DecoderOption{WithDecEncoding(JSON)},
+			ptsOpts: []Option{WithPrecision(M)},
+		},
+
+		{
+			name: "decode-json-with-precision-h",
+			data: []byte(`[ { "measurement": "abc",  "tags": {"t1": "val1"}, "fields": {"f1": 123, "f2": 3.14}, "time":123} ]`),
+			expectLP: []string{
+				`abc,t1=val1 f1=123,f2=3.14 442800000000000`,
+			},
+
+			opts:    []DecoderOption{WithDecEncoding(JSON)},
+			ptsOpts: []Option{WithPrecision(H)},
+		},
+
+		{
+			name: "decode-json-with-precision-x",
+			data: []byte(`[ { "measurement": "abc",  "tags": {"t1": "val1"}, "fields": {"f1": 123, "f2": 3.14}, "time":123} ]`),
+			expectLP: []string{
+				`abc,t1=val1 f1=123,f2=3.14 123`,
+			},
+
+			opts:    []DecoderOption{WithDecEncoding(JSON)},
+			ptsOpts: []Option{WithPrecision(W)},
+		},
+
+		{
 			name: "decode-metric-json",
 			data: []byte(`[ { "measurement": "abc",  "tags": {"t1": "val1"}, "fields": {"f1": 123, "f2": 3.14, "f-str": "hello"}, "time":123} ]`),
 			expectLP: []string{
