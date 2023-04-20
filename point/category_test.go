@@ -25,14 +25,14 @@ func TestURL(t *testing.T) {
 		{c: "/v1/write/rum", expect: RUM},
 		{c: "/v1/write/security", expect: Security},
 		{c: "/v1/write/profiling", expect: Profiling},
-		{c: "/v1/write/event", expect: KeyEvent},
+		{c: "/v1/write/keyevent", expect: KeyEvent},
 		{c: "/v1/write/tracing", expect: Tracing},
 		{c: "/v1/write/dynamic_dw", expect: DynamicDWCategory},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.c, func(t *testing.T) {
-			assert.Equal(t, tc.expect, CatURL(tc.c))
+			assert.Equal(t, tc.expect.String(), CatURL(tc.c).String())
 		})
 	}
 }
@@ -76,7 +76,7 @@ func TestString(t *testing.T) {
 		{c: "rum", expect: RUM},
 		{c: "security", expect: Security},
 		{c: "profiling", expect: Profiling},
-		{c: "event", expect: KeyEvent},
+		{c: "keyevent", expect: KeyEvent},
 		{c: "tracing", expect: Tracing},
 		{c: "dynamic_dw", expect: DynamicDWCategory},
 	}
