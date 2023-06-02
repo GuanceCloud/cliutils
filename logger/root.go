@@ -163,8 +163,8 @@ func InitCustomizeRoot(opt *Option) (*zap.Logger, error) {
 	go func() {
 		for {
 			next := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()+1, 0, 0, 0, 0, time.Local)
-			after := next.Unix() - time.Now().Unix() - 10
-			<-time.After(time.Duration(after) * time.Nanosecond)
+			after := next.Unix() - time.Now().Unix() - 1
+			<-time.After(time.Duration(after) * time.Second)
 			lumberLog.Rotate()
 		}
 	}()
