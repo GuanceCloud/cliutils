@@ -161,11 +161,19 @@ func InitCustomizeRoot(opt *Option) (*zap.Logger, error) {
 		Compress: opt.Compress,
 	}
 	go func() {
+		next := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()+1, 0, 0, 0, 0, time.Local)
+		after := next.Unix() - time.Now().Unix() - 1
+
+		time.Sleep(time.Duration(after) * time.Second)
+		lumberLog.Rotate()
+
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
 		for {
-			next := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()+1, 0, 0, 0, 0, time.Local)
-			after := next.Unix() - time.Now().Unix() - 1
-			<-time.After(time.Duration(after) * time.Second)
-			lumberLog.Rotate()
+			select {
+			case <-ticker.C:
+				lumberLog.Rotate()
+			}
 		}
 	}()
 	return newOnlyMessageRootLogger(lumberLog)
