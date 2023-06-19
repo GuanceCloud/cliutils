@@ -453,7 +453,11 @@ func (t *HTTPTask) setupAdvanceOpts(req *http.Request) error {
 	if opt.RequestOptions != nil {
 		// headers
 		for k, v := range opt.RequestOptions.Headers {
-			req.Header.Add(k, v)
+			if k == "Host" || k == "host" {
+				req.Host = v
+			} else {
+				req.Header.Add(k, v)
+			}
 		}
 
 		// cookie
