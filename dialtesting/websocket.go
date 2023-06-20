@@ -340,7 +340,7 @@ func (t *WebsocketTask) Run() error {
 
 	start := time.Now()
 
-	c, resp, err := websocket.DefaultDialer.DialContext(ctx, t.parsedURL.String(), header)
+	c, resp, err := websocket.DefaultDialer.DialContext(ctx, t.URL, header)
 	if err != nil {
 		t.reqError = err.Error()
 		t.reqDNSCost = 0
