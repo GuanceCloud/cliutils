@@ -11,9 +11,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 
-	tu "github.com/GuanceCloud/cliutils/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
 func BenchmarkMuitiLogs(b *testing.B) {
@@ -87,7 +88,7 @@ func TestLoggerSideEffect(t *testing.T) {
 	x := &abc{}
 	l.Debugf("%+#v", f(x)) // under info level, on debug, the f() still effected
 
-	tu.Equals(t, 1, x.i)
+	assert.Equal(t, 1, x.i)
 }
 
 func TestJsonLogging(t *testing.T) {
@@ -125,7 +126,7 @@ func TestJsonLogging(t *testing.T) {
 		NameKeyPos,
 	} {
 		_, ok := logdata[k]
-		tu.Assert(t, ok, "%s not exist")
+		assert.True(t, ok)
 	}
 
 	Reset()
@@ -183,10 +184,10 @@ func TestEnvLogPath(t *testing.T) {
 
 			err := InitRoot(opt)
 			if tc.fail {
-				tu.Assert(t, err != nil, "")
+				assert.True(t, err != nil)
 				t.Logf("expect error: %s", err)
 			} else {
-				tu.Equals(t, nil, err)
+				assert.NoError(t, err)
 			}
 
 			l := SLogger(tc.name)
@@ -225,7 +226,7 @@ func TestLogAppend(t *testing.T) {
 
 	Close()
 
-	tu.Equals(t, 2, logLines(opt.Path))
+	assert.Equal(t, 2, logLines(opt.Path))
 	showLog(opt.Path)
 }
 
@@ -258,7 +259,7 @@ func TestTotalSLoggers(t *testing.T) {
 
 	total := TotalSLoggers()
 
-	tu.Assert(t, n == total, fmt.Sprintf("%d != %d", n, total))
+	assert.Equalf(t, n, total, fmt.Sprintf("%d != %d", n, total))
 }
 
 func TestInitRoot(t *testing.T) {
@@ -360,12 +361,12 @@ func TestInitRoot(t *testing.T) {
 			err := InitRoot(c.opt)
 			l := SLogger(fmt.Sprintf("case-%d", idx))
 			if c.fail {
-				tu.NotOk(t, err, "")
+				assert.Error(t, err)
 				t.Logf("[%d] expected failing", idx)
 				return
 			}
 
-			tu.Ok(t, err)
+			assert.NoError(t, err)
 
 			for _, arr := range c.logs {
 				switch arr[0] {
@@ -385,12 +386,38 @@ func TestInitRoot(t *testing.T) {
 			Reset() // reset root logger
 			if c.opt.Flags&OPT_STDOUT == 0 {
 				t.Logf("case %d on file: %s", idx, c.opt.Path)
-				tu.Equals(t, len(c.logs), logLines(c.opt.Path))
-				tu.Equals(t, c.color, colorExits(c.opt.Path))
+				assert.Equal(t, len(c.logs), logLines(c.opt.Path))
+				assert.Equal(t, c.color, colorExits(c.opt.Path))
 				showLog(c.opt.Path)
 				os.Remove(c.opt.Path)
 			}
 		})
+	}
+}
+
+func TestRotateOnDevNull(t *testing.T) {
+
+	MaxSize = 1 // set to 1MB
+
+	opt := &Option{
+		Path:  "/dev/null",
+		Level: INFO,
+		Flags: OPT_ENC_CONSOLE | OPT_SHORT_CALLER | OPT_ROTATE, // set rotate
+	}
+
+	assert.NoError(t, InitRoot(opt))
+
+	t.Logf("MaxSize: %d", MaxSize)
+
+	l := SLogger(t.Name())
+	logData := strings.Repeat("3.1415926x", 1024) // 10kb
+	i := 0
+	for {
+		l.Info(logData)
+		i++
+		if i >= 200 { // 2MB
+			break
+		}
 	}
 }
 
