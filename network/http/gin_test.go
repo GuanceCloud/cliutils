@@ -6,6 +6,7 @@
 package http
 
 import (
+	"github.com/GuanceCloud/cliutils/testutil"
 	"io"
 	"net/http"
 	"testing"
@@ -58,7 +59,7 @@ func BenchmarkAllMiddlewares(b *testing.B) {
 			}
 
 			r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
-				Formatter: GinLogFormmatter,
+				Formatter: GinLogFormatter,
 			}))
 
 			v1 := r.Group("/v1")
@@ -93,6 +94,27 @@ func BenchmarkAllMiddlewares(b *testing.B) {
 	}
 }
 
+func TestCORSHeaders_Add(t *testing.T) {
+	// Accept, Accept-Encoding, Accept-Language, Authorization, Cache-Control, Content-Language, Content-Length, Content-Type, Origin, X-Csrf-Token, X-Datakit-Uuid, X-Lua, X-Precision, X-Requested-With, X-Rp, X-Token, *
+	defaultHeaders := defaultCORSHeader.String()
+
+	h1 := defaultCORSHeader.Add("content-type  , X-PRECISION")
+	testutil.Equals(t, defaultHeaders, h1)
+
+	h2 := defaultCORSHeader.Add("  ")
+	testutil.Equals(t, defaultHeaders, h2)
+
+	h3 := defaultCORSHeader.Add("x-Foo ,cache-control , X-BAR")
+	testutil.Equals(t, "X-Foo, X-Bar, "+defaultHeaders, h3)
+
+	h4 := defaultCORSHeader.Add(" * ")
+	testutil.Equals(t, defaultHeaders, h4)
+
+	h5 := defaultCORSHeader.Add("x-forwarded-for ,x-real-ip , x-client-ip")
+	testutil.Equals(t, "X-Forwarded-For, X-Real-Ip, X-Client-Ip, "+defaultHeaders, h5)
+
+}
+
 func TestMiddlewares(t *testing.T) {
 	r := gin.New()
 
@@ -100,7 +122,7 @@ func TestMiddlewares(t *testing.T) {
 	r.Use(TraceIDMiddleware)
 	r.Use(RequestLoggerMiddleware)
 	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
-		Formatter: GinLogFormmatter,
+		Formatter: GinLogFormatter,
 	}))
 
 	t.Setenv("MAX_REQUEST_BODY_LEN", "4")
