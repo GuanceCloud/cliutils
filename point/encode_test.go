@@ -255,6 +255,38 @@ func TestEncode(t *testing.T) {
 	}
 }
 
+func TestEncodeTags(t *T.T) {
+
+	t.Run("tag-value-begins-with-slash", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(LineProtocol))
+		defer PutEncoder(enc)
+
+		arr := func() []*Point {
+			x, err := NewPoint("abc", map[string]string{
+				"service": "/sf-webproxy/api/online_status",
+			}, map[string]interface{}{
+				"f3": "fv3",
+			}, WithTime(time.Unix(0, 123)))
+
+			require.NoError(t, err)
+
+			t.Logf("pt: %s", x.Pretty())
+			return []*Point{x}
+		}()
+
+		res, err := enc.Encode(arr)
+		assert.NoError(t, err)
+		t.Logf("%q", res[0])
+
+		dec := GetDecoder(WithDecEncoding(LineProtocol))
+		defer PutDecoder(dec)
+
+		pts, err := dec.Decode([]byte(`abc,service=/sf-webproxy/api/online_status f3="fv3" 123`))
+		assert.NoError(t, err)
+		t.Logf("%s", pts[0].LineProto())
+	})
+}
+
 func TestEncodeLen(t *testing.T) {
 	t.Run("encode-len", func(t *T.T) {
 		r := NewRander(WithFixedTags(true), WithRandText(3))
