@@ -9,9 +9,12 @@ github.com/DataDog/sketches-go/ddsketch/mapping
 github.com/DataDog/sketches-go/ddsketch/pb/sketchpb
 github.com/DataDog/sketches-go/ddsketch/stat
 github.com/DataDog/sketches-go/ddsketch/store
-# github.com/Microsoft/go-winio v0.5.1
-## explicit; go 1.12
+# github.com/Microsoft/go-winio v0.6.1
+## explicit; go 1.17
 github.com/Microsoft/go-winio
+github.com/Microsoft/go-winio/internal/fs
+github.com/Microsoft/go-winio/internal/socket
+github.com/Microsoft/go-winio/internal/stringbuffer
 github.com/Microsoft/go-winio/pkg/guid
 # github.com/aliyun/aliyun-oss-go-sdk v2.1.2+incompatible
 ## explicit
@@ -42,13 +45,13 @@ github.com/bytedance/sonic/loader
 github.com/bytedance/sonic/option
 github.com/bytedance/sonic/unquote
 github.com/bytedance/sonic/utf8
-# github.com/cespare/xxhash/v2 v2.1.2
+# github.com/cespare/xxhash/v2 v2.2.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
 # github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311
 ## explicit; go 1.15
 github.com/chenzhuoyu/base64x
-# github.com/davecgh/go-spew v1.1.1
+# github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
 # github.com/didip/tollbooth/v6 v6.1.2
@@ -107,16 +110,18 @@ github.com/goccy/go-json/internal/encoder/vm_color_indent
 github.com/goccy/go-json/internal/encoder/vm_indent
 github.com/goccy/go-json/internal/errors
 github.com/goccy/go-json/internal/runtime
-# github.com/golang/protobuf v1.5.2
+# github.com/golang/protobuf v1.5.3
 ## explicit; go 1.9
 github.com/golang/protobuf/proto
-github.com/golang/protobuf/ptypes/timestamp
 # github.com/google/uuid v1.3.0
 ## explicit
 github.com/google/uuid
-# github.com/gorilla/websocket v1.4.2
+# github.com/gorilla/websocket v1.5.0
 ## explicit; go 1.12
 github.com/gorilla/websocket
+# github.com/grafana/regexp v0.0.0-20221122212121-6b5c0a4cb7fd
+## explicit; go 1.17
+github.com/grafana/regexp
 # github.com/influxdata/influxdb1-client v0.0.0-20200827194710-b269163b24ab
 ## explicit
 github.com/influxdata/influxdb1-client/models
@@ -134,11 +139,11 @@ github.com/klauspost/cpuid/v2
 # github.com/leodido/go-urn v1.2.1
 ## explicit; go 1.13
 github.com/leodido/go-urn
-# github.com/mattn/go-isatty v0.0.17
+# github.com/mattn/go-isatty v0.0.19
 ## explicit; go 1.15
 github.com/mattn/go-isatty
-# github.com/matttproud/golang_protobuf_extensions v1.0.1
-## explicit
+# github.com/matttproud/golang_protobuf_extensions v1.0.4
+## explicit; go 1.9
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 ## explicit
@@ -159,33 +164,36 @@ github.com/philhofer/fwd
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
-# github.com/pmezard/go-difflib v1.0.0
+# github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 ## explicit
 github.com/pmezard/go-difflib/difflib
-# github.com/prometheus/client_golang v1.14.0
+# github.com/prometheus/client_golang v1.16.0
 ## explicit; go 1.17
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/collectors
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
-# github.com/prometheus/client_model v0.3.0
-## explicit; go 1.9
+# github.com/prometheus/client_model v0.4.0
+## explicit; go 1.18
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.37.0
-## explicit; go 1.16
+# github.com/prometheus/common v0.44.0
+## explicit; go 1.18
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
-# github.com/prometheus/procfs v0.8.0
-## explicit; go 1.17
+# github.com/prometheus/procfs v0.11.0
+## explicit; go 1.19
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
+# github.com/prometheus/prometheus v0.46.0
+## explicit; go 1.19
+github.com/prometheus/prometheus/util/strutil
 # github.com/rs/xid v1.2.1
 ## explicit
 github.com/rs/xid
-# github.com/stretchr/testify v1.8.1
-## explicit; go 1.13
+# github.com/stretchr/testify v1.8.4
+## explicit; go 1.20
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
 # github.com/tidwall/gjson v1.10.2
@@ -228,8 +236,8 @@ github.com/twitchyliquid64/golang-asm/unsafeheader
 # github.com/ugorji/go/codec v1.2.9
 ## explicit; go 1.11
 github.com/ugorji/go/codec
-# go.uber.org/atomic v1.6.0
-## explicit; go 1.13
+# go.uber.org/atomic v1.11.0
+## explicit; go 1.18
 go.uber.org/atomic
 # go.uber.org/multierr v1.5.0
 ## explicit; go 1.12
@@ -245,10 +253,13 @@ go.uber.org/zap/zapcore
 # golang.org/x/arch v0.0.0-20210923205945-b76863e36670
 ## explicit; go 1.17
 golang.org/x/arch/x86/x86asm
-# golang.org/x/crypto v0.5.0
+# golang.org/x/crypto v0.11.0
 ## explicit; go 1.17
 golang.org/x/crypto/sha3
-# golang.org/x/net v0.7.0
+# golang.org/x/mod v0.12.0
+## explicit; go 1.17
+golang.org/x/mod/semver
+# golang.org/x/net v0.12.0
 ## explicit; go 1.17
 golang.org/x/net/bpf
 golang.org/x/net/http/httpguts
@@ -261,17 +272,18 @@ golang.org/x/net/internal/iana
 golang.org/x/net/internal/socket
 golang.org/x/net/ipv4
 golang.org/x/net/ipv6
-# golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
-## explicit
+# golang.org/x/sync v0.3.0
+## explicit; go 1.17
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.5.0
+# golang.org/x/sys v0.10.0
 ## explicit; go 1.17
 golang.org/x/sys/cpu
+golang.org/x/sys/execabs
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/text v0.7.0
+# golang.org/x/text v0.11.0
 ## explicit; go 1.17
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
@@ -281,14 +293,32 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
+# golang.org/x/time v0.3.0
 ## explicit
 golang.org/x/time/rate
+# golang.org/x/tools v0.11.0
+## explicit; go 1.18
+golang.org/x/tools/cmd/stringer
+golang.org/x/tools/go/gcexportdata
+golang.org/x/tools/go/internal/packagesdriver
+golang.org/x/tools/go/packages
+golang.org/x/tools/internal/event
+golang.org/x/tools/internal/event/core
+golang.org/x/tools/internal/event/keys
+golang.org/x/tools/internal/event/label
+golang.org/x/tools/internal/event/tag
+golang.org/x/tools/internal/gcimporter
+golang.org/x/tools/internal/gocommand
+golang.org/x/tools/internal/packagesinternal
+golang.org/x/tools/internal/pkgbits
+golang.org/x/tools/internal/tokeninternal
+golang.org/x/tools/internal/typeparams
+golang.org/x/tools/internal/typesinternal
 # golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 ## explicit; go 1.11
 golang.org/x/xerrors
 golang.org/x/xerrors/internal
-# google.golang.org/protobuf v1.28.1
+# google.golang.org/protobuf v1.31.0
 ## explicit; go 1.11
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
