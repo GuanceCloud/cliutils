@@ -122,7 +122,7 @@ func TestExprConditions(t *testing.T) {
 		t.Run(tc.in, func(t *testing.T) {
 			conditions, _ := GetConds(tc.in)
 
-			tu.Equals(t, tc.pass, conditions.Eval(newtf(tc.tags, tc.fields)))
+			tu.Equals(t, tc.pass, conditions.Eval(newtf(tc.tags, tc.fields)) >= 0)
 
 			t.Logf("[ok] %s => %v, source: %s, tags: %+#v, fields: %+#v", tc.in, tc.pass, tc.source, tc.tags, tc.fields)
 		})
@@ -253,7 +253,7 @@ func TestConditions(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.in.String(), func(t *testing.T) {
-			tu.Equals(t, tc.pass, tc.in.Eval(newtf(tc.tags, tc.fields)))
+			tu.Equals(t, tc.pass, tc.in.Eval(newtf(tc.tags, tc.fields)) >= 0)
 			t.Logf("[ok] %s => %v,  tags: %+#v, fields: %+#v", tc.in, tc.pass, tc.tags, tc.fields)
 		})
 	}
