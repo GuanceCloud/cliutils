@@ -51,7 +51,7 @@ func TestDropBatch(t *T.T) {
 
 	t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
-	m := metrics.GetMetricOnLabels(mfs, "diskcache_dropped_total", c.labels...)
+	m := metrics.GetMetricOnLabels(mfs, "diskcache_dropped_total", c.path)
 	require.NotNil(t, m)
 	assert.Equal(t, float64(1), m.GetCounter().GetValue())
 
