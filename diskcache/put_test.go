@@ -252,7 +252,7 @@ func TestPutOnCapacityReached(t *T.T) {
 		require.NoError(t, err)
 
 		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
-		m := metrics.GetMetricOnLabels(mfs, "diskcache_dropped_total", c.labels...)
+		m := metrics.GetMetricOnLabels(mfs, "diskcache_dropped_total", c.path)
 		require.NotNil(t, m)
 		assert.True(t, m.GetCounter().GetValue() > 0.0)
 
@@ -312,7 +312,7 @@ func TestPutOnCapacityReached(t *T.T) {
 		require.NoError(t, err)
 		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
-		m := metrics.GetMetricOnLabels(mfs, "diskcache_dropped_total", c.labels...)
+		m := metrics.GetMetricOnLabels(mfs, "diskcache_dropped_total", c.path)
 		require.NotNil(t, m)
 
 		assert.True(t, m.GetCounter().GetValue() > 0.0)
