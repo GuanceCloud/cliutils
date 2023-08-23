@@ -85,7 +85,7 @@ func setupMetrics() {
 		prometheus.CounterOpts{
 			Namespace: ns,
 			Name:      "remove_total",
-			Help:      "Removed file count, if some file read EOF, remove it from un-readed list",
+			Help:      "Removed file count, if some file read EOF, remove it from un-read list",
 		},
 		[]string{"path"},
 	)
@@ -200,7 +200,7 @@ func setupMetrics() {
 		prometheus.GaugeOpts{
 			Namespace: ns,
 			Name:      "datafiles",
-			Help:      "Current un-readed data files",
+			Help:      "Current un-read data files",
 		},
 		[]string{"path"},
 	)
