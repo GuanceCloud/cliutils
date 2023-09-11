@@ -16,13 +16,56 @@ import (
 type Encoding int
 
 func EncodingStr(s string) Encoding {
-	switch s {
+	switch strings.ToLower(s) {
 	case "protobuf":
 		return Protobuf
-	case "lineproto", "lineprotocol":
+	case "json":
+		return JSON
+	case "lineproto",
+		"lineprotocol",
+		"line-protocol":
 		return LineProtocol
 	default:
 		return LineProtocol
+	}
+}
+
+func HTTPContentType(ct string) Encoding {
+	switch ct {
+	case "application/json":
+		return JSON
+	case "application/protobuf; proto=com.guance.Point":
+		return Protobuf
+	case "application/line-protocol":
+		return LineProtocol
+	default: // default use line-protocol to be compatible with lagacy code
+		return LineProtocol
+	}
+}
+
+func (e Encoding) HTTPContentType() string {
+	switch e {
+	case JSON:
+		return "application/json"
+	case Protobuf:
+		return "application/protobuf; proto=com.guance.Point"
+	case LineProtocol:
+		return "application/line-protocol"
+	default: // default use line-protocol to be compatible with lagacy code
+		return "application/line-protocol"
+	}
+}
+
+func (e Encoding) String() string {
+	switch e {
+	case JSON:
+		return "json"
+	case Protobuf:
+		return "protobuf"
+	case LineProtocol:
+		return "line-protocol"
+	default: // default use line-protocol to be compatible with lagacy code
+		return "line-protocol"
 	}
 }
 

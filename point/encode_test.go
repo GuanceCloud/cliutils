@@ -341,4 +341,14 @@ func BenchmarkEncode(b *testing.B) {
 			assert.NoError(b, err)
 		}
 	})
+
+	b.Run("bench-encode-json", func(b *testing.B) {
+		enc := GetEncoder(WithEncEncoding(JSON))
+		defer PutEncoder(enc)
+
+		for i := 0; i < b.N; i++ {
+			_, err := enc.Encode(pts)
+			assert.NoError(b, err)
+		}
+	})
 }
