@@ -281,8 +281,6 @@ func BenchmarkDecode(b *testing.B) {
 		d := GetDecoder()
 		defer PutDecoder(d)
 
-		b.Logf("decode %d lp", len(data[0]))
-
 		for i := 0; i < b.N; i++ {
 			d.Decode(data[0])
 		}
@@ -297,7 +295,6 @@ func BenchmarkDecode(b *testing.B) {
 		d := GetDecoder(WithDecEncoding(Protobuf))
 		defer PutDecoder(d)
 
-		b.Logf("decode %d pb", len(data[0]))
 		for i := 0; i < b.N; i++ {
 			d.Decode(data[0])
 		}
@@ -312,7 +309,6 @@ func BenchmarkDecode(b *testing.B) {
 		d := GetDecoder(WithDecEncoding(JSON))
 		defer PutDecoder(d)
 
-		b.Logf("decode %d pb", len(data[0]))
 		for i := 0; i < b.N; i++ {
 			d.Decode(data[0])
 		}

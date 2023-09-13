@@ -6,6 +6,7 @@
 package point
 
 import (
+	"math"
 	"sort"
 	T "testing"
 
@@ -45,6 +46,15 @@ func TestKVs(t *T.T) {
 	t.Run(`new-empty`, func(t *T.T) {
 		kvs := NewKVs(nil)
 		assert.Equal(t, 0, len(kvs))
+	})
+
+	t.Run(`new-invalid-float`, func(t *T.T) {
+		kvs := NewKVs(map[string]any{
+			"f1": math.NaN(),
+			"f2": math.Inf(1),
+		})
+
+		assert.Equal(t, 2, len(kvs))
 	})
 
 	t.Run(`new-all-types`, func(t *T.T) {
