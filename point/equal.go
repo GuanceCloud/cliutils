@@ -6,7 +6,6 @@
 package point
 
 import (
-	"bytes"
 	"crypto/md5" //nolint:gosec
 	"crypto/sha256"
 	"fmt"
@@ -57,7 +56,7 @@ func (p *Point) EqualWithReason(x *Point) (bool, string) {
 		}
 
 		kv := xtags.Get(t.Key)
-		if !bytes.Equal(t.GetD(), kv.GetD()) {
+		if t.GetS() != kv.GetS() {
 			return false, fmt.Sprintf("tag %q value not equal(%s <> %s)", t.Key, t, kv)
 		}
 	}
@@ -109,8 +108,8 @@ func (p *Point) hashstr() []byte {
 	sort.Sort(tags)
 
 	for _, t := range tags {
-		data = append(data, t.Key...)
-		data = append(data, t.GetD()...)
+		data = append(data, []byte(t.Key)...)
+		data = append(data, []byte(t.GetS())...)
 	}
 	return data
 }

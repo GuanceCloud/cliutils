@@ -77,6 +77,7 @@ func NewLPPoint(lp *influxdb.Point) *Point {
 // LPPoint get line-protocol part of the point.
 func (p *Point) LPPoint() *influxdb.Point {
 	lppt, _ := influxdb.NewPoint(string(p.name), p.InfluxTags(), p.InfluxFields(), p.time)
+
 	return lppt
 }
 
@@ -291,6 +292,8 @@ func (p *Point) Get(k string) any {
 			return kv.GetB()
 		case *Field_D:
 			return kv.GetD()
+		case *Field_S:
+			return kv.GetS()
 
 		default:
 			return nil
@@ -377,6 +380,8 @@ func (p *Point) Size() int {
 			n += 1
 		case *Field_D:
 			n += len(kv.GetD())
+		case *Field_S:
+			n += len(kv.GetS())
 		default:
 			// ignored
 		}

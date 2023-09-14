@@ -47,17 +47,19 @@ func (x KVs) InfluxFields() map[string]any {
 
 		switch x := kv.Val.(type) {
 		case *Field_I:
-			res[string(kv.Key)] = x.I
+			res[kv.Key] = x.I
 		case *Field_U:
 			if x.U <= math.MaxInt64 {
-				res[string(kv.Key)] = int64(x.U)
+				res[kv.Key] = int64(x.U)
 			} // else: dropped, see lp_test.go/parse-uint
 		case *Field_F:
-			res[string(kv.Key)] = x.F
+			res[kv.Key] = x.F
 		case *Field_B:
-			res[string(kv.Key)] = x.B
+			res[kv.Key] = x.B
 		case *Field_D:
-			res[string(kv.Key)] = string(x.D) // set []byte as string for line-proto field
+			res[kv.Key] = string(x.D)
+		case *Field_S:
+			res[kv.Key] = x.S
 		default:
 			continue
 		}
@@ -77,7 +79,7 @@ func (x KVs) InfluxTags() (res map[string]string) {
 			res = map[string]string{}
 		}
 
-		res[string(kv.Key)] = string(kv.GetD())
+		res[kv.Key] = kv.GetS()
 	}
 
 	return
@@ -228,7 +230,7 @@ func (x KVs) Add(k string, v any, isTag, force bool) KVs {
 
 	if isTag {
 		switch v.(type) {
-		case string, []byte:
+		case string:
 			kv.IsTag = isTag
 		default:
 			// ignore isTag
@@ -258,8 +260,7 @@ func (x KVs) AddTag(k, v string) KVs {
 }
 
 func (x KVs) MustAddTag(k, v string) KVs {
-	x = x.Add(k, v, true, true)
-	return x
+	return x.Add(k, v, true, true)
 }
 
 func (x KVs) AddKV(kv *Field, force bool) KVs {
@@ -296,6 +297,8 @@ func PBType(v isField_Val) KeyType {
 		return KeyType_B
 	case *Field_D:
 		return KeyType_D
+	case *Field_S:
+		return KeyType_S
 
 	default: // nil or other types
 		return KeyType_X
@@ -384,7 +387,7 @@ func NewKV(k string, v any, opts ...KVOption) *Field {
 		kv = &Field{Key: k, Val: &Field_F{float64(x)}}
 
 	case string:
-		kv = &Field{Key: k, Val: &Field_D{[]byte(x)}}
+		kv = &Field{Key: k, Val: &Field_S{x}}
 
 	case []byte:
 		kv = &Field{Key: k, Val: &Field_D{x}}

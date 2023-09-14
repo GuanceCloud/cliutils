@@ -63,7 +63,7 @@ message Field {
 			google.protobuf.Any a = 7 [json_name = "a"]; // any data
 	}
 
-	bool is_tag  = 8 [json_name = "is_tag"]; // the field is a tag?
+	bool is_tag  = 8 [json_name = "is_tag"]; // set field as a tag or not
 
 	MetricType type = 9;
 

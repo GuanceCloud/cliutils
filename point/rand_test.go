@@ -32,7 +32,7 @@ func TestPointRander(t *T.T) {
 
 		for _, tag := range tags {
 			require.Equal(t, defKeyLen, len(tag.Key))
-			require.Equal(t, defValLen, len(tag.GetD()))
+			require.Equal(t, defValLen, len(tag.GetS()))
 		}
 
 		for _, f := range fs {
@@ -131,7 +131,7 @@ func TestPointRander(t *T.T) {
 
 		for _, tag := range tags {
 			require.Equal(t, klen, len(tag.Key))
-			require.Equal(t, vlen, len(tag.GetD()))
+			require.Equal(t, vlen, len(tag.GetS()))
 		}
 	})
 }

@@ -19,17 +19,17 @@ func TestKVs(t *T.T) {
 		kvs := NewKVs(map[string]any{"f1": 123})
 
 		kvs = kvs.AddTag(`t1`, `v1`)
-		assert.Equal(t, []byte(`v1`), kvs.Get(`t1`).GetD())
+		assert.Equal(t, `v1`, kvs.Get(`t1`).GetS())
 		assert.Equal(t, 1, kvs.TagCount())
 
 		// add new tag t2
-		kvs = kvs.Add(`t2`, []byte(`v2`), true, true)
-		assert.Equal(t, []byte(`v2`), kvs.Get(`t2`).GetD())
+		kvs = kvs.Add(`t2`, `v2`, true, true)
+		assert.Equal(t, `v2`, kvs.Get(`t2`).GetS())
 		assert.Equal(t, 2, kvs.TagCount())
 
 		// replace t2's value v3
-		kvs = kvs.Add(`t2`, []byte(`v3`), true, true)
-		assert.Equal(t, []byte(`v3`), kvs.Get(`t2`).GetD())
+		kvs = kvs.Add(`t2`, `v3`, true, true)
+		assert.Equal(t, `v3`, kvs.Get(`t2`).GetS())
 		assert.Equal(t, 2, kvs.TagCount())
 
 		// invalid tag value(must be []byte/string), switch to field
@@ -77,7 +77,7 @@ func TestKVs(t *T.T) {
 		assert.Equal(t, int64(123), kvs.Get(`f1`).GetI())
 		assert.Equal(t, uint64(123), kvs.Get(`f2`).GetU())
 		assert.Equal(t, 3.14, kvs.Get(`f3`).GetF())
-		assert.Equal(t, []byte(`hello`), kvs.Get(`f4`).GetD())
+		assert.Equal(t, `hello`, kvs.Get(`f4`).GetS())
 		assert.Equal(t, []byte(`world`), kvs.Get(`f5`).GetD())
 		assert.Equal(t, false, kvs.Get(`f6`).GetB())
 		assert.Equal(t, true, kvs.Get(`f7`).GetB())

@@ -33,14 +33,15 @@ func TestJSONPointMarshal(t *testing.T) {
 				assert.NoError(t, err)
 
 				pt.SetFlag(Ppb) // setup pb
+
 				return pt
 			}(),
 
 			expect: fmt.Sprintf(`{
 				"name":"%s",
 				"fields":[
-					{"key":"%s","is_tag": true, "d":"%s"},
-					{"key":"%s","is_tag": true, "d":"%s"},
+					{"key":"%s","is_tag": true, "s":"%s"},
+					{"key":"%s","is_tag": true, "s":"%s"},
 				  {"key":"%s","i":"123"},
 				  {"key":"%s","b":false}
 				],

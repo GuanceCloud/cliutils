@@ -269,18 +269,16 @@ func BenchmarkDecode(b *testing.B) {
 	r := NewRander(WithFixedTags(true), WithRandText(3))
 	pts := r.Rand(1000)
 
-	b.Logf("pts[0]: %s", pts[0].Pretty())
-	b.Logf("pts[-1]: %s", pts[999].Pretty())
-
 	b.Run("bench-decode-lp", func(b *testing.B) {
 		enc := GetEncoder()
 		defer PutEncoder(enc)
 
 		data, _ := enc.Encode(pts)
 
-		d := GetDecoder()
+		d := GetDecoder(WithDecEncoding(LineProtocol))
 		defer PutDecoder(d)
 
+		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			d.Decode(data[0])
 		}
@@ -295,6 +293,7 @@ func BenchmarkDecode(b *testing.B) {
 		d := GetDecoder(WithDecEncoding(Protobuf))
 		defer PutDecoder(d)
 
+		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			d.Decode(data[0])
 		}
@@ -309,6 +308,7 @@ func BenchmarkDecode(b *testing.B) {
 		d := GetDecoder(WithDecEncoding(JSON))
 		defer PutDecoder(d)
 
+		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			d.Decode(data[0])
 		}

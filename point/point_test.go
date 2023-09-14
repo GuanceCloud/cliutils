@@ -23,14 +23,14 @@ func TestGetTag(t *T.T) {
 		pt := NewPointV2(`abc`, NewKVs(nil).MustAddTag(`t1`, `v1`))
 
 		assert.Equal(t, `v1`, pt.GetTag(`t1`))
-		assert.Nil(t, pt.GetTag(`not-exist`))
+		assert.Equal(t, "", pt.GetTag(`not-exist`))
 
 		// get non-tag key
 		pt.kvs = pt.kvs.MustAddKV(NewKV(`f1`, 1.23,
 			WithKVUnit("bytes"),
 			WithKVTagSet(true), // set failed
 			WithKVType(MetricType_COUNT)))
-		assert.Nil(t, pt.GetTag(`f1`))
+		assert.Equal(t, "", pt.GetTag(`f1`))
 
 		pt.AddTag(`empty-tag`, ``)
 		assert.Equal(t, ``, pt.GetTag(`empty-tag`))
@@ -194,7 +194,7 @@ func TestPointLineProtocol(t *T.T) {
 
 				assert.NoError(t, err)
 
-				t.Logf("pt: %+#v", pt)
+				t.Logf("pt: %s", pt.Pretty())
 				return pt
 			}(),
 			expect: `abc f1=1i,status="unknown" 123`,
@@ -341,6 +341,9 @@ line" 123`,
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
+
+			t.Logf("pt: %s", tc.pt.Pretty())
+
 			assert.Equal(t, tc.expect, tc.pt.LineProto(tc.prec))
 
 			_, err := models.ParsePointsWithPrecision([]byte(tc.expect), time.Now(), "n")
@@ -387,23 +390,23 @@ func TestPointPB(t *T.T) {
 		{ "key": "%s", "i": "123" },
 		{ "key": "%s", "b": false },
 		{ "key": "%s", "b": true },
-		{ "key": "%s", "d": "%s" },
+		{ "key": "%s", "s": "%s" },
 		{ "key": "%s", "d": "%s" },
 		{ "key": "%s" },
 		{ "key": "%s" },
 		{ "key": "%s", "f": "%f" }
 	], "time":"123"}`,
-			b64([]byte(`abc`)),
-			b64([]byte(`f1`)),
-			b64([]byte(`f2`)), uint64(math.MaxUint64),
-			b64([]byte(`f3`)),
-			b64([]byte(`f4`)),
-			b64([]byte(`f5`)),
-			b64([]byte(`f6`)), b64([]byte(`hello`)),
-			b64([]byte(`f7`)), b64([]byte(`world`)),
-			b64([]byte(`f8`)),
-			b64([]byte(`f9`)),
-			b64([]byte(`f10`)), float64(3.14))
+			`abc`,
+			`f1`,
+			`f2`, uint64(math.MaxUint64),
+			`f3`,
+			`f4`,
+			`f5`,
+			`f6`, `hello`,
+			`f7`, b64([]byte(`world`)),
+			`f8`,
+			`f9`,
+			`f10`, float64(3.14))
 
 		expect := MustFromPBJson([]byte(j))
 
@@ -430,7 +433,10 @@ func TestLPPoint(t *T.T) {
 		assert.Equal(t, fmt.Sprintf(`abc f1=%di 123`, math.MaxInt64), pt.LPPoint().String())
 
 		// max-int64 + 1 not ok
-		pt = NewPointV2(`abc`, NewKVs(map[string]any{"f1": uint64(math.MaxInt64 + 1), "f2": "foo"}), WithTime(time.Unix(0, 123)))
+		pt = NewPointV2(`abc`, NewKVs(map[string]any{
+			"f1": uint64(math.MaxInt64 + 1),
+			"f2": "foo",
+		}), WithTime(time.Unix(0, 123)))
 		assert.Equal(t, `abc f2="foo" 123`, pt.LPPoint().String())
 
 		t.Logf("lp: %s", pt.LPPoint().String())
@@ -662,7 +668,7 @@ func TestKey(t *T.T) {
 			"query-tag-no-field",
 			`t1`,
 			NewPointV2("abc", nil, WithExtraTags(map[string]string{"t1": "v1"})),
-			[]byte("v1"),
+			"v1",
 		},
 
 		{
@@ -717,6 +723,7 @@ func TestKey(t *T.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
+			t.Logf("%s", tc.pt.Pretty())
 			assert.Equal(t, tc.expect, tc.pt.Get(tc.key))
 		})
 	}

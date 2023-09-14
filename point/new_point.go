@@ -32,7 +32,7 @@ func NewPoint(name string, tags map[string]string, fields map[string]any, opts .
 
 	kvs := NewKVs(fields)
 	for k, v := range tags {
-		kvs = kvs.Add(k, v, true, true) // force add these tags
+		kvs = kvs.MustAddTag(k, v) // force add these tags
 	}
 
 	c := GetCfg(opts...)

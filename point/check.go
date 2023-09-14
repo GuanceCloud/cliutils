@@ -129,12 +129,12 @@ func (c *checker) checkTag(f *Field) *Field {
 		f.Key = f.Key[:c.cfg.maxTagKeyLen]
 	}
 
-	if c.cfg.maxTagValLen > 0 && len(f.GetD()) > c.cfg.maxTagValLen {
+	if c.cfg.maxTagValLen > 0 && len(f.GetS()) > c.cfg.maxTagValLen {
 		c.addWarn(WarnMaxTagValueLen,
 			fmt.Sprintf("exceed max tag value length(%d), got %d, value truncated",
-				c.cfg.maxTagValLen, len(f.GetD())))
+				c.cfg.maxTagValLen, len(f.GetS())))
 
-		f.Val = &Field_D{D: f.GetD()[:c.cfg.maxTagValLen]}
+		f.Val = &Field_S{S: f.GetS()[:c.cfg.maxTagValLen]}
 	}
 
 	// check tag key '\', '\n'
@@ -146,7 +146,7 @@ func (c *checker) checkTag(f *Field) *Field {
 
 	// check tag value: '\', '\n'
 	if strings.HasSuffix(f.GetS(), `\`) || strings.Contains(f.GetS(), "\n") {
-		c.addWarn(WarnInvalidTagValue, fmt.Sprintf("invalid tag value %q", f.GetD()))
+		c.addWarn(WarnInvalidTagValue, fmt.Sprintf("invalid tag value %q", f.GetS()))
 
 		f.Val = &Field_S{S: adjustKV(f.GetS())}
 	}
@@ -173,7 +173,7 @@ func (c *checker) checkField(f *Field) *Field {
 
 		c.addWarn(WarnMaxFieldKeyLen,
 			fmt.Sprintf("exceed max field key length(%d), got %d, key truncated to %s",
-				c.cfg.maxFieldKeyLen, len(f.Key), string(f.Key)))
+				c.cfg.maxFieldKeyLen, len(f.Key), f.Key))
 	}
 
 	if strings.Contains(f.Key, ".") && !c.cfg.enableDotInKey {
@@ -196,7 +196,7 @@ func (c *checker) checkField(f *Field) *Field {
 		} else {
 			if x.U > uint64(math.MaxInt64) {
 				c.addWarn(WarnMaxFieldValueInt,
-					fmt.Sprintf("too large int field: key=%s, value=%d(> %d)", string(f.Key), x.U, uint64(math.MaxInt64)))
+					fmt.Sprintf("too large int field: key=%s, value=%d(> %d)", f.Key, x.U, uint64(math.MaxInt64)))
 				return nil
 			} else {
 				// Force convert uint64 to int64: to disable line proto like
@@ -219,7 +219,7 @@ func (c *checker) checkField(f *Field) *Field {
 
 		if !c.cfg.enableStrField {
 			c.addWarn(WarnInvalidFieldValueType,
-				fmt.Sprintf("field(%s) dropped with string value, when [DisableStringField] enabled", string(f.Key)))
+				fmt.Sprintf("field(%s) dropped with string value, when [DisableStringField] enabled", f.Key))
 			return nil
 		}
 
@@ -229,6 +229,24 @@ func (c *checker) checkField(f *Field) *Field {
 					string(f.Key), c.cfg.maxFieldValLen, len(x.D)))
 
 			f.Val = &Field_D{D: x.D[:c.cfg.maxFieldValLen]}
+		}
+
+		return f
+
+	case *Field_S: // same as Field_D
+
+		if !c.cfg.enableStrField {
+			c.addWarn(WarnInvalidFieldValueType,
+				fmt.Sprintf("field(%s) dropped with string value, when [DisableStringField] enabled", f.Key))
+			return nil
+		}
+
+		if c.cfg.maxFieldValLen > 0 && len(x.S) > c.cfg.maxFieldValLen {
+			c.addWarn(WarnMaxFieldValueLen,
+				fmt.Sprintf("field (%s) exceed max field value length(%d), got %d, value truncated",
+					string(f.Key), c.cfg.maxFieldValLen, len(x.S)))
+
+			f.Val = &Field_S{S: x.S[:c.cfg.maxFieldValLen]}
 		}
 
 		return f
