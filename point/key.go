@@ -64,9 +64,9 @@ func (k *Key) Default() any {
 
 // Keys is sorted Keys.
 type Keys struct {
-	hashCount,
-	hash uint64
-	arr []*Key
+	hashed bool
+	hash   uint64
+	arr    []*Key
 }
 
 func (x *Keys) Len() int { return len(x.arr) }
@@ -99,8 +99,7 @@ func (x *Keys) Add(k *Key) {
 	}
 
 	x.arr = append(x.arr, k)
-	sort.Sort(x)
-	x.hash = 0 // reset hash
+	x.hashed = false
 }
 
 // Del remove specific k.
@@ -113,11 +112,9 @@ func (x *Keys) Del(k *Key) {
 		}
 	}
 
-	// len changed, reset hash.
-	if len(x.arr) != i {
-		x.hash = 0
+	if i != len(x.arr) {
+		x.hashed = false
 		x.arr = x.arr[:i]
-		sort.Sort(x)
 	}
 }
 
@@ -128,14 +125,16 @@ func (x *Keys) Pretty() string {
 		arr = append(arr, fmt.Sprintf("% 4s: %q", KeyType(k.key[len(k.key)-1]), k.key[:len(k.key)-1]))
 	}
 
-	arr = append(arr, fmt.Sprintf("-----\nhashed: %d", x.hashCount))
+	arr = append(arr, fmt.Sprintf("-----\nhashed: %v", x.hashed))
 
 	return strings.Join(arr, "\n")
 }
 
 // Hash calculate x's hash.
 func (x *Keys) Hash() uint64 {
-	if x.hash == 0 {
+
+	if !x.hashed {
+		sort.Sort(x)
 		h := fnv.New64a()
 		if _, err := h.Write(func() []byte {
 			var arr []byte
@@ -145,8 +144,9 @@ func (x *Keys) Hash() uint64 {
 			return arr
 		}()); err == nil {
 			x.hash = h.Sum64()
-			x.hashCount++
+			x.hashed = true
 		}
 	}
+
 	return x.hash
 }

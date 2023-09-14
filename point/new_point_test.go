@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sort"
 	"testing"
 	T "testing"
 	"time"
@@ -257,31 +258,80 @@ func TestNewPoint(t *T.T) {
 		},
 
 		{
-			tname:  "both-exceed-max-field-tag-count",
-			name:   "abc",
-			t:      map[string]string{"t1": "abc", "t2": "xyz"},
-			f:      map[string]interface{}{"f1": 123, "f2": "def"},
-			opts:   []Option{WithTime(time.Unix(0, 123)), WithMaxTags(1), WithMaxFields(1)},
+			tname: "both-exceed-max-field-tag-count",
+			name:  "abc",
+			t: map[string]string{
+				"t1": "abc",
+				"t2": "xyz",
+				"t3": "abc",
+				"t4": "xyz",
+				"t5": "abc",
+				"t6": "abc",
+				"t7": "abc",
+				"t8": "abc",
+				"t9": "abc",
+			},
+			f: map[string]interface{}{
+				"f1": 123,
+				"f2": "def",
+				"f3": "def",
+				"f4": "def",
+				"f5": "def",
+				"f6": "def",
+				"f7": "def",
+				"f8": "def",
+				"f9": "def",
+			},
+			opts: []Option{
+				WithTime(time.Unix(0, 123)),
+				WithMaxTags(1),
+				WithMaxFields(1),
+				WithKeySorted(true)},
 			expect: `abc,t1=abc f1=123i 123`,
 			warns:  2,
 		},
 
 		{
-			tname:  "exceed-max-field-count",
-			name:   "abc",
-			t:      map[string]string{"t1": "abc", "t2": "xyz"},
-			opts:   []Option{WithTime(time.Unix(0, 123)), WithMaxFields(1)},
-			f:      map[string]interface{}{"f1": 123, "f2": "def"},
+			tname: "exceed-max-field-count",
+			name:  "abc",
+			opts:  []Option{WithTime(time.Unix(0, 123)), WithMaxFields(1), WithKeySorted(true)},
+			t: map[string]string{
+				"t1": "abc",
+				"t2": "xyz",
+			},
+			f: map[string]interface{}{
+				"f1": 123,
+				"f2": "def",
+				"f3": "def",
+				"f4": "def",
+				"f5": "def",
+				"f6": "def",
+				"f7": "def",
+				"f8": "def",
+				"f9": "def",
+			},
 			expect: `abc,t1=abc,t2=xyz f1=123i 123`,
 			warns:  1,
 		},
 
 		{
-			tname:  "exceed-max-tag-count",
-			opts:   []Option{WithTime(time.Unix(0, 123)), WithMaxTags(1)},
-			name:   "abc",
-			t:      map[string]string{"t1": "abc", "t2": "xyz"},
-			f:      map[string]interface{}{"f1": 123},
+			tname: "exceed-max-tag-count",
+			opts:  []Option{WithTime(time.Unix(0, 123)), WithMaxTags(1), WithKeySorted(true)},
+			name:  "abc",
+			t: map[string]string{
+				"t1": "abc",
+				"t2": "xyz",
+				"t3": "abc",
+				"t4": "xyz",
+				"t5": "abc",
+				"t6": "abc",
+				"t7": "abc",
+				"t8": "abc",
+				"t9": "abc",
+			},
+			f: map[string]interface{}{
+				"f1": 123,
+			},
 			expect: `abc,t1=abc f1=123i 123`,
 			warns:  1,
 		},
@@ -390,6 +440,74 @@ func TestNewPoint(t *T.T) {
 	}
 }
 
+func TestPointKeySorted(t *testing.T) {
+	t.Run("sorted", func(t *testing.T) {
+		pt, err := NewPoint("basic",
+			map[string]string{
+				"t1": "v1",
+				"t2": "v2",
+				"t3": "v1",
+				"t4": "v2",
+				"t5": "v1",
+				"t6": "v2",
+				"t7": "v1",
+				"t8": "v2",
+			},
+			map[string]any{
+				"f1": 1,
+				"f2": 2,
+				"f3": 3,
+				"f4": 1,
+				"f5": 2,
+				"f6": 3,
+				"f7": 1,
+				"f8": 2,
+				"f9": 3,
+			},
+			WithKeySorted(true),
+		)
+
+		assert.NoError(t, err)
+
+		assert.True(t, sort.IsSorted(pt.kvs))
+
+		t.Logf("pt: %s", pt.Pretty())
+	})
+
+	t.Run("not-sorted", func(t *testing.T) {
+		pt, err := NewPoint("basic",
+			map[string]string{
+				"t1": "v1",
+				"t2": "v2",
+				"t3": "v1",
+				"t4": "v2",
+				"t5": "v1",
+				"t6": "v2",
+				"t7": "v1",
+				"t8": "v2",
+			},
+			map[string]any{
+				"f1": 1,
+				"f2": 2,
+				"f3": 3,
+				"f4": 1,
+				"f5": 2,
+				"f6": 3,
+				"f7": 1,
+				"f8": 2,
+				"f9": 3,
+			},
+			WithKeySorted(false),
+		)
+
+		assert.NoError(t, err)
+
+		assert.False(t, sort.IsSorted(pt.kvs))
+
+		t.Logf("pt: %s", pt.Pretty())
+	})
+}
+
 var (
 	__largeKeyForBench = cliutils.CreateRandomString(128)
 	__largeValForBench = cliutils.CreateRandomString(1024)
@@ -484,6 +602,48 @@ func BenchmarkNewPoint(b *T.B) {
 		kvs := NewKVs(map[string]any{"f1": 123, "f2": 3.14})
 		for i := 0; i < b.N; i++ {
 			doNewPoint(ptName, kvs, newCfg()) // slower ~17% than pooled
+		}
+	})
+
+	b.Run(`with-key-sorted`, func(b *T.B) {
+		ptName := `abc`
+		kvs := NewKVs(map[string]any{
+			"f1": 123,
+			"f2": 3.14,
+			"f3": "str",
+
+			"_f1": 123,
+			"_f2": 3.14,
+			"_f3": "str",
+
+			"_f1_": 123,
+			"_f2_": 3.14,
+			"_f3_": "str",
+		})
+
+		for i := 0; i < b.N; i++ {
+			NewPointV2(ptName, kvs, WithKeySorted(true))
+		}
+	})
+
+	b.Run(`without-key-sorted`, func(b *T.B) {
+		ptName := `abc`
+		kvs := NewKVs(map[string]any{
+			"f1": 123,
+			"f2": 3.14,
+			"f3": "str",
+
+			"_f1": 123,
+			"_f2": 3.14,
+			"_f3": "str",
+
+			"_f1_": 123,
+			"_f2_": 3.14,
+			"_f3_": "str",
+		})
+
+		for i := 0; i < b.N; i++ {
+			NewPointV2(ptName, kvs)
 		}
 	})
 }

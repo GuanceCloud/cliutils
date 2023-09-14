@@ -197,8 +197,7 @@ func TestPBPointJSON(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			pt, err := NewPoint(tc.name, tc.tags, tc.fields,
-				WithEncoding(Protobuf), WithTime(tc.time))
+			pt, err := NewPoint(tc.name, tc.tags, tc.fields, WithEncoding(Protobuf), WithTime(tc.time), WithKeySorted(true))
 
 			assert.NoError(t, err)
 

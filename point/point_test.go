@@ -380,7 +380,7 @@ func TestPointPB(t *T.T) {
 			"f8":  struct{}{}, // user-defined
 			"f9":  nil,
 			"f10": 3.14,
-		}), WithTime(time.Unix(0, 123)))
+		}), WithTime(time.Unix(0, 123)), WithKeySorted(true))
 
 		j := fmt.Sprintf(`{
 	"name": "%s",
@@ -797,11 +797,10 @@ func TestPointKeys(t *T.T) {
 		assert.Equal(t, hash1, hash3, "keys: \n%s", keys.Pretty())
 
 		// delete not-exist-key
-		hc := keys.hashCount
 		keys.Del(NewKey("t1", KeyType_D))
 		hash4 := keys.Hash()
 		assert.Equal(t, hash3, hash4, "keys: \n%s", keys.Pretty())
-		assert.Equal(t, hc, keys.hashCount)
+		assert.True(t, keys.hashed)
 
 		t.Logf("keys:\n%s", keys.Pretty())
 	})

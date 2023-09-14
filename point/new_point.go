@@ -58,11 +58,20 @@ func doNewPoint(name string, kvs KVs, c *cfg) *Point {
 		pt.SetFlag(Ppb)
 	}
 
+	if c.keySorted {
+		sort.Sort(pt.kvs)
+	}
+
 	if c.precheck {
 		chk := checker{cfg: c}
 		pt = chk.check(pt)
 		pt.SetFlag(Pcheck)
 		pt.warns = chk.warns
+	}
+
+	// sort again: during check, kv maybe update
+	if c.keySorted {
+		sort.Sort(pt.kvs)
 	}
 
 	if !c.t.IsZero() {
@@ -72,8 +81,6 @@ func doNewPoint(name string, kvs KVs, c *cfg) *Point {
 	if pt.time.IsZero() {
 		pt.time = time.Now()
 	}
-
-	sort.Sort(pt.kvs)
 
 	return pt
 }

@@ -110,21 +110,25 @@ func TestKVs(t *T.T) {
 	})
 
 	// any update to kvs should keep them sorted
-	t.Run(`test-sorted`, func(t *T.T) {
+	t.Run(`test-not-sorted`, func(t *T.T) {
 		kvs := NewKVs(nil)
 
 		assert.True(t, sort.IsSorted(kvs)) // empty kvs sorted
 
 		kvs = kvs.Add(`f2`, false, false, false)
 		kvs = kvs.Add(`f1`, 123, false, false)
+		kvs = kvs.Add(`f0`, 123, false, false)
 		kvs = kvs.MustAddTag(`t1`, "v1")
 
-		assert.True(t, sort.IsSorted(kvs))
+		assert.False(t, sort.IsSorted(kvs))
 
 		kvs = kvs.Del(`f1`)
-		assert.True(t, sort.IsSorted(kvs))
+		assert.False(t, sort.IsSorted(kvs))
 
 		kvs = kvs.MustAddKV(NewKV(`f3`, 3.14))
+		assert.False(t, sort.IsSorted(kvs))
+
+		sort.Sort(kvs)
 		assert.True(t, sort.IsSorted(kvs))
 	})
 }

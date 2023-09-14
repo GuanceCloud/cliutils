@@ -6,6 +6,7 @@
 package point
 
 import (
+	"sort"
 	"strings"
 	T "testing"
 	"time"
@@ -165,6 +166,10 @@ func TestWithFixKeys(t *T.T) {
 		pt1 := r.Rand(1)[0]
 		pt2 := r.Rand(1)[0]
 
+		// NOTE: sort kvs to keep assert ok
+		sort.Sort(pt1.kvs)
+		sort.Sort(pt2.kvs)
+
 		pt1tags := pt1.Tags()
 		pt2tags := pt2.Tags()
 		for idx, tag := range pt1tags {
@@ -175,7 +180,13 @@ func TestWithFixKeys(t *T.T) {
 		pt2fs := pt2.Fields()
 		t.Logf("field keys: %v", r.fieldKeys)
 		for idx, f := range pt1fs {
-			require.Equal(t, pt2fs[idx].Key, f.Key, "%d not equal:\npt1: %s\n\npt2: %s", idx, pt1.kvs.Pretty(), pt2.kvs.Pretty())
+			require.Equal(t,
+				pt2fs[idx].Key,
+				f.Key,
+				"%d not equal:\npt1: %s\n\npt2: %s",
+				idx,
+				pt1.kvs.Pretty(),
+				pt2.kvs.Pretty())
 		}
 	})
 }

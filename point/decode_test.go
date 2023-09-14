@@ -6,7 +6,9 @@
 package point
 
 import (
+	"bytes"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -311,6 +313,48 @@ func BenchmarkDecode(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			d.Decode(data[0])
+		}
+	})
+}
+
+func BenchmarkBytes2String(b *testing.B) {
+
+	repeat := 1
+	raw := []byte("xxxxxxxxxxxxxxxx")
+	//raw := []byte("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+
+	bytesData := bytes.Repeat(raw, repeat)
+	strData := strings.Repeat(string(raw), repeat)
+
+	str := string(raw)
+	b.Logf("str:   %p", &str)
+	b.Logf("bytes: %p", []byte(raw))
+	b.Logf("repeat: %p", &repeat)
+
+	b.Logf("str:   %p", &strData)
+	b.Logf("bytes: %p", []byte(strData))
+
+	{
+		y := string(bytesData)
+		_ = y
+		b.Errorf("y: %p, d: %p", &y, bytesData)
+	}
+
+	{
+		b.Errorf("y: %p, d: %p", []byte(strData), &strData)
+	}
+
+	b.Run("bytes2str", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			y := string(raw)
+			_ = y
+		}
+	})
+
+	b.Run("str2bytes", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			y := []byte(strData)
+			_ = y
 		}
 	})
 }

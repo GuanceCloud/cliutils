@@ -8,6 +8,7 @@ package point
 import (
 	"fmt"
 	"math"
+	"sort"
 	"testing"
 	T "testing"
 
@@ -187,10 +188,18 @@ func TestCheckFields(t *T.T) {
 		{
 			name: "exceed-max-field-count",
 			f: map[string]interface{}{
-				"f1": "aaaaaa1", "f2": "aaaaaa2", "f3": "aaaaaa3", "f4": "aaaaaa4", "f5": "aaaaaa5",
-				"f6": "aaaaaa6", "f7": "aaaaaa7", "f8": "aaaaaa8", "f9": "aaaaaa9", "f0": "aaaaaa0",
+				"f1": "aaaaaa1",
+				"f2": "aaaaaa2",
+				"f3": "aaaaaa3",
+				"f4": "aaaaaa4",
+				"f5": "aaaaaa5",
+				"f6": "aaaaaa6",
+				"f7": "aaaaaa7",
+				"f8": "aaaaaa8",
+				"f9": "aaaaaa9",
+				"f0": "aaaaaa0",
 			},
-			opts:  []Option{WithMaxFields(1)},
+			opts:  []Option{WithMaxFields(1), WithKeySorted(true)},
 			warns: 1,
 			expect: map[string]interface{}{
 				"f0": "aaaaaa0",
@@ -356,15 +365,23 @@ func TestCheckFields(t *T.T) {
 			defer PutCfg(cfg)
 
 			for _, opt := range tc.opts {
-				t.Logf("set opt: %+#v", opt)
 				opt(cfg)
 			}
 
-			c := checker{cfg: cfg}
-			kvs := c.checkKVs(NewKVs(tc.f))
+			t.Logf("cfg: %+#v", cfg)
 
-			require.Equal(t, tc.warns, len(c.warns))
+			c := checker{cfg: cfg}
+
+			kvs := NewKVs(tc.f)
 			expect := NewKVs(tc.expect)
+
+			if cfg.keySorted {
+				sort.Sort(kvs)
+				sort.Sort(expect)
+			}
+
+			kvs = c.checkKVs(kvs)
+			require.Equal(t, tc.warns, len(c.warns))
 
 			if tc.expect != nil {
 				eq, _ := kvsEq(expect, kvs)

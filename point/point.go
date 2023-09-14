@@ -195,6 +195,8 @@ func FromModelsLP(lp models.Point) *Point {
 		return nil
 	}
 
+	_ = lpfs
+
 	pt := &Point{
 		name: string(lp.Name()),
 		kvs:  NewKVs(lpfs),

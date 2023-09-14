@@ -7,7 +7,6 @@ package point
 
 import (
 	"math"
-	"sort"
 	"strings"
 
 	anypb "google.golang.org/protobuf/types/known/anypb"
@@ -217,7 +216,6 @@ func (x KVs) Del(k string) KVs {
 		x[j] = nil
 	}
 
-	// delete from sorted list do not need sort again.
 	x = x[:i]
 	return x
 }
@@ -250,7 +248,6 @@ func (x KVs) Add(k string, v any, isTag, force bool) KVs {
 	x = append(x, kv)
 
 out:
-	sort.Sort(x)
 	return x
 }
 
@@ -276,7 +273,6 @@ func (x KVs) AddKV(kv *Field, force bool) KVs {
 	x = append(x, kv)
 
 out:
-	sort.Sort(x)
 	return x
 }
 
@@ -318,9 +314,7 @@ func (x KVs) Keys() *Keys {
 		arr = append(arr, NewKey(f.Key, t))
 	}
 
-	res := &Keys{arr: arr}
-	sort.Sort(res)
-	return res
+	return &Keys{arr: arr}
 }
 
 func KVKey(f *Field) *Key {
@@ -420,7 +414,6 @@ func NewKVs(kvs map[string]interface{}) (res KVs) {
 		res = append(res, NewKV(k, v))
 	}
 
-	sort.Sort(res)
 	return res
 }
 
@@ -430,7 +423,5 @@ func NewTags(tags map[string]string) (arr KVs) {
 		arr = append(arr, &Field{IsTag: true, Key: k, Val: &Field_S{S: v}})
 	}
 
-	// keep them sorted.
-	sort.Sort(arr)
 	return arr
 }
