@@ -293,11 +293,12 @@ func TestPBPointPayload(t *testing.T) {
 			assert.NoError(t, err)
 			t.Logf("pb len: %d", len(pb))
 
-			t.Logf("pb len(gz): %f", func() float64 {
+			ratio, size := func() (float64, int) {
 				x, err := cliutils.GZip(pb)
 				assert.NoError(t, err)
-				return float64(len(x)) / float64(len(pb))
-			}())
+				return float64(len(x)) / float64(len(pb)), len(x)
+			}()
+			t.Logf("pb gz ratio: %f/%d", ratio, size)
 
 			// line-protocol
 			ptStrArr := []string{}
@@ -308,13 +309,13 @@ func TestPBPointPayload(t *testing.T) {
 			}
 
 			ptstr := strings.Join(ptStrArr, "\n")
-
-			t.Logf("lp len: %d", len(ptstr))
-			t.Logf("lp len(gz): %f", func() float64 {
+			ratio, size = func() (float64, int) {
 				x, err := cliutils.GZipStr(ptstr)
 				assert.NoError(t, err)
-				return float64(len(x)) / float64(len(ptstr))
-			}())
+				return float64(len(x)) / float64(len(ptstr)), len(x)
+			}()
+			t.Logf("lp len: %d", len(ptstr))
+			t.Logf("lp gz ratio: %f/%d", ratio, size)
 		})
 	}
 }

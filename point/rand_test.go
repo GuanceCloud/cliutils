@@ -80,9 +80,9 @@ func TestPointRander(t *T.T) {
 		fs := pts[0].Fields()
 		require.True(t, len(fs) > 0)
 
-		require.True(t, fs.Has([]byte("message")), "fields: %s", fs.Pretty())
-		require.True(t, fs.Has([]byte("error_message")))
-		require.True(t, fs.Has([]byte("error_stack")))
+		require.True(t, fs.Has("message"), "fields: %s", fs.Pretty())
+		require.True(t, fs.Has("error_message"))
+		require.True(t, fs.Has("error_stack"))
 
 		t.Logf("point: %s", pts[0].Pretty())
 	})

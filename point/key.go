@@ -6,7 +6,6 @@
 package point
 
 import (
-	"bytes"
 	"fmt"
 	"hash/fnv"
 	"sort"
@@ -15,36 +14,33 @@ import (
 
 // Key is the key-name and it's type composite.
 type Key struct {
-	key []byte // key-name + key-type
+	key string // key-name + key-type
+	t   KeyType
 	def any
 }
 
 // NewKey create Key.
-func NewKey(k []byte, t KeyType, defaultVal ...any) *Key {
+func NewKey(k string, t KeyType, defaultVal ...any) *Key {
 	var def any
 	if len(defaultVal) > 0 {
 		def = defaultVal[0]
 	}
 
 	return &Key{
-		key: append(k, uint8(t)),
+		key: k,
+		t:   t,
 		def: def,
 	}
 }
 
 // NewTagKey create tag key with type []byte.
-func NewTagKey(k []byte, defaultVal []byte) *Key {
+func NewTagKey(k string, defaultVal string) *Key {
 	return NewKey(k, KeyType_D, defaultVal)
 }
 
 // Key get key-name.
-func (k *Key) Key() []byte {
-	switch len(k.key) {
-	case 0, 1:
-		return nil
-	default:
-		return k.key[:len(k.key)-1]
-	}
+func (k *Key) Key() string {
+	return k.key
 }
 
 // Type get key-type.
@@ -81,14 +77,14 @@ func (x *Keys) Swap(i, j int) {
 }
 
 func (x *Keys) Less(i, j int) bool {
-	return bytes.Compare(x.arr[i].key, x.arr[j].key) < 0
+	return strings.Compare(x.arr[i].key, x.arr[j].key) < 0
 }
 
 // Has test if k exist.
 func (x *Keys) Has(k *Key) bool {
 	// TODO: should replaced by sort.Search()
 	for _, item := range x.arr {
-		if bytes.Equal(k.key, item.key) {
+		if k.key == item.key {
 			return true
 		}
 	}
@@ -111,7 +107,7 @@ func (x *Keys) Add(k *Key) {
 func (x *Keys) Del(k *Key) {
 	i := 0
 	for _, key := range x.arr {
-		if !bytes.Equal(key.key, k.key) {
+		if key.key != k.key {
 			x.arr[i] = key
 			i++
 		}

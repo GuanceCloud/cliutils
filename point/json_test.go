@@ -45,13 +45,14 @@ func TestJSONPointMarshal(t *testing.T) {
 				  {"key":"%s","b":false}
 				],
 				"time":"123"
-			}`, b64([]byte(`abc`)),
-				b64([]byte(`t2`)),
-				b64([]byte(`tv2`)),
-				b64([]byte(`t1`)),
-				b64([]byte(`tv1`)),
-				b64([]byte(`f1`)),
-				b64([]byte(`f2`))),
+			}`,
+				`abc`,
+				`t2`,
+				`tv2`,
+				`t1`,
+				`tv1`,
+				`f1`,
+				`f2`),
 		},
 	}
 

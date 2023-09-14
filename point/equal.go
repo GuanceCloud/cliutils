@@ -39,7 +39,7 @@ func (p *Point) EqualWithReason(x *Point) (bool, string) {
 		return false, fmt.Sprintf("timestamp not equal(%d <> %d)", ptime, xtime)
 	}
 
-	if !bytes.Equal(xname, pname) {
+	if xname != pname {
 		return false, fmt.Sprintf("measurement not equla(%s <> %s)", pname, xname)
 	}
 

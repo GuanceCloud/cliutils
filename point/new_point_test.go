@@ -51,7 +51,7 @@ func getNFields(n int) map[string]interface{} {
 
 func TestV2NewPoint(t *T.T) {
 	t.Run("valid-fields", func(t *T.T) {
-		pt := NewPointV2([]byte("abc"), NewKVs(
+		pt := NewPointV2("abc", NewKVs(
 			map[string]interface{}{
 				"[]byte":  []byte("abc"),
 				"[]uint8": []uint8("abc"),
@@ -101,14 +101,14 @@ func TestV2NewPoint(t *T.T) {
 			"u64-large": uint64(math.MaxInt64 + 1), // skipped in expect string
 			"u8":        uint8(1),
 		}
-		pt := NewPointV2([]byte(`abc`), NewKVs(kvs), WithTime(time.Unix(0, 123)), WithEncoding(Protobuf))
+		pt := NewPointV2(`abc`, NewKVs(kvs), WithTime(time.Unix(0, 123)), WithEncoding(Protobuf))
 		expect := `abc []byte="abc",[]uint8="abc",b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1i,u16=1i,u32=1i,u64=1i,u8=1i 123`
 		assert.Equal(t, expect, pt.LineProto())
 	})
 
 	t.Run("basic", func(t *T.T) {
-		kvs := NewKVs(map[string]interface{}{"f1": 12}).MustAddTag([]byte(`t1`), []byte(`tval1`))
-		pt := NewPointV2([]byte(`abc`), kvs, WithTime(time.Unix(0, 123)))
+		kvs := NewKVs(map[string]interface{}{"f1": 12}).MustAddTag(`t1`, `tval1`)
+		pt := NewPointV2(`abc`, kvs, WithTime(time.Unix(0, 123)))
 
 		assert.Equal(t, "abc,t1=tval1 f1=12i 123", pt.LineProto())
 	})
@@ -472,7 +472,7 @@ var benchCases = []struct {
 
 func BenchmarkNewPoint(b *T.B) {
 	b.Run(`with-pool-cfg`, func(b *T.B) {
-		ptName := []byte(`abc`)
+		ptName := `abc`
 		kvs := NewKVs(map[string]any{"f1": 123, "f2": 3.14})
 		for i := 0; i < b.N; i++ {
 			NewPointV2(ptName, kvs)
@@ -480,7 +480,7 @@ func BenchmarkNewPoint(b *T.B) {
 	})
 
 	b.Run(`without-pool-cfg`, func(b *T.B) {
-		ptName := []byte(`abc`)
+		ptName := `abc`
 		kvs := NewKVs(map[string]any{"f1": 123, "f2": 3.14})
 		for i := 0; i < b.N; i++ {
 			doNewPoint(ptName, kvs, newCfg()) // slower ~17% than pooled

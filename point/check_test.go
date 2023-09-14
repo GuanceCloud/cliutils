@@ -78,7 +78,7 @@ func TestCheckMeasurement(t *testing.T) {
 			}
 
 			c := checker{cfg: cfg}
-			m := c.checkMeasurement([]byte(tc.measurement))
+			m := c.checkMeasurement(tc.measurement)
 			assert.Equal(t, tc.expect, string(m))
 		})
 	}
@@ -99,7 +99,7 @@ func TestCheckTags(t *T.T) {
 				"t2": "23456",
 			},
 			opts: []Option{
-				WithDisabledKeys(NewTagKey([]byte(`t1`), nil)),
+				WithDisabledKeys(NewTagKey(`t1`, "")),
 			},
 			warns: 1,
 			expect: NewTags(
@@ -306,7 +306,7 @@ func TestCheckFields(t *T.T) {
 				"b": "12345",
 			},
 			warns: 1,
-			opts:  []Option{WithDisabledKeys(NewKey([]byte("a"), KeyType_I))},
+			opts:  []Option{WithDisabledKeys(NewKey("a", KeyType_I))},
 			expect: map[string]interface{}{
 				"b": "12345",
 			},
@@ -395,16 +395,16 @@ def`,
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
-			assert.Equal(t, tc.y, string(adjustKV([]byte(tc.x))))
+			assert.Equal(t, tc.y, string(adjustKV(tc.x)))
 		})
 	}
 }
 
 func TestRequiredKV(t *T.T) {
 	t.Run(`add`, func(t *T.T) {
-		pt := NewPointV2([]byte(`abc`), NewKVs(map[string]any{"f1": 123}),
-			WithRequiredKeys(NewKey([]byte(`rk`), KeyType_I, 1024)))
-		assert.Equal(t, int64(1024), pt.Get([]byte(`rk`)))
+		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123}),
+			WithRequiredKeys(NewKey(`rk`, KeyType_I, 1024)))
+		assert.Equal(t, int64(1024), pt.Get(`rk`))
 	})
 }
 

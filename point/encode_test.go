@@ -84,20 +84,20 @@ func TestEncode(t *testing.T) {
 		randPts = RandPoints(1000)
 
 		simplePts = []*Point{
-			NewPointV2([]byte(`abc`), NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
-				AddTag([]byte(`t1`), []byte(`tv1`)).
-				AddTag([]byte(`t2`), []byte(`tv2`)).
-				AddTag([]byte(`t3`), []byte(`tv3`)), WithTime(time.Unix(0, 123))),
+			NewPointV2(`abc`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
+				AddTag(`t1`, `tv1`).
+				AddTag(`t2`, `tv2`).
+				AddTag(`t3`, `tv3`), WithTime(time.Unix(0, 123))),
 
-			NewPointV2([]byte(`def`), NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
-				AddTag([]byte(`t1`), []byte(`tv1`)).
-				AddTag([]byte(`t2`), []byte(`tv2`)).
-				AddTag([]byte(`t3`), []byte(`tv3`)), WithTime(time.Unix(0, 123))),
+			NewPointV2(`def`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
+				AddTag(`t1`, `tv1`).
+				AddTag(`t2`, `tv2`).
+				AddTag(`t3`, `tv3`), WithTime(time.Unix(0, 123))),
 
-			NewPointV2([]byte(`xyz`), NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
-				AddTag([]byte(`t1`), []byte(`tv1`)).
-				AddTag([]byte(`t2`), []byte(`tv2`)).
-				AddTag([]byte(`t3`), []byte(`tv3`)), WithTime(time.Unix(0, 123))),
+			NewPointV2(`xyz`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
+				AddTag(`t1`, `tv1`).
+				AddTag(`t2`, `tv2`).
+				AddTag(`t3`, `tv3`), WithTime(time.Unix(0, 123))),
 		}
 
 		__fn = func(n int, data []byte) error {

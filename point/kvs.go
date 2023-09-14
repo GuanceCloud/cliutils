@@ -6,7 +6,6 @@
 package point
 
 import (
-	"bytes"
 	"math"
 	"sort"
 	"strings"
@@ -25,7 +24,7 @@ func (x KVs) Swap(i, j int) {
 }
 
 func (x KVs) Less(i, j int) bool {
-	return bytes.Compare(x[i].Key, x[j].Key) < 0 // stable sort
+	return strings.Compare(x[i].Key, x[j].Key) < 0 // stable sort
 }
 
 func (x KVs) Pretty() string {
@@ -85,9 +84,9 @@ func (x KVs) InfluxTags() (res map[string]string) {
 }
 
 // Has test if k exist.
-func (x KVs) Has(k []byte) bool {
+func (x KVs) Has(k string) bool {
 	for _, f := range x {
-		if bytes.Equal(f.Key, k) {
+		if f.Key == k {
 			return true
 		}
 	}
@@ -96,9 +95,9 @@ func (x KVs) Has(k []byte) bool {
 }
 
 // Get get k's value, if k not exist, return nil.
-func (x KVs) Get(k []byte) *Field {
+func (x KVs) Get(k string) *Field {
 	for _, f := range x {
-		if bytes.Equal(f.Key, k) {
+		if f.Key == k {
 			return f
 		}
 	}
@@ -107,18 +106,18 @@ func (x KVs) Get(k []byte) *Field {
 }
 
 // GetTag get tag k's value, if the tag not exist, return nil.
-func (x KVs) GetTag(k []byte) []byte {
+func (x KVs) GetTag(k string) string {
 	for _, f := range x {
 		if !f.IsTag {
 			continue
 		}
 
-		if bytes.Equal(f.Key, k) {
-			return f.GetD()
+		if f.Key == k {
+			return f.GetS()
 		}
 	}
 
-	return nil
+	return ""
 }
 
 func (x KVs) Tags() (arr KVs) {
@@ -202,10 +201,10 @@ func (x KVs) FieldCount() (i int) {
 }
 
 // Del delete specified k.
-func (x KVs) Del(k []byte) KVs {
+func (x KVs) Del(k string) KVs {
 	i := 0
 	for _, f := range x {
-		if !bytes.Equal(f.Key, k) {
+		if f.Key != k {
 			x[i] = f
 			i++
 		}
@@ -224,7 +223,7 @@ func (x KVs) Del(k []byte) KVs {
 // Add add new field
 //
 // If force enabled, overwrite exist key.
-func (x KVs) Add(k []byte, v any, isTag, force bool) KVs {
+func (x KVs) Add(k string, v any, isTag, force bool) KVs {
 	kv := NewKV(k, v)
 
 	if isTag {
@@ -237,7 +236,7 @@ func (x KVs) Add(k []byte, v any, isTag, force bool) KVs {
 	}
 
 	for i := range x {
-		if bytes.Equal(x[i].Key, k) { // k exist
+		if x[i].Key == k { // k exist
 			if force {
 				x[i] = kv // override exist tag/field
 			}
@@ -253,19 +252,19 @@ out:
 	return x
 }
 
-func (x KVs) AddTag(k, v []byte) KVs {
+func (x KVs) AddTag(k, v string) KVs {
 	x = x.Add(k, v, true, false)
 	return x
 }
 
-func (x KVs) MustAddTag(k, v []byte) KVs {
+func (x KVs) MustAddTag(k, v string) KVs {
 	x = x.Add(k, v, true, true)
 	return x
 }
 
 func (x KVs) AddKV(kv *Field, force bool) KVs {
 	for i := range x {
-		if bytes.Equal(x[i].Key, kv.Key) {
+		if x[i].Key == kv.Key {
 			if force {
 				x[i] = kv
 			}
@@ -353,7 +352,7 @@ func WithKVTagSet(on bool) KVOption {
 }
 
 // NewKV get kv from specified key and value.
-func NewKV(k []byte, v any, opts ...KVOption) *Field {
+func NewKV(k string, v any, opts ...KVOption) *Field {
 	var kv *Field
 
 	switch x := v.(type) {
@@ -415,7 +414,7 @@ func NewKV(k []byte, v any, opts ...KVOption) *Field {
 // NewKVs create kvs slice from map structure.
 func NewKVs(kvs map[string]interface{}) (res KVs) {
 	for k, v := range kvs {
-		res = append(res, NewKV([]byte(k), v))
+		res = append(res, NewKV(k, v))
 	}
 
 	sort.Sort(res)
@@ -425,7 +424,7 @@ func NewKVs(kvs map[string]interface{}) (res KVs) {
 // NewTags create tag kvs from map structure.
 func NewTags(tags map[string]string) (arr KVs) {
 	for k, v := range tags {
-		arr = append(arr, &Field{IsTag: true, Key: []byte(k), Val: &Field_D{D: []byte(v)}})
+		arr = append(arr, &Field{IsTag: true, Key: k, Val: &Field_S{S: v}})
 	}
 
 	// keep them sorted.

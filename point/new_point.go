@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func NewPointV2(name []byte, kvs KVs, opts ...Option) *Point {
+func NewPointV2(name string, kvs KVs, opts ...Option) *Point {
 	c := GetCfg(opts...)
 	defer PutCfg(c)
 
@@ -32,16 +32,16 @@ func NewPoint(name string, tags map[string]string, fields map[string]any, opts .
 
 	kvs := NewKVs(fields)
 	for k, v := range tags {
-		kvs = kvs.Add([]byte(k), []byte(v), true, true) // force add these tags
+		kvs = kvs.Add(k, v, true, true) // force add these tags
 	}
 
 	c := GetCfg(opts...)
 	defer PutCfg(c)
 
-	return doNewPoint([]byte(name), kvs, c), nil
+	return doNewPoint(name, kvs, c), nil
 }
 
-func doNewPoint(name []byte, kvs KVs, c *cfg) *Point {
+func doNewPoint(name string, kvs KVs, c *cfg) *Point {
 	pt := &Point{
 		name: name,
 		kvs:  kvs,
@@ -50,7 +50,7 @@ func doNewPoint(name []byte, kvs KVs, c *cfg) *Point {
 	// add extra tags
 	if len(c.extraTags) > 0 {
 		for _, kv := range c.extraTags {
-			pt.AddTag(kv.Key, kv.GetD()) // NOTE: do-not-override exist keys
+			pt.AddTag(kv.Key, kv.GetS()) // NOTE: do-not-override exist keys
 		}
 	}
 

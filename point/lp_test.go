@@ -177,7 +177,7 @@ func TestNewLPPoint(t *testing.T) {
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
 			warns:  1,
 			opts: []Option{
-				WithDisabledKeys(NewKey([]byte(`f1`), KeyType_I)),
+				WithDisabledKeys(NewKey(`f1`, KeyType_I)),
 				WithTime(time.Unix(0, 123)),
 			},
 			expect: "abc,t1=abc,t2=32 f2=32i,f3=32i 123",
@@ -189,7 +189,7 @@ func TestNewLPPoint(t *testing.T) {
 			fields: map[string]interface{}{"f1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
 			opts: []Option{
-				WithDisabledKeys(NewTagKey([]byte(`t2`), nil)),
+				WithDisabledKeys(NewTagKey(`t2`, "")),
 				WithTime(time.Unix(0, 123)),
 			},
 
@@ -573,7 +573,7 @@ func TestParsePoint(t *testing.T) {
 			data: []byte(`abc,t1=1,t2=2 f1=1i,f2=2,f3="abc" 123`),
 			opts: []Option{
 				WithTime(time.Unix(0, 123)),
-				WithDisabledKeys(NewKey([]byte(`f1`), KeyType_I)),
+				WithDisabledKeys(NewKey(`f1`, KeyType_I)),
 			},
 
 			expect: []*influxdb.Point{
@@ -589,7 +589,7 @@ func TestParsePoint(t *testing.T) {
 			data: []byte(`abc,t1=1,t2=2 f1=1i,f2=2,f3="abc" 123`),
 			opts: []Option{
 				WithTime(time.Unix(0, 123)),
-				WithDisabledKeys(NewTagKey([]byte(`t1`), nil)),
+				WithDisabledKeys(NewTagKey(`t1`, "")),
 			},
 
 			expect: []*influxdb.Point{

@@ -18,28 +18,28 @@ func TestKVs(t *T.T) {
 	t.Run("add-tag", func(t *T.T) {
 		kvs := NewKVs(map[string]any{"f1": 123})
 
-		kvs = kvs.AddTag([]byte(`t1`), []byte(`v1`))
-		assert.Equal(t, []byte(`v1`), kvs.Get([]byte(`t1`)).GetD())
+		kvs = kvs.AddTag(`t1`, `v1`)
+		assert.Equal(t, []byte(`v1`), kvs.Get(`t1`).GetD())
 		assert.Equal(t, 1, kvs.TagCount())
 
 		// add new tag t2
-		kvs = kvs.Add([]byte(`t2`), []byte(`v2`), true, true)
-		assert.Equal(t, []byte(`v2`), kvs.Get([]byte(`t2`)).GetD())
+		kvs = kvs.Add(`t2`, []byte(`v2`), true, true)
+		assert.Equal(t, []byte(`v2`), kvs.Get(`t2`).GetD())
 		assert.Equal(t, 2, kvs.TagCount())
 
 		// replace t2's value v3
-		kvs = kvs.Add([]byte(`t2`), []byte(`v3`), true, true)
-		assert.Equal(t, []byte(`v3`), kvs.Get([]byte(`t2`)).GetD())
+		kvs = kvs.Add(`t2`, []byte(`v3`), true, true)
+		assert.Equal(t, []byte(`v3`), kvs.Get(`t2`).GetD())
 		assert.Equal(t, 2, kvs.TagCount())
 
 		// invalid tag value(must be []byte/string), switch to field
-		kvs = kvs.Add([]byte(`tag-as-field`), 123, true, true)
-		assert.Equal(t, int64(123), kvs.Get([]byte(`tag-as-field`)).GetI())
+		kvs = kvs.Add(`tag-as-field`, 123, true, true)
+		assert.Equal(t, int64(123), kvs.Get(`tag-as-field`).GetI())
 		assert.Equal(t, 2, kvs.TagCount())
 
 		// invalid tag override exist
-		kvs = kvs.Add([]byte(`t2`), false, true, true)
-		assert.Equal(t, false, kvs.Get([]byte(`t2`)).GetB())
+		kvs = kvs.Add(`t2`, false, true, true)
+		assert.Equal(t, false, kvs.Get(`t2`).GetB())
 		assert.Equal(t, 1, kvs.TagCount())
 	})
 
@@ -74,21 +74,21 @@ func TestKVs(t *T.T) {
 		})
 		assert.Equal(t, 9, len(kvs))
 
-		assert.Equal(t, int64(123), kvs.Get([]byte(`f1`)).GetI())
-		assert.Equal(t, uint64(123), kvs.Get([]byte(`f2`)).GetU())
-		assert.Equal(t, 3.14, kvs.Get([]byte(`f3`)).GetF())
-		assert.Equal(t, []byte(`hello`), kvs.Get([]byte(`f4`)).GetD())
-		assert.Equal(t, []byte(`world`), kvs.Get([]byte(`f5`)).GetD())
-		assert.Equal(t, false, kvs.Get([]byte(`f6`)).GetB())
-		assert.Equal(t, true, kvs.Get([]byte(`f7`)).GetB())
+		assert.Equal(t, int64(123), kvs.Get(`f1`).GetI())
+		assert.Equal(t, uint64(123), kvs.Get(`f2`).GetU())
+		assert.Equal(t, 3.14, kvs.Get(`f3`).GetF())
+		assert.Equal(t, []byte(`hello`), kvs.Get(`f4`).GetD())
+		assert.Equal(t, []byte(`world`), kvs.Get(`f5`).GetD())
+		assert.Equal(t, false, kvs.Get(`f6`).GetB())
+		assert.Equal(t, true, kvs.Get(`f7`).GetB())
 
-		x := kvs.Get([]byte(`f8`)).GetA()
+		x := kvs.Get(`f8`).GetA()
 		assert.NotNil(t, x)
 		t.Logf("any: %s", x)
 		t.Logf("any.type: %q", x.TypeUrl)
 		t.Logf("any.value: %q", x.Value)
 
-		assert.Nil(t, kvs.Get([]byte(`f9`)).Val)
+		assert.Nil(t, kvs.Get(`f9`).Val)
 
 		t.Logf("kvs:\n%s", kvs.Pretty())
 	})
@@ -96,13 +96,13 @@ func TestKVs(t *T.T) {
 	t.Run(`add-kv`, func(t *T.T) {
 		kvs := NewKVs(nil)
 
-		kvs = kvs.MustAddKV(NewKV([]byte(`t1`), false, WithKVTagSet(true))) // set tag failed on bool value
-		kvs = kvs.MustAddKV(NewKV([]byte(`t2`), "v1", WithKVTagSet(true)))
-		kvs = kvs.MustAddKV(NewKV([]byte(`t3`), []byte("v2"), WithKVTagSet(true)))
+		kvs = kvs.MustAddKV(NewKV(`t1`, false, WithKVTagSet(true))) // set tag failed on bool value
+		kvs = kvs.MustAddKV(NewKV(`t2`, "v1", WithKVTagSet(true)))
+		kvs = kvs.MustAddKV(NewKV(`t3`, []byte("v2"), WithKVTagSet(true)))
 
-		kvs = kvs.MustAddKV(NewKV([]byte(`f1`), "foo"))
-		kvs = kvs.MustAddKV(NewKV([]byte(`f2`), 123, WithKVUnit("MB"), WithKVType(MetricType_COUNT)))
-		kvs = kvs.MustAddKV(NewKV([]byte(`f3`), 3.14, WithKVUnit("some"), WithKVType(MetricType_GAUGE)))
+		kvs = kvs.MustAddKV(NewKV(`f1`, "foo"))
+		kvs = kvs.MustAddKV(NewKV(`f2`, 123, WithKVUnit("MB"), WithKVType(MetricType_COUNT)))
+		kvs = kvs.MustAddKV(NewKV(`f3`, 3.14, WithKVUnit("some"), WithKVType(MetricType_GAUGE)))
 
 		assert.Equal(t, 6, len(kvs))
 
@@ -115,16 +115,16 @@ func TestKVs(t *T.T) {
 
 		assert.True(t, sort.IsSorted(kvs)) // empty kvs sorted
 
-		kvs = kvs.Add([]byte(`f2`), false, false, false)
-		kvs = kvs.Add([]byte(`f1`), 123, false, false)
-		kvs = kvs.MustAddTag([]byte(`t1`), []byte("v1"))
+		kvs = kvs.Add(`f2`, false, false, false)
+		kvs = kvs.Add(`f1`, 123, false, false)
+		kvs = kvs.MustAddTag(`t1`, "v1")
 
 		assert.True(t, sort.IsSorted(kvs))
 
-		kvs = kvs.Del([]byte(`f1`))
+		kvs = kvs.Del(`f1`)
 		assert.True(t, sort.IsSorted(kvs))
 
-		kvs = kvs.MustAddKV(NewKV([]byte(`f3`), 3.14))
+		kvs = kvs.MustAddKV(NewKV(`f3`, 3.14))
 		assert.True(t, sort.IsSorted(kvs))
 	})
 }

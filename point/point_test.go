@@ -20,20 +20,20 @@ import (
 
 func TestGetTag(t *T.T) {
 	t.Run(`get-tag`, func(t *T.T) {
-		pt := NewPointV2([]byte(`abc`), NewKVs(nil).MustAddTag([]byte(`t1`), []byte(`v1`)))
+		pt := NewPointV2(`abc`, NewKVs(nil).MustAddTag(`t1`, `v1`))
 
-		assert.Equal(t, []byte(`v1`), pt.GetTag([]byte(`t1`)))
-		assert.Nil(t, pt.GetTag([]byte(`not-exist`)))
+		assert.Equal(t, `v1`, pt.GetTag(`t1`))
+		assert.Nil(t, pt.GetTag(`not-exist`))
 
 		// get non-tag key
-		pt.kvs = pt.kvs.MustAddKV(NewKV([]byte(`f1`), 1.23,
+		pt.kvs = pt.kvs.MustAddKV(NewKV(`f1`, 1.23,
 			WithKVUnit("bytes"),
 			WithKVTagSet(true), // set failed
 			WithKVType(MetricType_COUNT)))
-		assert.Nil(t, pt.GetTag([]byte(`f1`)))
+		assert.Nil(t, pt.GetTag(`f1`))
 
-		pt.AddTag([]byte(`empty-tag`), []byte(``))
-		assert.Equal(t, []byte(``), pt.GetTag([]byte(`empty-tag`)))
+		pt.AddTag(`empty-tag`, ``)
+		assert.Equal(t, ``, pt.GetTag(`empty-tag`))
 
 		t.Logf("kvs:\n%s", pt.kvs.Pretty())
 	})
@@ -64,30 +64,27 @@ func TestFlags(t *T.T) {
 
 func TestPrettyPoint(t *T.T) {
 	t.Run(`basic`, func(t *T.T) {
-		pt := NewPointV2([]byte(`abc`), NewKVs(map[string]any{"f1": 123}).AddTag([]byte("t1"), []byte("v1")))
+		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123}).AddTag("t1", "v1"))
 		t.Logf("%s", pt.Pretty())
 	})
 
 	t.Run(`with-warns`, func(t *T.T) {
-		pt := NewPointV2([]byte(`abc`), NewKVs(map[string]any{"f1": 123}).
-			AddTag([]byte("t1"), []byte("v1")).
-			AddTag([]byte("t2"), []byte("v1")),
-			WithDisabledKeys(NewTagKey([]byte(`t2`), nil)))
+		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123}).
+			AddTag("t1", "v1").
+			AddTag("t2", "v1"),
+			WithDisabledKeys(NewTagKey(`t2`, "")))
 
 		t.Logf("%s", pt.Pretty())
 	})
 
 	t.Run(`with-all-types`, func(t *T.T) {
-		pt := NewPointV2([]byte(`abc`), NewKVs(map[string]any{
+		pt := NewPointV2(`abc`, NewKVs(map[string]any{
 			"f1": 123,
 			"f2": uint64(321),
 			"f3": 3.14,
 			"f4": false,
 			"f5": []byte("hello"),
-		}).
-			AddTag([]byte("t1"), []byte("v1")).
-			AddTag([]byte("t2"), []byte("v1")),
-			WithDisabledKeys(NewTagKey([]byte(`t2`), nil)))
+		}).AddTag("t1", "v1").AddTag("t2", "v1"), WithDisabledKeys(NewTagKey(`t2`, "")))
 
 		t.Logf("%s", pt.Pretty())
 	})
@@ -161,7 +158,7 @@ func TestPointString(t *T.T) {
 
 func TestInfluxTags(t *T.T) {
 	t.Run("get-tags", func(t *T.T) {
-		pt := NewPointV2([]byte(`abc`), NewKVs(map[string]any{"f1": 123}).AddTag([]byte(`t1`), []byte(`v1`)))
+		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123}).AddTag(`t1`, `v1`))
 		tags := pt.InfluxTags()
 		assert.Equal(t, map[string]string{"t1": "v1"}, tags)
 
@@ -169,9 +166,9 @@ func TestInfluxTags(t *T.T) {
 	})
 
 	t.Run("no-tags", func(t *T.T) {
-		pt := NewPointV2([]byte(`abc`),
+		pt := NewPointV2(`abc`,
 			NewKVs(map[string]any{"v1": 123}).
-				AddTag([]byte(`v1`), []byte(`foo`))) // tag key exist, skipped
+				AddTag(`v1`, `foo`)) // tag key exist, skipped
 
 		tags := pt.InfluxTags()
 		assert.Equal(t, 0, len(tags), "pt: %s", pt.Pretty())
@@ -330,7 +327,7 @@ func TestPointLineProtocol(t *T.T) {
 		{
 			name: `string-field-with-newline`,
 			prec: NS,
-			pt: NewPointV2([]byte(`abc`), append(NewTags(map[string]string{"tag1": "v1"}),
+			pt: NewPointV2(`abc`, append(NewTags(map[string]string{"tag1": "v1"}),
 				NewKVs(map[string]any{"f1": `message
 with
 new
@@ -354,10 +351,10 @@ line" 123`,
 
 func TestPBJson(t *T.T) {
 	t.Run("pbjson", func(t *T.T) {
-		pt := NewPointV2([]byte(`abc`), NewKVs(map[string]any{"f1": 123, "f2": 3.14}))
+		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123, "f2": 3.14}))
 
-		pt.kvs = pt.kvs.MustAddTag([]byte(`t1`), []byte(`v1`)).
-			MustAddKV(NewKV([]byte(`f2`), 3.14, WithKVUnit("kb"), WithKVType(MetricType_COUNT)))
+		pt.kvs = pt.kvs.MustAddTag(`t1`, `v1`).
+			MustAddKV(NewKV(`f2`, 3.14, WithKVUnit("kb"), WithKVType(MetricType_COUNT)))
 
 		j, _ := pt.PBJson()
 		t.Logf("%s", string(j))
@@ -369,7 +366,7 @@ func TestPBJson(t *T.T) {
 
 func TestPointPB(t *T.T) {
 	t.Run(`valid-types`, func(t *T.T) {
-		pt := NewPointV2([]byte(`abc`), NewKVs(map[string]any{
+		pt := NewPointV2(`abc`, NewKVs(map[string]any{
 			"f1":  uint64(123),
 			"f2":  uint64(math.MaxUint64),
 			"f3":  int64(123),
@@ -425,15 +422,15 @@ func TestPointPB(t *T.T) {
 
 func TestLPPoint(t *T.T) {
 	t.Run(`uint`, func(t *T.T) {
-		pt := NewPointV2([]byte(`abc`), NewKVs(map[string]any{"f1": uint64(123)}), WithTime(time.Unix(0, 123)))
+		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": uint64(123)}), WithTime(time.Unix(0, 123)))
 		assert.Equal(t, `abc f1=123i 123`, pt.LPPoint().String())
 
 		// max-int64 is ok
-		pt = NewPointV2([]byte(`abc`), NewKVs(map[string]any{"f1": uint64(math.MaxInt64)}), WithTime(time.Unix(0, 123)))
+		pt = NewPointV2(`abc`, NewKVs(map[string]any{"f1": uint64(math.MaxInt64)}), WithTime(time.Unix(0, 123)))
 		assert.Equal(t, fmt.Sprintf(`abc f1=%di 123`, math.MaxInt64), pt.LPPoint().String())
 
 		// max-int64 + 1 not ok
-		pt = NewPointV2([]byte(`abc`), NewKVs(map[string]any{"f1": uint64(math.MaxInt64 + 1), "f2": "foo"}), WithTime(time.Unix(0, 123)))
+		pt = NewPointV2(`abc`, NewKVs(map[string]any{"f1": uint64(math.MaxInt64 + 1), "f2": "foo"}), WithTime(time.Unix(0, 123)))
 		assert.Equal(t, `abc f2="foo" 123`, pt.LPPoint().String())
 
 		t.Logf("lp: %s", pt.LPPoint().String())
@@ -441,7 +438,7 @@ func TestLPPoint(t *T.T) {
 
 	t.Run(`nil`, func(t *T.T) {
 		// max-int64 + 1 not ok
-		pt := NewPointV2([]byte(`abc`), NewKVs(map[string]any{"f1": 123, "f2": nil}), WithTime(time.Unix(0, 123)))
+		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123, "f2": nil}), WithTime(time.Unix(0, 123)))
 		assert.Equal(t, `abc f1=123i 123`, pt.LPPoint().String())
 
 		t.Logf("lp: %s", pt.LPPoint().String())
@@ -449,7 +446,7 @@ func TestLPPoint(t *T.T) {
 
 	t.Run(`struct`, func(t *T.T) {
 		// max-int64 + 1 not ok
-		pt := NewPointV2([]byte(`abc`), NewKVs(map[string]any{"f1": 123, "f2": struct{}{}}), WithTime(time.Unix(0, 123)))
+		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123, "f2": struct{}{}}), WithTime(time.Unix(0, 123)))
 		assert.Equal(t, `abc f1=123i 123`, pt.LPPoint().String())
 
 		t.Logf("lp: %s", pt.LPPoint().String())
@@ -650,71 +647,70 @@ func FuzzPBPointString(f *T.F) {
 
 func TestKey(t *T.T) {
 	cases := []struct {
-		name   string
-		key    []byte
-		pt     *Point
-		expect any
+		name, key string
+		pt        *Point
+		expect    any
 	}{
 		{
 			"basic",
-			[]byte(`f1`),
-			NewPointV2([]byte("abc"), NewKVs(map[string]any{"f1": 123})),
+			`f1`,
+			NewPointV2("abc", NewKVs(map[string]any{"f1": 123})),
 			int64(123),
 		},
 
 		{
 			"query-tag-no-field",
-			[]byte(`t1`),
-			NewPointV2([]byte("abc"), nil, WithExtraTags(map[string]string{"t1": "v1"})),
+			`t1`,
+			NewPointV2("abc", nil, WithExtraTags(map[string]string{"t1": "v1"})),
 			[]byte("v1"),
 		},
 
 		{
 			"no-field-query-field-not-found",
-			[]byte(`f1`),
-			NewPointV2([]byte("abc"), nil, nil),
+			`f1`,
+			NewPointV2("abc", nil, nil),
 			nil,
 		},
 
 		{
 			"query-field-not-found",
-			[]byte(`f1`),
-			NewPointV2([]byte("abc"), NewKVs(map[string]any{"f2": 123})),
+			`f1`,
+			NewPointV2("abc", NewKVs(map[string]any{"f2": 123})),
 			nil,
 		},
 
 		{
 			"query-f32",
-			[]byte(`f1`),
-			NewPointV2([]byte("abc"), NewKVs(map[string]any{"f1": float32(3.0)})),
+			`f1`,
+			NewPointV2("abc", NewKVs(map[string]any{"f1": float32(3.0)})),
 			float64(3.0),
 		},
 
 		{
 			"query-f64",
-			[]byte(`f1`),
-			NewPointV2([]byte("abc"), NewKVs(map[string]any{"f1": float64(3.14)})),
+			`f1`,
+			NewPointV2("abc", NewKVs(map[string]any{"f1": float64(3.14)})),
 			float64(3.14),
 		},
 
 		{
 			"query-u64",
-			[]byte(`f1`),
-			NewPointV2([]byte("abc"), NewKVs(map[string]any{"f1": uint64(3)})),
+			`f1`,
+			NewPointV2("abc", NewKVs(map[string]any{"f1": uint64(3)})),
 			uint64(3),
 		},
 
 		{
 			"query-data",
-			[]byte(`f1`),
-			NewPointV2([]byte("abc"), NewKVs(map[string]any{"f1": []byte("hello")}), WithEncoding(Protobuf)),
+			`f1`,
+			NewPointV2("abc", NewKVs(map[string]any{"f1": []byte("hello")}), WithEncoding(Protobuf)),
 			[]byte("hello"),
 		},
 
 		{
 			"query-bool",
-			[]byte(`f1`),
-			NewPointV2([]byte("abc"), NewKVs(map[string]any{"f1": false})),
+			`f1`,
+			NewPointV2("abc", NewKVs(map[string]any{"f1": false})),
 			false,
 		},
 	}
@@ -728,7 +724,7 @@ func TestKey(t *T.T) {
 
 func TestPointKeys(t *T.T) {
 	t.Run("point-keys", func(t *T.T) {
-		p := NewPointV2([]byte("abc"),
+		p := NewPointV2("abc",
 			NewKVs(map[string]any{"f1": "123", "f2": false, "f3": float32(3.14)}),
 			WithExtraTags(map[string]string{"t1": "t2"}))
 		keys := p.Keys()
@@ -737,17 +733,17 @@ func TestPointKeys(t *T.T) {
 
 		hash1 := keys.Hash()
 
-		keys.Add(NewKey([]byte(`hello`), KeyType_D))
+		keys.Add(NewKey(`hello`, KeyType_D))
 
 		hash2 := keys.Hash()
 		assert.NotEqual(t, hash1, hash2, "keys:\n%s", keys.Pretty())
 
-		keys.Del(NewKey([]byte(`hello`), KeyType_D))
+		keys.Del(NewKey(`hello`, KeyType_D))
 
 		hash3 := keys.Hash()
 		assert.Equal(t, hash1, hash3, "keys: \n%s", keys.Pretty())
 
-		keys.Del(NewKey([]byte(`t1`), KeyType_D))
+		keys.Del(NewKey(`t1`, KeyType_D))
 
 		hash4 := keys.Hash()
 		assert.NotEqual(t, hash3, hash4, "keys: \n%s", keys.Pretty())
@@ -756,46 +752,46 @@ func TestPointKeys(t *T.T) {
 	})
 
 	t.Run("exist", func(t *T.T) {
-		p := NewPointV2([]byte("abc"), NewKVs(map[string]any{"x1": "123"}))
+		p := NewPointV2("abc", NewKVs(map[string]any{"x1": "123"}))
 		keys := p.Keys()
 
-		assert.True(t, keys.Has(NewKey([]byte(`x1`), KeyType_D)), "keys:\n%s", keys.Pretty())
+		assert.True(t, keys.Has(NewKey(`x1`, KeyType_D)), "keys:\n%s", keys.Pretty())
 	})
 
 	t.Run("add", func(t *T.T) {
-		p := NewPointV2([]byte("abc"), NewKVs(map[string]any{"f1": "123"}))
+		p := NewPointV2("abc", NewKVs(map[string]any{"f1": "123"}))
 		keys := p.Keys()
 
 		h1 := keys.Hash()
 
 		// add exist key
-		keys.Add(NewKey([]byte(`f1`), KeyType_D))
+		keys.Add(NewKey(`f1`, KeyType_D))
 
 		h2 := keys.Hash()
 		assert.Equal(t, h1, h2, "keys:\n%s", keys.Pretty())
 	})
 
 	t.Run("no-kvs", func(t *T.T) {
-		p := NewPointV2([]byte("abc"), nil)
+		p := NewPointV2("abc", nil)
 		keys := p.Keys()
 
 		t.Logf("keys:\n%s", keys.Pretty())
 
 		hash1 := keys.Hash()
 
-		keys.Add(NewKey([]byte("hello"), KeyType_D))
+		keys.Add(NewKey("hello", KeyType_D))
 
 		hash2 := keys.Hash()
 		assert.NotEqual(t, hash1, hash2, "keys:\n%s", keys.Pretty())
 
-		keys.Del(NewKey([]byte("hello"), KeyType_D))
+		keys.Del(NewKey("hello", KeyType_D))
 
 		hash3 := keys.Hash()
 		assert.Equal(t, hash1, hash3, "keys: \n%s", keys.Pretty())
 
 		// delete not-exist-key
 		hc := keys.hashCount
-		keys.Del(NewKey([]byte("t1"), KeyType_D))
+		keys.Del(NewKey("t1", KeyType_D))
 		hash4 := keys.Hash()
 		assert.Equal(t, hash3, hash4, "keys: \n%s", keys.Pretty())
 		assert.Equal(t, hc, keys.hashCount)
@@ -806,20 +802,20 @@ func TestPointKeys(t *T.T) {
 
 func TestPointAddKey(t *T.T) {
 	t.Run("add", func(t *T.T) {
-		pt := NewPointV2([]byte("abc"), NewKVs(map[string]any{"f1": 123}))
-		pt.Add([]byte("new-key"), "hello")
-		assert.True(t, pt.kvs.Has([]byte(`new-key`)), "fields: %s", pt.kvs.Pretty())
+		pt := NewPointV2("abc", NewKVs(map[string]any{"f1": 123}))
+		pt.Add("new-key", "hello")
+		assert.True(t, pt.kvs.Has(`new-key`), "fields: %s", pt.kvs.Pretty())
 	})
 }
 
 func TestSize(t *T.T) {
 	t.Run("sizes", func(t *T.T) {
 		// empty point
-		pt := NewPointV2([]byte(`abc`), nil)
+		pt := NewPointV2(`abc`, nil)
 		t.Logf("pt size: %d, pb size: %d, lp size: %d", pt.Size(), pt.PBSize(), pt.LPSize())
 
 		// basic point
-		pt = NewPointV2([]byte(`abc`), NewKVs(map[string]any{
+		pt = NewPointV2(`abc`, NewKVs(map[string]any{
 			"f1": 123,
 			"f2": uint64(123),
 			"f3": false,
@@ -829,7 +825,7 @@ func TestSize(t *T.T) {
 		t.Logf("pt size: %d, pb size: %d, lp size: %d", pt.Size(), pt.PBSize(), pt.LPSize())
 
 		// large numbers
-		pt = NewPointV2([]byte(`abc`), NewKVs(map[string]any{
+		pt = NewPointV2(`abc`, NewKVs(map[string]any{
 			"f1": math.MaxInt64,
 			"f3": false,
 			"f5": []byte(strings.Repeat(`hello`, 100)),
@@ -842,9 +838,9 @@ func TestSize(t *T.T) {
 		t.Logf("lp: %s", pt.LineProto())
 
 		// with kv unit/type
-		pt = NewPointV2([]byte(`abc`), NewKVs(nil).
-			MustAddKV(NewKV([]byte(`f1`), 123, WithKVUnit("MB"), WithKVType(MetricType_COUNT))).
-			MustAddTag([]byte(`t1`), []byte(`v1`)))
+		pt = NewPointV2(`abc`, NewKVs(nil).
+			MustAddKV(NewKV(`f1`, 123, WithKVUnit("MB"), WithKVType(MetricType_COUNT))).
+			MustAddTag(`t1`, `v1`))
 		t.Logf("pt size: %d, pb size: %d, lp size: %d", pt.Size(), pt.PBSize(), pt.LPSize())
 
 		// rand point

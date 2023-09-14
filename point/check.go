@@ -6,10 +6,10 @@
 package point
 
 import (
-	"bytes"
 	"fmt"
 	"math"
 	"reflect"
+	"strings"
 )
 
 type checker struct {
@@ -37,7 +37,7 @@ func (c *checker) addWarn(t, msg string) {
 	})
 }
 
-func (c *checker) checkMeasurement(m []byte) []byte {
+func (c *checker) checkMeasurement(m string) string {
 	if len(m) == 0 {
 		c.addWarn(WarnInvalidMeasurement,
 			fmt.Sprintf("empty measurement, use %s", DefaultMeasurementName))
@@ -99,13 +99,13 @@ func (c *checker) checkKVs(kvs KVs) KVs {
 
 // Remove all `\` suffix on key/val
 // Replace all `\n` with ` `.
-func adjustKV(x []byte) []byte {
-	if bytes.HasSuffix(x, []byte(`\`)) {
-		x = trimSuffixAll(x, []byte(`\`))
+func adjustKV(x string) string {
+	if strings.HasSuffix(x, `\`) {
+		x = trimSuffixAll(x, `\`)
 	}
 
-	if bytes.Contains(x, []byte("\n")) {
-		x = bytes.ReplaceAll(x, []byte("\n"), []byte(" "))
+	if strings.Contains(x, "\n") {
+		x = strings.ReplaceAll(x, "\n", " ")
 	}
 
 	return x
@@ -138,27 +138,27 @@ func (c *checker) checkTag(f *Field) *Field {
 	}
 
 	// check tag key '\', '\n'
-	if bytes.HasSuffix(f.Key, []byte(`\`)) || bytes.Contains(f.Key, []byte("\n")) {
+	if strings.HasSuffix(f.Key, `\`) || strings.Contains(f.Key, "\n") {
 		c.addWarn(WarnInvalidTagKey, fmt.Sprintf("invalid tag key `%s'", f.Key))
 
 		f.Key = adjustKV(f.Key)
 	}
 
 	// check tag value: '\', '\n'
-	if bytes.HasSuffix(f.GetD(), []byte(`\`)) || bytes.Contains(f.GetD(), []byte("\n")) {
+	if strings.HasSuffix(f.GetS(), `\`) || strings.Contains(f.GetS(), "\n") {
 		c.addWarn(WarnInvalidTagValue, fmt.Sprintf("invalid tag value %q", f.GetD()))
 
-		f.Val = &Field_D{D: adjustKV(f.GetD())}
+		f.Val = &Field_S{S: adjustKV(f.GetS())}
 	}
 
 	// replace `.' with `_' in tag keys
-	if bytes.Contains(f.Key, []byte(".")) && !c.cfg.enableDotInKey {
+	if strings.Contains(f.Key, ".") && !c.cfg.enableDotInKey {
 		c.addWarn(WarnInvalidTagKey, fmt.Sprintf("invalid tag key `%s': found `.'", f.Key))
 
-		f.Key = bytes.ReplaceAll(f.Key, []byte("."), []byte("_"))
+		f.Key = strings.ReplaceAll(f.Key, ".", "_")
 	}
 
-	if c.keyDisabled(NewTagKey(f.Key, nil)) {
+	if c.keyDisabled(NewTagKey(f.Key, "")) {
 		c.addWarn(WarnTagDisabled, fmt.Sprintf("tag key `%s' disabled", string(f.Key)))
 		return nil
 	}
@@ -176,11 +176,11 @@ func (c *checker) checkField(f *Field) *Field {
 				c.cfg.maxFieldKeyLen, len(f.Key), string(f.Key)))
 	}
 
-	if bytes.Contains(f.Key, []byte(".")) && !c.cfg.enableDotInKey {
+	if strings.Contains(f.Key, ".") && !c.cfg.enableDotInKey {
 		c.addWarn(WarnDotInkey,
 			fmt.Sprintf("invalid field key `%s': found `.'", f.Key))
 
-		f.Key = bytes.ReplaceAll(f.Key, []byte("."), []byte("_"))
+		f.Key = strings.ReplaceAll(f.Key, ".", "_")
 	}
 
 	if c.keyDisabled(KVKey(f)) {
@@ -240,11 +240,11 @@ func (c *checker) checkField(f *Field) *Field {
 	}
 }
 
-func trimSuffixAll(s, sfx []byte) []byte {
-	var x []byte
+func trimSuffixAll(s, sfx string) string {
+	var x string
 	for {
-		x = bytes.TrimSuffix(s, sfx)
-		if bytes.Equal(x, s) {
+		x = strings.TrimSuffix(s, sfx)
+		if x == s {
 			break
 		}
 		s = x
@@ -262,7 +262,7 @@ func (c *checker) keyDisabled(k *Key) bool {
 	}
 
 	for _, item := range c.cfg.disabledKeys {
-		if bytes.Equal(k.key, item.key) {
+		if k.key == item.key {
 			return true
 		}
 	}

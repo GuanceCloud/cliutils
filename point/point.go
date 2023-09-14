@@ -38,7 +38,7 @@ type Point struct {
 	// flags about the point
 	flags uint64
 
-	name []byte
+	name string
 	kvs  KVs
 	time time.Time
 }
@@ -157,13 +157,13 @@ func FromPBJson(j []byte) (*Point, error) {
 
 func FromJSONPoint(j *JSONPoint) *Point {
 	pt := &Point{
-		name: []byte(j.Measurement),
+		name: j.Measurement,
 		kvs:  NewKVs(j.Fields),
 		time: time.Unix(0, j.Time),
 	}
 
 	for k, v := range j.Tags {
-		pt.MustAddTag([]byte(k), []byte(v))
+		pt.MustAddTag(k, v)
 	}
 
 	return pt
@@ -176,13 +176,13 @@ func FromLP(lp *influxdb.Point) *Point {
 	}
 
 	pt := &Point{
-		name: []byte(lp.Name()),
+		name: lp.Name(),
 		kvs:  NewKVs(lpfs),
 		time: lp.Time(),
 	}
 
 	for k, v := range lp.Tags() {
-		pt.MustAddTag([]byte(k), []byte(v))
+		pt.MustAddTag(k, v)
 	}
 
 	return pt
@@ -195,13 +195,13 @@ func FromModelsLP(lp models.Point) *Point {
 	}
 
 	pt := &Point{
-		name: lp.Name(),
+		name: string(lp.Name()),
 		kvs:  NewKVs(lpfs),
 		time: lp.Time(),
 	}
 
 	for _, t := range lp.Tags() {
-		pt.MustAddTag(t.Key, t.Value)
+		pt.MustAddTag(string(t.Key), string(t.Value))
 	}
 
 	return pt
@@ -268,7 +268,7 @@ func (p *Point) MustAddKV(kv *Field) {
 }
 
 // Name return point's measurement name.
-func (p *Point) Name() []byte {
+func (p *Point) Name() string {
 	return p.name
 }
 
@@ -278,7 +278,7 @@ func (p *Point) Time() time.Time {
 }
 
 // Get get specific key from point.
-func (p *Point) Get(k []byte) any {
+func (p *Point) Get(k string) any {
 	if kv := p.kvs.Get(k); kv != nil {
 		switch kv.Val.(type) {
 		case *Field_I:
@@ -301,32 +301,32 @@ func (p *Point) Get(k []byte) any {
 
 // GetTag get value of tag k.
 // If key k not tag or k not eixst, return nil.
-func (p *Point) GetTag(k []byte) []byte {
+func (p *Point) GetTag(k string) string {
 	return p.kvs.GetTag(k)
 }
 
 // MustAdd add specific key value to fields, if k exist, override it.
-func (p *Point) MustAdd(k []byte, v any) {
+func (p *Point) MustAdd(k string, v any) {
 	p.kvs = p.kvs.Add(k, v, false, true)
 }
 
 // Add add specific key value to fields, if k exist, do nothing.
-func (p *Point) Add(k []byte, v any) {
+func (p *Point) Add(k string, v any) {
 	p.kvs = p.kvs.Add(k, v, false, false)
 }
 
 // MustAddTag add specific key value to fields, if k exist, override it.
-func (p *Point) MustAddTag(k, v []byte) {
+func (p *Point) MustAddTag(k, v string) {
 	p.kvs = p.kvs.Add(k, v, true, true)
 }
 
 // AddTag add specific key value to fields, if k exist, do nothing.
-func (p *Point) AddTag(k, v []byte) {
+func (p *Point) AddTag(k, v string) {
 	p.kvs = p.kvs.Add(k, v, true, false)
 }
 
 // Del delete specific key from tags/fields.
-func (p *Point) Del(k []byte) {
+func (p *Point) Del(k string) {
 	p.kvs = p.kvs.Del(k)
 }
 

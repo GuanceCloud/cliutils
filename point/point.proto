@@ -36,6 +36,7 @@ enum KeyType {
 	B   = 4;
 	D   = 5;
 	NIL = 6;
+	S   = 7;
 }
 
 enum MetricType {
@@ -47,7 +48,7 @@ enum MetricType {
 
 message Field {
 
-	bytes key = 1; // field name
+	string key = 1; // field name
 
 	// See https://developers.google.com/protocol-buffers/docs/proto3#json
 	oneof val {
@@ -55,7 +56,8 @@ message Field {
 			uint64 u   = 3 [json_name = "u"]; // unsigned int
 			double f   = 4 [json_name = "f"]; // float64
 			bool   b   = 5 [json_name = "b"]; // bool
-			bytes  d   = 6 [json_name = "d"]; // bytes, for string or binary data
+			bytes  d   = 6 [json_name = "d"]; // bytes, for binary data
+			string s   = 11 [json_name = "s"];// string, for string data
 
 			// XXX: not used
 			google.protobuf.Any a = 7 [json_name = "a"]; // any data
@@ -76,7 +78,7 @@ message Warn {
 }
 
 message PBPoint {
-	bytes name            = 1;
+	string name           = 1;
 	repeated Field fields = 2;
 	int64 time            = 3;
 
@@ -86,7 +88,7 @@ message PBPoint {
 	repeated Debug debugs = 5;
 }
 
-// Batch of PBPoint.
+// batch of pbpoint.
 message PBPoints {
 	repeated PBPoint arr = 1;
 }
