@@ -208,7 +208,7 @@ func (c *checker) checkField(f *Field) *Field {
 			}
 		}
 
-	case *Field_F, *Field_B, *Field_I, *Field_A:
+	case *Field_F, *Field_B, *Field_I:
 		return f
 
 	case nil:

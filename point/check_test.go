@@ -315,7 +315,7 @@ func TestCheckFields(t *T.T) {
 				"b": "12345",
 			},
 			warns: 1,
-			opts:  []Option{WithDisabledKeys(NewKey("a", KeyType_I))},
+			opts:  []Option{WithDisabledKeys(NewKey("a", I))},
 			expect: map[string]interface{}{
 				"b": "12345",
 			},
@@ -420,7 +420,7 @@ def`,
 func TestRequiredKV(t *T.T) {
 	t.Run(`add`, func(t *T.T) {
 		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123}),
-			WithRequiredKeys(NewKey(`rk`, KeyType_I, 1024)))
+			WithRequiredKeys(NewKey(`rk`, I, 1024)))
 		assert.Equal(t, int64(1024), pt.Get(`rk`))
 	})
 }

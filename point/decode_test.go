@@ -48,7 +48,7 @@ func TestDecode(t *testing.T) {
 			},
 
 			opts:    []DecoderOption{WithDecEncoding(JSON)},
-			ptsOpts: []Option{WithPrecision(S)},
+			ptsOpts: []Option{WithPrecision(PrecS)},
 		},
 
 		{
@@ -59,7 +59,7 @@ func TestDecode(t *testing.T) {
 			},
 
 			opts:    []DecoderOption{WithDecEncoding(JSON)},
-			ptsOpts: []Option{WithPrecision(MS)},
+			ptsOpts: []Option{WithPrecision(PrecMS)},
 		},
 
 		{
@@ -70,7 +70,7 @@ func TestDecode(t *testing.T) {
 			},
 
 			opts:    []DecoderOption{WithDecEncoding(JSON)},
-			ptsOpts: []Option{WithPrecision(US)},
+			ptsOpts: []Option{WithPrecision(PrecUS)},
 		},
 
 		{
@@ -81,7 +81,7 @@ func TestDecode(t *testing.T) {
 			},
 
 			opts:    []DecoderOption{WithDecEncoding(JSON)},
-			ptsOpts: []Option{WithPrecision(M)},
+			ptsOpts: []Option{WithPrecision(PrecM)},
 		},
 
 		{
@@ -92,7 +92,7 @@ func TestDecode(t *testing.T) {
 			},
 
 			opts:    []DecoderOption{WithDecEncoding(JSON)},
-			ptsOpts: []Option{WithPrecision(H)},
+			ptsOpts: []Option{WithPrecision(PrecH)},
 		},
 
 		{
@@ -103,7 +103,7 @@ func TestDecode(t *testing.T) {
 			},
 
 			opts:    []DecoderOption{WithDecEncoding(JSON)},
-			ptsOpts: []Option{WithPrecision(W)},
+			ptsOpts: []Option{WithPrecision(PrecW)},
 		},
 
 		{

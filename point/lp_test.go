@@ -177,7 +177,7 @@ func TestNewLPPoint(t *testing.T) {
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
 			warns:  1,
 			opts: []Option{
-				WithDisabledKeys(NewKey(`f1`, KeyType_I)),
+				WithDisabledKeys(NewKey(`f1`, I)),
 				WithTime(time.Unix(0, 123)),
 			},
 			expect: "abc,t1=abc,t2=32 f2=32i,f3=32i 123",
@@ -575,7 +575,7 @@ func TestParsePoint(t *testing.T) {
 			data: []byte(`abc,t1=1,t2=2 f1=1i,f2=2,f3="abc" 123`),
 			opts: []Option{
 				WithTime(time.Unix(0, 123)),
-				WithDisabledKeys(NewKey(`f1`, KeyType_I)),
+				WithDisabledKeys(NewKey(`f1`, I)),
 			},
 
 			expect: []*influxdb.Point{

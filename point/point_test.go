@@ -15,7 +15,6 @@ import (
 
 	"github.com/influxdata/influxdb1-client/models"
 	"github.com/stretchr/testify/assert"
-	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestGetTag(t *T.T) {
@@ -29,7 +28,7 @@ func TestGetTag(t *T.T) {
 		pt.kvs = pt.kvs.MustAddKV(NewKV(`f1`, 1.23,
 			WithKVUnit("bytes"),
 			WithKVTagSet(true), // set failed
-			WithKVType(MetricType_COUNT)))
+			WithKVType(COUNT)))
 		assert.Equal(t, "", pt.GetTag(`f1`))
 
 		pt.AddTag(`empty-tag`, ``)
@@ -187,7 +186,7 @@ func TestPointLineProtocol(t *T.T) {
 	}{
 		{
 			name: "lp-point-ns-prec",
-			prec: NS,
+			prec: PrecNS,
 			pt: func() *Point {
 				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(0, 123)))...)
@@ -202,7 +201,7 @@ func TestPointLineProtocol(t *T.T) {
 
 		{
 			name: "lp-point-ms-prec",
-			prec: MS,
+			prec: PrecMS,
 			pt: func() *Point {
 				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(0, 12345678)))...)
@@ -215,7 +214,7 @@ func TestPointLineProtocol(t *T.T) {
 
 		{
 			name: "lp-point-us-prec",
-			prec: US, // only accept u
+			prec: PrecUS, // only accept u
 			pt: func() *Point {
 				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(0, 12345678)))...)
@@ -228,7 +227,7 @@ func TestPointLineProtocol(t *T.T) {
 
 		{
 			name: "lp-point-ns-prec",
-			prec: NS, // only accept u
+			prec: PrecNS, // only accept u
 			pt: func() *Point {
 				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(0, 12345678)))...)
@@ -252,7 +251,7 @@ func TestPointLineProtocol(t *T.T) {
 
 		{
 			name: "lp-point-second-prec",
-			prec: S,
+			prec: PrecS,
 			pt: func() *Point {
 				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(1, 123456789)))...)
@@ -264,7 +263,7 @@ func TestPointLineProtocol(t *T.T) {
 
 		{
 			name: "lp-point-minute-prec",
-			prec: M,
+			prec: PrecM,
 			pt: func() *Point {
 				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(120, 123456789)))...)
@@ -276,7 +275,7 @@ func TestPointLineProtocol(t *T.T) {
 
 		{
 			name: "lp-point-hour-prec",
-			prec: H,
+			prec: PrecH,
 			pt: func() *Point {
 				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(7199, 123456789)))...)
@@ -289,8 +288,7 @@ func TestPointLineProtocol(t *T.T) {
 		// pb point
 		{
 			name: "pb-point",
-			// pb:   true,
-			prec: NS,
+			prec: PrecNS,
 			pt: func() *Point {
 				pt, err := NewPoint("abc",
 					nil,
@@ -307,8 +305,7 @@ func TestPointLineProtocol(t *T.T) {
 
 		{
 			name: "pb-point-with-binary-data",
-			// pb:   true,
-			prec: NS,
+			prec: PrecNS,
 			pt: func() *Point {
 				pt, err := NewPoint("abc",
 					map[string]string{"t1": "v1"},
@@ -326,7 +323,7 @@ func TestPointLineProtocol(t *T.T) {
 
 		{
 			name: `string-field-with-newline`,
-			prec: NS,
+			prec: PrecNS,
 			pt: NewPointV2(`abc`, append(NewTags(map[string]string{"tag1": "v1"}),
 				NewKVs(map[string]any{"f1": `message
 with
@@ -357,7 +354,7 @@ func TestPBJson(t *T.T) {
 		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123, "f2": 3.14}))
 
 		pt.kvs = pt.kvs.MustAddTag(`t1`, `v1`).
-			MustAddKV(NewKV(`f2`, 3.14, WithKVUnit("kb"), WithKVType(MetricType_COUNT)))
+			MustAddKV(NewKV(`f2`, 3.14, WithKVUnit("kb"), WithKVType(COUNT)))
 
 		j, _ := pt.PBJson()
 		t.Logf("%s", string(j))
@@ -460,8 +457,6 @@ func TestLPPoint(t *T.T) {
 }
 
 func TestFields(t *T.T) {
-	someAny, err := anypb.New(&AnyDemo{Demo: "demo example"})
-	assert.NoError(t, err)
 
 	cases := []struct {
 		name   string
@@ -489,7 +484,6 @@ func TestFields(t *T.T) {
 						"str":    "hello",
 						"data":   []byte("abc123"),
 						"nil":    nil,
-						"any":    someAny,
 						"udf":    struct{}{},
 					})
 				assert.NoError(t, err)
@@ -510,7 +504,6 @@ func TestFields(t *T.T) {
 				"bool_1": false,
 				"nil":    nil,
 				"udf":    nil,
-				"any":    someAny,
 				"data":   []byte("abc123"),
 				"bool_2": true,
 				"str":    "hello",
@@ -523,7 +516,6 @@ func TestFields(t *T.T) {
 			pt: func() *Point {
 				x, err := NewPoint("abc", nil,
 					map[string]interface{}{
-						"any":    someAny,
 						"bool_1": false,
 						"bool_2": true,
 						"data":   []byte("abc123"),
@@ -560,7 +552,6 @@ func TestFields(t *T.T) {
 				"u32":    int64(1),
 				"u64":    uint64(1),
 				"u8":     int64(1),
-				"any":    someAny,
 				"nil":    nil,
 				"udf":    nil,
 			},
@@ -740,17 +731,17 @@ func TestPointKeys(t *T.T) {
 
 		hash1 := keys.Hash()
 
-		keys.Add(NewKey(`hello`, KeyType_D))
+		keys.Add(NewKey(`hello`, D))
 
 		hash2 := keys.Hash()
 		assert.NotEqual(t, hash1, hash2, "keys:\n%s", keys.Pretty())
 
-		keys.Del(NewKey(`hello`, KeyType_D))
+		keys.Del(NewKey(`hello`, D))
 
 		hash3 := keys.Hash()
 		assert.Equal(t, hash1, hash3, "keys: \n%s", keys.Pretty())
 
-		keys.Del(NewKey(`t1`, KeyType_D))
+		keys.Del(NewKey(`t1`, D))
 
 		hash4 := keys.Hash()
 		assert.NotEqual(t, hash3, hash4, "keys: \n%s", keys.Pretty())
@@ -762,7 +753,7 @@ func TestPointKeys(t *T.T) {
 		p := NewPointV2("abc", NewKVs(map[string]any{"x1": "123"}))
 		keys := p.Keys()
 
-		assert.True(t, keys.Has(NewKey(`x1`, KeyType_D)), "keys:\n%s", keys.Pretty())
+		assert.True(t, keys.Has(NewKey(`x1`, D)), "keys:\n%s", keys.Pretty())
 	})
 
 	t.Run("add", func(t *T.T) {
@@ -772,7 +763,7 @@ func TestPointKeys(t *T.T) {
 		h1 := keys.Hash()
 
 		// add exist key
-		keys.Add(NewKey(`f1`, KeyType_D))
+		keys.Add(NewKey(`f1`, D))
 
 		h2 := keys.Hash()
 		assert.Equal(t, h1, h2, "keys:\n%s", keys.Pretty())
@@ -786,18 +777,18 @@ func TestPointKeys(t *T.T) {
 
 		hash1 := keys.Hash()
 
-		keys.Add(NewKey("hello", KeyType_D))
+		keys.Add(NewKey("hello", D))
 
 		hash2 := keys.Hash()
 		assert.NotEqual(t, hash1, hash2, "keys:\n%s", keys.Pretty())
 
-		keys.Del(NewKey("hello", KeyType_D))
+		keys.Del(NewKey("hello", D))
 
 		hash3 := keys.Hash()
 		assert.Equal(t, hash1, hash3, "keys: \n%s", keys.Pretty())
 
 		// delete not-exist-key
-		keys.Del(NewKey("t1", KeyType_D))
+		keys.Del(NewKey("t1", D))
 		hash4 := keys.Hash()
 		assert.Equal(t, hash3, hash4, "keys: \n%s", keys.Pretty())
 		assert.True(t, keys.hashed)
@@ -845,7 +836,7 @@ func TestSize(t *T.T) {
 
 		// with kv unit/type
 		pt = NewPointV2(`abc`, NewKVs(nil).
-			MustAddKV(NewKV(`f1`, 123, WithKVUnit("MB"), WithKVType(MetricType_COUNT))).
+			MustAddKV(NewKV(`f1`, 123, WithKVUnit("MB"), WithKVType(COUNT))).
 			MustAddTag(`t1`, `v1`))
 		t.Logf("pt size: %d, pb size: %d, lp size: %d", pt.Size(), pt.PBSize(), pt.LPSize())
 

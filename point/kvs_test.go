@@ -11,7 +11,6 @@ import (
 	T "testing"
 
 	"github.com/stretchr/testify/assert"
-	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestKVs(t *T.T) {
@@ -66,10 +65,6 @@ func TestKVs(t *T.T) {
 			"f5": []byte(`world`),
 			"f6": false,
 			"f7": true,
-			"f8": func() *anypb.Any {
-				x, _ := anypb.New(&AnyDemo{Demo: "haha"})
-				return x
-			}(),
 			"f9": struct{}{},
 		})
 		assert.Equal(t, 9, len(kvs))
@@ -81,12 +76,6 @@ func TestKVs(t *T.T) {
 		assert.Equal(t, []byte(`world`), kvs.Get(`f5`).GetD())
 		assert.Equal(t, false, kvs.Get(`f6`).GetB())
 		assert.Equal(t, true, kvs.Get(`f7`).GetB())
-
-		x := kvs.Get(`f8`).GetA()
-		assert.NotNil(t, x)
-		t.Logf("any: %s", x)
-		t.Logf("any.type: %q", x.TypeUrl)
-		t.Logf("any.value: %q", x.Value)
 
 		assert.Nil(t, kvs.Get(`f9`).Val)
 
@@ -101,8 +90,8 @@ func TestKVs(t *T.T) {
 		kvs = kvs.MustAddKV(NewKV(`t3`, []byte("v2"), WithKVTagSet(true)))
 
 		kvs = kvs.MustAddKV(NewKV(`f1`, "foo"))
-		kvs = kvs.MustAddKV(NewKV(`f2`, 123, WithKVUnit("MB"), WithKVType(MetricType_COUNT)))
-		kvs = kvs.MustAddKV(NewKV(`f3`, 3.14, WithKVUnit("some"), WithKVType(MetricType_GAUGE)))
+		kvs = kvs.MustAddKV(NewKV(`f2`, 123, WithKVUnit("MB"), WithKVType(COUNT)))
+		kvs = kvs.MustAddKV(NewKV(`f3`, 3.14, WithKVUnit("some"), WithKVType(GAUGE)))
 
 		assert.Equal(t, 6, len(kvs))
 

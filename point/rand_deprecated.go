@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
-	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
 // doRandomPoints deprecated.
@@ -99,13 +98,6 @@ func doRandomPBPoints(count int) (*PBPoints, error) {
 				{Key: cliutils.CreateRandomString(12), Val: &Field_F{mrand.NormFloat64()}},
 				{Key: cliutils.CreateRandomString(13), Val: &Field_B{false}},
 				{Key: cliutils.CreateRandomString(14), Val: &Field_B{true}},
-				{Key: cliutils.CreateRandomString(15), Val: &Field_A{A: func() *anypb.Any {
-					x, err := anypb.New(&AnyDemo{Demo: "random point"})
-					if err != nil {
-						panic(fmt.Sprintf("anypb.New: %s", err))
-					}
-					return x
-				}()}},
 			},
 			Time: time.Now().UnixNano(),
 		})

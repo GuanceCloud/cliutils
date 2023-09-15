@@ -12,9 +12,8 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
+	proto "github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/protobuf/proto"
-	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
 var name = "abc"
@@ -132,30 +131,6 @@ func TestPBPointJSON(t *testing.T) {
 		},
 
 		{
-			name: "with-anypb",
-			tags: map[string]string{
-				"t1": "123",
-				"t2": "xyz",
-			},
-			fields: map[string]interface{}{
-				"f1": int64(123),
-				"f2": 123.4,
-				"f3": false,
-				"f4": "abc",
-				"f5": []byte("xyz"),
-				"f6": uint64(1234567890),
-				"f7": func() *anypb.Any {
-					x, err := anypb.New(&AnyDemo{Demo: "this is a any field"})
-					if err != nil {
-						t.Errorf("anypb.New: %s", err)
-					}
-					return x
-				}(),
-			},
-			time: time.Unix(0, 123),
-		},
-
-		{
 			name: "with-warnings",
 			tags: map[string]string{
 				"t1": "123",
@@ -163,13 +138,6 @@ func TestPBPointJSON(t *testing.T) {
 			fields: map[string]interface{}{
 				"t1": "dulicated key in tags", // triger warnning
 				"f1": int64(123),
-				"f2": func() *anypb.Any {
-					x, err := anypb.New(&AnyDemo{Demo: "this is a any field"})
-					if err != nil {
-						t.Errorf("anypb.New: %s", err)
-					}
-					return x
-				}(),
 			},
 			time: time.Unix(0, 123),
 		},
@@ -182,13 +150,6 @@ func TestPBPointJSON(t *testing.T) {
 			fields: map[string]interface{}{
 				"t1": "dulicated key in tags",
 				"f1": int64(123),
-				"f2": func() *anypb.Any {
-					x, err := anypb.New(&AnyDemo{Demo: "this is a any field"})
-					if err != nil {
-						t.Errorf("anypb.New: %s", err)
-					}
-					return x
-				}(),
 			},
 			time:   time.Unix(0, 123),
 			debugs: []*Debug{{Info: "some debug info"}},

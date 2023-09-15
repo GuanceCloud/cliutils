@@ -8,8 +8,6 @@ package point
 import (
 	"math"
 	"strings"
-
-	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
 type KVs []*Field
@@ -284,20 +282,20 @@ func (x KVs) MustAddKV(kv *Field) KVs {
 func PBType(v isField_Val) KeyType {
 	switch v.(type) {
 	case *Field_I:
-		return KeyType_I
+		return I
 	case *Field_U:
-		return KeyType_U
+		return U
 	case *Field_F:
-		return KeyType_F
+		return F
 	case *Field_B:
-		return KeyType_B
+		return B
 	case *Field_D:
-		return KeyType_D
+		return D
 	case *Field_S:
-		return KeyType_S
+		return S
 
 	default: // nil or other types
-		return KeyType_X
+		return X
 	}
 }
 
@@ -307,7 +305,7 @@ func (x KVs) Keys() *Keys {
 
 	for _, f := range x {
 		t := PBType(f.Val)
-		if t == KeyType_X {
+		if t == X {
 			continue // ignore
 		}
 
@@ -388,9 +386,6 @@ func NewKV(k string, v any, opts ...KVOption) *Field {
 
 	case bool:
 		kv = &Field{Key: k, Val: &Field_B{x}}
-
-	case *anypb.Any:
-		kv = &Field{Key: k, Val: &Field_A{x}}
 
 	case nil: // pass
 		kv = &Field{Key: k, Val: nil}

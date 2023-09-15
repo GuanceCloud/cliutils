@@ -10,7 +10,8 @@ import (
 	sync "sync"
 	"time"
 
-	"google.golang.org/protobuf/proto"
+	//"google.golang.org/protobuf/proto"
+	proto "github.com/gogo/protobuf/proto"
 )
 
 var decPool sync.Pool
@@ -89,15 +90,15 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 
 			if x.Time > 0 { // check if precision attached
 				switch cfg.precision {
-				case US:
+				case PrecUS:
 					x.Time *= int64(time.Microsecond)
-				case MS:
+				case PrecMS:
 					x.Time *= int64(time.Millisecond)
-				case S:
+				case PrecS:
 					x.Time *= int64(time.Second)
-				case M:
+				case PrecM:
 					x.Time *= int64(time.Minute)
-				case H:
+				case PrecH:
 					x.Time *= int64(time.Hour)
 
 				default:

@@ -7,6 +7,7 @@
 package point
 
 import (
+	bytes "bytes"
 	"encoding/base64"
 	"fmt"
 	"sort"
@@ -15,8 +16,9 @@ import (
 
 	"github.com/influxdata/influxdb1-client/models"
 	influxdb "github.com/influxdata/influxdb1-client/v2"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
+
+	//"google.golang.org/protobuf/encoding/protojson"
+	protojson "github.com/gogo/protobuf/jsonpb"
 )
 
 const (
@@ -149,7 +151,9 @@ func MustFromPBJson(j []byte) *Point {
 
 func FromPBJson(j []byte) (*Point, error) {
 	var pbpt PBPoint
-	if err := protojson.Unmarshal(j, &pbpt); err != nil {
+	m := &protojson.Unmarshaler{}
+	buf := bytes.NewBuffer(j)
+	if err := m.Unmarshal(buf, &pbpt); err != nil {
 		return nil, err
 	}
 
@@ -234,15 +238,24 @@ func (p *Point) LineProto(prec ...Precision) string {
 
 func (p *Point) PBJson() ([]byte, error) {
 	pbpt := p.PBPoint()
-	return protojson.Marshal(pbpt)
+	m := protojson.Marshaler{}
+	buf := &bytes.Buffer{}
+	if err := m.Marshal(buf, pbpt); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func (p *Point) PBJsonPretty() ([]byte, error) {
 	pbpt := p.PBPoint()
 
-	mo := &protojson.MarshalOptions{Multiline: true, Indent: "  "}
+	m := &protojson.Marshaler{Indent: "  "}
+	buf := &bytes.Buffer{}
+	if err := m.Marshal(buf, pbpt); err != nil {
+		return nil, err
+	}
 
-	return mo.Marshal(pbpt)
+	return buf.Bytes(), nil
 }
 
 // Tags return point's key-values except fields.
@@ -405,12 +418,15 @@ func (p *Point) LPSize() int {
 // PBSize get point protobuf size.
 func (p *Point) PBSize() int {
 	pbpt := p.PBPoint()
-	d, err := proto.Marshal(pbpt)
-	if err != nil {
+
+	m := protojson.Marshaler{}
+	buf := bytes.Buffer{}
+
+	if err := m.Marshal(&buf, pbpt); err != nil {
 		return 0
 	}
 
-	return len(d)
+	return buf.Len()
 }
 
 func b64(x []byte) string {

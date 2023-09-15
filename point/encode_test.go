@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
+	proto "github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 )
 
 // Test if encode change points' payload

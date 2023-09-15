@@ -10,7 +10,8 @@ import (
 	"strings"
 	sync "sync"
 
-	"google.golang.org/protobuf/proto"
+	//"google.golang.org/protobuf/proto"
+	proto "github.com/gogo/protobuf/proto"
 )
 
 type Encoding int
