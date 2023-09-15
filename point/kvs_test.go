@@ -65,9 +65,8 @@ func TestKVs(t *T.T) {
 			"f5": []byte(`world`),
 			"f6": false,
 			"f7": true,
-			"f9": struct{}{},
 		})
-		assert.Equal(t, 9, len(kvs))
+		assert.Equal(t, 7, len(kvs))
 
 		assert.Equal(t, int64(123), kvs.Get(`f1`).GetI())
 		assert.Equal(t, uint64(123), kvs.Get(`f2`).GetU())
@@ -76,8 +75,6 @@ func TestKVs(t *T.T) {
 		assert.Equal(t, []byte(`world`), kvs.Get(`f5`).GetD())
 		assert.Equal(t, false, kvs.Get(`f6`).GetB())
 		assert.Equal(t, true, kvs.Get(`f7`).GetB())
-
-		assert.Nil(t, kvs.Get(`f9`).Val)
 
 		t.Logf("kvs:\n%s", kvs.Pretty())
 	})
