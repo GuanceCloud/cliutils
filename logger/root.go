@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -64,11 +65,11 @@ func SetGlobalRootLogger(fpath, level string, options int) error {
 }
 
 // InitRoot used to setup global root logger, include
-//	- log level
-//	- log path
-//		- set to disk file(with or without rotate)
-//		- set to some remtoe TCP/UDP server
-//	- a bounch of other OPT_XXXs
+//   - log level
+//   - log path
+//   - set to disk file(with or without rotate)
+//   - set to some remtoe TCP/UDP server
+//   - a bounch of other OPT_XXXs
 func InitRoot(opt *Option) error {
 	if opt == nil {
 		opt = defaultOption
@@ -148,4 +149,37 @@ func newRootLogger(fpath, level string, options int) (*zap.Logger, error) {
 	}
 
 	return newNormalRootLogger(fpath, level, options)
+}
+
+// InitCustomizeRoot used to setup global root logger, include
+//   - log path
+//   - log maxsize
+//   - log compress
+
+func InitCustomizeRoot(opt *Option) (*zap.Logger, error) {
+	mtx.Lock()
+	defer mtx.Unlock()
+
+	lumberLog := &lumberjack.Logger{
+		Filename: opt.Path,
+		MaxSize:  opt.MaxSize,
+		Compress: opt.Compress,
+	}
+	go func() {
+		next := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()+1, 0, 0, 0, 0, time.Local)
+		after := next.Unix() - time.Now().Unix() - 1
+
+		time.Sleep(time.Duration(after) * time.Second)
+		lumberLog.Rotate()
+
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				lumberLog.Rotate()
+			}
+		}
+	}()
+	return newOnlyMessageRootLogger(lumberLog)
 }
