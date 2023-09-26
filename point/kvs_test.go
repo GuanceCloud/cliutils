@@ -14,6 +14,18 @@ import (
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
+func TestKVsAdd(t *T.T) {
+	t.Run("basic", func(t *T.T) {
+		var kvs KVs
+		kvs.Add("f1", 123, false, false)
+
+		assert.Len(t, kvs, 0)
+
+		kvs = kvs.Add("f1", 123, false, false)
+		assert.Len(t, kvs, 1)
+	})
+}
+
 func TestKVs(t *T.T) {
 	t.Run("add-tag", func(t *T.T) {
 		kvs := NewKVs(map[string]any{"f1": 123})
