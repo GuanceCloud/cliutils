@@ -125,6 +125,15 @@ func (p *Point) Warns() []*Warn {
 	return p.warns
 }
 
+// WarnsPretty return human readable warnning info.
+func (p *Point) WarnsPretty() string {
+	var arr []string
+	for _, w := range p.warns {
+		arr = append(arr, w.String())
+	}
+	return strings.Join(arr, "\n")
+}
+
 // makeLineproto build lineproto from @p's raw data(name/tag/field/time).
 func (p *Point) makeLineproto(prec ...Precision) string {
 	lp := p.LPPoint()
@@ -195,15 +204,14 @@ func FromModelsLP(lp models.Point) *Point {
 		return nil
 	}
 
-	_ = lpfs
-
 	pt := &Point{
 		name: string(lp.Name()),
 		kvs:  NewKVs(lpfs),
 		time: lp.Time(),
 	}
 
-	for _, t := range lp.Tags() {
+	tags := lp.Tags()
+	for _, t := range tags {
 		pt.MustAddTag(string(t.Key), string(t.Value))
 	}
 

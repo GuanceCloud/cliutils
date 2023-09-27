@@ -16,6 +16,23 @@ Point 是 DataKit 中最常用的一种数据表示形式，目前 Point 有两�
 以上测试，参见 `TestSize/BenchmarkEncode/BenchmarkDecode`。 可参考如下结果：
 
 ``` shell
+### BAD
+$ CGO_CFLAGS=-Wno-undef-prefix go test -run XXX -test.benchmem -test.v -bench BenchmarkDecode
+
+goos: darwin
+goarch: arm64
+pkg: github.com/GuanceCloud/cliutils/point
+BenchmarkDecode
+BenchmarkDecode/bench-decode-lp
+BenchmarkDecode/bench-decode-lp-10         	     100	  10841921 ns/op	 5324489 B/op	   90675 allocs/op
+BenchmarkDecode/bench-decode-pb
+BenchmarkDecode/bench-decode-pb-10         	     268	   4428517 ns/op	 3609821 B/op	   69974 allocs/op
+BenchmarkDecode/bench-decode-json
+BenchmarkDecode/bench-decode-json-10       	      93	  12543126 ns/op	 6545212 B/op	  136204 allocs/op
+PASS
+ok  	github.com/GuanceCloud/cliutils/point	5.357s
+
+#################
 $ CGO_CFLAGS=-Wno-undef-prefix go test -run XXX -test.benchmem -test.v -bench BenchmarkDecode
 
 goos: darwin

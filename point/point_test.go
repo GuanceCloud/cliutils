@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	T "testing"
 	"time"
@@ -17,6 +18,52 @@ import (
 	"github.com/stretchr/testify/assert"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
+
+func BenchmarkFromModelsLP(b *T.B) {
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	pts := r.Rand(1)
+
+	enc := GetEncoder()
+	defer PutEncoder(enc)
+
+	data, err := enc.Encode(pts)
+	assert.NoError(b, err)
+	assert.Len(b, data, 1)
+
+	b.Run("basic", func(b *T.B) {
+		lppts, err := models.ParsePointsWithPrecision(data[0], time.Now(), "n")
+		assert.NoError(b, err)
+		assert.Len(b, lppts, 1)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			FromModelsLP(lppts[0])
+		}
+	})
+
+	b.Run("with-check", func(b *T.B) {
+		lppts, err := models.ParsePointsWithPrecision(data[0], time.Now(), "n")
+		assert.NoError(b, err)
+		assert.Len(b, lppts, 1)
+
+		c := GetCfg()
+		chk := checker{cfg: c}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			pt := FromModelsLP(lppts[0])
+
+			pt = chk.check(pt)
+			pt.warns = chk.warns
+			chk.reset()
+
+			// re-sort again: check may update pt.kvs
+			if c.keySorted {
+				sort.Sort(pt.kvs)
+			}
+		}
+	})
+}
 
 func TestGetTag(t *T.T) {
 	t.Run(`get-tag`, func(t *T.T) {
