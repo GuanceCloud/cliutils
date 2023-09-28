@@ -14,6 +14,27 @@ import (
 
 type KVs []*Field
 
+// Raw return underlying raw data
+func (kv *Field) Raw() any {
+	switch kv.Val.(type) {
+	case *Field_I:
+		return kv.GetI()
+	case *Field_U:
+		return kv.GetU()
+	case *Field_F:
+		return kv.GetF()
+	case *Field_B:
+		return kv.GetB()
+	case *Field_D:
+		return kv.GetD()
+	case *Field_S:
+		return kv.GetS()
+
+	default:
+		return nil
+	}
+}
+
 func (x KVs) Len() int {
 	return len(x)
 }

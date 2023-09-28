@@ -291,23 +291,7 @@ func (p *Point) Time() time.Time {
 // Get get specific key from point.
 func (p *Point) Get(k string) any {
 	if kv := p.kvs.Get(k); kv != nil {
-		switch kv.Val.(type) {
-		case *Field_I:
-			return kv.GetI()
-		case *Field_U:
-			return kv.GetU()
-		case *Field_F:
-			return kv.GetF()
-		case *Field_B:
-			return kv.GetB()
-		case *Field_D:
-			return kv.GetD()
-		case *Field_S:
-			return kv.GetS()
-
-		default:
-			return nil
-		}
+		return kv.Raw()
 	}
 	return nil
 }
