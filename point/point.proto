@@ -28,6 +28,25 @@ message AnyDemo {
 	string demo = 1;
 }
 
+message BasicTypes {
+	oneof x {
+			int64  i   = 1 [json_name = "i"]; // signed int
+			uint64 u   = 2 [json_name = "u"]; // unsigned int
+			double f   = 3 [json_name = "f"]; // float64
+			bool   b   = 4 [json_name = "b"]; // bool
+			bytes  d   = 5 [json_name = "d"]; // bytes, for binary data
+			string s   = 6 [json_name = "s"]; // string, for string data
+	}
+}
+
+message Array {
+	repeated BasicTypes arr = 1;
+}
+
+message Map {
+	map<string, BasicTypes> map = 1;
+}
+
 enum KeyType {
 	X   = 0; // unknown
 	I   = 1;
@@ -37,6 +56,7 @@ enum KeyType {
 	D   = 5;
 	NIL = 6;
 	S   = 7;
+	A   = 8;
 }
 
 enum MetricType {
