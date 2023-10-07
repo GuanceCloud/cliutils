@@ -5,9 +5,98 @@
 
 package point
 
+import (
+	"fmt"
+	"reflect"
+
+	"google.golang.org/protobuf/proto"
+	anypb "google.golang.org/protobuf/types/known/anypb"
+)
+
+func MustAnyRaw(x *anypb.Any) any {
+	res, err := AnyRaw(x)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return res
+}
+
+// AnyRaw get original wrapped value within anypb.
+func AnyRaw(x *anypb.Any) (any, error) {
+	switch x.TypeUrl {
+	case "type.googleapis.com/point.Array":
+		var arr Array
+		if err := proto.Unmarshal(x.Value, &arr); err != nil {
+			return nil, err
+		}
+
+		var res []any
+		for _, v := range arr.Arr {
+			switch v.GetX().(type) {
+			case *BasicTypes_I:
+				res = append(res, v.GetI())
+			case *BasicTypes_U:
+				res = append(res, v.GetU())
+			case *BasicTypes_F:
+				res = append(res, v.GetF())
+			case *BasicTypes_B:
+				res = append(res, v.GetB())
+			case *BasicTypes_D:
+				res = append(res, v.GetD())
+			case *BasicTypes_S:
+				res = append(res, v.GetS())
+			default: // pass
+				return nil, fmt.Errorf("unknown type %q within array", reflect.TypeOf(v.GetX()).String())
+			}
+		}
+
+		return res, nil
+
+	case "type.googleapis.com/point.Map":
+		var m Map
+		if err := proto.Unmarshal(x.Value, &m); err != nil {
+			return nil, err
+		}
+
+		res := map[string]any{}
+		for k, v := range m.Map {
+			switch v.GetX().(type) {
+			case *BasicTypes_I:
+				res[k] = v.GetI()
+			case *BasicTypes_U:
+				res[k] = v.GetU()
+			case *BasicTypes_F:
+				res[k] = v.GetF()
+			case *BasicTypes_B:
+				res[k] = v.GetB()
+			case *BasicTypes_D:
+				res[k] = v.GetD()
+			case *BasicTypes_S:
+				res[k] = v.GetS()
+			default:
+				return nil, fmt.Errorf("unknown type %q within map", reflect.TypeOf(v.GetX()).String())
+			}
+		}
+
+		return res, nil
+
+	default:
+		return nil, fmt.Errorf("unknown type %q", x.TypeUrl)
+	}
+}
+
+func MustNewArray(ents []any) *Array {
+	x, err := NewArray(ents)
+	if err != nil {
+		panic(err.Error())
+	}
+	return x
+}
+
 // NewArray create array value that can be used in point field.
 // The types within ents can be mixed basic types
-func NewArray(ents []any) (arr *Array) {
+func NewArray(ents []any) (arr *Array, err error) {
 	arr = &Array{
 		Arr: make([]*BasicTypes, 0, len(ents)),
 	}
@@ -44,15 +133,27 @@ func NewArray(ents []any) (arr *Array) {
 			arr.Arr = append(arr.Arr, &BasicTypes{X: &BasicTypes_D{x}})
 		case bool:
 			arr.Arr = append(arr.Arr, &BasicTypes{X: &BasicTypes_B{x}})
-		default: // value ignored
+		case nil:
+			arr.Arr = append(arr.Arr, nil)
+		default:
+			return nil, fmt.Errorf("unknown type %q within array", reflect.TypeOf(v).String())
 		}
 	}
 
 	return
 }
 
+func MustNewMap(ents map[string]any) *Map {
+	x, err := NewMap(ents)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return x
+}
+
 // NewMap create map value that can be used in point field.
-func NewMap(ents map[string]any) (dict *Map) {
+func NewMap(ents map[string]any) (dict *Map, err error) {
 	dict = &Map{
 		Map: map[string]*BasicTypes{},
 	}
@@ -89,9 +190,25 @@ func NewMap(ents map[string]any) (dict *Map) {
 			dict.Map[k] = &BasicTypes{X: &BasicTypes_D{x}}
 		case bool:
 			dict.Map[k] = &BasicTypes{X: &BasicTypes_B{x}}
+		case nil:
+			dict.Map[k] = nil
 		default: // value ignored
+			return nil, fmt.Errorf("unknown type %q within map", reflect.TypeOf(v).String())
 		}
 	}
 
 	return
+}
+
+// MustNewAny create anypb based on exist proto message.
+func NewAny(x proto.Message) (*anypb.Any, error) {
+	return anypb.New(x)
+}
+
+func MustNewAny(x proto.Message) *anypb.Any {
+	if a, err := anypb.New(x); err != nil {
+		panic(err.Error())
+	} else {
+		return a
+	}
 }

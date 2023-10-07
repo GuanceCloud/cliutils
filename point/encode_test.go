@@ -80,8 +80,11 @@ func TestIdempotent(t *testing.T) {
 }
 
 func TestEncode(t *testing.T) {
+
+	r := NewRander(WithKVSorted(true))
+
 	var (
-		randPts = RandPoints(1000)
+		randPts = r.Rand(1000)
 
 		simplePts = []*Point{
 			NewPointV2(`abc`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
@@ -130,7 +133,7 @@ func TestEncode(t *testing.T) {
 					"f1": "fv1",
 					"f2": "fv2",
 					"f3": "fv3",
-				}, WithTime(time.Unix(0, 123)))
+				}, WithTime(time.Unix(0, 123)), WithKeySorted(true))
 
 				require.NoError(t, err)
 

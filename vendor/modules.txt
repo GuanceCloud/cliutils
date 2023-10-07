@@ -122,8 +122,8 @@ github.com/gorilla/websocket
 # github.com/grafana/regexp v0.0.0-20221122212121-6b5c0a4cb7fd
 ## explicit; go 1.17
 github.com/grafana/regexp
-# github.com/influxdata/influxdb1-client v0.0.0-20200827194710-b269163b24ab
-## explicit
+# github.com/influxdata/influxdb1-client v0.0.0-20200827194710-b269163b24ab => /Users/tanbiao/go/src/gitlab.jiagouyun.com/guance/influxdb1-client
+## explicit; go 1.18
 github.com/influxdata/influxdb1-client/models
 github.com/influxdata/influxdb1-client/pkg/escape
 github.com/influxdata/influxdb1-client/v2
@@ -367,3 +367,4 @@ gopkg.in/natefinch/lumberjack.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
+# github.com/influxdata/influxdb1-client => /Users/tanbiao/go/src/gitlab.jiagouyun.com/guance/influxdb1-client
