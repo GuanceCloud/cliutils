@@ -140,7 +140,7 @@ func NewArray(ents []any) (arr *Array, err error) {
 		}
 	}
 
-	return nil, nil
+	return arr, nil
 }
 
 func MustNewMap(ents map[string]any) *Map {
@@ -197,7 +197,7 @@ func NewMap(ents map[string]any) (dict *Map, err error) {
 		}
 	}
 
-	return nil, nil
+	return dict, nil
 }
 
 // NewAny create anypb based on exist proto message.
