@@ -95,7 +95,7 @@ func MustNewArray(ents []any) *Array {
 }
 
 // NewArray create array value that can be used in point field.
-// The types within ents can be mixed basic types
+// The types within ents can be mixed basic types.
 func NewArray(ents []any) (arr *Array, err error) {
 	arr = &Array{
 		Arr: make([]*BasicTypes, 0, len(ents)),
@@ -120,7 +120,7 @@ func NewArray(ents []any) (arr *Array, err error) {
 		case uint:
 			arr.Arr = append(arr.Arr, &BasicTypes{X: &BasicTypes_U{uint64(x)}})
 		case int64:
-			arr.Arr = append(arr.Arr, &BasicTypes{X: &BasicTypes_I{int64(x)}})
+			arr.Arr = append(arr.Arr, &BasicTypes{X: &BasicTypes_I{x}})
 		case uint64:
 			arr.Arr = append(arr.Arr, &BasicTypes{X: &BasicTypes_U{x}})
 		case float64:
@@ -140,7 +140,7 @@ func NewArray(ents []any) (arr *Array, err error) {
 		}
 	}
 
-	return
+	return nil, nil
 }
 
 func MustNewMap(ents map[string]any) *Map {
@@ -177,7 +177,7 @@ func NewMap(ents map[string]any) (dict *Map, err error) {
 		case uint:
 			dict.Map[k] = &BasicTypes{X: &BasicTypes_U{uint64(x)}}
 		case int64:
-			dict.Map[k] = &BasicTypes{X: &BasicTypes_I{int64(x)}}
+			dict.Map[k] = &BasicTypes{X: &BasicTypes_I{x}}
 		case uint64:
 			dict.Map[k] = &BasicTypes{X: &BasicTypes_U{x}}
 		case float64:
@@ -197,10 +197,10 @@ func NewMap(ents map[string]any) (dict *Map, err error) {
 		}
 	}
 
-	return
+	return nil, nil
 }
 
-// MustNewAny create anypb based on exist proto message.
+// NewAny create anypb based on exist proto message.
 func NewAny(x proto.Message) (*anypb.Any, error) {
 	return anypb.New(x)
 }

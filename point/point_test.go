@@ -9,11 +9,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"reflect"
 	"sort"
 	"strings"
 	T "testing"
 	"time"
-	"unsafe"
 
 	influxm "github.com/influxdata/influxdb1-client/models"
 	"github.com/stretchr/testify/assert"
@@ -21,21 +21,7 @@ import (
 )
 
 func TestSizeofPoint(t *T.T) {
-
 	t.Run("small-pt", func(t *T.T) {
-		fields := map[string]any{
-			"f1": 123,
-			"f2": 3.14,
-		}
-		tags := influxm.Tags{
-			influxm.Tag{[]byte("t1"), []byte("v1")},
-			influxm.Tag{[]byte("t2"), []byte("v2")},
-		}
-
-		pt, err := influxm.NewPoint("some", tags, fields, time.Now())
-		assert.NoError(t, err)
-		t.Logf("sizeof(lppt): %d", unsafe.Sizeof(pt))
-
 		var kvs KVs
 		kvs = kvs.Add("f1", 123, false, true)
 		kvs = kvs.Add("f2", 3.14, false, true)
@@ -43,32 +29,27 @@ func TestSizeofPoint(t *T.T) {
 		kvs = kvs.MustAddTag("t2", "v2")
 
 		pbpt := NewPointV2("some", kvs)
-		t.Logf("sizeof(pbpt): %d", unsafe.Sizeof(pbpt))
+		t.Logf("type  size(pbpt): %d", reflect.TypeOf(*pbpt).Size())
+		t.Logf("value size(pbpt): %d", pbpt.Size())
 	})
 
 	t.Run("rand-large-pt", func(t *T.T) {
-
 		r := NewRander(WithFixedTags(true), WithRandText(3))
 		pts := r.Rand(1)
-
-		lppt := pts[0].MustLPPoint()
-
-		t.Logf("sizeof(lppt): %d", unsafe.Sizeof(lppt))
-		t.Logf("sizeof(pbpt): %d", unsafe.Sizeof(*pts[0]))
+		t.Logf("type  size(pbpt): %d", reflect.TypeOf(*pts[0]).Size())
+		t.Logf("value size(pbpt): %d", pts[0].Size())
 	})
-
 }
 
 func BenchmarkLPPoint(b *T.B) {
-
 	b.Run("pt-lppt", func(b *T.B) {
 		fields := map[string]any{
 			"f1": 123,
 			"f2": 3.14,
 		}
 		tags := influxm.Tags{
-			influxm.Tag{[]byte("t1"), []byte("v1")},
-			influxm.Tag{[]byte("t2"), []byte("v2")},
+			influxm.Tag{Key: []byte("t1"), Value: []byte("v1")},
+			influxm.Tag{Key: []byte("t2"), Value: []byte("v2")},
 		}
 		now := time.Now()
 
@@ -525,13 +506,11 @@ line" 123`,
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
-
 			t.Logf("pt: %s", tc.pt.Pretty())
 
 			assert.Equal(t, tc.expect, tc.pt.LineProto(tc.prec))
 
-			//_, err := influxm.ParsePointsWithPrecision([]byte(tc.expect), time.Now(), "n")
-			//assert.NoError(t, err)
+			// _, err := influxm.ParsePointsWithPrecision([]byte(tc.expect), time.Now(), "n")
 		})
 	}
 }

@@ -318,17 +318,15 @@ func BenchmarkDecode(b *testing.B) {
 }
 
 func BenchmarkBytes2String(b *testing.B) {
-
 	repeat := 1
 	raw := []byte("xxxxxxxxxxxxxxxx")
-	//raw := []byte("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
 
 	bytesData := bytes.Repeat(raw, repeat)
 	strData := strings.Repeat(string(raw), repeat)
 
 	str := string(raw)
 	b.Logf("str:   %p", &str)
-	b.Logf("bytes: %p", []byte(raw))
+	b.Logf("bytes: %p", raw)
 	b.Logf("repeat: %p", &repeat)
 
 	b.Logf("str:   %p", &strData)

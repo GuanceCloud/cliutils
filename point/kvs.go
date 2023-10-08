@@ -15,7 +15,7 @@ import (
 
 type KVs []*Field
 
-// Raw return underlying raw data
+// Raw return underlying raw data.
 func (kv *Field) Raw() any {
 	switch kv.Val.(type) {
 	case *Field_I:

@@ -30,7 +30,6 @@ func (p *Point) EqualWithReason(x *Point) (bool, string) {
 	ptags := p.Tags()
 	pfields := p.Fields()
 
-	xname := x.Name()
 	xtags := x.Tags()
 	xfields := x.Fields()
 
@@ -38,7 +37,7 @@ func (p *Point) EqualWithReason(x *Point) (bool, string) {
 		return false, fmt.Sprintf("timestamp not equal(%d <> %d)", ptime, xtime)
 	}
 
-	if xname != pname {
+	if xname := x.Name(); xname != pname {
 		return false, fmt.Sprintf("measurement not equla(%s <> %s)", pname, xname)
 	}
 
@@ -71,7 +70,7 @@ func kvsEq(l, r KVs) (bool, string) {
 
 	for _, f := range l {
 		if !r.Has(f.Key) { // key not exists
-			return false, fmt.Sprintf("field %s not exists", string(f.Key))
+			return false, fmt.Sprintf("field %s not exists", f.Key)
 		}
 
 		v := r.Get(f.Key)

@@ -80,7 +80,6 @@ func TestIdempotent(t *testing.T) {
 }
 
 func TestEncode(t *testing.T) {
-
 	r := NewRander(WithKVSorted(true))
 
 	var (
@@ -259,7 +258,6 @@ func TestEncode(t *testing.T) {
 }
 
 func TestEncodeTags(t *T.T) {
-
 	t.Run("tag-value-begins-with-slash", func(t *T.T) {
 		enc := GetEncoder(WithEncEncoding(LineProtocol))
 		defer PutEncoder(enc)

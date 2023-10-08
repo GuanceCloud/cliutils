@@ -286,7 +286,8 @@ func TestNewPoint(t *T.T) {
 				WithTime(time.Unix(0, 123)),
 				WithMaxTags(1),
 				WithMaxFields(1),
-				WithKeySorted(true)},
+				WithKeySorted(true),
+			},
 			expect: `abc,t1=abc f1=123i 123`,
 			warns:  2,
 		},
@@ -649,7 +650,6 @@ func BenchmarkNewPoint(b *T.B) {
 }
 
 func BenchmarkNewPointV2(b *T.B) {
-
 	b.Run(`with-maps`, func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			tags := map[string]string{
@@ -682,7 +682,6 @@ func BenchmarkNewPointV2(b *T.B) {
 	})
 
 	b.Run(`without-map-without-prealloc`, func(b *T.B) {
-
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
 			kvs = kvs.AddTag("t1", "val1")
@@ -712,7 +711,6 @@ func BenchmarkNewPointV2(b *T.B) {
 	})
 
 	b.Run(`without-map-with-prealloc`, func(b *T.B) {
-
 		for i := 0; i < b.N; i++ {
 			kvs := make(KVs, 0, 20)
 			kvs = kvs.AddTag("t1", "val1")
@@ -742,7 +740,6 @@ func BenchmarkNewPointV2(b *T.B) {
 	})
 
 	b.Run(`without-map-with-prealloc-and-MUST`, func(b *T.B) {
-
 		for i := 0; i < b.N; i++ {
 			kvs := make(KVs, 0, 20)
 			kvs = kvs.MustAddTag("t1", "val1")

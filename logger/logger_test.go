@@ -396,7 +396,6 @@ func TestInitRoot(t *testing.T) {
 }
 
 func TestRotateOnDevNull(t *testing.T) {
-
 	MaxSize = 1 // set to 1MB
 
 	opt := &Option{

@@ -42,7 +42,7 @@ func TestCheckMeasurement(t *testing.T) {
 		{
 			name:        "empty-measurement",
 			measurement: "",
-			expect:      string(DefaultMeasurementName),
+			expect:      DefaultMeasurementName,
 		},
 
 		{
@@ -51,7 +51,7 @@ func TestCheckMeasurement(t *testing.T) {
 			opts: []Option{
 				WithMaxMeasurementLen(3),
 			},
-			expect: string(DefaultMeasurementName[:3]),
+			expect: DefaultMeasurementName[:3],
 		},
 
 		{
@@ -80,7 +80,7 @@ func TestCheckMeasurement(t *testing.T) {
 
 			c := checker{cfg: cfg}
 			m := c.checkMeasurement(tc.measurement)
-			assert.Equal(t, tc.expect, string(m))
+			assert.Equal(t, tc.expect, m)
 		})
 	}
 }
@@ -412,7 +412,7 @@ def`,
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
-			assert.Equal(t, tc.y, string(adjustKV(tc.x)))
+			assert.Equal(t, tc.y, adjustKV(tc.x))
 		})
 	}
 }

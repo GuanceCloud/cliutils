@@ -9,6 +9,7 @@ package logger
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -139,7 +140,6 @@ func newRootLogger(fpath, level string, options int) (*zap.Logger, error) {
 	if options&OPT_ROTATE != 0 &&
 		options&OPT_STDOUT == 0 && // can't rotate stdout
 		fpath != os.DevNull { // can't rotate(rename) /dev/null
-
 		return newCustomizeRootLogger(level, options, &lumberjack.Logger{
 			Filename:   fpath,
 			MaxSize:    MaxSize,
@@ -165,21 +165,25 @@ func InitCustomizeRoot(opt *Option) (*zap.Logger, error) {
 		MaxSize:  opt.MaxSize,
 		Compress: opt.Compress,
 	}
+
 	go func() {
 		next := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()+1, 0, 0, 0, 0, time.Local)
 		after := next.Unix() - time.Now().Unix() - 1
 
 		time.Sleep(time.Duration(after) * time.Second)
-		lumberLog.Rotate()
+		if err := lumberLog.Rotate(); err != nil {
+			log.Printf("lumberLog.Rotate: %s, ignored", err.Error())
+		}
 
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				lumberLog.Rotate()
+
+		for range ticker.C {
+			if err := lumberLog.Rotate(); err != nil {
+				log.Printf("lumberLog.Rotate on tick: %s, ignored", err.Error())
 			}
 		}
 	}()
+
 	return newOnlyMessageRootLogger(lumberLog)
 }

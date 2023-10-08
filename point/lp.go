@@ -117,7 +117,7 @@ func parseLPPoints(data []byte, c *cfg) ([]*Point, error) {
 		if c.extraTags != nil {
 			for _, t := range c.extraTags {
 				if !x.HasTag([]byte(t.Key)) {
-					x.AddTag(string(t.Key), string(t.GetS()))
+					x.AddTag(t.Key, t.GetS())
 				}
 			}
 		}

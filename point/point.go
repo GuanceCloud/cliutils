@@ -84,7 +84,7 @@ func (p *Point) MustLPPoint() influxm.Point {
 
 // LPPoint get line-protocol part of the point.
 func (p *Point) LPPoint() (influxm.Point, error) {
-	return influxm.NewPoint(string(p.name), p.InfluxTags(), p.InfluxFields(), p.time)
+	return influxm.NewPoint(p.name, p.InfluxTags(), p.InfluxFields(), p.time)
 }
 
 // InfluxFields convert fields to map structure.
@@ -97,7 +97,7 @@ func (p *Point) InfluxTags() influxm.Tags {
 	return p.kvs.InfluxTags()
 }
 
-// InfluxTags convert tags to map structure.
+// MapTags convert all key-value to map.
 func (p *Point) MapTags() map[string]string {
 	res := map[string]string{}
 
@@ -112,7 +112,7 @@ func (p *Point) MapTags() map[string]string {
 	return res
 }
 
-// KVMap return all key-value in map
+// KVMap return all key-value in map.
 func (p *Point) KVMap() map[string]any {
 	res := map[string]any{}
 
@@ -128,7 +128,7 @@ func (p *Point) KVMap() map[string]any {
 func (p *Point) Pretty() string {
 	arr := []string{
 		"\n",
-		string(p.Name()),
+		p.Name(),
 		"-----------",
 		p.kvs.Pretty(),
 		"-----------",
@@ -400,7 +400,9 @@ func (p *Point) Size() int {
 		n += 4 // MetricType: uint32
 		n += len(kv.Unit)
 		switch kv.Val.(type) {
-		case *Field_I, *Field_F, *Field_U:
+		case *Field_I,
+			*Field_F,
+			*Field_U:
 			n += 8
 		case *Field_B:
 			n += 1

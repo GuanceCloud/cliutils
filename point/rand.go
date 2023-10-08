@@ -142,8 +142,7 @@ func (r *ptRander) getFieldKey(i int) string {
 func (r *ptRander) doRand() *Point {
 	var kvs KVs
 
-	//tags := map[string]string{}
-	//fields := map[string]interface{}{}
+	// fields := map[string]interface{}{}
 
 	switch {
 	case r.fixedTags:
