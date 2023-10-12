@@ -75,11 +75,11 @@ func doNewPoint(name string, kvs KVs, c *cfg) *Point {
 	}
 
 	if !c.t.IsZero() {
-		pt.time = c.t
+		pt.time = c.t.Round(0) // trim monotonic clock
 	}
 
 	if pt.time.IsZero() {
-		pt.time = time.Now()
+		pt.time = time.Now().Round(0) // trim monotonic clock
 	}
 
 	return pt

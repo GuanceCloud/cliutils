@@ -7,7 +7,6 @@ package point
 
 import (
 	"encoding/json"
-	"log"
 	"strings"
 	sync "sync"
 
@@ -200,7 +199,6 @@ func (e *Encoder) doEncode(pts []*Point) ([][]byte, error) {
 			curBytesBatchSize += pt.Size()
 
 			if curBytesBatchSize >= e.bytesSize {
-				log.Printf("curBytesBatchSize > %d, spliting...", e.bytesSize)
 
 				payload, err := e.getPayload(batch)
 				if err != nil {
@@ -212,6 +210,14 @@ func (e *Encoder) doEncode(pts []*Point) ([][]byte, error) {
 				batch = batch[:0]
 				curBytesBatchSize = 0
 			}
+		}
+
+		if len(batch) > 0 { // tail
+			payload, err := e.getPayload(batch)
+			if err != nil {
+				return nil, err
+			}
+			batches = append(batches, payload)
 		}
 	} else if e.batchSize > 0 { // then point count
 		for _, pt := range pts {

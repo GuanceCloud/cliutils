@@ -132,7 +132,9 @@ func (p *Point) Pretty() string {
 		"-----------",
 		p.kvs.Pretty(),
 		"-----------",
-		p.Time().String(),
+		fmt.Sprintf("%s | %d",
+			p.Time().String(),
+			p.Time().UnixNano()),
 	}
 
 	if len(p.warns) > 0 {

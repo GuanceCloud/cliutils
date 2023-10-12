@@ -15,6 +15,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestTimeRound(t *testing.T) {
+	t.Run(`decode-time`, func(t *testing.T) {
+		pt := NewPointV2("some", nil, WithTime(time.Now()))
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		data, err := enc.Encode([]*Point{pt})
+		assert.NoError(t, err)
+
+		dec := GetDecoder(WithDecEncoding(Protobuf))
+		pts, err := dec.Decode(data[0])
+		assert.NoError(t, err)
+
+		assert.Equal(t, pt.Pretty(), pts[0].Pretty())
+	})
+}
+
 func TestDecode(t *testing.T) {
 	var fnCalled int
 
