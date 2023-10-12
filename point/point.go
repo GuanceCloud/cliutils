@@ -399,20 +399,37 @@ func (p *Point) Size() int {
 		n += 8 // time
 		n += 4 // MetricType: uint32
 		n += len(kv.Unit)
+
 		switch kv.Val.(type) {
 		case *Field_I,
 			*Field_F,
 			*Field_U:
 			n += 8
+
 		case *Field_B:
 			n += 1
+
 		case *Field_D:
 			n += len(kv.GetD())
+
 		case *Field_S:
 			n += len(kv.GetS())
+
+		case *Field_A:
+			a := kv.GetA()
+			n += (len(a.TypeUrl) + len(a.Value))
+
 		default:
 			// ignored
 		}
+	}
+
+	for _, w := range p.warns {
+		n += (len(w.Type) + len(w.Msg))
+	}
+
+	for _, d := range p.debugs {
+		n += (len(d.Info))
 	}
 
 	return n

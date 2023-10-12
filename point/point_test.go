@@ -15,6 +15,7 @@ import (
 	T "testing"
 	"time"
 
+	"github.com/GuanceCloud/cliutils"
 	influxm "github.com/influxdata/influxdb1-client/models"
 	"github.com/stretchr/testify/assert"
 	anypb "google.golang.org/protobuf/types/known/anypb"
@@ -977,6 +978,26 @@ func TestPointAddKey(t *T.T) {
 	})
 }
 
+func BenchmarkPointSize(b *T.B) {
+	b.Run(`basic-pt-size`, func(b *T.B) {
+		r := NewRander(WithRandText(3))
+		pts := r.Rand(1)
+
+		for i := 0; i < b.N; i++ {
+			pts[0].Size()
+		}
+	})
+
+	b.Run(`basic-pb-size`, func(b *T.B) {
+		r := NewRander(WithRandText(3))
+		pts := r.Rand(1)
+
+		for i := 0; i < b.N; i++ {
+			pts[0].PBSize()
+		}
+	})
+}
+
 func TestSize(t *T.T) {
 	t.Run("sizes", func(t *T.T) {
 		// empty point
@@ -1004,7 +1025,6 @@ func TestSize(t *T.T) {
 			"f9": 3.14159265359,
 		}))
 		t.Logf("pt size: %d, pb size: %d, lp size: %d", pt.Size(), pt.PBSize(), pt.LPSize())
-		t.Logf("lp: %s", pt.LineProto())
 
 		// with kv unit/type
 		pt = NewPointV2(`abc`, NewKVs(nil).
@@ -1018,5 +1038,41 @@ func TestSize(t *T.T) {
 		for idx, pt := range pts {
 			t.Logf("[%d] pt size: % 5d, pb size: % 5d, lp size: % 5d", idx, pt.Size(), pt.PBSize(), pt.LPSize())
 		}
+	})
+
+	t.Run("size-of-anypb", func(t *T.T) {
+		pt := NewPointV2("some", nil)
+
+		pt.MustAdd("arr", []string{
+			cliutils.CreateRandomString(100),
+			cliutils.CreateRandomString(100),
+		})
+		t.Logf("s-arr pt size: %d, pbsize: %d\npt: %s", pt.Size(), pt.PBSize(), pt.Pretty())
+
+		pt = NewPointV2("some", nil)
+		pt.MustAdd("arr", []int{(1), (1)})
+		t.Logf("i-arr pt size: %d, pbsize: %d\npt: %s", pt.Size(), pt.PBSize(), pt.Pretty())
+
+		pt = NewPointV2("some", nil)
+		pt.MustAdd("arr", []bool{false, true})
+		t.Logf("b-arr pt size: %d, pbsize: %d\npt: %s", pt.Size(), pt.PBSize(), pt.Pretty())
+	})
+
+	t.Run("size-of-large-string-point", func(t *T.T) {
+		pt := NewPointV2("some", nil)
+
+		_32mstr := cliutils.CreateRandomString(1024 * 1024 * 32)
+		pt.MustAdd("large-string", _32mstr)
+
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		defer PutEncoder(enc)
+
+		datas, err := enc.Encode([]*Point{pt})
+		assert.NoError(t, err)
+
+		gz := cliutils.MustGZip(datas[0])
+		gz32mb := cliutils.MustGZip([]byte(_32mstr))
+
+		t.Logf("pt size: %d, pbsize: %d/gz: %d, gzraw: %d", pt.Size(), pt.PBSize(), len(gz), len(gz32mb))
 	})
 }

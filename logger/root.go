@@ -8,7 +8,6 @@ package logger
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -130,7 +129,7 @@ func newRootLogger(fpath, level string, options int) (*zap.Logger, error) {
 			}
 
 			// create empty log file
-			if err := ioutil.WriteFile(fpath, nil, 0o600); err != nil {
+			if err := os.WriteFile(fpath, nil, 0o600); err != nil {
 				return nil, fmt.Errorf("WriteFile(%s): %w", fpath, err)
 			}
 		}

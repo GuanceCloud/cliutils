@@ -7,6 +7,7 @@ package point
 
 import (
 	"encoding/json"
+	"log"
 	"strings"
 	sync "sync"
 
@@ -86,10 +87,16 @@ func WithEncBatchSize(size int) EncoderOption {
 	return func(e *Encoder) { e.batchSize = size }
 }
 
+func WithEncBatchBytes(bytes int) EncoderOption {
+	return func(e *Encoder) { e.bytesSize = bytes }
+}
+
 type Encoder struct {
+	bytesSize,
 	batchSize int
-	fn        EncodeFn
-	enc       Encoding
+
+	fn  EncodeFn
+	enc Encoding
 }
 
 var encPool sync.Pool
@@ -185,7 +192,28 @@ func (e *Encoder) doEncode(pts []*Point) ([][]byte, error) {
 		batch   []*Point
 	)
 
-	if e.batchSize > 0 {
+	// nolint: gocritic
+	if e.bytesSize > 0 { // prefer byte size
+		curBytesBatchSize := 0
+		for _, pt := range pts {
+			batch = append(batch, pt)
+			curBytesBatchSize += pt.Size()
+
+			if curBytesBatchSize >= e.bytesSize {
+				log.Printf("curBytesBatchSize > %d, spliting...", e.bytesSize)
+
+				payload, err := e.getPayload(batch)
+				if err != nil {
+					return nil, err
+				}
+				batches = append(batches, payload)
+
+				// reset
+				batch = batch[:0]
+				curBytesBatchSize = 0
+			}
+		}
+	} else if e.batchSize > 0 { // then point count
 		for _, pt := range pts {
 			batch = append(batch, pt)
 			if len(batch)%e.batchSize == 0 { // switch next batch

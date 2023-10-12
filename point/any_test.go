@@ -101,3 +101,100 @@ func TestAnyRaw(t *T.T) {
 		assert.Equal(t, []any{int64(1), 2.0}, raw)
 	})
 }
+
+func TestNewArray(t *T.T) {
+	t.Run(`basic-uint`, func(t *T.T) {
+		u16s := []uint16{
+			uint16(1),
+			uint16(2),
+			uint16(3),
+		}
+
+		x := MustNewUintArray(u16s...)
+
+		raw, err := AnyRaw(x)
+		assert.NoError(t, err)
+		assert.Equal(t, []any{
+			uint64(1),
+			uint64(2),
+			uint64(3),
+		}, raw)
+		t.Logf("any.Raw: %+#v", raw)
+	})
+
+	t.Run(`basic-int`, func(t *T.T) {
+		i16s := []int16{
+			int16(1),
+			int16(2),
+			int16(3),
+		}
+
+		raw, err := AnyRaw(MustNewIntArray(i16s...))
+		assert.NoError(t, err)
+		assert.Equal(t, []any{
+			int64(1),
+			int64(2),
+			int64(3),
+		}, raw)
+		t.Logf("any.Raw: %+#v", raw)
+	})
+
+	t.Run(`basic-float`, func(t *T.T) {
+		arr := []float64{
+			float64(1.1),
+			float64(2.2),
+			float64(3.3),
+		}
+
+		raw, err := AnyRaw(MustNewFloatArray(arr...))
+		assert.NoError(t, err)
+		assert.Equal(t, []any{
+			float64(1.1),
+			float64(2.2),
+			float64(3.3),
+		}, raw)
+		t.Logf("any.Raw: %+#v", raw)
+	})
+
+	t.Run(`basic-float32`, func(t *T.T) {
+		arr := []float32{
+			float32(1.1),
+			float32(2.2),
+			float32(3.1415926),
+		}
+
+		raw, err := AnyRaw(MustNewFloatArray(arr...))
+		assert.NoError(t, err)
+		assert.Len(t, raw, 3)
+		assert.NotEqual(t, []any{ // float32 -> float64 not equal
+			float64(1.1),
+			float64(2.2),
+			float64(3.1415926),
+		}, raw)
+		t.Logf("any.Raw: %+#v", raw)
+	})
+
+	t.Run(`basic-bool`, func(t *T.T) {
+		arr := []bool{
+			false, true,
+		}
+
+		raw, err := AnyRaw(MustNewBoolArray(arr...))
+		assert.NoError(t, err)
+		assert.Len(t, raw, 2)
+		assert.Equal(t, []any{false, true}, raw)
+		t.Logf("any.Raw: %+#v", raw)
+	})
+
+	t.Run(`basic-string`, func(t *T.T) {
+		arr := []string{
+			"s1", "s2", "s3",
+		}
+
+		raw, err := AnyRaw(MustNewStringArray(arr...))
+		assert.NoError(t, err)
+		assert.Len(t, raw, 3)
+		assert.Equal(t, []any{"s1", "s2", "s3"}, raw)
+		t.Logf("any.Raw: %+#v", raw)
+	})
+}
