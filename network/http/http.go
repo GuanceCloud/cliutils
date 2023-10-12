@@ -7,22 +7,22 @@
 package http
 
 import (
-	"io/ioutil"
 	"net/http"
 )
 
-// ReadBody will automatically unzip body.
-func ReadBody(req *http.Request) ([]byte, error) {
-	buf, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		return nil, err
-	}
+var (
+	// ZIPMagic see https://en.wikipedia.org/wiki/ZIP_(file_format)#Local_file_header
+	ZIPMagic = []byte{0x50, 0x4b, 0x3, 0x4} //
 
-	// as HTTP server, we do not need to close body
-	switch req.Header.Get("Content-Encoding") {
-	case "gzip":
-		return Unzip(buf)
-	default:
-		return buf, err
-	}
+	// LZ4Magic see https://android.googlesource.com/platform/external/lz4/+/HEAD/doc/lz4_Frame_format.md#general-structure-of-lz4-frame-format
+	LZ4Magic = []byte{0x4, 0x22, 0x4d, 0x18}
+
+	// GzipMagic see https://en.wikipedia.org/wiki/Gzip#File_format
+	GzipMagic = []byte{0x1f, 0x8b}
+)
+
+// ReadBody will automatically unzip the body, it doesn't close the Request.Body.
+func ReadBody(req *http.Request) ([]byte, error) {
+	body, _, err := gzipReadMD5AndClose(req, false, false)
+	return body, err
 }

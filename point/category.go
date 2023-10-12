@@ -50,10 +50,8 @@ func CatString(c string) Category {
 }
 
 func CatURL(c string) Category {
-	for k, v := range categoryURL {
-		if c == v {
-			return k
-		}
+	if category, ok := URLCategoryMap[c]; ok {
+		return category
 	}
 	return UnknownCategory
 }
@@ -152,6 +150,8 @@ var (
 		UnknownCategory: URLUnknownCategory,
 	}
 
+	URLCategoryMap = flipMap(categoryURL)
+
 	categoryAias = map[Category]string{
 		Metric:            CM,
 		Network:           CN,
@@ -183,3 +183,12 @@ var (
 		DynamicDWCategory: SDynamicDWCategory,
 	}
 )
+
+// Exchanges all keys with their associated values in a map
+func flipMap(m map[Category]string) map[string]Category {
+	fm := make(map[string]Category, len(m))
+	for c, url := range m {
+		fm[url] = c
+	}
+	return fm
+}
