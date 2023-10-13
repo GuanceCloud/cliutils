@@ -114,7 +114,7 @@ func TestAgg(t *testing.T) {
 						}
 						pt := ptsLi[cat][bukName][0]
 						f := pt.InfluxFields()
-						tags := pt.InfluxTags()
+						tags := pt.MapTags()
 						if _, ok := f[k]; ok {
 							assert.Equal(t, v, f[k])
 						} else if _, ok := tags[k]; ok {

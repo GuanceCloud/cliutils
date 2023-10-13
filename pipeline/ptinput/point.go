@@ -339,8 +339,6 @@ func WrapPoint(cat point.Category, pt *point.Point) PlInputPt {
 		return nil
 	}
 
-	tags := pt.InfluxTags()
-	fields := pt.InfluxFields()
-
-	return NewPlPoint(cat, pt.Name(), tags, fields, pt.Time())
+	return NewPlPoint(cat, pt.Name(),
+		pt.MapTags(), pt.InfluxFields(), pt.Time())
 }

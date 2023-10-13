@@ -216,7 +216,7 @@ func BenchmarkScript(b *testing.B) {
 			b.Fatal("script == nil")
 		}
 		for i := 0; i < b.N; i++ {
-			p := ptinput.NewPlPoint(point.Logging, pt.Name(), pt.InfluxTags(), pt.InfluxFields(), pt.Time())
+			p := ptinput.WrapPoint(point.Logging, pt)
 			if err := runtime.RunScriptWithRMapIn(sp, p, nil); err != nil {
 				b.Fatal(err)
 			}
@@ -236,7 +236,7 @@ func BenchmarkScript(b *testing.B) {
 			b.Fatal("script == nil")
 		}
 		for i := 0; i < b.N; i++ {
-			p := ptinput.NewPlPoint(point.Logging, pt.Name(), pt.InfluxTags(), pt.InfluxFields(), pt.Time())
+			p := ptinput.WrapPoint(point.Logging, pt)
 			if err := runtime.RunScriptWithRMapIn(sp, p, nil); err != nil {
 				b.Fatal(err)
 			}
@@ -257,7 +257,7 @@ func BenchmarkScript(b *testing.B) {
 			b.Fatal("script == nil")
 		}
 		for i := 0; i < b.N; i++ {
-			p := ptinput.NewPlPoint(point.Logging, pt.Name(), pt.InfluxTags(), pt.InfluxFields(), pt.Time())
+			p := ptinput.WrapPoint(point.Logging, pt)
 			if err := runtime.RunScriptWithRMapIn(sp, p, nil); err != nil {
 				b.Fatal(err)
 			}
@@ -277,7 +277,7 @@ func BenchmarkScript(b *testing.B) {
 			b.Fatal("script == nil")
 		}
 		for i := 0; i < b.N; i++ {
-			p := ptinput.NewPlPoint(point.Logging, pt.Name(), pt.InfluxTags(), pt.InfluxFields(), pt.Time())
+			p := ptinput.WrapPoint(point.Logging, pt)
 			if err := runtime.RunScriptWithRMapIn(sp, p, nil); err != nil {
 				b.Fatal(err)
 			}
@@ -298,7 +298,7 @@ func BenchmarkScript(b *testing.B) {
 			b.Fatal("script == nil")
 		}
 		for i := 0; i < b.N; i++ {
-			p := ptinput.NewPlPoint(point.Logging, pt.Name(), pt.InfluxTags(), pt.InfluxFields(), pt.Time())
+			p := ptinput.WrapPoint(point.Logging, pt)
 			if err := sp.Run(p, nil, &manager.Option{}); err != nil {
 				b.Fatal(err)
 			}
