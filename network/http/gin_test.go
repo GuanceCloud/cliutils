@@ -6,14 +6,43 @@
 package http
 
 import (
+	"bytes"
+	"compress/gzip"
+	"crypto/md5"
+	"encoding/hex"
+	"fmt"
 	"github.com/GuanceCloud/cliutils/testutil"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+const testText = `观测云提供的系统全链路可观测解决方案，
+可实现从底层基础设施到通用技术组件，
+再到业务应用系统的全链路可观测，
+将不可预知性变为确定已知性。
+观测云提供快速实现系统可观测的解决方案，满足云、云原生、应用和业务上的监测需求。
+通过自定义监测方案，实现实时可交互仪表板、高效观测基础设施、全链路应用性能可观测等功能，保障系统稳定性
+观测云、全链路可观测、实时监测、自定义监测、云原生
+观测云提供的系统全链路可观测解决方案，
+可实现从底层基础设施到通用技术组件，
+再到业务应用系统的全链路可观测，
+将不可预知性变为确定已知性。
+观测云提供快速实现系统可观测的解决方案，满足云、云原生、应用和业务上的监测需求。
+通过自定义监测方案，实现实时可交互仪表板、高效观测基础设施、全链路应用性能可观测等功能，保障系统稳定性
+观测云、全链路可观测、实时监测、自定义监测、云原生
+观测云提供的系统全链路可观测解决方案，
+可实现从底层基础设施到通用技术组件，
+再到业务应用系统的全链路可观测，
+将不可预知性变为确定已知性。
+观测云提供快速实现系统可观测的解决方案，满足云、云原生、应用和业务上的监测需求。
+通过自定义监测方案，实现实时可交互仪表板、高效观测基础设施、全链路应用性能可观测等功能，保障系统稳定性
+观测云、全链路可观测、实时监测、自定义监测、云原生
+`
 
 func BenchmarkAllMiddlewares(b *testing.B) {
 	cases := []struct {
@@ -199,4 +228,138 @@ func TestMiddlewares(t *testing.T) {
 		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 	}
+}
+
+func TestNewHashReader(t *testing.T) {
+	src := []byte(testText)
+
+	r := NewReaderWithHash(bytes.NewReader(src), md5.New())
+
+	all, err := io.ReadAll(r)
+	testutil.Ok(t, err)
+	testutil.Equals(t, src, all)
+
+	md5Sum := md5.Sum(src)
+	s := r.Sum()
+
+	testutil.Equals(t, md5Sum[:], s)
+
+	fmt.Println(r.SumHex())
+	fmt.Println(hex.EncodeToString(md5Sum[:]))
+	testutil.Equals(t, hex.EncodeToString(md5Sum[:]), r.SumHex())
+}
+
+type testCase struct {
+	name            string
+	body            []byte
+	contentEncoding string
+}
+
+func TestGzipReadWithMD5(t *testing.T) {
+
+	gzipOut := &bytes.Buffer{}
+	gw := gzip.NewWriter(gzipOut)
+	_, err := gw.Write([]byte(testText))
+	testutil.Ok(t, err)
+	err = gw.Close()
+	testutil.Ok(t, err)
+
+	testCases := []testCase{
+		{
+			name:            "plain body",
+			body:            []byte(testText),
+			contentEncoding: "",
+		},
+		{
+			name:            "gzip body",
+			body:            gzipOut.Bytes(),
+			contentEncoding: "gzip",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			req1, err := http.NewRequest(http.MethodPost, "/", bytes.NewReader(tc.body))
+			testutil.Ok(t, err)
+			if tc.contentEncoding != "" {
+				req1.Header.Set("Content-Encoding", tc.contentEncoding)
+			}
+
+			req2, err := http.NewRequest(http.MethodPost, "/", bytes.NewReader(tc.body))
+			testutil.Ok(t, err)
+			if tc.contentEncoding != "" {
+				req2.Header.Set("Content-Encoding", tc.contentEncoding)
+			}
+
+			ginCtx := &gin.Context{Request: req1}
+			body1, sum1, err := GinReadWithMD5(ginCtx)
+			testutil.Ok(t, err)
+
+			body2, sum2, err := GzipReadWithMD5(req2)
+			testutil.Ok(t, err)
+
+			testutil.Equals(t, body1, body2)
+			testutil.Equals(t, sum1, sum2)
+
+		})
+	}
+}
+
+func BenchmarkGzipReadWithMD5(b *testing.B) {
+
+	text := strings.Repeat(testText, 100000)
+
+	gzipOut := &bytes.Buffer{}
+	gw := gzip.NewWriter(gzipOut)
+	_, err := gw.Write([]byte(text))
+	testutil.Ok(b, err)
+	err = gw.Close()
+	testutil.Ok(b, err)
+
+	sr := strings.NewReader(text)
+
+	b.Run("GinRead", func(t *testing.B) {
+		sr.Reset(text)
+
+		req, err := http.NewRequest(http.MethodPost, "/", sr)
+		testutil.Ok(t, err)
+
+		_, err = GinRead(&gin.Context{Request: req})
+		testutil.Ok(t, err)
+	})
+
+	b.Run("GzipRead", func(t *testing.B) {
+
+		sr.Reset(text)
+
+		req, err := http.NewRequest(http.MethodPost, "/", sr)
+		testutil.Ok(t, err)
+
+		_, err = GzipRead(req)
+		testutil.Ok(t, err)
+	})
+
+	b.Run("GinReadWithMD5", func(t *testing.B) {
+
+		req, err := http.NewRequest(http.MethodPost, "/", bytes.NewReader(gzipOut.Bytes()))
+		testutil.Ok(t, err)
+		req.Header.Set("Content-Encoding", "gzip")
+
+		body, _, err := GinReadWithMD5(&gin.Context{Request: req})
+		testutil.Ok(t, err)
+		testutil.Equals(t, string(body), text)
+	})
+
+	b.Run("GzipReadWithMD5", func(t *testing.B) {
+
+		req, err := http.NewRequest(http.MethodPost, "/", bytes.NewReader(gzipOut.Bytes()))
+		testutil.Ok(t, err)
+		req.Header.Set("Content-Encoding", "gzip")
+
+		body, _, err := GzipReadWithMD5(req)
+		testutil.Ok(t, err)
+		testutil.Equals(t, string(body), text)
+	})
+
 }

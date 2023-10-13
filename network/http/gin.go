@@ -6,10 +6,14 @@
 package http
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"crypto/md5" //nolint:gosec
+	"encoding/hex"
 	"fmt"
+	"hash"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -268,6 +272,7 @@ func RequestLoggerMiddleware(c *gin.Context) {
 		body[:len(body)%MaxRequestBodyLen]+"...")
 }
 
+// Deprecated, use GzipReadWithMD5 instead
 func GinReadWithMD5(c *gin.Context) (buf []byte, md5str string, err error) {
 	buf, err = readBody(c)
 	if err != nil {
@@ -283,6 +288,7 @@ func GinReadWithMD5(c *gin.Context) (buf []byte, md5str string, err error) {
 	return
 }
 
+// Deprecated, use GzipRead instead.
 func GinRead(c *gin.Context) (buf []byte, err error) {
 	buf, err = readBody(c)
 	if err != nil {
@@ -307,6 +313,106 @@ func GinGetArg(c *gin.Context, hdr, param string) (v string, err error) {
 	return
 }
 
+type ReaderWithHash struct {
+	r io.Reader
+	h hash.Hash
+}
+
+func NewReaderWithHash(r io.Reader, h hash.Hash) *ReaderWithHash {
+	return &ReaderWithHash{
+		r: r,
+		h: h,
+	}
+}
+
+func (h *ReaderWithHash) Read(p []byte) (int, error) {
+	n, err := h.r.Read(p)
+	if n > 0 {
+		_, we := h.h.Write(p[:n])
+		if we != nil {
+			return n, fmt.Errorf("unable to write data to hasher: %w", we)
+		}
+	}
+	return n, err
+}
+
+func (h *ReaderWithHash) Sum() []byte {
+	return h.h.Sum(nil)
+}
+
+func (h *ReaderWithHash) SumHex() string {
+	return hex.EncodeToString(h.Sum())
+}
+
+func (h *ReaderWithHash) Close() error {
+	return nil
+}
+
+func gzipReadMD5AndClose(req *http.Request, md5Sum bool, closeBody bool) ([]byte, string, error) {
+
+	var (
+		rc io.ReadCloser
+		rh *ReaderWithHash
+	)
+
+	rc = req.Body
+	if closeBody {
+		defer req.Body.Close()
+	}
+
+	if md5Sum {
+		rh = NewReaderWithHash(rc, md5.New())
+		defer rh.Close()
+		rc = rh
+	}
+
+	// as an HTTP server, we do not need to close the Body
+	switch req.Header.Get("Content-Encoding") {
+	case "gzip":
+		bufReader := bufio.NewReader(rc)
+		magic, err := bufReader.Peek(len(GzipMagic))
+		if err != nil {
+			return nil, "", fmt.Errorf("unable to peek 2 bytes from Body: %w", err)
+		}
+
+		if bytes.Compare(GzipMagic, magic) == 0 {
+			rc, err = gzip.NewReader(bufReader)
+			if err != nil {
+				return nil, "", fmt.Errorf("unable to init gzip reader: %w", err)
+			}
+			defer rc.Close()
+		} else {
+			l.Warnf(`illegal gzip format while Content-Encoding = gzip, magic %v expected, got %v`, GzipMagic, magic)
+			rc = io.NopCloser(bufReader)
+		}
+	}
+
+	body, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, "", fmt.Errorf("unable to successfully read: %w, bytes has read: %d, http Content-Length: %d", err, len(body), req.ContentLength)
+	}
+
+	if md5Sum && rh != nil {
+		return body, rh.SumHex(), nil
+	}
+
+	return body, "", nil
+
+}
+
+// GzipReadWithMD5 will automatically unzip the Request.Body and calculate its MD5 sum,
+// it WILL close the Request.Body on return.
+func GzipReadWithMD5(req *http.Request) ([]byte, string, error) {
+	return gzipReadMD5AndClose(req, true, true)
+}
+
+// GzipRead will automatically unzip the Request.Body, it WILL close the Request.Body on return.
+func GzipRead(req *http.Request) ([]byte, error) {
+	body, _, err := gzipReadMD5AndClose(req, false, true)
+	return body, err
+}
+
+// Deprecated, you should first consider using GzipRead or GzipReadWithMD5
 func Unzip(in []byte) (out []byte, err error) {
 	gzr, err := gzip.NewReader(bytes.NewBuffer(in))
 	if err != nil {
