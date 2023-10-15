@@ -7,6 +7,7 @@ package point
 
 import (
 	"math"
+	"sort"
 	"strings"
 
 	influxm "github.com/influxdata/influxdb1-client/models"
@@ -115,6 +116,9 @@ func (x KVs) InfluxTags() (res influxm.Tags) {
 			Value: []byte(kv.GetS()),
 		})
 	}
+
+	// keep tags sorted used to build lineprotocol text
+	sort.Sort(res)
 
 	return
 }
