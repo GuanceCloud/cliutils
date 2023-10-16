@@ -37,6 +37,7 @@ require (
 	github.com/oschwald/geoip2-golang v1.9.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/prometheus v0.46.0
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/spf13/cast v1.5.1
 	github.com/tidwall/gjson v1.17.0
 	github.com/vjeantet/grok v1.0.1
