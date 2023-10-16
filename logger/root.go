@@ -13,8 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
+	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
@@ -165,21 +165,10 @@ func InitCustomizeRoot(opt *Option) (*zap.Logger, error) {
 		MaxSize:  opt.MaxSize,
 		Compress: opt.Compress,
 	}
-	go func() {
-		next := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()+1, 0, 0, 0, 0, time.Local)
-		after := next.Unix() - time.Now().Unix() - 1
 
-		time.Sleep(time.Duration(after) * time.Second)
-		lumberLog.Rotate()
+	c := cron.New(cron.WithSeconds())
+	c.AddFunc("50 59 * * * *", func() { lumberLog.Rotate() })
+	c.Start()
 
-		ticker := time.NewTicker(24 * time.Hour)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				lumberLog.Rotate()
-			}
-		}
-	}()
 	return newOnlyMessageRootLogger(lumberLog)
 }
