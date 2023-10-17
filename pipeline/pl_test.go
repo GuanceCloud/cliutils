@@ -37,7 +37,6 @@ var rumTestPointDataWithoutAppID = []byte(`error,t2=tag2 f1=1.0,f2=2i,f3="abc"
 action,t1=tag1,t2=tag2 f1=1.0,f2=2i,f3="abc"`)
 
 func TestSCriptName(t *testing.T) {
-
 	kvs := point.NewTags(map[string]string{"service": "svc_name"})
 	kvs = append(kvs, point.NewKVs(map[string]interface{}{"message@json": "a"})...)
 	pt := point.NewPointV2("m_name",

@@ -20,14 +20,12 @@ import (
 	"github.com/hashicorp/go-retryablehttp"
 )
 
-var (
-	// _plReferTables PlReferTables
-	// _runner        = &Runner{
-	// 	initFinished: make(chan struct{}),
-	// }
+// _plReferTables PlReferTables
+// _runner        = &Runner{
+// 	initFinished: make(chan struct{}),
+// }
 
-	l = logger.DefaultSLogger("refer-table")
-)
+var l = logger.DefaultSLogger("refer-table")
 
 const (
 	SchemeHTTP  = "http"
@@ -163,7 +161,7 @@ func checkURL(tableURL string) (string, error) {
 	return scheme, nil
 }
 
-// InitFinished used to check init status
+// InitFinished used to check init status.
 func (refT *ReferTable) InitFinished(waitTime time.Duration) bool {
 	ticker := time.NewTicker(waitTime)
 
@@ -199,13 +197,13 @@ func (refT *ReferTable) PullWorker(ctx context.Context) {
 
 func (refT *ReferTable) getAndUpdate() error {
 	if tables, err := httpGet(refT.cli, refT.inConfig.URL); err != nil {
-		return fmt.Errorf("get table data from URL: %v", err)
+		return fmt.Errorf("get table data from URL: %w", err)
 	} else {
 		if refT.tables == nil {
 			return nil
 		}
 		if err := refT.tables.updateAll(tables); err != nil {
-			l.Errorf("failed to update tables: %v", err)
+			l.Errorf("failed to update tables: %w", err)
 		}
 	}
 

@@ -161,7 +161,7 @@ func TestGet(t *T.T) {
 		kvs = kvs.Add("d", []byte(`hello`), false, true)
 		kvs = kvs.Add("s", `hello`, false, true)
 
-		kvs = kvs.Add("arr", MustNewAny(MustNewArray([]any{1, 2.0, false})), false, true)
+		kvs = kvs.Add("arr", MustNewAnyArray(1, 2.0, false), false, true)
 		kvs = kvs.Add("map", MustNewAny(MustNewMap(map[string]any{"i": 1, "f": 3.14, "s": "world"})), false, true)
 
 		pt := NewPointV2("get", kvs)
@@ -496,7 +496,9 @@ line" 123`,
 			prec: NS,
 			pt: func() *Point {
 				var kvs KVs
-				kvs = kvs.Add("arr", MustNewAny(MustNewArray([]any{1, 3.14, 1.414, "hello"})), false, true)
+				kvs = kvs.Add("arr",
+					MustNewAnyArray(1, 3.14, 1.414, "hello"),
+					false, true)
 				pt := NewPointV2("abc", kvs, WithTime(time.Unix(0, 123)))
 
 				return pt
@@ -516,18 +518,31 @@ line" 123`,
 	}
 }
 
-func TestPBJson(t *T.T) {
+func TestPBJSON(t *T.T) {
 	t.Run("pbjson", func(t *T.T) {
-		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123, "f2": 3.14}))
+		pt := NewPointV2(`abc`, NewKVs(map[string]any{
+			"f1":        1234567890,
+			"f2":        3.14,
+			"d":         []byte("hello world"),
+			"int-arr":   MustNewIntArray([]int{1, 2, 3}...),
+			"mixed-arr": MustNewAnyArray(1, 2.0, "hello", false),
+		}))
 
 		pt.kvs = pt.kvs.MustAddTag(`t1`, `v1`).
-			MustAddKV(NewKV(`f2`, 3.14, WithKVUnit("kb"), WithKVType(MetricType_COUNT)))
+			MustAddKV(NewKV(`f3`, 1.414, WithKVUnit("kb"), WithKVType(MetricType_COUNT)))
 
 		j, _ := pt.PBJson()
-		t.Logf("%s", string(j))
+		t.Logf("raw: %s", string(j))
+
+		jpt := MustFromPBJson(j)
+
+		assert.True(t, pt.Equal(jpt))
 
 		j, _ = pt.PBJsonPretty()
-		t.Logf("%s", string(j))
+		t.Logf("pretty:\n%s", string(j))
+
+		jpt = MustFromPBJson(j)
+		assert.True(t, pt.Equal(jpt))
 	})
 }
 

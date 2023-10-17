@@ -18,7 +18,6 @@ import (
 )
 
 func whichStore(c *Manager, cat point.Category) *ScriptStore {
-
 	v, _ := c.whichStore(cat)
 	return v
 }

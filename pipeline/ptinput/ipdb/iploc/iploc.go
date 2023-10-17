@@ -21,9 +21,7 @@ import (
 
 var _ ipdb.IPdb = (*IPloc)(nil)
 
-var (
-	l = logger.DefaultSLogger("iploc")
-)
+var l = logger.DefaultSLogger("iploc")
 
 type DB interface {
 	Get_all(ipaddress string) (ip2location.IP2Locationrecord, error)

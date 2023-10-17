@@ -16,7 +16,8 @@ func TestAny(t *T.T) {
 	t.Run("basic", func(t *T.T) {
 		var kvs KVs
 
-		arr := MustNewArray([]any{1, 2, 3})
+		arr, err := NewArray(1, 2, 3)
+		assert.NoError(t, err)
 		assert.Len(t, arr.Arr, 3)
 
 		x, err := anypb.New(arr)
@@ -31,7 +32,8 @@ func TestAny(t *T.T) {
 	t.Run("mixed-array", func(t *T.T) {
 		var kvs KVs
 
-		arr := MustNewArray([]any{1, 2.0, false})
+		arr, err := NewArray(1, 2.0, false)
+		assert.NoError(t, err)
 		assert.Len(t, arr.Arr, 3)
 
 		x, err := anypb.New(arr)
@@ -46,7 +48,8 @@ func TestAny(t *T.T) {
 	t.Run("with-nil", func(t *T.T) {
 		var kvs KVs
 
-		arr := MustNewArray([]any{1, 2.0, nil})
+		arr, err := NewArray(1, 2.0, nil)
+		assert.NoError(t, err)
 		assert.Len(t, arr.Arr, 3)
 
 		x, err := anypb.New(arr)
@@ -91,7 +94,8 @@ func TestAny(t *T.T) {
 
 func TestAnyRaw(t *T.T) {
 	t.Run("arr", func(t *T.T) {
-		arr := MustNewArray([]any{1, 2.0})
+		arr, err := NewArray(1, 2.0)
+		assert.NoError(t, err)
 		assert.Len(t, arr.Arr, 2)
 
 		x, err := anypb.New(arr)

@@ -166,7 +166,14 @@ func InitCustomizeRoot(opt *Option) (*zap.Logger, error) {
 	}
 
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("50 59 * * * *", func() { lumberLog.Rotate() })
+	if _, err := c.AddFunc("50 59 * * * *",
+		func() {
+			if err := lumberLog.Rotate(); err != nil {
+				log.Printf("lumberLog.Rotate: %s, ignored", err.Error())
+			}
+		}); err != nil {
+		return nil, err
+	}
 	c.Start()
 
 	return newOnlyMessageRootLogger(lumberLog)

@@ -17,15 +17,13 @@ import (
 	"github.com/GuanceCloud/platypus/pkg/engine/runtime"
 )
 
-var (
-	pipelineDefaultCfg = &PipelineCfg{
-		IPdbType: "iploc",
-		IPdbAttr: map[string]string{
-			"iploc_file": "iploc.bin",
-			"isp_file":   "ip2isp.txt",
-		},
-	}
-)
+var pipelineDefaultCfg = &PipelineCfg{
+	IPdbType: "iploc",
+	IPdbAttr: map[string]string{
+		"iploc_file": "iploc.bin",
+		"isp_file":   "ip2isp.txt",
+	},
+}
 
 const (
 	TypIPLOC    = "iploc"

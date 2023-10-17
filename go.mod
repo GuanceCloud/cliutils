@@ -3,46 +3,43 @@ module github.com/GuanceCloud/cliutils
 go 1.19
 
 require (
+	github.com/DataDog/datadog-agent/pkg/obfuscate v0.47.1
+	github.com/GuanceCloud/grok v1.1.3
+	github.com/GuanceCloud/platypus v0.2.9
 	github.com/aliyun/aliyun-oss-go-sdk v2.1.2+incompatible
+	github.com/antchfx/xmlquery v1.3.18
+	github.com/araddon/dateparse v0.0.0-20201001162425-8aadafed4dc4
+	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/didip/tollbooth/v6 v6.1.2
 	github.com/gin-gonic/gin v1.9.0
 	github.com/go-ping/ping v1.1.0
 	github.com/gobwas/ws v1.1.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c
-	github.com/prometheus/client_model v0.4.0
-	github.com/prometheus/common v0.44.0
-	github.com/rs/xid v1.2.1
-	github.com/stretchr/testify v1.8.4
-	github.com/tidwall/wal v1.1.7
-	go.uber.org/zap v1.23.0
-	golang.org/x/net v0.12.0
-	golang.org/x/sys v0.10.0
-	gopkg.in/CodapeWild/dd-trace-go.v1 v1.35.17
-	gopkg.in/natefinch/lumberjack.v2 v2.0.0
-)
-
-require (
-	github.com/DataDog/datadog-agent/pkg/obfuscate v0.47.1
-	github.com/GuanceCloud/grok v1.1.3
-	github.com/GuanceCloud/platypus v0.2.9
-	github.com/antchfx/xmlquery v1.3.18
-	github.com/araddon/dateparse v0.0.0-20201001162425-8aadafed4dc4
-	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/hashicorp/go-retryablehttp v0.7.4
+	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c
 	github.com/influxdata/line-protocol/v2 v2.2.1
 	github.com/ip2location/ip2location-go v8.3.0+incompatible
 	github.com/itchyny/timefmt-go v0.1.5
 	github.com/mssola/user_agent v0.6.0
 	github.com/oschwald/geoip2-golang v1.9.0
 	github.com/prometheus/client_golang v1.16.0
+	github.com/prometheus/client_model v0.4.0
+	github.com/prometheus/common v0.44.0
 	github.com/prometheus/prometheus v0.46.0
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/rs/xid v1.2.1
 	github.com/spf13/cast v1.5.1
+	github.com/stretchr/testify v1.8.4
 	github.com/tidwall/gjson v1.17.0
+	github.com/tidwall/wal v1.1.7
 	github.com/vjeantet/grok v1.0.1
+	go.uber.org/zap v1.23.0
+	golang.org/x/net v0.12.0
+	golang.org/x/sys v0.10.0
 	golang.org/x/text v0.11.0
 	google.golang.org/protobuf v1.31.0
+	gopkg.in/CodapeWild/dd-trace-go.v1 v1.35.17
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	modernc.org/sqlite v1.25.0
 )
@@ -115,3 +112,5 @@ require (
 	modernc.org/strutil v1.1.3 // indirect
 	modernc.org/token v1.0.1 // indirect
 )
+
+replace github.com/influxdata/influxdb1-client => github.com/GuanceCloud/influxdb1-client v0.1.3

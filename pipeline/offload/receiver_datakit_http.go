@@ -111,7 +111,6 @@ func (recevier *DKRecver) Send(s uint64, cat point.Category, data []*point.Point
 	defer point.PutEncoder(enc)
 
 	dataList, err := enc.Encode(data)
-
 	if err != nil {
 		return err
 	}

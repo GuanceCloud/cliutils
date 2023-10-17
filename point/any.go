@@ -87,13 +87,23 @@ func AnyRaw(x *anypb.Any) (any, error) {
 	}
 }
 
-// MustNewArray wrapped ents into Array type, and panic if any error.
-func MustNewArray(ents []any) *Array {
-	x, err := NewArray(ents)
-	if err != nil {
+// MustNewAnyArray wrapped mix-basic-typed list into anypb.Any, and panic if any error.
+func MustNewAnyArray(a ...any) *anypb.Any {
+	if x, err := NewAnyArray(a...); err != nil {
 		panic(err.Error())
+	} else {
+		return x
 	}
-	return x
+}
+
+// NewAnyArray wrapped mix-basic-typed list into anypb.Any.
+func NewAnyArray(a ...any) (*anypb.Any, error) {
+	x, err := NewArray(a...)
+	if err != nil {
+		return nil, err
+	}
+
+	return anypb.New(x)
 }
 
 // MustNewIntArray wrapped signed int list into anypb.Any, and panic if any error.
@@ -208,7 +218,7 @@ func NewStringArray(s ...string) (*anypb.Any, error) {
 
 // NewArray create array value that can be used in point field.
 // The types within ents can be mixed basic types.
-func NewArray(ents []any) (arr *Array, err error) {
+func NewArray(ents ...any) (arr *Array, err error) {
 	arr = &Array{
 		Arr: make([]*BasicTypes, 0, len(ents)),
 	}

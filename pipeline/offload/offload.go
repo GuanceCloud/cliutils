@@ -21,9 +21,7 @@ const (
 	flushInterval = time.Second * 15
 )
 
-var (
-	l = logger.DefaultSLogger("pl-offload")
-)
+var l = logger.DefaultSLogger("pl-offload")
 
 func InitLog() {
 	l = logger.SLogger("pl-offload")

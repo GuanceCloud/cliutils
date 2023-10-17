@@ -199,7 +199,6 @@ func (e *Encoder) doEncode(pts []*Point) ([][]byte, error) {
 			curBytesBatchSize += pt.Size()
 
 			if curBytesBatchSize >= e.bytesSize {
-
 				payload, err := e.getPayload(batch)
 				if err != nil {
 					return nil, err
