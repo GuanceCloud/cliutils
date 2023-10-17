@@ -7,14 +7,12 @@ package dialtesting
 
 import (
 	"bytes"
-	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -23,473 +21,405 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var httpCases = []struct {
+func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struct {
 	t         *HTTPTask
 	fail      bool
 	reasonCnt int
-}{
-	{
-		fail:      false,
-		reasonCnt: 0,
-		t: &HTTPTask{
-			ExternalID: cliutils.XID("dtst_"),
-			Method:     "GET",
-			URL:        "https://localhost:54323/_test_no_resp",
-			Name:       "_test_no_resp",
-			Region:     "hangzhou",
-			Frequency:  "1s",
-			AdvanceOptions: &HTTPAdvanceOption{
-				Certificate: &HTTPOptCertificate{
-					IgnoreServerCertificateError: true,
-					PrivateKey:                   string(tlsData["key"]),
-					Certificate:                  string(tlsData["crt"]),
-				},
-				Secret: &HTTPSecret{
-					NoSaveResponseBody: true,
-				},
-			},
-
-			SuccessWhen: []*HTTPSuccess{
-				{
-					StatusCode: []*SuccessOption{
-						{Is: "200"},
+} {
+	return []struct {
+		t         *HTTPTask
+		fail      bool
+		reasonCnt int
+	}{
+		{
+			fail:      false,
+			reasonCnt: 0,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dtst_"),
+				Method:     "GET",
+				URL:        fmt.Sprintf("%s/_test_no_resp", httpsServer.URL),
+				Name:       "_test_no_resp",
+				Region:     "hangzhou",
+				Frequency:  "1s",
+				AdvanceOptions: &HTTPAdvanceOption{
+					Certificate: &HTTPOptCertificate{
+						IgnoreServerCertificateError: true,
+						PrivateKey:                   string(tlsData["key"]),
+						Certificate:                  string(tlsData["crt"]),
+					},
+					Secret: &HTTPSecret{
+						NoSaveResponseBody: true,
 					},
 				},
-			},
-		},
-	},
 
-	// test dial with certificate
-	{
-		fail:      false,
-		reasonCnt: 0,
-		t: &HTTPTask{
-			ExternalID: cliutils.XID("dtst_"),
-			Method:     "GET",
-			URL:        "https://localhost:54323/_test_with_cert",
-			Name:       "_test_with_cert",
-			Region:     "hangzhou",
-			Frequency:  "1s",
-			AdvanceOptions: &HTTPAdvanceOption{
-				Certificate: &HTTPOptCertificate{
-					IgnoreServerCertificateError: true,
-					PrivateKey:                   string(tlsData["key"]),
-					Certificate:                  string(tlsData["crt"]),
-				},
-			},
-
-			SuccessWhen: []*HTTPSuccess{
-				{
-					StatusCode: []*SuccessOption{
-						{Is: "200"},
-					},
-				},
-			},
-		},
-	},
-	{
-		fail:      true,
-		reasonCnt: 0,
-		t: &HTTPTask{
-			ExternalID: cliutils.XID("dtst_"),
-			Method:     "GET",
-			URL:        "https://localhost:54323/_test_with_cert",
-			Name:       "_test_with_cert",
-			Region:     "hangzhou",
-			Frequency:  "1s",
-			AdvanceOptions: &HTTPAdvanceOption{
-				Certificate: &HTTPOptCertificate{
-					IgnoreServerCertificateError: false, // bad certificate, expect fail
-					PrivateKey:                   string(tlsData["key"]),
-					Certificate:                  string(tlsData["crt"]),
-				},
-			},
-
-			SuccessWhen: []*HTTPSuccess{
-				{
-					StatusCode: []*SuccessOption{
-						{Is: "200"},
-					},
-				},
-			},
-		},
-	},
-
-	// test dial with proxy
-	{
-		fail:      false,
-		reasonCnt: 0,
-		t: &HTTPTask{
-			ExternalID: cliutils.XID("dtst_"),
-			Method:     "POST",
-			URL:        "http://localhost:54321/_test_with_proxy",
-			Name:       "_test_with_proxy",
-			Region:     "hangzhou",
-			Frequency:  "1s",
-			AdvanceOptions: &HTTPAdvanceOption{
-				Proxy: &HTTPOptProxy{
-					URL:     "http://localhost:54322",
-					Headers: map[string]string{"X-proxy-header": "proxy-foo"},
-				},
-			},
-
-			SuccessWhen: []*HTTPSuccess{
-				{
-					StatusCode: []*SuccessOption{
-						{Is: "200"},
-					},
-				},
-			},
-		},
-	},
-
-	// test dial with body
-	{
-		fail:      true,
-		reasonCnt: 0,
-		t: &HTTPTask{
-			ExternalID: cliutils.XID("dtst_"),
-			Method:     "POST",
-			URL:        "http://localhost:54321/_test_with_body",
-			Name:       "_test_with_body",
-			Region:     "hangzhou",
-			Frequency:  "1s",
-			AdvanceOptions: &HTTPAdvanceOption{
-				RequestBody: &HTTPOptBody{
-					BodyType: "application/unknown", // XXX: invalid body type
-					Body:     `{"key": "value"}`,
-				},
-			},
-
-			SuccessWhen: []*HTTPSuccess{
-				{
-					StatusCode: []*SuccessOption{
-						{Is: "200"},
-					},
-				},
-			},
-		},
-	},
-
-	{
-		reasonCnt: 0,
-		t: &HTTPTask{
-			ExternalID: cliutils.XID("dtst_"),
-			Method:     "POST",
-			URL:        "http://localhost:54321/_test_with_body",
-			Name:       "_test_with_body",
-			Region:     "hangzhou",
-			Frequency:  "1s",
-			AdvanceOptions: &HTTPAdvanceOption{
-				RequestBody: &HTTPOptBody{
-					BodyType: "None", // "application/json",
-					Body:     `{"key": "value"}`,
-				},
-			},
-
-			SuccessWhen: []*HTTPSuccess{
-				{
-					StatusCode: []*SuccessOption{
-						{Is: "200"},
-					},
-				},
-			},
-		},
-	},
-
-	// test dial with headers
-	{
-		reasonCnt: 0,
-		t: &HTTPTask{
-			ExternalID: cliutils.XID("dtst_"),
-			Method:     "GET",
-			URL:        "http://localhost:54321/_test_with_headers",
-			Name:       "_test_with_headers",
-			Region:     "hangzhou",
-			Frequency:  "1s",
-			AdvanceOptions: &HTTPAdvanceOption{
-				RequestOptions: &HTTPOptRequest{
-					Headers: map[string]string{
-						"X-Header-1": "foo",
-						"X-Header-2": "bar",
-					},
-				},
-			},
-
-			SuccessWhen: []*HTTPSuccess{
-				{
-					StatusCode: []*SuccessOption{
-						{Is: "200"},
-					},
-				},
-			},
-		},
-	},
-
-	// test dial with auth
-	{
-		reasonCnt: 0,
-		t: &HTTPTask{
-			ExternalID: cliutils.XID("dtst_"),
-			Method:     "GET",
-			URL:        "http://localhost:54321/_test_with_basic_auth",
-			Name:       "_test_with_basic_auth",
-			Region:     "hangzhou",
-			Frequency:  "1s",
-			AdvanceOptions: &HTTPAdvanceOption{
-				RequestOptions: &HTTPOptRequest{
-					Auth: &HTTPOptAuth{
-						Username: "foo",
-						Password: "bar",
-					},
-				},
-			},
-
-			SuccessWhen: []*HTTPSuccess{
-				{
-					StatusCode: []*SuccessOption{
-						{Is: "200"},
-					},
-				},
-			},
-		},
-	},
-
-	// test dial with cookie
-	{
-		reasonCnt: 0,
-		t: &HTTPTask{
-			ExternalID: cliutils.XID("dtst_"),
-			Method:     "GET",
-			URL:        "http://localhost:54321/_test_with_cookie",
-			Name:       "_test_with_cookie",
-			Region:     "hangzhou",
-			Frequency:  "1s",
-			AdvanceOptions: &HTTPAdvanceOption{
-				RequestOptions: &HTTPOptRequest{
-					Cookies: (&http.Cookie{
-						Name:   "_test_with_cookie",
-						Value:  "foo-bar",
-						MaxAge: 0,
-						Secure: true,
-					}).String(),
-				},
-			},
-
-			SuccessWhen: []*HTTPSuccess{
-				{
-					StatusCode: []*SuccessOption{
-						{Is: "200"},
-					},
-				},
-			},
-		},
-	},
-
-	// test dial for redirect
-	{
-		reasonCnt: 0,
-		t: &HTTPTask{
-			ExternalID: cliutils.XID("dtst_"),
-			Method:     "GET",
-			URL:        "http://localhost:54321/_test_redirect",
-			Name:       "_test_redirect",
-			Region:     "hangzhou",
-			Frequency:  "1s",
-			AdvanceOptions: &HTTPAdvanceOption{
-				RequestOptions: &HTTPOptRequest{FollowRedirect: true},
-			},
-
-			SuccessWhen: []*HTTPSuccess{
-				{
-					StatusCode: []*SuccessOption{
-						{Is: "200"}, // allow redirect, should be 200
-					},
-				},
-			},
-		},
-	},
-
-	{
-		reasonCnt: 0,
-		t: &HTTPTask{
-			ExternalID: cliutils.XID("dtst_"),
-			Method:     "GET",
-			URL:        "http://localhost:54321/_test_redirect",
-			Name:       "_test_redirect_disabled",
-			Region:     "hangzhou",
-			Frequency:  "1s",
-			AdvanceOptions: &HTTPAdvanceOption{
-				RequestOptions: &HTTPOptRequest{FollowRedirect: false},
-			},
-
-			SuccessWhen: []*HTTPSuccess{
-				{
-					StatusCode: []*SuccessOption{
-						{Is: "302"}, // disabled redirect, should be 302
-					},
-				},
-			},
-		},
-	},
-
-	// test dial with response time checking
-	{
-		reasonCnt: 1,
-		t: &HTTPTask{
-			ExternalID: cliutils.XID("dialt_"),
-			Method:     "GET",
-			URL:        "http://localhost:54321/_test_resp_time_less_10ms",
-			Name:       "_test_resp_time_less_10ms",
-			Frequency:  "1s",
-			Region:     "hangzhou",
-			SuccessWhen: []*HTTPSuccess{
-				{ResponseTime: "10ms"},
-			},
-		},
-	},
-
-	// test dial with response headers
-	{
-		reasonCnt: 2,
-		t: &HTTPTask{
-			ExternalID: cliutils.XID("dtst_"),
-			Method:     "GET",
-			URL:        "http://localhost:54321/_test_header_checking",
-			Name:       "_test_header_checking",
-			Region:     "hangzhou",
-			Frequency:  "1s",
-			SuccessWhen: []*HTTPSuccess{
-				{
-					Header: map[string][]*SuccessOption{
-						"Cache-Control": {
-							{MatchRegex: `max-ag=\d`}, // expect fail: max-age
-						},
-						"Server": {
-							{Is: `Apache`}, // expect fail
-						},
-
-						"Date": {
-							{Contains: "GMT"}, // ok: Date always use GMT
-						},
-						"NotExistHeader1": {
-							{NotMatchRegex: `.+`}, // ok
-						},
-						"NotExistHeader2": {
-							{IsNot: `abc`}, // ok
-						},
-						"NotExistHeader3": {
-							{NotContains: `def`}, // ok
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{Is: "200"},
 						},
 					},
 				},
 			},
 		},
-	},
-}
 
-func prepareSSL(t *testing.T) {
-	t.Helper()
-	for k, v := range tlsData {
-		if err := ioutil.WriteFile("."+k+".pem", v, 0o644); err != nil {
-			t.Error(err)
-		}
-	}
-}
+		// test dial with certificate
+		{
+			fail:      false,
+			reasonCnt: 0,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dtst_"),
+				Method:     "GET",
+				URL:        fmt.Sprintf("%s/_test_with_cert", httpsServer.URL),
+				Name:       "_test_with_cert",
+				Region:     "hangzhou",
+				Frequency:  "1s",
+				AdvanceOptions: &HTTPAdvanceOption{
+					Certificate: &HTTPOptCertificate{
+						IgnoreServerCertificateError: true,
+						PrivateKey:                   string(tlsData["key"]),
+						Certificate:                  string(tlsData["crt"]),
+					},
+				},
 
-func cleanTLSData() {
-	for k := range tlsData {
-		os.Remove("." + k + ".pem") //nolint:errcheck
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{Is: "200"},
+						},
+					},
+				},
+			},
+		},
+		{
+			fail:      true,
+			reasonCnt: 0,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dtst_"),
+				Method:     "GET",
+				URL:        fmt.Sprintf("%s/_test_with_cert", httpsServer.URL),
+				Name:       "_test_with_cert",
+				Region:     "hangzhou",
+				Frequency:  "1s",
+				AdvanceOptions: &HTTPAdvanceOption{
+					Certificate: &HTTPOptCertificate{
+						IgnoreServerCertificateError: false, // bad certificate, expect fail
+						PrivateKey:                   string(tlsData["key"]),
+						Certificate:                  string(tlsData["crt"]),
+					},
+				},
+
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{Is: "200"},
+						},
+					},
+				},
+			},
+		},
+
+		// test dial with proxy
+		{
+			fail:      false,
+			reasonCnt: 0,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dtst_"),
+				Method:     "POST",
+				URL:        fmt.Sprintf("%s/_test_with_proxy", httpServer.URL),
+				Name:       "_test_with_proxy",
+				Region:     "hangzhou",
+				Frequency:  "1s",
+				AdvanceOptions: &HTTPAdvanceOption{
+					Proxy: &HTTPOptProxy{
+						URL:     proxyServer.URL,
+						Headers: map[string]string{"X-proxy-header": "proxy-foo"},
+					},
+				},
+
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{Is: "200"},
+						},
+					},
+				},
+			},
+		},
+
+		// test dial with body
+		{
+			fail:      true,
+			reasonCnt: 0,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dtst_"),
+				Method:     "POST",
+				URL:        fmt.Sprintf("%s/_test_with_body", httpServer.URL),
+				Name:       "_test_with_body",
+				Region:     "hangzhou",
+				Frequency:  "1s",
+				AdvanceOptions: &HTTPAdvanceOption{
+					RequestBody: &HTTPOptBody{
+						BodyType: "application/unknown", // XXX: invalid body type
+						Body:     `{"key": "value"}`,
+					},
+				},
+
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{Is: "200"},
+						},
+					},
+				},
+			},
+		},
+
+		{
+			reasonCnt: 0,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dtst_"),
+				Method:     "POST",
+				URL:        fmt.Sprintf("%s/_test_with_body", httpServer.URL),
+				Name:       "_test_with_body",
+				Region:     "hangzhou",
+				Frequency:  "1s",
+				AdvanceOptions: &HTTPAdvanceOption{
+					RequestBody: &HTTPOptBody{
+						BodyType: "None", // "application/json",
+						Body:     `{"key": "value"}`,
+					},
+				},
+
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{Is: "200"},
+						},
+					},
+				},
+			},
+		},
+
+		// test dial with headers
+		{
+			reasonCnt: 0,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dtst_"),
+				Method:     "GET",
+				URL:        fmt.Sprintf("%s/_test_with_headers", httpServer.URL),
+				Name:       "_test_with_headers",
+				Region:     "hangzhou",
+				Frequency:  "1s",
+				AdvanceOptions: &HTTPAdvanceOption{
+					RequestOptions: &HTTPOptRequest{
+						Headers: map[string]string{
+							"X-Header-1": "foo",
+							"X-Header-2": "bar",
+						},
+					},
+				},
+
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{Is: "200"},
+						},
+					},
+				},
+			},
+		},
+
+		// test dial with auth
+		{
+			reasonCnt: 0,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dtst_"),
+				Method:     "GET",
+				URL:        fmt.Sprintf("%s/_test_with_basic_auth", httpServer.URL),
+				Name:       "_test_with_basic_auth",
+				Region:     "hangzhou",
+				Frequency:  "1s",
+				AdvanceOptions: &HTTPAdvanceOption{
+					RequestOptions: &HTTPOptRequest{
+						Auth: &HTTPOptAuth{
+							Username: "foo",
+							Password: "bar",
+						},
+					},
+				},
+
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{Is: "200"},
+						},
+					},
+				},
+			},
+		},
+
+		// test dial with cookie
+		{
+			reasonCnt: 0,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dtst_"),
+				Method:     "GET",
+				URL:        fmt.Sprintf("%s/_test_with_cookie", httpServer.URL),
+				Name:       "_test_with_cookie",
+				Region:     "hangzhou",
+				Frequency:  "1s",
+				AdvanceOptions: &HTTPAdvanceOption{
+					RequestOptions: &HTTPOptRequest{
+						Cookies: (&http.Cookie{
+							Name:   "_test_with_cookie",
+							Value:  "foo-bar",
+							MaxAge: 0,
+							Secure: true,
+						}).String(),
+					},
+				},
+
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{Is: "200"},
+						},
+					},
+				},
+			},
+		},
+
+		// test dial for redirect
+		{
+			reasonCnt: 0,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dtst_"),
+				Method:     "GET",
+				URL:        fmt.Sprintf("%s/_test_redirect", httpServer.URL),
+				Name:       "_test_redirect",
+				Region:     "hangzhou",
+				Frequency:  "1s",
+				AdvanceOptions: &HTTPAdvanceOption{
+					RequestOptions: &HTTPOptRequest{FollowRedirect: true},
+				},
+
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{Is: "200"}, // allow redirect, should be 200
+						},
+					},
+				},
+			},
+		},
+
+		{
+			reasonCnt: 0,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dtst_"),
+				Method:     "GET",
+				URL:        fmt.Sprintf("%s/_test_redirect", httpServer.URL),
+				Name:       "_test_redirect_disabled",
+				Region:     "hangzhou",
+				Frequency:  "1s",
+				AdvanceOptions: &HTTPAdvanceOption{
+					RequestOptions: &HTTPOptRequest{FollowRedirect: false},
+				},
+
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{Is: "302"}, // disabled redirect, should be 302
+						},
+					},
+				},
+			},
+		},
+
+		// test dial with response time checking
+		{
+			reasonCnt: 1,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dialt_"),
+				Method:     "GET",
+				URL:        fmt.Sprintf("%s/_test_resp_time_less_10ms", httpServer.URL),
+				Name:       "_test_resp_time_less_10ms",
+				Frequency:  "1s",
+				Region:     "hangzhou",
+				SuccessWhen: []*HTTPSuccess{
+					{ResponseTime: "10ms"},
+				},
+			},
+		},
+
+		// test dial with response headers
+		{
+			reasonCnt: 2,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dtst_"),
+				Method:     "GET",
+				URL:        fmt.Sprintf("%s/_test_resp_time_less_10ms", httpServer.URL),
+				Name:       "_test_header_checking",
+				Region:     "hangzhou",
+				Frequency:  "1s",
+				SuccessWhen: []*HTTPSuccess{
+					{
+						Header: map[string][]*SuccessOption{
+							"Cache-Control": {
+								{MatchRegex: `max-ag=\d`}, // expect fail: max-age
+							},
+							"Server": {
+								{Is: `Apache`}, // expect fail
+							},
+
+							"Date": {
+								{Contains: "GMT"}, // ok: Date always use GMT
+							},
+							"NotExistHeader1": {
+								{NotMatchRegex: `.+`}, // ok
+							},
+							"NotExistHeader2": {
+								{IsNot: `abc`}, // ok
+							},
+							"NotExistHeader3": {
+								{NotContains: `def`}, // ok
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
 func TestDialHTTP(t *testing.T) {
-	stopserver := make(chan interface{})
-
-	defer close(stopserver)
-	defer cleanTLSData()
-
-	httpServer := func(bind string, https bool) {
+	createServer := func(proxyServer *httptest.Server, isHttps bool) *httptest.Server {
 		gin.SetMode(gin.ReleaseMode)
 
 		r := gin.New()
 		gin.DisableConsoleColor()
 		r.Use(gin.Recovery())
 
-		addTestingRoutes(t, r, https)
+		addTestingRoutes(t, r, proxyServer, isHttps)
 
-		// start HTTP server
-		srv := &http.Server{
-			Addr:    bind,
-			Handler: r,
-		}
-
-		if https {
-			prepareSSL(t)
-			go func() {
-				if err := srv.ListenAndServeTLS(".crt.pem", ".key.pem"); err != nil {
-					t.Errorf("ListenAndServeTLS(): %s", err)
-				}
-			}()
+		if isHttps {
+			return httptest.NewTLSServer(r)
 		} else {
-			go func() {
-				if err := srv.ListenAndServe(); err != nil {
-					t.Logf("ListenAndServe(): %s", err)
-				}
-			}()
+			return httptest.NewServer(r)
 		}
-
-		<-stopserver
-		_ = srv.Shutdown(context.Background())
 	}
 
-	go proxyServer(t)
-	go httpServer("localhost:54321", false) // http server
-	go httpServer("localhost:54323", true)  // https server
+	proxyServer := proxyServer(t)
+	httpServer := createServer(proxyServer, false) // http server
+	httpsServer := createServer(proxyServer, true) // https server
 
-	time.Sleep(time.Second) // wait servers ok
+	defer httpServer.Close()
+	defer httpsServer.Close()
+	defer proxyServer.Close()
 
-	for i, c := range httpCases {
-		if i != 0 {
-			continue
-		}
+	httpCases := getHttpCases(httpServer, httpsServer, proxyServer)
 
-		data := `{
-			"external_id": "dial_4ee6469fdbff4bc6bf0d645ed1f46f9a",
-			"name": "new",
-			"access_key": "tfAA3qeo5AOB2kEflcZA",
-			"method": "GET",
-			"url": "https://www.baidu.com",
-			"post_url": "http://testing-openway.cloudcare.cn?token=tkn_2dc438b6693711eb8ff97aeee04b54af",
-			"status": "OK",
-			"frequency": "1m",
-			"region": "reg_c2q9vei9f5ko9nfi2vm0",
-			"owner_external_id": "ak_c1imts73q2c335d71cn0-wksp_2dc431d6693711eb8ff97aeee04b54af",
-			"success_when": [
-			  {
-				"status_code": [
-				  {
-					"is": "200"
-				  }
-				]
-			  }
-			],
-			"advance_options": {
-			  "request_options": {
-				"auth": {}
-			  },
-			  "request_body": {},
-			  "secret": {}
-			},
-			"update_time": 1622728655503709
-		  }`
-
-		err := json.Unmarshal([]byte(data), c.t)
-		if err != nil {
-			t.Logf("error: %s", err.Error())
-			return
-		}
-
+	for _, c := range httpCases {
 		if err := c.t.Init(); err != nil {
 			if c.fail == false {
 				t.Errorf("case %s failed: %s", c.t.Name, err)
@@ -510,8 +440,6 @@ func TestDialHTTP(t *testing.T) {
 
 		ts, fs := c.t.GetResults()
 
-		// data, _ := json.Marshal(c.t)
-		// t.Logf("ts: %+#v \n fs: %+#v \n task: %+#v\n  %s", ts, fs, c.t, string(data))
 		t.Logf("ts: %+#v \n fs: %+#v \n ", ts, fs)
 
 		reasons, _ := c.t.CheckResult()
@@ -525,19 +453,16 @@ func TestDialHTTP(t *testing.T) {
 	}
 }
 
-func proxyServer(t *testing.T) {
+func proxyServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	http.HandleFunc("/_test_with_proxy", func(w http.ResponseWriter, req *http.Request) {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		t.Logf("proxied request coming")
 		for k := range req.Header {
 			t.Logf("proxied header: %s: %s", k, req.Header.Get(k))
 		}
 
 		fmt.Fprintf(w, "ok")
-	})
-	if err := http.ListenAndServe("localhost:54322", nil); err != nil {
-		t.Logf("ListenAndServe(): %s", err)
-	}
+	}))
 }
 
 func proxyHandler(t *testing.T, target string) gin.HandlerFunc {
@@ -549,8 +474,8 @@ func proxyHandler(t *testing.T, target string) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
-		director := func(req *http.Request) { //nolint:staticcheck
-			req = c.Request //nolint: staticcheck
+		director := func(_ *http.Request) {
+			req := c.Request
 
 			req.URL.Scheme = remote.Scheme
 			req.URL.Host = remote.Host
@@ -634,7 +559,7 @@ HHrpiTXtbrUfbKX2TEk3DSevJ9EZEuewxALtsaRQgX4WyHlxpYDXNSjag04Nn+/x
 -----END PRIVATE KEY-----`),
 }
 
-func addTestingRoutes(t *testing.T, r *gin.Engine, https bool) {
+func addTestingRoutes(t *testing.T, r *gin.Engine, proxyServer *httptest.Server, isHttps bool) {
 	t.Helper()
 	r.GET("/_test_resp_time_less_10ms", func(c *gin.Context) {
 		time.Sleep(time.Millisecond * 11)
@@ -702,9 +627,9 @@ func addTestingRoutes(t *testing.T, r *gin.Engine, https bool) {
 	})
 
 	r.GET("/_test_with_proxy",
-		proxyHandler(t, "http://localhost:54322/_test_with_proxy" /*url must be the same*/))
+		proxyHandler(t, fmt.Sprintf("%s/_test_with_proxy", proxyServer.URL)))
 
-	if https {
+	if isHttps {
 		r.GET("/_test_with_cert", func(c *gin.Context) {
 			t.Logf("request tls: %+#v", c.Request.TLS)
 			c.Data(http.StatusOK, ``, nil)
