@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -107,7 +106,7 @@ func TestJsonLogging(t *testing.T) {
 	showLog(opt.Path)
 
 	// check json elements
-	j, err := ioutil.ReadFile(opt.Path)
+	j, err := os.ReadFile(opt.Path)
 	if err != nil {
 		t.Error(err)
 	}
@@ -396,7 +395,6 @@ func TestInitRoot(t *testing.T) {
 }
 
 func TestRotateOnDevNull(t *testing.T) {
-
 	MaxSize = 1 // set to 1MB
 
 	opt := &Option{
@@ -423,7 +421,7 @@ func TestRotateOnDevNull(t *testing.T) {
 
 //nolint:forbidigo
 func showLog(f string) {
-	logdata, err := ioutil.ReadFile(f)
+	logdata, err := os.ReadFile(f)
 	if err != nil {
 		panic(err)
 	}
@@ -433,7 +431,7 @@ func showLog(f string) {
 }
 
 func colorExits(f string) bool {
-	logdata, err := ioutil.ReadFile(f)
+	logdata, err := os.ReadFile(f)
 	if err != nil {
 		panic(err)
 	}
@@ -443,7 +441,7 @@ func colorExits(f string) bool {
 }
 
 func logLines(f string) int {
-	logdata, err := ioutil.ReadFile(f)
+	logdata, err := os.ReadFile(f)
 	if err != nil {
 		panic(fmt.Sprintf("ReadFile(%s) failed: %s", f, err))
 	}

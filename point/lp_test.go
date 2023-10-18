@@ -177,7 +177,7 @@ func TestNewLPPoint(t *testing.T) {
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
 			warns:  1,
 			opts: []Option{
-				WithDisabledKeys(NewKey([]byte(`f1`), KeyType_I)),
+				WithDisabledKeys(NewKey(`f1`, KeyType_I)),
 				WithTime(time.Unix(0, 123)),
 			},
 			expect: "abc,t1=abc,t2=32 f2=32i,f3=32i 123",
@@ -189,7 +189,7 @@ func TestNewLPPoint(t *testing.T) {
 			fields: map[string]interface{}{"f1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
 			opts: []Option{
-				WithDisabledKeys(NewTagKey([]byte(`t2`), nil)),
+				WithDisabledKeys(NewTagKey(`t2`, "")),
 				WithTime(time.Unix(0, 123)),
 			},
 
@@ -216,6 +216,7 @@ func TestNewLPPoint(t *testing.T) {
 				WithTime(time.Unix(0, 123)),
 				WithMaxTags(2),
 				WithMaxFields(1),
+				WithKeySorted(true),
 				WithExtraTags(map[string]string{
 					"etag1": "1",
 					"etag2": "2",
@@ -235,6 +236,7 @@ func TestNewLPPoint(t *testing.T) {
 			opts: []Option{
 				WithTime(time.Unix(0, 123)),
 				WithMaxTags(2),
+				WithKeySorted(true),
 				WithExtraTags(map[string]string{
 					"etag1": "1",
 					"etag2": "2",
@@ -281,7 +283,7 @@ func TestNewLPPoint(t *testing.T) {
 			name:   "abc",
 			fields: map[string]interface{}{"f1": 1, "f2": nil},
 			tags:   map[string]string{"t1": "def", "t2": "abc"},
-			opts:   []Option{WithTime(time.Unix(0, 123)), WithMaxTags(1)},
+			opts:   []Option{WithTime(time.Unix(0, 123)), WithMaxTags(1), WithKeySorted(true)},
 			expect: `abc,t1=def f1=1i 123`,
 			warns:  2,
 		},
@@ -573,7 +575,7 @@ func TestParsePoint(t *testing.T) {
 			data: []byte(`abc,t1=1,t2=2 f1=1i,f2=2,f3="abc" 123`),
 			opts: []Option{
 				WithTime(time.Unix(0, 123)),
-				WithDisabledKeys(NewKey([]byte(`f1`), KeyType_I)),
+				WithDisabledKeys(NewKey(`f1`, KeyType_I)),
 			},
 
 			expect: []*influxdb.Point{
@@ -589,7 +591,7 @@ func TestParsePoint(t *testing.T) {
 			data: []byte(`abc,t1=1,t2=2 f1=1i,f2=2,f3="abc" 123`),
 			opts: []Option{
 				WithTime(time.Unix(0, 123)),
-				WithDisabledKeys(NewTagKey([]byte(`t1`), nil)),
+				WithDisabledKeys(NewTagKey(`t1`, "")),
 			},
 
 			expect: []*influxdb.Point{
@@ -603,7 +605,7 @@ func TestParsePoint(t *testing.T) {
 		{
 			name: `exceed-max-tags`,
 			data: []byte(`abc,t1=1,t2=2 f1=1i,f2=2,f3="abc" 123`),
-			opts: []Option{WithTime(time.Unix(0, 123)), WithMaxTags(1)},
+			opts: []Option{WithTime(time.Unix(0, 123)), WithMaxTags(1), WithKeySorted(true)},
 
 			expect: []*influxdb.Point{
 				newPoint("abc",
@@ -616,7 +618,7 @@ func TestParsePoint(t *testing.T) {
 		{
 			name: `exceed-max-fields`,
 			data: []byte(`abc f1=1i,f2=2,f3="abc" 123`),
-			opts: []Option{WithTime(time.Unix(0, 123)), WithMaxFields(2)},
+			opts: []Option{WithTime(time.Unix(0, 123)), WithMaxFields(2), WithKeySorted(true)},
 
 			expect: []*influxdb.Point{
 				newPoint("abc",
@@ -890,7 +892,7 @@ abc f1=1i,f2=2,f3="abc" 789
 			opts: []Option{
 				WithTime(time.Unix(0, 123)),
 				WithCallback(func(p *Point) (*Point, error) {
-					if string(p.Name()) == "abc" {
+					if p.Name() == "abc" {
 						t.Logf("haha, we get measurement `abc'")
 					}
 					return p, nil
@@ -950,9 +952,7 @@ line`}, time.Unix(0, 123)),
 			for idx, pt := range pts {
 				if len(tc.expect) > 0 {
 					got := pt.LineProto()
-					assert.Equal(t, tc.expect[idx].String(),
-						got,
-						"got point: %s", pt.Pretty())
+					assert.Equal(t, tc.expect[idx].String(), got, "got point: %s", pt.Pretty())
 
 					if _, err := parseLineProto(t, []byte(got), "n"); err != nil {
 						t.Logf("parseLineProto failed: %s", err)

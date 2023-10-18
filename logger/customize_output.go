@@ -83,7 +83,6 @@ func newOnlyMessageRootLogger(ws io.Writer) (*zap.Logger, error) {
 		EncodeCaller: zapcore.FullCallerEncoder,
 	}
 
-	//enc := zapcore.NewJSONEncoder(cfg)
 	enc := zapcore.NewConsoleEncoder(cfg)
 	lvl := zap.DebugLevel
 
