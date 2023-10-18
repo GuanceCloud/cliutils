@@ -15,15 +15,23 @@ import (
 
 type Encoding int
 
+// EncodingStr convert encoding-string in configure file to
+// encoding enum.
+//
+// Here v1/v2 are alias for lineprotocol and protobuf, this makes
+// people easy to switch between lineprotocol and protobuf. For
+// json, you should not configure json encoding in production
+// environments.
 func EncodingStr(s string) Encoding {
 	switch strings.ToLower(s) {
-	case "protobuf":
+	case "protobuf", "v2":
 		return Protobuf
 	case "json":
 		return JSON
 	case "lineproto",
 		"lineprotocol",
-		"line-protocol":
+		"line-protocol",
+		"v1":
 		return LineProtocol
 	default:
 		return LineProtocol
