@@ -38,7 +38,6 @@ require (
 	golang.org/x/net v0.12.0
 	golang.org/x/sys v0.10.0
 	golang.org/x/text v0.11.0
-	google.golang.org/protobuf v1.31.0
 	gopkg.in/CodapeWild/dd-trace-go.v1 v1.35.17
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -102,6 +101,7 @@ require (
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.11.0 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/uint128 v1.2.0 // indirect
 	modernc.org/cc/v3 v3.40.0 // indirect
