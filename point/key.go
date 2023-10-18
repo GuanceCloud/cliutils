@@ -132,7 +132,6 @@ func (x *Keys) Pretty() string {
 
 // Hash calculate x's hash.
 func (x *Keys) Hash() uint64 {
-
 	if !x.hashed {
 		sort.Sort(x)
 		h := fnv.New64a()

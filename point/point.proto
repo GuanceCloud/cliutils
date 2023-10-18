@@ -14,11 +14,37 @@ option java_outer_classname = "Point";
 
 package point;
 
+import "google/protobuf/any.proto";
+
 // Debug used to attached some debug info for the point, these debug info
 // will encoded into payload, storage can take optional handle on these debug
 // info.
 message Debug {
 	string info = 1;
+}
+
+// example of pb.Any
+message AnyDemo {
+	string demo = 1;
+}
+
+message BasicTypes {
+	oneof x {
+			int64  i   = 1 [json_name = "i"]; // signed int
+			uint64 u   = 2 [json_name = "u"]; // unsigned int
+			double f   = 3 [json_name = "f"]; // float64
+			bool   b   = 4 [json_name = "b"]; // bool
+			bytes  d   = 5 [json_name = "d"]; // bytes, for binary data
+			string s   = 6 [json_name = "s"]; // string, for string data
+	}
+}
+
+message Array {
+	repeated BasicTypes arr = 1;
+}
+
+message Map {
+	map<string, BasicTypes> map = 1;
 }
 
 enum KeyType {
@@ -30,6 +56,7 @@ enum KeyType {
 	D   = 5;
 	NIL = 6;
 	S   = 7;
+	A   = 8;
 }
 
 enum MetricType {
@@ -53,7 +80,7 @@ message Field {
 			string s   = 11 [json_name = "s"];// string, for string data
 
 			// XXX: not used
-			//google.protobuf.Any a = 7 [json_name = "a"]; // any data
+			google.protobuf.Any a = 7 [json_name = "a"]; // any data
 	}
 
 	bool is_tag  = 8 [json_name = "is_tag"]; // set field as a tag or not

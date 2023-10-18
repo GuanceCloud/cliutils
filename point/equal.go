@@ -13,7 +13,7 @@ import (
 )
 
 // Equal test if two point are the same.
-// Equality test not check on warns and debugs.
+// Equality test NOT check on warns and debugs.
 // If two points equal, they have the same ID(MD5/Sha256),
 // but same ID do not means they are equal.
 func (p *Point) Equal(x *Point) bool {
@@ -30,7 +30,6 @@ func (p *Point) EqualWithReason(x *Point) (bool, string) {
 	ptags := p.Tags()
 	pfields := p.Fields()
 
-	xname := x.Name()
 	xtags := x.Tags()
 	xfields := x.Fields()
 
@@ -38,7 +37,7 @@ func (p *Point) EqualWithReason(x *Point) (bool, string) {
 		return false, fmt.Sprintf("timestamp not equal(%d <> %d)", ptime, xtime)
 	}
 
-	if xname != pname {
+	if xname := x.Name(); xname != pname {
 		return false, fmt.Sprintf("measurement not equla(%s <> %s)", pname, xname)
 	}
 
@@ -71,7 +70,7 @@ func kvsEq(l, r KVs) (bool, string) {
 
 	for _, f := range l {
 		if !r.Has(f.Key) { // key not exists
-			return false, fmt.Sprintf("field %s not exists", string(f.Key))
+			return false, fmt.Sprintf("field %s not exists", f.Key)
 		}
 
 		v := r.Get(f.Key)
@@ -103,7 +102,7 @@ func (p *Point) hashstr() []byte {
 
 	var data []byte
 
-	data = append(data, p.Name()...)
+	data = append(data, []byte(p.Name())...)
 
 	sort.Sort(tags)
 

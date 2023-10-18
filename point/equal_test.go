@@ -405,9 +405,12 @@ func TestHash(t *T.T) {
 			if tc.expectEqual {
 				assert.Equal(t, tc.l.MD5(), tc.r.MD5())
 				assert.Equal(t, tc.l.Sha256(), tc.r.Sha256())
+
+				t.Logf("md5: %s\nsha256: %s", tc.l.MD5(), tc.l.Sha256())
 			} else {
 				assert.NotEqual(t, tc.l.MD5(), tc.r.MD5())
 				assert.NotEqual(t, tc.l.Sha256(), tc.r.Sha256())
+				t.Logf("md5: %s\nsha256: %s", tc.l.MD5(), tc.l.Sha256())
 			}
 		})
 	}

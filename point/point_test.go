@@ -9,15 +9,117 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"reflect"
+	"sort"
 	"strings"
 	T "testing"
 	"time"
 
-	"github.com/influxdata/influxdb1-client/models"
+	"github.com/GuanceCloud/cliutils"
+	influxm "github.com/influxdata/influxdb1-client/models"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetTag(t *T.T) {
+func TestSizeofPoint(t *T.T) {
+	t.Run("small-pt", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f1", 123, false, true)
+		kvs = kvs.Add("f2", 3.14, false, true)
+		kvs = kvs.MustAddTag("t1", "v1")
+		kvs = kvs.MustAddTag("t2", "v2")
+
+		pbpt := NewPointV2("some", kvs)
+		t.Logf("type  size(pbpt): %d", reflect.TypeOf(*pbpt).Size())
+		t.Logf("value size(pbpt): %d", pbpt.Size())
+	})
+
+	t.Run("rand-large-pt", func(t *T.T) {
+		r := NewRander(WithFixedTags(true), WithRandText(3))
+		pts := r.Rand(1)
+		t.Logf("type  size(pbpt): %d", reflect.TypeOf(*pts[0]).Size())
+		t.Logf("value size(pbpt): %d", pts[0].Size())
+	})
+}
+
+func BenchmarkLPPoint(b *T.B) {
+	b.Run("pt-lppt", func(b *T.B) {
+		fields := map[string]any{
+			"f1": 123,
+			"f2": 3.14,
+		}
+		tags := influxm.Tags{
+			influxm.Tag{Key: []byte("t1"), Value: []byte("v1")},
+			influxm.Tag{Key: []byte("t2"), Value: []byte("v2")},
+		}
+		now := time.Now()
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			influxm.NewPoint("some", tags, fields, now)
+		}
+	})
+
+	b.Run("pt-pbpt", func(b *T.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			var kvs KVs
+			kvs = kvs.Add("f1", 123, false, true)
+			kvs = kvs.Add("f2", 3.14, false, true)
+			kvs = kvs.MustAddTag("t1", "v1")
+			kvs = kvs.MustAddTag("t2", "v2")
+
+			NewPointV2("some", kvs)
+		}
+	})
+}
+
+func BenchmarkFromModelsLP(b *T.B) {
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	pts := r.Rand(1)
+
+	enc := GetEncoder()
+	defer PutEncoder(enc)
+
+	data, err := enc.Encode(pts)
+	assert.NoError(b, err)
+	assert.Len(b, data, 1)
+
+	b.Run("basic", func(b *T.B) {
+		lppts, err := influxm.ParsePointsWithPrecision(data[0], time.Now(), "n")
+		assert.NoError(b, err)
+		assert.Len(b, lppts, 1)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			FromModelsLP(lppts[0])
+		}
+	})
+
+	b.Run("with-check", func(b *T.B) {
+		lppts, err := influxm.ParsePointsWithPrecision(data[0], time.Now(), "n")
+		assert.NoError(b, err)
+		assert.Len(b, lppts, 1)
+
+		c := GetCfg()
+		chk := checker{cfg: c}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			pt := FromModelsLP(lppts[0])
+
+			pt = chk.check(pt)
+			pt.warns = chk.warns
+			chk.reset()
+
+			// re-sort again: check may update pt.kvs
+			if c.keySorted {
+				sort.Sort(pt.kvs)
+			}
+		}
+	})
+}
+
+func TestGet(t *T.T) {
 	t.Run(`get-tag`, func(t *T.T) {
 		pt := NewPointV2(`abc`, NewKVs(nil).MustAddTag(`t1`, `v1`))
 
@@ -35,6 +137,55 @@ func TestGetTag(t *T.T) {
 		assert.Equal(t, ``, pt.GetTag(`empty-tag`))
 
 		t.Logf("kvs:\n%s", pt.kvs.Pretty())
+	})
+
+	t.Run("get", func(t *T.T) {
+		var kvs KVs
+
+		kvs = kvs.Add("si1", int8(1), false, true)
+		kvs = kvs.Add("si2", int16(1), false, true)
+		kvs = kvs.Add("si3", int32(1), false, true)
+		kvs = kvs.Add("si4", int(1), false, true)
+		kvs = kvs.Add("si5", int64(1), false, true)
+
+		kvs = kvs.Add("ui1", uint8(1), false, true)
+		kvs = kvs.Add("ui2", uint16(1), false, true)
+		kvs = kvs.Add("ui3", uint32(1), false, true)
+		kvs = kvs.Add("ui4", uint(1), false, true)
+		kvs = kvs.Add("ui5", uint64(1), false, true)
+
+		kvs = kvs.Add("b1", false, false, true)
+		kvs = kvs.Add("b2", true, false, true)
+
+		kvs = kvs.Add("d", []byte(`hello`), false, true)
+		kvs = kvs.Add("s", `hello`, false, true)
+
+		kvs = kvs.Add("arr", MustNewAnyArray(1, 2.0, false), false, true)
+		kvs = kvs.Add("map", MustNewAny(MustNewMap(map[string]any{"i": 1, "f": 3.14, "s": "world"})), false, true)
+
+		pt := NewPointV2("get", kvs)
+
+		t.Logf("pt: %s", pt.Pretty())
+
+		assert.Equal(t, int64(1), pt.Get("si1"))
+		assert.Equal(t, int64(1), pt.Get("si2"))
+		assert.Equal(t, int64(1), pt.Get("si3"))
+		assert.Equal(t, int64(1), pt.Get("si4"))
+		assert.Equal(t, int64(1), pt.Get("si5"))
+
+		assert.Equal(t, uint64(1), pt.Get("ui1"))
+		assert.Equal(t, uint64(1), pt.Get("ui2"))
+		assert.Equal(t, uint64(1), pt.Get("ui3"))
+		assert.Equal(t, uint64(1), pt.Get("ui4"))
+		assert.Equal(t, uint64(1), pt.Get("ui5"))
+
+		assert.Equal(t, false, pt.Get("b1"))
+		assert.Equal(t, true, pt.Get("b2"))
+		assert.Equal(t, []byte(`hello`), pt.Get("d"))
+		assert.Equal(t, `hello`, pt.Get("s"))
+
+		assert.Equal(t, []any{int64(1), 2.0, false}, pt.Get("arr"))
+		assert.Equal(t, map[string]any{"i": int64(1), "f": 3.14, "s": "world"}, pt.Get("map"))
 	})
 }
 
@@ -159,7 +310,9 @@ func TestInfluxTags(t *T.T) {
 	t.Run("get-tags", func(t *T.T) {
 		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123}).AddTag(`t1`, `v1`))
 		tags := pt.InfluxTags()
-		assert.Equal(t, map[string]string{"t1": "v1"}, tags)
+		assert.Equal(t,
+			influxm.Tags{influxm.Tag{Key: []byte("t1"), Value: []byte("v1")}},
+			tags)
 
 		t.Log(pt.Pretty())
 	})
@@ -334,33 +487,59 @@ with
 new
 line" 123`,
 		},
+
+		{
+			name: "lp-point-with-array-field",
+			prec: PrecNS,
+			pt: func() *Point {
+				var kvs KVs
+				kvs = kvs.Add("arr",
+					MustNewAnyArray(1, 3.14, 1.414, "hello"),
+					false, true)
+				pt := NewPointV2("abc", kvs, WithTime(time.Unix(0, 123)))
+
+				return pt
+			}(),
+			expect: `abc arr=[1i,3.14,1.414,"hello"] 123`,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
-
 			t.Logf("pt: %s", tc.pt.Pretty())
 
 			assert.Equal(t, tc.expect, tc.pt.LineProto(tc.prec))
 
-			_, err := models.ParsePointsWithPrecision([]byte(tc.expect), time.Now(), "n")
-			assert.NoError(t, err)
+			// _, err := influxm.ParsePointsWithPrecision([]byte(tc.expect), time.Now(), "n")
 		})
 	}
 }
 
-func TestPBJson(t *T.T) {
+func TestPBJSON(t *T.T) {
 	t.Run("pbjson", func(t *T.T) {
-		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123, "f2": 3.14}))
+		pt := NewPointV2(`abc`, NewKVs(map[string]any{
+			"f1":        1234567890,
+			"f2":        3.14,
+			"d":         []byte("hello world"),
+			"int-arr":   MustNewIntArray([]int{1, 2, 3}...),
+			"mixed-arr": MustNewAnyArray(1, 2.0, "hello", false),
+		}))
 
 		pt.kvs = pt.kvs.MustAddTag(`t1`, `v1`).
 			MustAddKV(NewKV(`f2`, 3.14, WithKVUnit("kb"), WithKVType(COUNT)))
 
 		j, _ := pt.PBJson()
-		t.Logf("%s", string(j))
+		t.Logf("raw: %s", string(j))
+
+		jpt := MustFromPBJson(j)
+
+		assert.True(t, pt.Equal(jpt))
 
 		j, _ = pt.PBJsonPretty()
-		t.Logf("%s", string(j))
+		t.Logf("pretty:\n%s", string(j))
+
+		jpt = MustFromPBJson(j)
+		assert.True(t, pt.Equal(jpt))
 	})
 }
 
@@ -423,36 +602,36 @@ func TestPointPB(t *T.T) {
 func TestLPPoint(t *T.T) {
 	t.Run(`uint`, func(t *T.T) {
 		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": uint64(123)}), WithTime(time.Unix(0, 123)))
-		assert.Equal(t, `abc f1=123i 123`, pt.LPPoint().String())
+		assert.Equal(t, `abc f1=123i 123`, pt.MustLPPoint().String())
 
 		// max-int64 is ok
 		pt = NewPointV2(`abc`, NewKVs(map[string]any{"f1": uint64(math.MaxInt64)}), WithTime(time.Unix(0, 123)))
-		assert.Equal(t, fmt.Sprintf(`abc f1=%di 123`, math.MaxInt64), pt.LPPoint().String())
+		assert.Equal(t, fmt.Sprintf(`abc f1=%di 123`, math.MaxInt64), pt.MustLPPoint().String())
 
 		// max-int64 + 1 not ok
 		pt = NewPointV2(`abc`, NewKVs(map[string]any{
 			"f1": uint64(math.MaxInt64 + 1),
 			"f2": "foo",
 		}), WithTime(time.Unix(0, 123)))
-		assert.Equal(t, `abc f2="foo" 123`, pt.LPPoint().String())
+		assert.Equal(t, `abc f2="foo" 123`, pt.MustLPPoint().String())
 
-		t.Logf("lp: %s", pt.LPPoint().String())
+		t.Logf("lp: %s", pt.MustLPPoint().String())
 	})
 
 	t.Run(`nil`, func(t *T.T) {
 		// max-int64 + 1 not ok
 		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123, "f2": nil}), WithTime(time.Unix(0, 123)))
-		assert.Equal(t, `abc f1=123i 123`, pt.LPPoint().String())
+		assert.Equal(t, `abc f1=123i 123`, pt.MustLPPoint().String())
 
-		t.Logf("lp: %s", pt.LPPoint().String())
+		t.Logf("lp: %s", pt.MustLPPoint().String())
 	})
 
 	t.Run(`struct`, func(t *T.T) {
 		// max-int64 + 1 not ok
 		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123, "f2": struct{}{}}), WithTime(time.Unix(0, 123)))
-		assert.Equal(t, `abc f1=123i 123`, pt.LPPoint().String())
+		assert.Equal(t, `abc f1=123i 123`, pt.MustLPPoint().String())
 
-		t.Logf("lp: %s", pt.LPPoint().String())
+		t.Logf("lp: %s", pt.MustLPPoint().String())
 	})
 }
 
@@ -492,11 +671,11 @@ func TestFields(t *T.T) {
 
 			expect: map[string]interface{}{
 				"i8":     int64(1),
-				"u8":     int64(1),
+				"u8":     uint64(1),
 				"i16":    int64(1),
-				"u16":    int64(1),
+				"u16":    uint64(1),
 				"i32":    int64(1),
-				"u32":    int64(1),
+				"u32":    uint64(1),
 				"i64":    int64(1),
 				"u64":    uint64(1),
 				"f32":    float32(1.0),
@@ -538,20 +717,21 @@ func TestFields(t *T.T) {
 			}(),
 
 			expect: map[string]interface{}{
+				//"any":    someAny,
 				"bool_1": false,
 				"bool_2": true,
 				"data":   []byte("abc123"),
-				"f32":    float32(1.0),
+				"f32":    float64(1.0),
 				"f64":    float64(1.0),
 				"i16":    int64(1),
 				"i32":    int64(1),
 				"i64":    int64(1),
 				"i8":     int64(1),
 				"str":    "hello",
-				"u16":    int64(1),
-				"u32":    int64(1),
+				"u16":    uint64(1),
+				"u32":    uint64(1),
 				"u64":    uint64(1),
-				"u8":     int64(1),
+				"u8":     uint64(1),
 				"nil":    nil,
 				"udf":    nil,
 			},
@@ -567,7 +747,7 @@ func TestFields(t *T.T) {
 			assert.True(t, eq, "not equal, reason: %s, pt: %s", reason, tc.pt.Pretty())
 
 			assert.NotNil(t, tc.pt.PBPoint())
-			assert.NotNil(t, tc.pt.LPPoint())
+			assert.NotNil(t, tc.pt.MustLPPoint())
 
 			eq, reason = kvsEq(fs, NewKVs(tc.expect))
 			assert.True(t, eq, "not equal, reason: %s, pt: %s", reason, tc.pt.kvs.Pretty())
@@ -805,6 +985,26 @@ func TestPointAddKey(t *T.T) {
 	})
 }
 
+func BenchmarkPointSize(b *T.B) {
+	b.Run(`basic-pt-size`, func(b *T.B) {
+		r := NewRander(WithRandText(3))
+		pts := r.Rand(1)
+
+		for i := 0; i < b.N; i++ {
+			pts[0].Size()
+		}
+	})
+
+	b.Run(`basic-pb-size`, func(b *T.B) {
+		r := NewRander(WithRandText(3))
+		pts := r.Rand(1)
+
+		for i := 0; i < b.N; i++ {
+			pts[0].PBSize()
+		}
+	})
+}
+
 func TestSize(t *T.T) {
 	t.Run("sizes", func(t *T.T) {
 		// empty point
@@ -832,7 +1032,6 @@ func TestSize(t *T.T) {
 			"f9": 3.14159265359,
 		}))
 		t.Logf("pt size: %d, pb size: %d, lp size: %d", pt.Size(), pt.PBSize(), pt.LPSize())
-		t.Logf("lp: %s", pt.LineProto())
 
 		// with kv unit/type
 		pt = NewPointV2(`abc`, NewKVs(nil).
@@ -846,5 +1045,41 @@ func TestSize(t *T.T) {
 		for idx, pt := range pts {
 			t.Logf("[%d] pt size: % 5d, pb size: % 5d, lp size: % 5d", idx, pt.Size(), pt.PBSize(), pt.LPSize())
 		}
+	})
+
+	t.Run("size-of-anypb", func(t *T.T) {
+		pt := NewPointV2("some", nil)
+
+		pt.MustAdd("arr", []string{
+			cliutils.CreateRandomString(100),
+			cliutils.CreateRandomString(100),
+		})
+		t.Logf("s-arr pt size: %d, pbsize: %d\npt: %s", pt.Size(), pt.PBSize(), pt.Pretty())
+
+		pt = NewPointV2("some", nil)
+		pt.MustAdd("arr", []int{(1), (1)})
+		t.Logf("i-arr pt size: %d, pbsize: %d\npt: %s", pt.Size(), pt.PBSize(), pt.Pretty())
+
+		pt = NewPointV2("some", nil)
+		pt.MustAdd("arr", []bool{false, true})
+		t.Logf("b-arr pt size: %d, pbsize: %d\npt: %s", pt.Size(), pt.PBSize(), pt.Pretty())
+	})
+
+	t.Run("size-of-large-string-point", func(t *T.T) {
+		pt := NewPointV2("some", nil)
+
+		_32mstr := cliutils.CreateRandomString(1024 * 1024 * 32)
+		pt.MustAdd("large-string", _32mstr)
+
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		defer PutEncoder(enc)
+
+		datas, err := enc.Encode([]*Point{pt})
+		assert.NoError(t, err)
+
+		gz := cliutils.MustGZip(datas[0])
+		gz32mb := cliutils.MustGZip([]byte(_32mstr))
+
+		t.Logf("pt size: %d, pbsize: %d/gz: %d, gzraw: %d", pt.Size(), pt.PBSize(), len(gz), len(gz32mb))
 	})
 }

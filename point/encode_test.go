@@ -80,8 +80,10 @@ func TestIdempotent(t *testing.T) {
 }
 
 func TestEncode(t *testing.T) {
+	r := NewRander(WithKVSorted(true))
+
 	var (
-		randPts = RandPoints(1000)
+		randPts = r.Rand(1000)
 
 		simplePts = []*Point{
 			NewPointV2(`abc`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
@@ -130,7 +132,7 @@ func TestEncode(t *testing.T) {
 					"f1": "fv1",
 					"f2": "fv2",
 					"f3": "fv3",
-				}, WithTime(time.Unix(0, 123)))
+				}, WithTime(time.Unix(0, 123)), WithKeySorted(true))
 
 				require.NoError(t, err)
 
@@ -255,8 +257,35 @@ func TestEncode(t *testing.T) {
 	}
 }
 
-func TestEncodeTags(t *T.T) {
+func TestEncodeWithBytesLimit(t *T.T) {
+	t.Run(`bytes-limite`, func(t *T.T) {
+		r := NewRander(WithFixedTags(true), WithRandText(3))
+		pts := r.Rand(1000)
 
+		// add anypb data
+		for _, pt := range pts {
+			pt.MustAdd("s-arr", []string{"s1", "s2"})
+			pt.MustAdd("i-arr", []int{1, 2})
+			pt.MustAdd("b-arr", []bool{true, false})
+			pt.MustAdd("f-arr", []float64{1.414, 3.14})
+		}
+
+		bytesBatchSize := 128 * 1024
+		enc := GetEncoder(WithEncBatchBytes(bytesBatchSize), WithEncFn(func(n int, payload []byte) error {
+			t.Logf("points: %d, payload: %dbytes", n, len(payload))
+			return nil
+		}))
+		defer PutEncoder(enc)
+
+		batches, err := enc.Encode(pts)
+		assert.NoError(t, err)
+		for idx, b := range batches {
+			t.Logf("[%d] batch: %d", idx, len(b))
+		}
+	})
+}
+
+func TestEncodeTags(t *T.T) {
 	t.Run("tag-value-begins-with-slash", func(t *T.T) {
 		enc := GetEncoder(WithEncEncoding(LineProtocol))
 		defer PutEncoder(enc)
@@ -292,6 +321,11 @@ func TestEncodeLen(t *testing.T) {
 		r := NewRander(WithFixedTags(true), WithRandText(3))
 		pts := r.Rand(1000)
 
+		ptsTotalSize := 0
+		for _, pt := range pts {
+			ptsTotalSize += pt.Size()
+		}
+
 		enc := GetEncoder()
 		defer PutEncoder(enc)
 
@@ -300,7 +334,7 @@ func TestEncodeLen(t *testing.T) {
 		assert.Equal(t, 1, len(data1))
 
 		gzData1 := cliutils.MustGZip(data1[0])
-		t.Logf("lp data: %d bytes, gz: %d", len(data1[0]), len(gzData1))
+		t.Logf("lp data: %d bytes, gz: %d, pts size: %d", len(data1[0]), len(gzData1), ptsTotalSize)
 
 		// setup pb
 		WithEncEncoding(Protobuf)(enc)
@@ -310,7 +344,7 @@ func TestEncodeLen(t *testing.T) {
 		assert.Equal(t, 1, len(data2))
 
 		gzData2 := cliutils.MustGZip(data2[0])
-		t.Logf("lp data: %d bytes, gz: %d", len(data2[0]), len(gzData2))
+		t.Logf("pb data: %d bytes, gz: %d, pts size: %d", len(data2[0]), len(gzData2), ptsTotalSize)
 
 		t.Logf("ratio: %f, gz ration: %f",
 			100*float64(len(data2[0]))/float64(len(data1[0])),

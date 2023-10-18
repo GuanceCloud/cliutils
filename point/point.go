@@ -14,10 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/influxdata/influxdb1-client/models"
-	influxdb "github.com/influxdata/influxdb1-client/v2"
+	influxm "github.com/influxdata/influxdb1-client/models"
 
-	//"google.golang.org/protobuf/encoding/protojson"
 	protojson "github.com/gogo/protobuf/jsonpb"
 )
 
@@ -62,7 +60,7 @@ func (p *Point) HasFlag(f uint) bool {
 }
 
 // WrapPoint wrap lagacy line-protocol point into Point.
-func WrapPoint(pts []*influxdb.Point) (arr []*Point) {
+func WrapPoint(pts []influxm.Point) (arr []*Point) {
 	for _, pt := range pts {
 		if x := FromLP(pt); x != nil {
 			arr = append(arr, x)
@@ -72,15 +70,22 @@ func WrapPoint(pts []*influxdb.Point) (arr []*Point) {
 }
 
 // NewLPPoint create Point based on a lineproto point.
-func NewLPPoint(lp *influxdb.Point) *Point {
+func NewLPPoint(lp influxm.Point) *Point {
 	return FromLP(lp)
 }
 
-// LPPoint get line-protocol part of the point.
-func (p *Point) LPPoint() *influxdb.Point {
-	lppt, _ := influxdb.NewPoint(string(p.name), p.InfluxTags(), p.InfluxFields(), p.time)
+func (p *Point) MustLPPoint() influxm.Point {
+	lppt, err := p.LPPoint()
+	if err != nil {
+		panic(err.Error())
+	}
 
 	return lppt
+}
+
+// LPPoint get line-protocol part of the point.
+func (p *Point) LPPoint() (influxm.Point, error) {
+	return influxm.NewPoint(p.name, p.InfluxTags(), p.InfluxFields(), p.time)
 }
 
 // InfluxFields convert fields to map structure.
@@ -89,8 +94,34 @@ func (p *Point) InfluxFields() map[string]any {
 }
 
 // InfluxTags convert tags to map structure.
-func (p *Point) InfluxTags() map[string]string {
+func (p *Point) InfluxTags() influxm.Tags {
 	return p.kvs.InfluxTags()
+}
+
+// MapTags convert all key-value to map.
+func (p *Point) MapTags() map[string]string {
+	res := map[string]string{}
+
+	for _, kv := range p.kvs {
+		if !kv.IsTag {
+			continue
+		}
+
+		res[kv.Key] = kv.GetS()
+	}
+
+	return res
+}
+
+// KVMap return all key-value in map.
+func (p *Point) KVMap() map[string]any {
+	res := map[string]any{}
+
+	for _, kv := range p.kvs {
+		res[kv.Key] = kv.Raw()
+	}
+
+	return res
 }
 
 // Pretty get string representation of point, suffixed with all warning(if any)
@@ -98,11 +129,13 @@ func (p *Point) InfluxTags() map[string]string {
 func (p *Point) Pretty() string {
 	arr := []string{
 		"\n",
-		string(p.Name()),
+		p.Name(),
 		"-----------",
 		p.kvs.Pretty(),
 		"-----------",
-		p.Time().String(),
+		fmt.Sprintf("%s | %d",
+			p.Time().String(),
+			p.Time().UnixNano()),
 	}
 
 	if len(p.warns) > 0 {
@@ -127,10 +160,19 @@ func (p *Point) Warns() []*Warn {
 	return p.warns
 }
 
+// WarnsPretty return human readable warnning info.
+func (p *Point) WarnsPretty() string {
+	var arr []string
+	for _, w := range p.warns {
+		arr = append(arr, w.String())
+	}
+	return strings.Join(arr, "\n")
+}
+
 // makeLineproto build lineproto from @p's raw data(name/tag/field/time).
 func (p *Point) makeLineproto(prec ...Precision) string {
-	lp := p.LPPoint()
-	if lp == nil {
+	lp, err := p.LPPoint()
+	if err != nil {
 		return ""
 	}
 
@@ -174,32 +216,11 @@ func FromJSONPoint(j *JSONPoint) *Point {
 	return pt
 }
 
-func FromLP(lp *influxdb.Point) *Point {
+func FromLP(lp influxm.Point) *Point {
 	lpfs, err := lp.Fields()
 	if err != nil { // invalid line-protocol point
 		return nil
 	}
-
-	pt := &Point{
-		name: lp.Name(),
-		kvs:  NewKVs(lpfs),
-		time: lp.Time(),
-	}
-
-	for k, v := range lp.Tags() {
-		pt.MustAddTag(k, v)
-	}
-
-	return pt
-}
-
-func FromModelsLP(lp models.Point) *Point {
-	lpfs, err := lp.Fields()
-	if err != nil {
-		return nil
-	}
-
-	_ = lpfs
 
 	pt := &Point{
 		name: string(lp.Name()),
@@ -207,7 +228,27 @@ func FromModelsLP(lp models.Point) *Point {
 		time: lp.Time(),
 	}
 
-	for _, t := range lp.Tags() {
+	for _, tag := range lp.Tags() {
+		pt.MustAddTag(string(tag.Key), string(tag.Value))
+	}
+
+	return pt
+}
+
+func FromModelsLP(lp influxm.Point) *Point {
+	lpfs, err := lp.Fields()
+	if err != nil {
+		return nil
+	}
+
+	pt := &Point{
+		name: string(lp.Name()),
+		kvs:  NewKVs(lpfs),
+		time: lp.Time(),
+	}
+
+	tags := lp.Tags()
+	for _, t := range tags {
 		pt.MustAddTag(string(t.Key), string(t.Value))
 	}
 
@@ -296,23 +337,7 @@ func (p *Point) Time() time.Time {
 // Get get specific key from point.
 func (p *Point) Get(k string) any {
 	if kv := p.kvs.Get(k); kv != nil {
-		switch kv.Val.(type) {
-		case *Field_I:
-			return kv.GetI()
-		case *Field_U:
-			return kv.GetU()
-		case *Field_F:
-			return kv.GetF()
-		case *Field_B:
-			return kv.GetB()
-		case *Field_D:
-			return kv.GetD()
-		case *Field_S:
-			return kv.GetS()
-
-		default:
-			return nil
-		}
+		return kv.Raw()
 	}
 	return nil
 }
@@ -388,18 +413,38 @@ func (p *Point) Size() int {
 		n += 8 // time
 		n += 4 // MetricType: uint32
 		n += len(kv.Unit)
+
 		switch kv.Val.(type) {
-		case *Field_I, *Field_F, *Field_U:
+		case *Field_I,
+			*Field_F,
+			*Field_U:
 			n += 8
+
 		case *Field_B:
 			n += 1
+
 		case *Field_D:
 			n += len(kv.GetD())
+
 		case *Field_S:
 			n += len(kv.GetS())
+
+		case *Field_A:
+			if a := kv.GetA(); a != nil {
+				n += (len(a.TypeUrl) + len(a.Value))
+			}
+
 		default:
 			// ignored
 		}
+	}
+
+	for _, w := range p.warns {
+		n += (len(w.Type) + len(w.Msg))
+	}
+
+	for _, d := range p.debugs {
+		n += (len(d.Info))
 	}
 
 	return n
@@ -407,8 +452,8 @@ func (p *Point) Size() int {
 
 // LPSize get point line-protocol size.
 func (p *Point) LPSize() int {
-	lppt := p.LPPoint()
-	if lppt == nil {
+	lppt, err := p.LPPoint()
+	if err != nil {
 		return 0
 	}
 

@@ -7,10 +7,42 @@ package point
 
 import (
 	"math"
+	"sort"
 	"strings"
+
+	types "github.com/gogo/protobuf/types"
+	influxm "github.com/influxdata/influxdb1-client/models"
 )
 
 type KVs []*Field
+
+// Raw return underlying raw data.
+func (kv *Field) Raw() any {
+	switch kv.Val.(type) {
+	case *Field_I:
+		return kv.GetI()
+	case *Field_U:
+		return kv.GetU()
+	case *Field_F:
+		return kv.GetF()
+	case *Field_B:
+		return kv.GetB()
+	case *Field_D:
+		return kv.GetD()
+	case *Field_S:
+		return kv.GetS()
+
+	case *Field_A:
+
+		if v, err := AnyRaw(kv.GetA()); err != nil {
+			return nil
+		} else {
+			return v
+		}
+	default:
+		return nil
+	}
+}
 
 func (x KVs) Len() int {
 	return len(x)
@@ -57,6 +89,13 @@ func (x KVs) InfluxFields() map[string]any {
 			res[kv.Key] = string(x.D)
 		case *Field_S:
 			res[kv.Key] = x.S
+
+		case *Field_A:
+			if v, err := AnyRaw(kv.GetA()); err != nil {
+				// pass
+			} else {
+				res[kv.Key] = v
+			}
 		default:
 			continue
 		}
@@ -66,18 +105,20 @@ func (x KVs) InfluxFields() map[string]any {
 }
 
 // InfluxTags convert tag KVs to map structure.
-func (x KVs) InfluxTags() (res map[string]string) {
+func (x KVs) InfluxTags() (res influxm.Tags) {
 	for _, kv := range x {
 		if !kv.IsTag {
 			continue
 		}
 
-		if len(res) == 0 {
-			res = map[string]string{}
-		}
-
-		res[kv.Key] = kv.GetS()
+		res = append(res, influxm.Tag{
+			Key:   []byte(kv.Key),
+			Value: []byte(kv.GetS()),
+		})
 	}
+
+	// keep tags sorted used to build lineprotocol text
+	sort.Sort(res)
 
 	return
 }
@@ -293,7 +334,8 @@ func PBType(v isField_Val) KeyType {
 		return D
 	case *Field_S:
 		return S
-
+	case *Field_A:
+		return A
 	default: // nil or other types
 		return X
 	}
@@ -338,7 +380,7 @@ func WithKVType(t MetricType) KVOption {
 func WithKVTagSet(on bool) KVOption {
 	return func(kv *Field) {
 		switch kv.Val.(type) {
-		case *Field_D:
+		case *Field_S:
 			kv.IsTag = on
 		default:
 			// ignored
@@ -353,39 +395,155 @@ func NewKV(k string, v any, opts ...KVOption) *Field {
 	switch x := v.(type) {
 	case int8:
 		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
+	case []int8:
+		iarr, err := NewIntArray(x...)
+		if err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{iarr}}
+		}
+
 	case uint8:
-		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
+		kv = &Field{Key: k, Val: &Field_U{uint64(x)}}
+		// case []uint8 is []byte, skip it.
+
 	case int16:
 		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
+
+	case []int16:
+		iarr, err := NewIntArray(x...)
+		if err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{iarr}}
+		}
+
 	case uint16:
-		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
+		kv = &Field{Key: k, Val: &Field_U{uint64(x)}}
+
+	case []uint16:
+		iarr, err := NewUintArray(x...)
+		if err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{iarr}}
+		}
+
 	case int32:
 		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
+
+	case []int32:
+		iarr, err := NewIntArray(x...)
+		if err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{iarr}}
+		}
+
 	case uint32:
-		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
+		kv = &Field{Key: k, Val: &Field_U{uint64(x)}}
+
+	case []uint32:
+		iarr, err := NewUintArray(x...)
+		if err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{iarr}}
+		}
+
 	case int:
 		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
+
+	case []int:
+		iarr, err := NewIntArray(x...)
+		if err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{iarr}}
+		}
+
 	case uint:
-		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
+		kv = &Field{Key: k, Val: &Field_U{uint64(x)}}
+
+	case []uint:
+		iarr, err := NewUintArray(x...)
+		if err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{iarr}}
+		}
+
 	case int64:
 		kv = &Field{Key: k, Val: &Field_I{x}}
+
+	case []int64:
+		iarr, err := NewIntArray(x...)
+		if err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{iarr}}
+		}
+
 	case uint64:
 		kv = &Field{Key: k, Val: &Field_U{x}}
+
+	case []uint64:
+		iarr, err := NewUintArray(x...)
+		if err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{iarr}}
+		}
 
 	case float64:
 		kv = &Field{Key: k, Val: &Field_F{x}}
 
+	case []float64:
+		farr, err := NewFloatArray(x...)
+		if err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{farr}}
+		}
+
 	case float32:
 		kv = &Field{Key: k, Val: &Field_F{float64(x)}}
 
+	case []float32:
+		farr, err := NewFloatArray(x...)
+		if err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{farr}}
+		}
+
 	case string:
 		kv = &Field{Key: k, Val: &Field_S{x}}
+
+	case []string:
+		sarr, err := NewStringArray(x...)
+		if err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{sarr}}
+		}
 
 	case []byte:
 		kv = &Field{Key: k, Val: &Field_D{x}}
 
 	case bool:
 		kv = &Field{Key: k, Val: &Field_B{x}}
+
+	case []bool:
+		barr, err := NewBoolArray(x...)
+		if err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{barr}}
+		}
+
+	case *types.Any:
+		kv = &Field{Key: k, Val: &Field_A{x}}
 
 	case nil: // pass
 		kv = &Field{Key: k, Val: nil}

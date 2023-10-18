@@ -52,7 +52,7 @@ func TestPointRander(t *T.T) {
 	t.Run("with-measurement-prefix", func(t *T.T) {
 		r := NewRander(WithRandMeasurementPrefix("abc_"))
 		pts := r.Rand(1)
-		require.True(t, strings.HasPrefix(string(pts[0].Name()), "abc_"))
+		require.True(t, strings.HasPrefix(pts[0].Name(), "abc_"))
 
 		t.Logf("point: %s", pts[0].Pretty())
 	})

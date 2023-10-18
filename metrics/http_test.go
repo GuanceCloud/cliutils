@@ -7,7 +7,7 @@ package metrics
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -51,7 +51,7 @@ func TestRouteForGin(t *T.T) {
 		req, err := http.Get(fmt.Sprintf("%s/metrics", ts.URL))
 		assert.NoError(t, err)
 
-		body, err := ioutil.ReadAll(req.Body)
+		body, err := io.ReadAll(req.Body)
 		assert.NoError(t, err)
 
 		t.Logf("\n%s", string(body))

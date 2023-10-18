@@ -8,6 +8,8 @@ import (
 	encoding_binary "encoding/binary"
 	fmt "fmt"
 	proto "github.com/gogo/protobuf/proto"
+	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+	types "github.com/gogo/protobuf/types"
 	io "io"
 	math "math"
 	math_bits "math/bits"
@@ -38,6 +40,7 @@ const (
 	D   KeyType = 5
 	NIL KeyType = 6
 	S   KeyType = 7
+	A   KeyType = 8
 )
 
 var KeyType_name = map[int32]string{
@@ -49,6 +52,7 @@ var KeyType_name = map[int32]string{
 	5: "D",
 	6: "NIL",
 	7: "S",
+	8: "A",
 }
 
 var KeyType_value = map[string]int32{
@@ -60,6 +64,7 @@ var KeyType_value = map[string]int32{
 	"D":   5,
 	"NIL": 6,
 	"S":   7,
+	"A":   8,
 }
 
 func (KeyType) EnumDescriptor() ([]byte, []int) {
@@ -139,6 +144,273 @@ func (m *Debug) GetInfo() string {
 	return ""
 }
 
+// example of pb.Any
+type AnyDemo struct {
+	Demo string `protobuf:"bytes,1,opt,name=demo,proto3" json:"demo,omitempty"`
+}
+
+func (m *AnyDemo) Reset()      { *m = AnyDemo{} }
+func (*AnyDemo) ProtoMessage() {}
+func (*AnyDemo) Descriptor() ([]byte, []int) {
+	return fileDescriptor_dbb1a16d5866e018, []int{1}
+}
+func (m *AnyDemo) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *AnyDemo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_AnyDemo.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *AnyDemo) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AnyDemo.Merge(m, src)
+}
+func (m *AnyDemo) XXX_Size() int {
+	return m.Size()
+}
+func (m *AnyDemo) XXX_DiscardUnknown() {
+	xxx_messageInfo_AnyDemo.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_AnyDemo proto.InternalMessageInfo
+
+func (m *AnyDemo) GetDemo() string {
+	if m != nil {
+		return m.Demo
+	}
+	return ""
+}
+
+type BasicTypes struct {
+	// Types that are valid to be assigned to X:
+	//	*BasicTypes_I
+	//	*BasicTypes_U
+	//	*BasicTypes_F
+	//	*BasicTypes_B
+	//	*BasicTypes_D
+	//	*BasicTypes_S
+	X isBasicTypes_X `protobuf_oneof:"x"`
+}
+
+func (m *BasicTypes) Reset()      { *m = BasicTypes{} }
+func (*BasicTypes) ProtoMessage() {}
+func (*BasicTypes) Descriptor() ([]byte, []int) {
+	return fileDescriptor_dbb1a16d5866e018, []int{2}
+}
+func (m *BasicTypes) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *BasicTypes) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_BasicTypes.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *BasicTypes) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BasicTypes.Merge(m, src)
+}
+func (m *BasicTypes) XXX_Size() int {
+	return m.Size()
+}
+func (m *BasicTypes) XXX_DiscardUnknown() {
+	xxx_messageInfo_BasicTypes.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_BasicTypes proto.InternalMessageInfo
+
+type isBasicTypes_X interface {
+	isBasicTypes_X()
+	Equal(interface{}) bool
+	MarshalTo([]byte) (int, error)
+	Size() int
+}
+
+type BasicTypes_I struct {
+	I int64 `protobuf:"varint,1,opt,name=i,proto3,oneof" json:"i,omitempty"`
+}
+type BasicTypes_U struct {
+	U uint64 `protobuf:"varint,2,opt,name=u,proto3,oneof" json:"u,omitempty"`
+}
+type BasicTypes_F struct {
+	F float64 `protobuf:"fixed64,3,opt,name=f,proto3,oneof" json:"f,omitempty"`
+}
+type BasicTypes_B struct {
+	B bool `protobuf:"varint,4,opt,name=b,proto3,oneof" json:"b,omitempty"`
+}
+type BasicTypes_D struct {
+	D []byte `protobuf:"bytes,5,opt,name=d,proto3,oneof" json:"d,omitempty"`
+}
+type BasicTypes_S struct {
+	S string `protobuf:"bytes,6,opt,name=s,proto3,oneof" json:"s,omitempty"`
+}
+
+func (*BasicTypes_I) isBasicTypes_X() {}
+func (*BasicTypes_U) isBasicTypes_X() {}
+func (*BasicTypes_F) isBasicTypes_X() {}
+func (*BasicTypes_B) isBasicTypes_X() {}
+func (*BasicTypes_D) isBasicTypes_X() {}
+func (*BasicTypes_S) isBasicTypes_X() {}
+
+func (m *BasicTypes) GetX() isBasicTypes_X {
+	if m != nil {
+		return m.X
+	}
+	return nil
+}
+
+func (m *BasicTypes) GetI() int64 {
+	if x, ok := m.GetX().(*BasicTypes_I); ok {
+		return x.I
+	}
+	return 0
+}
+
+func (m *BasicTypes) GetU() uint64 {
+	if x, ok := m.GetX().(*BasicTypes_U); ok {
+		return x.U
+	}
+	return 0
+}
+
+func (m *BasicTypes) GetF() float64 {
+	if x, ok := m.GetX().(*BasicTypes_F); ok {
+		return x.F
+	}
+	return 0
+}
+
+func (m *BasicTypes) GetB() bool {
+	if x, ok := m.GetX().(*BasicTypes_B); ok {
+		return x.B
+	}
+	return false
+}
+
+func (m *BasicTypes) GetD() []byte {
+	if x, ok := m.GetX().(*BasicTypes_D); ok {
+		return x.D
+	}
+	return nil
+}
+
+func (m *BasicTypes) GetS() string {
+	if x, ok := m.GetX().(*BasicTypes_S); ok {
+		return x.S
+	}
+	return ""
+}
+
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*BasicTypes) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
+		(*BasicTypes_I)(nil),
+		(*BasicTypes_U)(nil),
+		(*BasicTypes_F)(nil),
+		(*BasicTypes_B)(nil),
+		(*BasicTypes_D)(nil),
+		(*BasicTypes_S)(nil),
+	}
+}
+
+type Array struct {
+	Arr []*BasicTypes `protobuf:"bytes,1,rep,name=arr,proto3" json:"arr,omitempty"`
+}
+
+func (m *Array) Reset()      { *m = Array{} }
+func (*Array) ProtoMessage() {}
+func (*Array) Descriptor() ([]byte, []int) {
+	return fileDescriptor_dbb1a16d5866e018, []int{3}
+}
+func (m *Array) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *Array) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_Array.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *Array) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Array.Merge(m, src)
+}
+func (m *Array) XXX_Size() int {
+	return m.Size()
+}
+func (m *Array) XXX_DiscardUnknown() {
+	xxx_messageInfo_Array.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Array proto.InternalMessageInfo
+
+func (m *Array) GetArr() []*BasicTypes {
+	if m != nil {
+		return m.Arr
+	}
+	return nil
+}
+
+type Map struct {
+	Map map[string]*BasicTypes `protobuf:"bytes,1,rep,name=map,proto3" json:"map,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+}
+
+func (m *Map) Reset()      { *m = Map{} }
+func (*Map) ProtoMessage() {}
+func (*Map) Descriptor() ([]byte, []int) {
+	return fileDescriptor_dbb1a16d5866e018, []int{4}
+}
+func (m *Map) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *Map) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_Map.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *Map) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Map.Merge(m, src)
+}
+func (m *Map) XXX_Size() int {
+	return m.Size()
+}
+func (m *Map) XXX_DiscardUnknown() {
+	xxx_messageInfo_Map.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Map proto.InternalMessageInfo
+
+func (m *Map) GetMap() map[string]*BasicTypes {
+	if m != nil {
+		return m.Map
+	}
+	return nil
+}
+
 type Field struct {
 	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	// See https://developers.google.com/protocol-buffers/docs/proto3#json
@@ -150,6 +422,7 @@ type Field struct {
 	//	*Field_B
 	//	*Field_D
 	//	*Field_S
+	//	*Field_A
 	Val   isField_Val `protobuf_oneof:"val"`
 	IsTag bool        `protobuf:"varint,8,opt,name=is_tag,proto3" json:"is_tag,omitempty"`
 	Type  MetricType  `protobuf:"varint,9,opt,name=type,proto3,enum=point.MetricType" json:"type,omitempty"`
@@ -160,7 +433,7 @@ type Field struct {
 func (m *Field) Reset()      { *m = Field{} }
 func (*Field) ProtoMessage() {}
 func (*Field) Descriptor() ([]byte, []int) {
-	return fileDescriptor_dbb1a16d5866e018, []int{1}
+	return fileDescriptor_dbb1a16d5866e018, []int{5}
 }
 func (m *Field) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -214,6 +487,9 @@ type Field_D struct {
 type Field_S struct {
 	S string `protobuf:"bytes,11,opt,name=s,proto3,oneof" json:"s,omitempty"`
 }
+type Field_A struct {
+	A *types.Any `protobuf:"bytes,7,opt,name=a,proto3,oneof" json:"a,omitempty"`
+}
 
 func (*Field_I) isField_Val() {}
 func (*Field_U) isField_Val() {}
@@ -221,6 +497,7 @@ func (*Field_F) isField_Val() {}
 func (*Field_B) isField_Val() {}
 func (*Field_D) isField_Val() {}
 func (*Field_S) isField_Val() {}
+func (*Field_A) isField_Val() {}
 
 func (m *Field) GetVal() isField_Val {
 	if m != nil {
@@ -278,6 +555,13 @@ func (m *Field) GetS() string {
 	return ""
 }
 
+func (m *Field) GetA() *types.Any {
+	if x, ok := m.GetVal().(*Field_A); ok {
+		return x.A
+	}
+	return nil
+}
+
 func (m *Field) GetIsTag() bool {
 	if m != nil {
 		return m.IsTag
@@ -308,6 +592,7 @@ func (*Field) XXX_OneofWrappers() []interface{} {
 		(*Field_B)(nil),
 		(*Field_D)(nil),
 		(*Field_S)(nil),
+		(*Field_A)(nil),
 	}
 }
 
@@ -320,7 +605,7 @@ type Warn struct {
 func (m *Warn) Reset()      { *m = Warn{} }
 func (*Warn) ProtoMessage() {}
 func (*Warn) Descriptor() ([]byte, []int) {
-	return fileDescriptor_dbb1a16d5866e018, []int{2}
+	return fileDescriptor_dbb1a16d5866e018, []int{6}
 }
 func (m *Warn) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -376,7 +661,7 @@ type PBPoint struct {
 func (m *PBPoint) Reset()      { *m = PBPoint{} }
 func (*PBPoint) ProtoMessage() {}
 func (*PBPoint) Descriptor() ([]byte, []int) {
-	return fileDescriptor_dbb1a16d5866e018, []int{3}
+	return fileDescriptor_dbb1a16d5866e018, []int{7}
 }
 func (m *PBPoint) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -448,7 +733,7 @@ type PBPoints struct {
 func (m *PBPoints) Reset()      { *m = PBPoints{} }
 func (*PBPoints) ProtoMessage() {}
 func (*PBPoints) Descriptor() ([]byte, []int) {
-	return fileDescriptor_dbb1a16d5866e018, []int{4}
+	return fileDescriptor_dbb1a16d5866e018, []int{8}
 }
 func (m *PBPoints) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -488,6 +773,11 @@ func init() {
 	proto.RegisterEnum("point.KeyType", KeyType_name, KeyType_value)
 	proto.RegisterEnum("point.MetricType", MetricType_name, MetricType_value)
 	proto.RegisterType((*Debug)(nil), "point.Debug")
+	proto.RegisterType((*AnyDemo)(nil), "point.AnyDemo")
+	proto.RegisterType((*BasicTypes)(nil), "point.BasicTypes")
+	proto.RegisterType((*Array)(nil), "point.Array")
+	proto.RegisterType((*Map)(nil), "point.Map")
+	proto.RegisterMapType((map[string]*BasicTypes)(nil), "point.Map.MapEntry")
 	proto.RegisterType((*Field)(nil), "point.Field")
 	proto.RegisterType((*Warn)(nil), "point.Warn")
 	proto.RegisterType((*PBPoint)(nil), "point.PBPoint")
@@ -497,40 +787,50 @@ func init() {
 func init() { proto.RegisterFile("point.proto", fileDescriptor_dbb1a16d5866e018) }
 
 var fileDescriptor_dbb1a16d5866e018 = []byte{
-	// 516 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x54, 0x92, 0xcf, 0x8a, 0x13, 0x4f,
-	0x10, 0xc7, 0xa7, 0xd2, 0xd3, 0x99, 0xa4, 0xb2, 0xec, 0xaf, 0x7f, 0x8d, 0x48, 0x83, 0xd0, 0x8c,
-	0x41, 0x61, 0x58, 0x64, 0x95, 0xf5, 0x28, 0x1e, 0x36, 0xff, 0xd6, 0xa0, 0xc6, 0xd0, 0x9b, 0xa0,
-	0x78, 0x91, 0x89, 0x99, 0x84, 0xc1, 0xcd, 0x24, 0xcc, 0x4c, 0x94, 0xdc, 0x7c, 0x04, 0x1f, 0xc1,
-	0xa3, 0x8f, 0xe2, 0x31, 0xe0, 0x65, 0x8f, 0x66, 0x72, 0xf1, 0xb8, 0x8f, 0x20, 0xd5, 0x19, 0x14,
-	0x4f, 0x55, 0x9f, 0xf9, 0x76, 0x55, 0xd7, 0xb7, 0x7a, 0xb0, 0xb1, 0x5a, 0xc6, 0x49, 0x7e, 0xba,
-	0x4a, 0x97, 0xf9, 0x52, 0x72, 0x0b, 0xcd, 0x3b, 0xc8, 0x3b, 0xd1, 0x64, 0x3d, 0x97, 0x12, 0xdd,
-	0x38, 0x99, 0x2d, 0x15, 0xf8, 0x10, 0xd4, 0x8d, 0xcd, 0x9b, 0x3f, 0x00, 0x79, 0x2f, 0x8e, 0xae,
-	0xa6, 0x52, 0x20, 0xfb, 0x10, 0x6d, 0x4a, 0x91, 0x52, 0x79, 0x8c, 0x10, 0xab, 0x8a, 0x0f, 0x01,
-	0x7b, 0xe6, 0x18, 0x88, 0x89, 0xd7, 0x8a, 0xf9, 0x10, 0xb8, 0xc4, 0x6b, 0xe2, 0x99, 0x72, 0x7d,
-	0x08, 0x80, 0x78, 0x46, 0x3c, 0x51, 0xdc, 0x87, 0xa0, 0x46, 0x3c, 0x21, 0x9e, 0xaa, 0xaa, 0x0f,
-	0xc1, 0x11, 0xf1, 0x94, 0x38, 0x53, 0x0d, 0xea, 0x4f, 0x9c, 0xc9, 0xdb, 0x58, 0x8d, 0xb3, 0x77,
-	0x79, 0x38, 0x57, 0x35, 0x2a, 0x32, 0x25, 0xc9, 0xfb, 0xe8, 0xe6, 0x9b, 0x55, 0xa4, 0xea, 0x3e,
-	0x04, 0xc7, 0x67, 0xff, 0x9f, 0x1e, 0x3c, 0xbd, 0x8c, 0xf2, 0x34, 0x7e, 0x3f, 0xda, 0xac, 0x22,
-	0x63, 0x65, 0xb2, 0xb3, 0x4e, 0xe2, 0x5c, 0xe1, 0xc1, 0x0e, 0xe5, 0x2d, 0x8e, 0xec, 0x63, 0x78,
-	0xd5, 0x7c, 0x84, 0xee, 0xeb, 0x30, 0x4d, 0xe8, 0x88, 0xed, 0x54, 0x3a, 0xb6, 0x65, 0xb7, 0x90,
-	0x2d, 0xb2, 0xb9, 0xf5, 0x55, 0x37, 0xde, 0x22, 0xca, 0xb2, 0x70, 0x1e, 0x35, 0xbf, 0x02, 0x7a,
-	0xc3, 0xd6, 0x90, 0x6e, 0xa2, 0xaa, 0x24, 0x5c, 0xfc, 0xa9, 0xa2, 0x5c, 0xde, 0xc3, 0xea, 0x8c,
-	0xd6, 0x94, 0xa9, 0x8a, 0xcf, 0x82, 0xc6, 0xd9, 0x51, 0x39, 0x95, 0xdd, 0x9d, 0x29, 0x35, 0x7b,
-	0x5f, 0xbc, 0x88, 0xec, 0x92, 0x98, 0xb1, 0xb9, 0xbc, 0x8b, 0xfc, 0x53, 0x98, 0x26, 0x99, 0x72,
-	0x6d, 0x61, 0xa3, 0x2c, 0xa4, 0xf9, 0xcc, 0x41, 0xa1, 0xe6, 0x53, 0x7a, 0xa1, 0x4c, 0xf1, 0x7f,
-	0x9a, 0xdb, 0x67, 0x33, 0xa5, 0xd6, 0x7c, 0x80, 0xb5, 0x72, 0xc2, 0x4c, 0xfa, 0xc8, 0xc2, 0x34,
-	0x55, 0x60, 0x8f, 0x1f, 0x97, 0xc7, 0x4b, 0xd5, 0x90, 0x74, 0xd2, 0x46, 0xef, 0x79, 0xb4, 0xa1,
-	0x75, 0x49, 0x8e, 0xf0, 0x46, 0x38, 0x14, 0xfa, 0x02, 0x28, 0x8c, 0x45, 0x85, 0x42, 0x4f, 0x30,
-	0x0a, 0x2d, 0xe1, 0x52, 0xe8, 0x08, 0x2e, 0x3d, 0x64, 0x83, 0xfe, 0x0b, 0x51, 0x25, 0xbe, 0x14,
-	0xde, 0xc9, 0x53, 0xc4, 0xbf, 0x6b, 0x97, 0xff, 0x61, 0x63, 0x3c, 0xb8, 0x1c, 0x76, 0xdb, 0xfd,
-	0x5e, 0xbf, 0xdb, 0x11, 0x8e, 0xac, 0x23, 0x6f, 0xbf, 0x1a, 0x0f, 0x46, 0x02, 0x64, 0x0d, 0x5d,
-	0x73, 0x3e, 0xea, 0x8a, 0x0a, 0x7d, 0xbc, 0x38, 0x1f, 0x5f, 0x74, 0x05, 0x6b, 0xf5, 0xb6, 0x3b,
-	0xed, 0x5c, 0xef, 0xb4, 0x73, 0xb3, 0xd3, 0xf0, 0xb9, 0xd0, 0xf0, 0xad, 0xd0, 0xf0, 0xbd, 0xd0,
-	0xb0, 0x2d, 0x34, 0xfc, 0x2c, 0x34, 0xfc, 0x2a, 0xb4, 0x73, 0x53, 0x68, 0xf8, 0xb2, 0xd7, 0xce,
-	0x76, 0xaf, 0x9d, 0xeb, 0xbd, 0x76, 0x5a, 0xdc, 0xba, 0x18, 0xc2, 0x5b, 0xef, 0xe1, 0x13, 0x6b,
-	0x6c, 0x52, 0xb5, 0xff, 0xf3, 0xe3, 0xdf, 0x01, 0x00, 0x00, 0xff, 0xff, 0x05, 0xee, 0xa2, 0x67,
-	0xde, 0x02, 0x00, 0x00,
+	// 681 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x53, 0x41, 0x6f, 0xd3, 0x4a,
+	0x10, 0xf6, 0x66, 0xed, 0x38, 0x99, 0x54, 0x7d, 0xfb, 0xf6, 0x55, 0x4f, 0xfb, 0xfa, 0x84, 0x65,
+	0x4c, 0x2b, 0xa2, 0xaa, 0x4a, 0x11, 0x5c, 0x10, 0x88, 0x43, 0xd2, 0x24, 0x25, 0x40, 0x4b, 0xe4,
+	0x36, 0x02, 0x71, 0x41, 0x1b, 0xb2, 0x89, 0x2c, 0x12, 0x27, 0xd8, 0x49, 0x8b, 0x6f, 0xfc, 0x04,
+	0x7e, 0x02, 0x47, 0x7e, 0x0a, 0xc7, 0x1e, 0x7b, 0xa4, 0xe9, 0x85, 0x63, 0xaf, 0xdc, 0xd0, 0xac,
+	0xdd, 0x14, 0xa2, 0x1e, 0xac, 0x99, 0x6f, 0xbf, 0x99, 0xd9, 0x99, 0x6f, 0xc7, 0x50, 0x9a, 0x8c,
+	0x83, 0x70, 0x5a, 0x99, 0x44, 0xe3, 0xe9, 0x98, 0x5b, 0x1a, 0xac, 0xff, 0x37, 0x18, 0x8f, 0x07,
+	0x43, 0xb5, 0xa3, 0x0f, 0xbb, 0xb3, 0xfe, 0x8e, 0x0c, 0x93, 0x34, 0xc2, 0xfb, 0x1f, 0xac, 0xba,
+	0xea, 0xce, 0x06, 0x9c, 0x83, 0x19, 0x84, 0xfd, 0xb1, 0x20, 0x2e, 0x29, 0x17, 0x7d, 0xed, 0x7b,
+	0xb7, 0xc0, 0xae, 0x86, 0x49, 0x5d, 0x8d, 0xc6, 0x48, 0xf7, 0xd4, 0x68, 0x41, 0xa3, 0xef, 0x7d,
+	0x00, 0xa8, 0xc9, 0x38, 0x78, 0x77, 0x94, 0x4c, 0x54, 0xcc, 0x57, 0x81, 0x04, 0x9a, 0xa6, 0x4f,
+	0x0d, 0x9f, 0x04, 0x88, 0x67, 0x22, 0xe7, 0x92, 0xb2, 0x89, 0x78, 0x86, 0xb8, 0x2f, 0xa8, 0x4b,
+	0xca, 0x04, 0x71, 0x1f, 0x71, 0x57, 0x98, 0x2e, 0x29, 0x17, 0x10, 0x77, 0x11, 0xf7, 0x84, 0xe5,
+	0x92, 0xf2, 0x0a, 0xe2, 0x1e, 0xe2, 0x58, 0xe4, 0xf1, 0x3a, 0xc4, 0x71, 0x8d, 0x02, 0xf9, 0xe8,
+	0x6d, 0x83, 0x55, 0x8d, 0x22, 0x99, 0xf0, 0x3b, 0x40, 0x65, 0x14, 0x09, 0xe2, 0xd2, 0x72, 0xe9,
+	0xfe, 0xdf, 0x95, 0x74, 0xe8, 0xeb, 0x6e, 0x7c, 0x64, 0xbd, 0x13, 0xa0, 0xfb, 0x72, 0xc2, 0x37,
+	0x81, 0x8e, 0xe4, 0x24, 0x8b, 0xfd, 0x27, 0x8b, 0xdd, 0x97, 0x13, 0xfc, 0x1a, 0xe1, 0x34, 0x4a,
+	0x7c, 0xe4, 0xd7, 0x5b, 0x50, 0xb8, 0x3a, 0xe0, 0x0c, 0xe8, 0x7b, 0x95, 0x64, 0xd3, 0xa2, 0xcb,
+	0xef, 0x82, 0x75, 0x2c, 0x87, 0x33, 0xa5, 0x47, 0xba, 0xf1, 0xca, 0x94, 0x7f, 0x94, 0x7b, 0x48,
+	0xbc, 0x9f, 0x04, 0xac, 0x66, 0xa0, 0x86, 0xbd, 0x1b, 0x0a, 0x69, 0x9d, 0x72, 0x4b, 0x3a, 0xd1,
+	0x25, 0x9d, 0xcc, 0x25, 0x9d, 0xac, 0x25, 0x9d, 0xf2, 0x4b, 0x3a, 0x95, 0x16, 0x3a, 0xf1, 0x0d,
+	0x20, 0x52, 0xd8, 0xba, 0xc9, 0xb5, 0x4a, 0xfa, 0xf0, 0x95, 0xab, 0x87, 0xaf, 0x54, 0xc3, 0x04,
+	0xa3, 0x24, 0xff, 0x17, 0xf2, 0x41, 0xfc, 0x76, 0x2a, 0x07, 0xa2, 0x80, 0xa5, 0xfd, 0x0c, 0xf1,
+	0x4d, 0x30, 0xa7, 0xc9, 0x44, 0x89, 0xa2, 0x4b, 0xca, 0xab, 0x8b, 0x29, 0xf7, 0xd5, 0x34, 0x4a,
+	0xc7, 0xf4, 0x35, 0x8d, 0xeb, 0x30, 0x0b, 0x83, 0xa9, 0x80, 0x74, 0x1d, 0xd0, 0xaf, 0x59, 0x40,
+	0x8f, 0xe5, 0xd0, 0xbb, 0x07, 0xe6, 0x2b, 0x19, 0x85, 0x18, 0xa2, 0x2b, 0x65, 0x1b, 0xa3, 0xd3,
+	0xd6, 0x80, 0x8e, 0xe2, 0x81, 0x9e, 0xbe, 0xe8, 0xdb, 0x23, 0x15, 0xc7, 0x72, 0xa0, 0xbc, 0x2f,
+	0x04, 0xec, 0x76, 0xad, 0x8d, 0x37, 0x61, 0x56, 0x28, 0x47, 0x8b, 0x2c, 0xf4, 0xf9, 0x06, 0xe4,
+	0xfb, 0x28, 0x66, 0x2c, 0x72, 0xfa, 0x09, 0x57, 0xb2, 0xae, 0xb4, 0xc2, 0x7e, 0xc6, 0xe9, 0xfb,
+	0x82, 0x91, 0xd2, 0x52, 0x52, 0x5f, 0xfb, 0xfc, 0x36, 0x58, 0x27, 0x32, 0x0a, 0x63, 0x61, 0xea,
+	0xc4, 0x52, 0x96, 0x88, 0xfd, 0xf9, 0x29, 0x83, 0xc5, 0x7b, 0xf8, 0x03, 0xc4, 0xc2, 0xfa, 0xa3,
+	0xb8, 0xfe, 0x2b, 0xfc, 0x8c, 0xf3, 0xb6, 0xa1, 0x90, 0x75, 0x18, 0x73, 0xf7, 0xf7, 0xd5, 0x5b,
+	0xcd, 0xc2, 0x33, 0x56, 0xef, 0xdd, 0xd6, 0x33, 0xb0, 0x9f, 0xab, 0x04, 0xe5, 0xe2, 0x16, 0x90,
+	0xd7, 0xcc, 0x40, 0xd3, 0x62, 0x04, 0x4d, 0x87, 0xe5, 0xd0, 0x34, 0x19, 0x45, 0x53, 0x63, 0x26,
+	0x9a, 0x3a, 0xb3, 0xb8, 0x0d, 0xf4, 0xa0, 0xf5, 0x82, 0xe5, 0x11, 0x1f, 0x32, 0x1b, 0x4d, 0x95,
+	0x15, 0xb6, 0x9e, 0x00, 0x5c, 0xab, 0xcf, 0xff, 0x82, 0x52, 0xe7, 0xe0, 0xb0, 0xdd, 0xd8, 0x6d,
+	0x35, 0x5b, 0x8d, 0x3a, 0x33, 0x78, 0x11, 0xac, 0xdd, 0x97, 0x9d, 0x83, 0x23, 0x46, 0x78, 0x01,
+	0x4c, 0xbf, 0x7a, 0xd4, 0x60, 0x39, 0x3c, 0xdc, 0xab, 0x76, 0xf6, 0x1a, 0x8c, 0xd6, 0x9a, 0xa7,
+	0xe7, 0x8e, 0x71, 0x76, 0xee, 0x18, 0x97, 0xe7, 0x0e, 0xf9, 0x34, 0x77, 0xc8, 0xd7, 0xb9, 0x43,
+	0xbe, 0xcd, 0x1d, 0x72, 0x3a, 0x77, 0xc8, 0xf7, 0xb9, 0x43, 0x7e, 0xcc, 0x1d, 0xe3, 0x72, 0xee,
+	0x90, 0xcf, 0x17, 0x8e, 0x71, 0x7a, 0xe1, 0x18, 0x67, 0x17, 0x8e, 0x51, 0xb3, 0xf4, 0x30, 0x6d,
+	0xf2, 0xc6, 0xde, 0x79, 0xac, 0xe7, 0xeb, 0xe6, 0xf5, 0x0a, 0x3d, 0xf8, 0x15, 0x00, 0x00, 0xff,
+	0xff, 0x90, 0x42, 0xde, 0x4f, 0x5f, 0x04, 0x00, 0x00,
 }
 
 func (x KeyType) String() string {
@@ -568,6 +868,262 @@ func (this *Debug) Equal(that interface{}) bool {
 	}
 	if this.Info != that1.Info {
 		return false
+	}
+	return true
+}
+func (this *AnyDemo) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*AnyDemo)
+	if !ok {
+		that2, ok := that.(AnyDemo)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.Demo != that1.Demo {
+		return false
+	}
+	return true
+}
+func (this *BasicTypes) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*BasicTypes)
+	if !ok {
+		that2, ok := that.(BasicTypes)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if that1.X == nil {
+		if this.X != nil {
+			return false
+		}
+	} else if this.X == nil {
+		return false
+	} else if !this.X.Equal(that1.X) {
+		return false
+	}
+	return true
+}
+func (this *BasicTypes_I) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*BasicTypes_I)
+	if !ok {
+		that2, ok := that.(BasicTypes_I)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.I != that1.I {
+		return false
+	}
+	return true
+}
+func (this *BasicTypes_U) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*BasicTypes_U)
+	if !ok {
+		that2, ok := that.(BasicTypes_U)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.U != that1.U {
+		return false
+	}
+	return true
+}
+func (this *BasicTypes_F) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*BasicTypes_F)
+	if !ok {
+		that2, ok := that.(BasicTypes_F)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.F != that1.F {
+		return false
+	}
+	return true
+}
+func (this *BasicTypes_B) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*BasicTypes_B)
+	if !ok {
+		that2, ok := that.(BasicTypes_B)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.B != that1.B {
+		return false
+	}
+	return true
+}
+func (this *BasicTypes_D) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*BasicTypes_D)
+	if !ok {
+		that2, ok := that.(BasicTypes_D)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !bytes.Equal(this.D, that1.D) {
+		return false
+	}
+	return true
+}
+func (this *BasicTypes_S) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*BasicTypes_S)
+	if !ok {
+		that2, ok := that.(BasicTypes_S)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.S != that1.S {
+		return false
+	}
+	return true
+}
+func (this *Array) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*Array)
+	if !ok {
+		that2, ok := that.(Array)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if len(this.Arr) != len(that1.Arr) {
+		return false
+	}
+	for i := range this.Arr {
+		if !this.Arr[i].Equal(that1.Arr[i]) {
+			return false
+		}
+	}
+	return true
+}
+func (this *Map) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*Map)
+	if !ok {
+		that2, ok := that.(Map)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if len(this.Map) != len(that1.Map) {
+		return false
+	}
+	for i := range this.Map {
+		if !this.Map[i].Equal(that1.Map[i]) {
+			return false
+		}
 	}
 	return true
 }
@@ -757,6 +1313,30 @@ func (this *Field_S) Equal(that interface{}) bool {
 	}
 	return true
 }
+func (this *Field_A) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*Field_A)
+	if !ok {
+		that2, ok := that.(Field_A)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if !this.A.Equal(that1.A) {
+		return false
+	}
+	return true
+}
 func (this *Warn) Equal(that interface{}) bool {
 	if that == nil {
 		return this == nil
@@ -874,11 +1454,115 @@ func (this *Debug) GoString() string {
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
+func (this *AnyDemo) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&point.AnyDemo{")
+	s = append(s, "Demo: "+fmt.Sprintf("%#v", this.Demo)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *BasicTypes) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 10)
+	s = append(s, "&point.BasicTypes{")
+	if this.X != nil {
+		s = append(s, "X: "+fmt.Sprintf("%#v", this.X)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *BasicTypes_I) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&point.BasicTypes_I{` +
+		`I:` + fmt.Sprintf("%#v", this.I) + `}`}, ", ")
+	return s
+}
+func (this *BasicTypes_U) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&point.BasicTypes_U{` +
+		`U:` + fmt.Sprintf("%#v", this.U) + `}`}, ", ")
+	return s
+}
+func (this *BasicTypes_F) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&point.BasicTypes_F{` +
+		`F:` + fmt.Sprintf("%#v", this.F) + `}`}, ", ")
+	return s
+}
+func (this *BasicTypes_B) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&point.BasicTypes_B{` +
+		`B:` + fmt.Sprintf("%#v", this.B) + `}`}, ", ")
+	return s
+}
+func (this *BasicTypes_D) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&point.BasicTypes_D{` +
+		`D:` + fmt.Sprintf("%#v", this.D) + `}`}, ", ")
+	return s
+}
+func (this *BasicTypes_S) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&point.BasicTypes_S{` +
+		`S:` + fmt.Sprintf("%#v", this.S) + `}`}, ", ")
+	return s
+}
+func (this *Array) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&point.Array{")
+	if this.Arr != nil {
+		s = append(s, "Arr: "+fmt.Sprintf("%#v", this.Arr)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *Map) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&point.Map{")
+	keysForMap := make([]string, 0, len(this.Map))
+	for k, _ := range this.Map {
+		keysForMap = append(keysForMap, k)
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForMap)
+	mapStringForMap := "map[string]*BasicTypes{"
+	for _, k := range keysForMap {
+		mapStringForMap += fmt.Sprintf("%#v: %#v,", k, this.Map[k])
+	}
+	mapStringForMap += "}"
+	if this.Map != nil {
+		s = append(s, "Map: "+mapStringForMap+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
 func (this *Field) GoString() string {
 	if this == nil {
 		return "nil"
 	}
-	s := make([]string, 0, 14)
+	s := make([]string, 0, 15)
 	s = append(s, "&point.Field{")
 	s = append(s, "Key: "+fmt.Sprintf("%#v", this.Key)+",\n")
 	if this.Val != nil {
@@ -936,6 +1620,14 @@ func (this *Field_S) GoString() string {
 	}
 	s := strings.Join([]string{`&point.Field_S{` +
 		`S:` + fmt.Sprintf("%#v", this.S) + `}`}, ", ")
+	return s
+}
+func (this *Field_A) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&point.Field_A{` +
+		`A:` + fmt.Sprintf("%#v", this.A) + `}`}, ", ")
 	return s
 }
 func (this *Warn) GoString() string {
@@ -1015,6 +1707,238 @@ func (m *Debug) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i = encodeVarintPoint(dAtA, i, uint64(len(m.Info)))
 		i--
 		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *AnyDemo) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *AnyDemo) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *AnyDemo) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Demo) > 0 {
+		i -= len(m.Demo)
+		copy(dAtA[i:], m.Demo)
+		i = encodeVarintPoint(dAtA, i, uint64(len(m.Demo)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *BasicTypes) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *BasicTypes) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *BasicTypes) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.X != nil {
+		{
+			size := m.X.Size()
+			i -= size
+			if _, err := m.X.MarshalTo(dAtA[i:]); err != nil {
+				return 0, err
+			}
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *BasicTypes_I) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *BasicTypes_I) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	i = encodeVarintPoint(dAtA, i, uint64(m.I))
+	i--
+	dAtA[i] = 0x8
+	return len(dAtA) - i, nil
+}
+func (m *BasicTypes_U) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *BasicTypes_U) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	i = encodeVarintPoint(dAtA, i, uint64(m.U))
+	i--
+	dAtA[i] = 0x10
+	return len(dAtA) - i, nil
+}
+func (m *BasicTypes_F) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *BasicTypes_F) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	i -= 8
+	encoding_binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(m.F))))
+	i--
+	dAtA[i] = 0x19
+	return len(dAtA) - i, nil
+}
+func (m *BasicTypes_B) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *BasicTypes_B) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	i--
+	if m.B {
+		dAtA[i] = 1
+	} else {
+		dAtA[i] = 0
+	}
+	i--
+	dAtA[i] = 0x20
+	return len(dAtA) - i, nil
+}
+func (m *BasicTypes_D) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *BasicTypes_D) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.D != nil {
+		i -= len(m.D)
+		copy(dAtA[i:], m.D)
+		i = encodeVarintPoint(dAtA, i, uint64(len(m.D)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	return len(dAtA) - i, nil
+}
+func (m *BasicTypes_S) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *BasicTypes_S) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	i -= len(m.S)
+	copy(dAtA[i:], m.S)
+	i = encodeVarintPoint(dAtA, i, uint64(len(m.S)))
+	i--
+	dAtA[i] = 0x32
+	return len(dAtA) - i, nil
+}
+func (m *Array) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Array) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Array) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Arr) > 0 {
+		for iNdEx := len(m.Arr) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Arr[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintPoint(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *Map) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Map) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Map) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Map) > 0 {
+		for k := range m.Map {
+			v := m.Map[k]
+			baseI := i
+			if v != nil {
+				{
+					size, err := v.MarshalToSizedBuffer(dAtA[:i])
+					if err != nil {
+						return 0, err
+					}
+					i -= size
+					i = encodeVarintPoint(dAtA, i, uint64(size))
+				}
+				i--
+				dAtA[i] = 0x12
+			}
+			i -= len(k)
+			copy(dAtA[i:], k)
+			i = encodeVarintPoint(dAtA, i, uint64(len(k)))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintPoint(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0xa
+		}
 	}
 	return len(dAtA) - i, nil
 }
@@ -1147,6 +2071,27 @@ func (m *Field_D) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i = encodeVarintPoint(dAtA, i, uint64(len(m.D)))
 		i--
 		dAtA[i] = 0x32
+	}
+	return len(dAtA) - i, nil
+}
+func (m *Field_A) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Field_A) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.A != nil {
+		{
+			size, err := m.A.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintPoint(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x3a
 	}
 	return len(dAtA) - i, nil
 }
@@ -1339,6 +2284,126 @@ func (m *Debug) Size() (n int) {
 	return n
 }
 
+func (m *AnyDemo) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Demo)
+	if l > 0 {
+		n += 1 + l + sovPoint(uint64(l))
+	}
+	return n
+}
+
+func (m *BasicTypes) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.X != nil {
+		n += m.X.Size()
+	}
+	return n
+}
+
+func (m *BasicTypes_I) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	n += 1 + sovPoint(uint64(m.I))
+	return n
+}
+func (m *BasicTypes_U) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	n += 1 + sovPoint(uint64(m.U))
+	return n
+}
+func (m *BasicTypes_F) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	n += 9
+	return n
+}
+func (m *BasicTypes_B) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	n += 2
+	return n
+}
+func (m *BasicTypes_D) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.D != nil {
+		l = len(m.D)
+		n += 1 + l + sovPoint(uint64(l))
+	}
+	return n
+}
+func (m *BasicTypes_S) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.S)
+	n += 1 + l + sovPoint(uint64(l))
+	return n
+}
+func (m *Array) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Arr) > 0 {
+		for _, e := range m.Arr {
+			l = e.Size()
+			n += 1 + l + sovPoint(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *Map) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Map) > 0 {
+		for k, v := range m.Map {
+			_ = k
+			_ = v
+			l = 0
+			if v != nil {
+				l = v.Size()
+				l += 1 + sovPoint(uint64(l))
+			}
+			mapEntrySize := 1 + len(k) + sovPoint(uint64(len(k))) + l
+			n += mapEntrySize + 1 + sovPoint(uint64(mapEntrySize))
+		}
+	}
+	return n
+}
+
 func (m *Field) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1409,6 +2474,18 @@ func (m *Field_D) Size() (n int) {
 	_ = l
 	if m.D != nil {
 		l = len(m.D)
+		n += 1 + l + sovPoint(uint64(l))
+	}
+	return n
+}
+func (m *Field_A) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.A != nil {
+		l = m.A.Size()
 		n += 1 + l + sovPoint(uint64(l))
 	}
 	return n
@@ -1505,6 +2582,121 @@ func (this *Debug) String() string {
 	}, "")
 	return s
 }
+func (this *AnyDemo) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&AnyDemo{`,
+		`Demo:` + fmt.Sprintf("%v", this.Demo) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *BasicTypes) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&BasicTypes{`,
+		`X:` + fmt.Sprintf("%v", this.X) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *BasicTypes_I) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&BasicTypes_I{`,
+		`I:` + fmt.Sprintf("%v", this.I) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *BasicTypes_U) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&BasicTypes_U{`,
+		`U:` + fmt.Sprintf("%v", this.U) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *BasicTypes_F) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&BasicTypes_F{`,
+		`F:` + fmt.Sprintf("%v", this.F) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *BasicTypes_B) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&BasicTypes_B{`,
+		`B:` + fmt.Sprintf("%v", this.B) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *BasicTypes_D) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&BasicTypes_D{`,
+		`D:` + fmt.Sprintf("%v", this.D) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *BasicTypes_S) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&BasicTypes_S{`,
+		`S:` + fmt.Sprintf("%v", this.S) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Array) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForArr := "[]*BasicTypes{"
+	for _, f := range this.Arr {
+		repeatedStringForArr += strings.Replace(f.String(), "BasicTypes", "BasicTypes", 1) + ","
+	}
+	repeatedStringForArr += "}"
+	s := strings.Join([]string{`&Array{`,
+		`Arr:` + repeatedStringForArr + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Map) String() string {
+	if this == nil {
+		return "nil"
+	}
+	keysForMap := make([]string, 0, len(this.Map))
+	for k, _ := range this.Map {
+		keysForMap = append(keysForMap, k)
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForMap)
+	mapStringForMap := "map[string]*BasicTypes{"
+	for _, k := range keysForMap {
+		mapStringForMap += fmt.Sprintf("%v: %v,", k, this.Map[k])
+	}
+	mapStringForMap += "}"
+	s := strings.Join([]string{`&Map{`,
+		`Map:` + mapStringForMap + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *Field) String() string {
 	if this == nil {
 		return "nil"
@@ -1565,6 +2757,16 @@ func (this *Field_D) String() string {
 	}
 	s := strings.Join([]string{`&Field_D{`,
 		`D:` + fmt.Sprintf("%v", this.D) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Field_A) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Field_A{`,
+		`A:` + strings.Replace(fmt.Sprintf("%v", this.A), "Any", "types.Any", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1702,6 +2904,538 @@ func (m *Debug) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Info = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipPoint(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthPoint
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *AnyDemo) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowPoint
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AnyDemo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AnyDemo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Demo", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowPoint
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthPoint
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthPoint
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Demo = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipPoint(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthPoint
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *BasicTypes) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowPoint
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: BasicTypes: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: BasicTypes: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field I", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowPoint
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.X = &BasicTypes_I{v}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field U", wireType)
+			}
+			var v uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowPoint
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.X = &BasicTypes_U{v}
+		case 3:
+			if wireType != 1 {
+				return fmt.Errorf("proto: wrong wireType = %d for field F", wireType)
+			}
+			var v uint64
+			if (iNdEx + 8) > l {
+				return io.ErrUnexpectedEOF
+			}
+			v = uint64(encoding_binary.LittleEndian.Uint64(dAtA[iNdEx:]))
+			iNdEx += 8
+			m.X = &BasicTypes_F{float64(math.Float64frombits(v))}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field B", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowPoint
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.X = &BasicTypes_B{b}
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field D", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowPoint
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthPoint
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthPoint
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := make([]byte, postIndex-iNdEx)
+			copy(v, dAtA[iNdEx:postIndex])
+			m.X = &BasicTypes_D{v}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field S", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowPoint
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthPoint
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthPoint
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.X = &BasicTypes_S{string(dAtA[iNdEx:postIndex])}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipPoint(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthPoint
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Array) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowPoint
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Array: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Array: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Arr", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowPoint
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthPoint
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthPoint
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Arr = append(m.Arr, &BasicTypes{})
+			if err := m.Arr[len(m.Arr)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipPoint(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthPoint
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Map) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowPoint
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Map: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Map: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Map", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowPoint
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthPoint
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthPoint
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Map == nil {
+				m.Map = make(map[string]*BasicTypes)
+			}
+			var mapkey string
+			var mapvalue *BasicTypes
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowPoint
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowPoint
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthPoint
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthPoint
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapmsglen int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowPoint
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapmsglen |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					if mapmsglen < 0 {
+						return ErrInvalidLengthPoint
+					}
+					postmsgIndex := iNdEx + mapmsglen
+					if postmsgIndex < 0 {
+						return ErrInvalidLengthPoint
+					}
+					if postmsgIndex > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = &BasicTypes{}
+					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
+						return err
+					}
+					iNdEx = postmsgIndex
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipPoint(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthPoint
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Map[mapkey] = mapvalue
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -1889,6 +3623,41 @@ func (m *Field) Unmarshal(dAtA []byte) error {
 			v := make([]byte, postIndex-iNdEx)
 			copy(v, dAtA[iNdEx:postIndex])
 			m.Val = &Field_D{v}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field A", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowPoint
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthPoint
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthPoint
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &types.Any{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Val = &Field_A{v}
 			iNdEx = postIndex
 		case 8:
 			if wireType != 0 {

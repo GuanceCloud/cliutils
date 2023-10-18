@@ -15,6 +15,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestTimeRound(t *testing.T) {
+	t.Run(`decode-time`, func(t *testing.T) {
+		pt := NewPointV2("some", nil, WithTime(time.Now()))
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		data, err := enc.Encode([]*Point{pt})
+		assert.NoError(t, err)
+
+		dec := GetDecoder(WithDecEncoding(Protobuf))
+		pts, err := dec.Decode(data[0])
+		assert.NoError(t, err)
+
+		assert.Equal(t, pt.Pretty(), pts[0].Pretty())
+	})
+}
+
 func TestDecode(t *testing.T) {
 	var fnCalled int
 
@@ -318,17 +333,15 @@ func BenchmarkDecode(b *testing.B) {
 }
 
 func BenchmarkBytes2String(b *testing.B) {
-
 	repeat := 1
 	raw := []byte("xxxxxxxxxxxxxxxx")
-	//raw := []byte("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
 
 	bytesData := bytes.Repeat(raw, repeat)
 	strData := strings.Repeat(string(raw), repeat)
 
 	str := string(raw)
 	b.Logf("str:   %p", &str)
-	b.Logf("bytes: %p", []byte(raw))
+	b.Logf("bytes: %p", raw)
 	b.Logf("repeat: %p", &repeat)
 
 	b.Logf("str:   %p", &strData)

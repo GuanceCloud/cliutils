@@ -286,7 +286,8 @@ func TestNewPoint(t *T.T) {
 				WithTime(time.Unix(0, 123)),
 				WithMaxTags(1),
 				WithMaxFields(1),
-				WithKeySorted(true)},
+				WithKeySorted(true),
+			},
 			expect: `abc,t1=abc f1=123i 123`,
 			warns:  2,
 		},
@@ -644,6 +645,126 @@ func BenchmarkNewPoint(b *T.B) {
 
 		for i := 0; i < b.N; i++ {
 			NewPointV2(ptName, kvs)
+		}
+	})
+}
+
+func BenchmarkNewPointV2(b *T.B) {
+	b.Run(`with-maps`, func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			tags := map[string]string{
+				"t1": "val1",
+				"t2": "val2",
+				"t3": "val3",
+				"t4": "val4",
+				"t5": "val5",
+				"t6": "val6",
+				"t7": "val7",
+				"t8": "val8",
+				"t9": "val9",
+				"t0": "val0",
+			}
+			fields := map[string]interface{}{
+				"f1":  123,
+				"f2":  "abc",
+				"f3":  45.6,
+				"f4":  123,
+				"f5":  "abc",
+				"f6":  45.6,
+				"f7":  123,
+				"f8":  "abc",
+				"f9":  45.6,
+				"f10": false,
+			}
+
+			NewPointV2("abc", append(NewTags(tags), NewKVs(fields)...))
+		}
+	})
+
+	b.Run(`without-map-without-prealloc`, func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			var kvs KVs
+			kvs = kvs.AddTag("t1", "val1")
+			kvs = kvs.AddTag("t2", "val2")
+			kvs = kvs.AddTag("t3", "val3")
+			kvs = kvs.AddTag("t4", "val4")
+			kvs = kvs.AddTag("t5", "val5")
+			kvs = kvs.AddTag("t6", "val6")
+			kvs = kvs.AddTag("t7", "val7")
+			kvs = kvs.AddTag("t8", "val8")
+			kvs = kvs.AddTag("t9", "val9")
+			kvs = kvs.AddTag("t0", "val0")
+
+			kvs = kvs.Add("f1", 123, false, false)
+			kvs = kvs.Add("f2", "abc", false, false)
+			kvs = kvs.Add("f3", 45.6, false, false)
+			kvs = kvs.Add("f4", 123, false, false)
+			kvs = kvs.Add("f5", "abc", false, false)
+			kvs = kvs.Add("f6", 45.6, false, false)
+			kvs = kvs.Add("f7", 123, false, false)
+			kvs = kvs.Add("f8", "abc", false, false)
+			kvs = kvs.Add("f9", 45.6, false, false)
+			kvs = kvs.Add("f10", false, false, false)
+
+			NewPointV2("abc", kvs)
+		}
+	})
+
+	b.Run(`without-map-with-prealloc`, func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			kvs := make(KVs, 0, 20)
+			kvs = kvs.AddTag("t1", "val1")
+			kvs = kvs.AddTag("t2", "val2")
+			kvs = kvs.AddTag("t3", "val3")
+			kvs = kvs.AddTag("t5", "val4")
+			kvs = kvs.AddTag("t5", "val5")
+			kvs = kvs.AddTag("t6", "val6")
+			kvs = kvs.AddTag("t7", "val7")
+			kvs = kvs.AddTag("t8", "val8")
+			kvs = kvs.AddTag("t9", "val9")
+			kvs = kvs.AddTag("t0", "val0")
+
+			kvs = kvs.Add("f1", 123, false, false)
+			kvs = kvs.Add("f2", "abc", false, false)
+			kvs = kvs.Add("f3", 45.6, false, false)
+			kvs = kvs.Add("f4", 123, false, false)
+			kvs = kvs.Add("f5", "abc", false, false)
+			kvs = kvs.Add("f6", 45.6, false, false)
+			kvs = kvs.Add("f7", 123, false, false)
+			kvs = kvs.Add("f8", "abc", false, false)
+			kvs = kvs.Add("f9", 45.6, false, false)
+			kvs = kvs.Add("f10", false, false, false)
+
+			NewPointV2("abc", kvs)
+		}
+	})
+
+	b.Run(`without-map-with-prealloc-and-MUST`, func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			kvs := make(KVs, 0, 20)
+			kvs = kvs.MustAddTag("t1", "val1")
+			kvs = kvs.MustAddTag("t2", "val2")
+			kvs = kvs.MustAddTag("t3", "val3")
+			kvs = kvs.MustAddTag("t4", "val4")
+			kvs = kvs.MustAddTag("t5", "val5")
+			kvs = kvs.MustAddTag("t6", "val6")
+			kvs = kvs.MustAddTag("t7", "val7")
+			kvs = kvs.MustAddTag("t8", "val8")
+			kvs = kvs.MustAddTag("t9", "val9")
+			kvs = kvs.MustAddTag("t0", "val0")
+
+			kvs = kvs.Add("f1", 123, false, true)
+			kvs = kvs.Add("f2", "abc", false, true)
+			kvs = kvs.Add("f3", 45.6, false, true)
+			kvs = kvs.Add("f4", 123, false, true)
+			kvs = kvs.Add("f5", "abc", false, true)
+			kvs = kvs.Add("f6", 45.6, false, true)
+			kvs = kvs.Add("f7", 123, false, true)
+			kvs = kvs.Add("f8", "abc", false, true)
+			kvs = kvs.Add("f9", 45.6, false, true)
+			kvs = kvs.Add("f10", false, false, true)
+
+			NewPointV2("abc", kvs)
 		}
 	})
 }

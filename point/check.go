@@ -159,7 +159,7 @@ func (c *checker) checkTag(f *Field) *Field {
 	}
 
 	if c.keyDisabled(NewTagKey(f.Key, "")) {
-		c.addWarn(WarnTagDisabled, fmt.Sprintf("tag key `%s' disabled", string(f.Key)))
+		c.addWarn(WarnTagDisabled, fmt.Sprintf("tag key `%s' disabled", f.Key))
 		return nil
 	}
 
@@ -208,11 +208,11 @@ func (c *checker) checkField(f *Field) *Field {
 			}
 		}
 
-	case *Field_F, *Field_B, *Field_I:
+	case *Field_F, *Field_B, *Field_I, *Field_A:
 		return f
 
 	case nil:
-		c.addWarn(WarnNilField, fmt.Sprintf("nil field(%s)", string(f.Key)))
+		c.addWarn(WarnNilField, fmt.Sprintf("nil field(%s)", f.Key))
 		return f
 
 	case *Field_D: // same as []uint8
@@ -226,7 +226,7 @@ func (c *checker) checkField(f *Field) *Field {
 		if c.cfg.maxFieldValLen > 0 && len(x.D) > c.cfg.maxFieldValLen {
 			c.addWarn(WarnMaxFieldValueLen,
 				fmt.Sprintf("field (%s) exceed max field value length(%d), got %d, value truncated",
-					string(f.Key), c.cfg.maxFieldValLen, len(x.D)))
+					f.Key, c.cfg.maxFieldValLen, len(x.D)))
 
 			f.Val = &Field_D{D: x.D[:c.cfg.maxFieldValLen]}
 		}
@@ -244,7 +244,7 @@ func (c *checker) checkField(f *Field) *Field {
 		if c.cfg.maxFieldValLen > 0 && len(x.S) > c.cfg.maxFieldValLen {
 			c.addWarn(WarnMaxFieldValueLen,
 				fmt.Sprintf("field (%s) exceed max field value length(%d), got %d, value truncated",
-					string(f.Key), c.cfg.maxFieldValLen, len(x.S)))
+					f.Key, c.cfg.maxFieldValLen, len(x.S)))
 
 			f.Val = &Field_S{S: x.S[:c.cfg.maxFieldValLen]}
 		}
@@ -253,7 +253,8 @@ func (c *checker) checkField(f *Field) *Field {
 
 	default:
 		c.addWarn(WarnInvalidFieldValueType,
-			fmt.Sprintf("invalid field (%s), value: %s, type: %s", string(f.Key), f.Val, reflect.TypeOf(f.Val)))
+			fmt.Sprintf("invalid field (%s), value: %s, type: %s",
+				f.Key, f.Val, reflect.TypeOf(f.Val)))
 		return nil
 	}
 }

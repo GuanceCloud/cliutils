@@ -892,7 +892,7 @@ abc f1=1i,f2=2,f3="abc" 789
 			opts: []Option{
 				WithTime(time.Unix(0, 123)),
 				WithCallback(func(p *Point) (*Point, error) {
-					if string(p.Name()) == "abc" {
+					if p.Name() == "abc" {
 						t.Logf("haha, we get measurement `abc'")
 					}
 					return p, nil

@@ -7,7 +7,7 @@ package http
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -61,7 +61,7 @@ func TestHTTPWrapperWithMetricReporter(t *testing.T) {
 			t.Error(err)
 		}
 
-		body, err = ioutil.ReadAll(resp.Body)
+		body, err = io.ReadAll(resp.Body)
 		if err != nil {
 			t.Error(err)
 		}
@@ -111,7 +111,7 @@ func TestHTTPWrapperWithRateLimit(t *testing.T) {
 			t.Error(err)
 		}
 
-		body, err = ioutil.ReadAll(resp.Body)
+		body, err = io.ReadAll(resp.Body)
 		if err != nil {
 			t.Error(err)
 		}

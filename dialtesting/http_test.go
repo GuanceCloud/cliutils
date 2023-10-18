@@ -10,7 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -391,7 +391,7 @@ var httpCases = []struct {
 func prepareSSL(t *testing.T) {
 	t.Helper()
 	for k, v := range tlsData {
-		if err := ioutil.WriteFile("."+k+".pem", v, 0o644); err != nil {
+		if err := os.WriteFile("."+k+".pem", v, 0o644); err != nil {
 			t.Error(err)
 		}
 	}
@@ -691,7 +691,7 @@ func addTestingRoutes(t *testing.T, r *gin.Engine, https bool) {
 
 	r.POST("/_test_with_body", func(c *gin.Context) {
 		defer c.Request.Body.Close() //nolint:errcheck
-		body, err := ioutil.ReadAll(c.Request.Body)
+		body, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			t.Error(err)
 		}

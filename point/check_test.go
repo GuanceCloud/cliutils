@@ -42,7 +42,7 @@ func TestCheckMeasurement(t *testing.T) {
 		{
 			name:        "empty-measurement",
 			measurement: "",
-			expect:      string(DefaultMeasurementName),
+			expect:      DefaultMeasurementName,
 		},
 
 		{
@@ -51,7 +51,7 @@ func TestCheckMeasurement(t *testing.T) {
 			opts: []Option{
 				WithMaxMeasurementLen(3),
 			},
-			expect: string(DefaultMeasurementName[:3]),
+			expect: DefaultMeasurementName[:3],
 		},
 
 		{
@@ -80,7 +80,7 @@ func TestCheckMeasurement(t *testing.T) {
 
 			c := checker{cfg: cfg}
 			m := c.checkMeasurement(tc.measurement)
-			assert.Equal(t, tc.expect, string(m))
+			assert.Equal(t, tc.expect, m)
 		})
 	}
 }
@@ -347,10 +347,10 @@ func TestCheckFields(t *T.T) {
 				"int16":        int64(12345),
 				"int32":        int64(1234567),
 				"int64":        int64(123456789),
-				"uint":         int64(1),
-				"uint8":        int64(1),
-				"uint16":       int64(12345),
-				"uint32":       int64(1234567),
+				"uint":         uint64(1),
+				"uint8":        uint64(1),
+				"uint16":       uint64(12345),
+				"uint32":       uint64(1234567),
 				"uint64":       uint64(12345678),
 				"float32":      float32(1.234),
 				"float64":      float64(1.234),
@@ -412,7 +412,7 @@ def`,
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
-			assert.Equal(t, tc.y, string(adjustKV(tc.x)))
+			assert.Equal(t, tc.y, adjustKV(tc.x))
 		})
 	}
 }
