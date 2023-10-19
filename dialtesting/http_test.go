@@ -8,7 +8,7 @@ package dialtesting
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -616,7 +616,7 @@ func addTestingRoutes(t *testing.T, r *gin.Engine, proxyServer *httptest.Server,
 
 	r.POST("/_test_with_body", func(c *gin.Context) {
 		defer c.Request.Body.Close() //nolint:errcheck
-		body, err := ioutil.ReadAll(c.Request.Body)
+		body, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			t.Error(err)
 		}

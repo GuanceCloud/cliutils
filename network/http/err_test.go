@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -45,7 +45,7 @@ func TestBytesBody(t *testing.T) {
 
 	defer resp.Body.Close()
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Error(err)
 	}
@@ -95,7 +95,7 @@ func TestNoSniff(t *testing.T) {
 			for k := range resp.Header {
 				t.Logf("%s: %s", k, resp.Header.Get(k))
 			}
-			body, _ := ioutil.ReadAll(resp.Body)
+			body, _ := io.ReadAll(resp.Body)
 			t.Logf("body: %s", body)
 			resp.Body.Close()
 		})
@@ -233,7 +233,7 @@ func TestHTTPErr(t *testing.T) {
 			}
 
 			if resp.Body != nil {
-				body, err := ioutil.ReadAll(resp.Body)
+				body, err := io.ReadAll(resp.Body)
 				if err != nil {
 					t.Error(err)
 					return

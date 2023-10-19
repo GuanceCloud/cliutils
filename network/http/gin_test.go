@@ -6,12 +6,12 @@
 package http
 
 import (
-	"github.com/GuanceCloud/cliutils/testutil"
 	"io"
 	"net/http"
 	"testing"
 	"time"
 
+	"github.com/GuanceCloud/cliutils/testutil"
 	"github.com/gin-gonic/gin"
 )
 
@@ -112,7 +112,6 @@ func TestCORSHeaders_Add(t *testing.T) {
 
 	h5 := defaultCORSHeader.Add("x-forwarded-for ,x-real-ip , x-client-ip")
 	testutil.Equals(t, "X-Forwarded-For, X-Real-Ip, X-Client-Ip, "+defaultHeaders, h5)
-
 }
 
 func TestMiddlewares(t *testing.T) {

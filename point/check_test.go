@@ -8,6 +8,7 @@ package point
 import (
 	"fmt"
 	"math"
+	"sort"
 	"testing"
 	T "testing"
 
@@ -41,7 +42,7 @@ func TestCheckMeasurement(t *testing.T) {
 		{
 			name:        "empty-measurement",
 			measurement: "",
-			expect:      string(DefaultMeasurementName),
+			expect:      DefaultMeasurementName,
 		},
 
 		{
@@ -50,7 +51,7 @@ func TestCheckMeasurement(t *testing.T) {
 			opts: []Option{
 				WithMaxMeasurementLen(3),
 			},
-			expect: string(DefaultMeasurementName[:3]),
+			expect: DefaultMeasurementName[:3],
 		},
 
 		{
@@ -78,8 +79,8 @@ func TestCheckMeasurement(t *testing.T) {
 			}
 
 			c := checker{cfg: cfg}
-			m := c.checkMeasurement([]byte(tc.measurement))
-			assert.Equal(t, tc.expect, string(m))
+			m := c.checkMeasurement(tc.measurement)
+			assert.Equal(t, tc.expect, m)
 		})
 	}
 }
@@ -99,7 +100,7 @@ func TestCheckTags(t *T.T) {
 				"t2": "23456",
 			},
 			opts: []Option{
-				WithDisabledKeys(NewTagKey([]byte(`t1`), nil)),
+				WithDisabledKeys(NewTagKey(`t1`, "")),
 			},
 			warns: 1,
 			expect: NewTags(
@@ -187,10 +188,18 @@ func TestCheckFields(t *T.T) {
 		{
 			name: "exceed-max-field-count",
 			f: map[string]interface{}{
-				"f1": "aaaaaa1", "f2": "aaaaaa2", "f3": "aaaaaa3", "f4": "aaaaaa4", "f5": "aaaaaa5",
-				"f6": "aaaaaa6", "f7": "aaaaaa7", "f8": "aaaaaa8", "f9": "aaaaaa9", "f0": "aaaaaa0",
+				"f1": "aaaaaa1",
+				"f2": "aaaaaa2",
+				"f3": "aaaaaa3",
+				"f4": "aaaaaa4",
+				"f5": "aaaaaa5",
+				"f6": "aaaaaa6",
+				"f7": "aaaaaa7",
+				"f8": "aaaaaa8",
+				"f9": "aaaaaa9",
+				"f0": "aaaaaa0",
 			},
-			opts:  []Option{WithMaxFields(1)},
+			opts:  []Option{WithMaxFields(1), WithKeySorted(true)},
 			warns: 1,
 			expect: map[string]interface{}{
 				"f0": "aaaaaa0",
@@ -306,7 +315,7 @@ func TestCheckFields(t *T.T) {
 				"b": "12345",
 			},
 			warns: 1,
-			opts:  []Option{WithDisabledKeys(NewKey([]byte("a"), KeyType_I))},
+			opts:  []Option{WithDisabledKeys(NewKey("a", KeyType_I))},
 			expect: map[string]interface{}{
 				"b": "12345",
 			},
@@ -338,10 +347,10 @@ func TestCheckFields(t *T.T) {
 				"int16":        int64(12345),
 				"int32":        int64(1234567),
 				"int64":        int64(123456789),
-				"uint":         int64(1),
-				"uint8":        int64(1),
-				"uint16":       int64(12345),
-				"uint32":       int64(1234567),
+				"uint":         uint64(1),
+				"uint8":        uint64(1),
+				"uint16":       uint64(12345),
+				"uint32":       uint64(1234567),
 				"uint64":       uint64(12345678),
 				"float32":      float32(1.234),
 				"float64":      float64(1.234),
@@ -356,15 +365,23 @@ func TestCheckFields(t *T.T) {
 			defer PutCfg(cfg)
 
 			for _, opt := range tc.opts {
-				t.Logf("set opt: %+#v", opt)
 				opt(cfg)
 			}
 
-			c := checker{cfg: cfg}
-			kvs := c.checkKVs(NewKVs(tc.f))
+			t.Logf("cfg: %+#v", cfg)
 
-			require.Equal(t, tc.warns, len(c.warns))
+			c := checker{cfg: cfg}
+
+			kvs := NewKVs(tc.f)
 			expect := NewKVs(tc.expect)
+
+			if cfg.keySorted {
+				sort.Sort(kvs)
+				sort.Sort(expect)
+			}
+
+			kvs = c.checkKVs(kvs)
+			require.Equal(t, tc.warns, len(c.warns))
 
 			if tc.expect != nil {
 				eq, _ := kvsEq(expect, kvs)
@@ -395,16 +412,16 @@ def`,
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
-			assert.Equal(t, tc.y, string(adjustKV([]byte(tc.x))))
+			assert.Equal(t, tc.y, adjustKV(tc.x))
 		})
 	}
 }
 
 func TestRequiredKV(t *T.T) {
 	t.Run(`add`, func(t *T.T) {
-		pt := NewPointV2([]byte(`abc`), NewKVs(map[string]any{"f1": 123}),
-			WithRequiredKeys(NewKey([]byte(`rk`), KeyType_I, 1024)))
-		assert.Equal(t, int64(1024), pt.Get([]byte(`rk`)))
+		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123}),
+			WithRequiredKeys(NewKey(`rk`, KeyType_I, 1024)))
+		assert.Equal(t, int64(1024), pt.Get(`rk`))
 	})
 }
 

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sort"
 	"testing"
 	T "testing"
 	"time"
@@ -51,7 +52,7 @@ func getNFields(n int) map[string]interface{} {
 
 func TestV2NewPoint(t *T.T) {
 	t.Run("valid-fields", func(t *T.T) {
-		pt := NewPointV2([]byte("abc"), NewKVs(
+		pt := NewPointV2("abc", NewKVs(
 			map[string]interface{}{
 				"[]byte":  []byte("abc"),
 				"[]uint8": []uint8("abc"),
@@ -101,14 +102,14 @@ func TestV2NewPoint(t *T.T) {
 			"u64-large": uint64(math.MaxInt64 + 1), // skipped in expect string
 			"u8":        uint8(1),
 		}
-		pt := NewPointV2([]byte(`abc`), NewKVs(kvs), WithTime(time.Unix(0, 123)), WithEncoding(Protobuf))
+		pt := NewPointV2(`abc`, NewKVs(kvs), WithTime(time.Unix(0, 123)), WithEncoding(Protobuf))
 		expect := `abc []byte="abc",[]uint8="abc",b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1i,u16=1i,u32=1i,u64=1i,u8=1i 123`
 		assert.Equal(t, expect, pt.LineProto())
 	})
 
 	t.Run("basic", func(t *T.T) {
-		kvs := NewKVs(map[string]interface{}{"f1": 12}).MustAddTag([]byte(`t1`), []byte(`tval1`))
-		pt := NewPointV2([]byte(`abc`), kvs, WithTime(time.Unix(0, 123)))
+		kvs := NewKVs(map[string]interface{}{"f1": 12}).MustAddTag(`t1`, `tval1`)
+		pt := NewPointV2(`abc`, kvs, WithTime(time.Unix(0, 123)))
 
 		assert.Equal(t, "abc,t1=tval1 f1=12i 123", pt.LineProto())
 	})
@@ -257,31 +258,81 @@ func TestNewPoint(t *T.T) {
 		},
 
 		{
-			tname:  "both-exceed-max-field-tag-count",
-			name:   "abc",
-			t:      map[string]string{"t1": "abc", "t2": "xyz"},
-			f:      map[string]interface{}{"f1": 123, "f2": "def"},
-			opts:   []Option{WithTime(time.Unix(0, 123)), WithMaxTags(1), WithMaxFields(1)},
+			tname: "both-exceed-max-field-tag-count",
+			name:  "abc",
+			t: map[string]string{
+				"t1": "abc",
+				"t2": "xyz",
+				"t3": "abc",
+				"t4": "xyz",
+				"t5": "abc",
+				"t6": "abc",
+				"t7": "abc",
+				"t8": "abc",
+				"t9": "abc",
+			},
+			f: map[string]interface{}{
+				"f1": 123,
+				"f2": "def",
+				"f3": "def",
+				"f4": "def",
+				"f5": "def",
+				"f6": "def",
+				"f7": "def",
+				"f8": "def",
+				"f9": "def",
+			},
+			opts: []Option{
+				WithTime(time.Unix(0, 123)),
+				WithMaxTags(1),
+				WithMaxFields(1),
+				WithKeySorted(true),
+			},
 			expect: `abc,t1=abc f1=123i 123`,
 			warns:  2,
 		},
 
 		{
-			tname:  "exceed-max-field-count",
-			name:   "abc",
-			t:      map[string]string{"t1": "abc", "t2": "xyz"},
-			opts:   []Option{WithTime(time.Unix(0, 123)), WithMaxFields(1)},
-			f:      map[string]interface{}{"f1": 123, "f2": "def"},
+			tname: "exceed-max-field-count",
+			name:  "abc",
+			opts:  []Option{WithTime(time.Unix(0, 123)), WithMaxFields(1), WithKeySorted(true)},
+			t: map[string]string{
+				"t1": "abc",
+				"t2": "xyz",
+			},
+			f: map[string]interface{}{
+				"f1": 123,
+				"f2": "def",
+				"f3": "def",
+				"f4": "def",
+				"f5": "def",
+				"f6": "def",
+				"f7": "def",
+				"f8": "def",
+				"f9": "def",
+			},
 			expect: `abc,t1=abc,t2=xyz f1=123i 123`,
 			warns:  1,
 		},
 
 		{
-			tname:  "exceed-max-tag-count",
-			opts:   []Option{WithTime(time.Unix(0, 123)), WithMaxTags(1)},
-			name:   "abc",
-			t:      map[string]string{"t1": "abc", "t2": "xyz"},
-			f:      map[string]interface{}{"f1": 123},
+			tname: "exceed-max-tag-count",
+			opts:  []Option{WithTime(time.Unix(0, 123)), WithMaxTags(1), WithKeySorted(true)},
+			name:  "abc",
+			t: map[string]string{
+				"t1": "abc",
+				"t2": "xyz",
+				"t3": "abc",
+				"t4": "xyz",
+				"t5": "abc",
+				"t6": "abc",
+				"t7": "abc",
+				"t8": "abc",
+				"t9": "abc",
+			},
+			f: map[string]interface{}{
+				"f1": 123,
+			},
 			expect: `abc,t1=abc f1=123i 123`,
 			warns:  1,
 		},
@@ -390,6 +441,74 @@ func TestNewPoint(t *T.T) {
 	}
 }
 
+func TestPointKeySorted(t *testing.T) {
+	t.Run("sorted", func(t *testing.T) {
+		pt, err := NewPoint("basic",
+			map[string]string{
+				"t1": "v1",
+				"t2": "v2",
+				"t3": "v1",
+				"t4": "v2",
+				"t5": "v1",
+				"t6": "v2",
+				"t7": "v1",
+				"t8": "v2",
+			},
+			map[string]any{
+				"f1": 1,
+				"f2": 2,
+				"f3": 3,
+				"f4": 1,
+				"f5": 2,
+				"f6": 3,
+				"f7": 1,
+				"f8": 2,
+				"f9": 3,
+			},
+			WithKeySorted(true),
+		)
+
+		assert.NoError(t, err)
+
+		assert.True(t, sort.IsSorted(pt.kvs))
+
+		t.Logf("pt: %s", pt.Pretty())
+	})
+
+	t.Run("not-sorted", func(t *testing.T) {
+		pt, err := NewPoint("basic",
+			map[string]string{
+				"t1": "v1",
+				"t2": "v2",
+				"t3": "v1",
+				"t4": "v2",
+				"t5": "v1",
+				"t6": "v2",
+				"t7": "v1",
+				"t8": "v2",
+			},
+			map[string]any{
+				"f1": 1,
+				"f2": 2,
+				"f3": 3,
+				"f4": 1,
+				"f5": 2,
+				"f6": 3,
+				"f7": 1,
+				"f8": 2,
+				"f9": 3,
+			},
+			WithKeySorted(false),
+		)
+
+		assert.NoError(t, err)
+
+		assert.False(t, sort.IsSorted(pt.kvs))
+
+		t.Logf("pt: %s", pt.Pretty())
+	})
+}
+
 var (
 	__largeKeyForBench = cliutils.CreateRandomString(128)
 	__largeValForBench = cliutils.CreateRandomString(1024)
@@ -472,7 +591,7 @@ var benchCases = []struct {
 
 func BenchmarkNewPoint(b *T.B) {
 	b.Run(`with-pool-cfg`, func(b *T.B) {
-		ptName := []byte(`abc`)
+		ptName := `abc`
 		kvs := NewKVs(map[string]any{"f1": 123, "f2": 3.14})
 		for i := 0; i < b.N; i++ {
 			NewPointV2(ptName, kvs)
@@ -480,10 +599,172 @@ func BenchmarkNewPoint(b *T.B) {
 	})
 
 	b.Run(`without-pool-cfg`, func(b *T.B) {
-		ptName := []byte(`abc`)
+		ptName := `abc`
 		kvs := NewKVs(map[string]any{"f1": 123, "f2": 3.14})
 		for i := 0; i < b.N; i++ {
 			doNewPoint(ptName, kvs, newCfg()) // slower ~17% than pooled
+		}
+	})
+
+	b.Run(`with-key-sorted`, func(b *T.B) {
+		ptName := `abc`
+		kvs := NewKVs(map[string]any{
+			"f1": 123,
+			"f2": 3.14,
+			"f3": "str",
+
+			"_f1": 123,
+			"_f2": 3.14,
+			"_f3": "str",
+
+			"_f1_": 123,
+			"_f2_": 3.14,
+			"_f3_": "str",
+		})
+
+		for i := 0; i < b.N; i++ {
+			NewPointV2(ptName, kvs, WithKeySorted(true))
+		}
+	})
+
+	b.Run(`without-key-sorted`, func(b *T.B) {
+		ptName := `abc`
+		kvs := NewKVs(map[string]any{
+			"f1": 123,
+			"f2": 3.14,
+			"f3": "str",
+
+			"_f1": 123,
+			"_f2": 3.14,
+			"_f3": "str",
+
+			"_f1_": 123,
+			"_f2_": 3.14,
+			"_f3_": "str",
+		})
+
+		for i := 0; i < b.N; i++ {
+			NewPointV2(ptName, kvs)
+		}
+	})
+}
+
+func BenchmarkNewPointV2(b *T.B) {
+	b.Run(`with-maps`, func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			tags := map[string]string{
+				"t1": "val1",
+				"t2": "val2",
+				"t3": "val3",
+				"t4": "val4",
+				"t5": "val5",
+				"t6": "val6",
+				"t7": "val7",
+				"t8": "val8",
+				"t9": "val9",
+				"t0": "val0",
+			}
+			fields := map[string]interface{}{
+				"f1":  123,
+				"f2":  "abc",
+				"f3":  45.6,
+				"f4":  123,
+				"f5":  "abc",
+				"f6":  45.6,
+				"f7":  123,
+				"f8":  "abc",
+				"f9":  45.6,
+				"f10": false,
+			}
+
+			NewPointV2("abc", append(NewTags(tags), NewKVs(fields)...))
+		}
+	})
+
+	b.Run(`without-map-without-prealloc`, func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			var kvs KVs
+			kvs = kvs.AddTag("t1", "val1")
+			kvs = kvs.AddTag("t2", "val2")
+			kvs = kvs.AddTag("t3", "val3")
+			kvs = kvs.AddTag("t4", "val4")
+			kvs = kvs.AddTag("t5", "val5")
+			kvs = kvs.AddTag("t6", "val6")
+			kvs = kvs.AddTag("t7", "val7")
+			kvs = kvs.AddTag("t8", "val8")
+			kvs = kvs.AddTag("t9", "val9")
+			kvs = kvs.AddTag("t0", "val0")
+
+			kvs = kvs.Add("f1", 123, false, false)
+			kvs = kvs.Add("f2", "abc", false, false)
+			kvs = kvs.Add("f3", 45.6, false, false)
+			kvs = kvs.Add("f4", 123, false, false)
+			kvs = kvs.Add("f5", "abc", false, false)
+			kvs = kvs.Add("f6", 45.6, false, false)
+			kvs = kvs.Add("f7", 123, false, false)
+			kvs = kvs.Add("f8", "abc", false, false)
+			kvs = kvs.Add("f9", 45.6, false, false)
+			kvs = kvs.Add("f10", false, false, false)
+
+			NewPointV2("abc", kvs)
+		}
+	})
+
+	b.Run(`without-map-with-prealloc`, func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			kvs := make(KVs, 0, 20)
+			kvs = kvs.AddTag("t1", "val1")
+			kvs = kvs.AddTag("t2", "val2")
+			kvs = kvs.AddTag("t3", "val3")
+			kvs = kvs.AddTag("t5", "val4")
+			kvs = kvs.AddTag("t5", "val5")
+			kvs = kvs.AddTag("t6", "val6")
+			kvs = kvs.AddTag("t7", "val7")
+			kvs = kvs.AddTag("t8", "val8")
+			kvs = kvs.AddTag("t9", "val9")
+			kvs = kvs.AddTag("t0", "val0")
+
+			kvs = kvs.Add("f1", 123, false, false)
+			kvs = kvs.Add("f2", "abc", false, false)
+			kvs = kvs.Add("f3", 45.6, false, false)
+			kvs = kvs.Add("f4", 123, false, false)
+			kvs = kvs.Add("f5", "abc", false, false)
+			kvs = kvs.Add("f6", 45.6, false, false)
+			kvs = kvs.Add("f7", 123, false, false)
+			kvs = kvs.Add("f8", "abc", false, false)
+			kvs = kvs.Add("f9", 45.6, false, false)
+			kvs = kvs.Add("f10", false, false, false)
+
+			NewPointV2("abc", kvs)
+		}
+	})
+
+	b.Run(`without-map-with-prealloc-and-MUST`, func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			kvs := make(KVs, 0, 20)
+			kvs = kvs.MustAddTag("t1", "val1")
+			kvs = kvs.MustAddTag("t2", "val2")
+			kvs = kvs.MustAddTag("t3", "val3")
+			kvs = kvs.MustAddTag("t4", "val4")
+			kvs = kvs.MustAddTag("t5", "val5")
+			kvs = kvs.MustAddTag("t6", "val6")
+			kvs = kvs.MustAddTag("t7", "val7")
+			kvs = kvs.MustAddTag("t8", "val8")
+			kvs = kvs.MustAddTag("t9", "val9")
+			kvs = kvs.MustAddTag("t0", "val0")
+
+			kvs = kvs.Add("f1", 123, false, true)
+			kvs = kvs.Add("f2", "abc", false, true)
+			kvs = kvs.Add("f3", 45.6, false, true)
+			kvs = kvs.Add("f4", 123, false, true)
+			kvs = kvs.Add("f5", "abc", false, true)
+			kvs = kvs.Add("f6", 45.6, false, true)
+			kvs = kvs.Add("f7", 123, false, true)
+			kvs = kvs.Add("f8", "abc", false, true)
+			kvs = kvs.Add("f9", 45.6, false, true)
+			kvs = kvs.Add("f10", false, false, true)
+
+			NewPointV2("abc", kvs)
 		}
 	})
 }

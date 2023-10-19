@@ -8,7 +8,7 @@ package logger
 
 import (
 	"fmt"
-	"io/ioutil"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -129,7 +129,7 @@ func newRootLogger(fpath, level string, options int) (*zap.Logger, error) {
 			}
 
 			// create empty log file
-			if err := ioutil.WriteFile(fpath, nil, 0o600); err != nil {
+			if err := os.WriteFile(fpath, nil, 0o600); err != nil {
 				return nil, fmt.Errorf("WriteFile(%s): %w", fpath, err)
 			}
 		}
@@ -139,7 +139,6 @@ func newRootLogger(fpath, level string, options int) (*zap.Logger, error) {
 	if options&OPT_ROTATE != 0 &&
 		options&OPT_STDOUT == 0 && // can't rotate stdout
 		fpath != os.DevNull { // can't rotate(rename) /dev/null
-
 		return newCustomizeRootLogger(level, options, &lumberjack.Logger{
 			Filename:   fpath,
 			MaxSize:    MaxSize,
@@ -167,7 +166,14 @@ func InitCustomizeRoot(opt *Option) (*zap.Logger, error) {
 	}
 
 	c := cron.New(cron.WithSeconds())
-	c.AddFunc("50 59 * * * *", func() { lumberLog.Rotate() })
+	if _, err := c.AddFunc("50 59 * * * *",
+		func() {
+			if err := lumberLog.Rotate(); err != nil {
+				log.Printf("lumberLog.Rotate: %s, ignored", err.Error())
+			}
+		}); err != nil {
+		return nil, err
+	}
 	c.Start()
 
 	return newOnlyMessageRootLogger(lumberLog)

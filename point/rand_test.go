@@ -6,6 +6,7 @@
 package point
 
 import (
+	"sort"
 	"strings"
 	T "testing"
 	"time"
@@ -32,7 +33,7 @@ func TestPointRander(t *T.T) {
 
 		for _, tag := range tags {
 			require.Equal(t, defKeyLen, len(tag.Key))
-			require.Equal(t, defValLen, len(tag.GetD()))
+			require.Equal(t, defValLen, len(tag.GetS()))
 		}
 
 		for _, f := range fs {
@@ -51,7 +52,7 @@ func TestPointRander(t *T.T) {
 	t.Run("with-measurement-prefix", func(t *T.T) {
 		r := NewRander(WithRandMeasurementPrefix("abc_"))
 		pts := r.Rand(1)
-		require.True(t, strings.HasPrefix(string(pts[0].Name()), "abc_"))
+		require.True(t, strings.HasPrefix(pts[0].Name(), "abc_"))
 
 		t.Logf("point: %s", pts[0].Pretty())
 	})
@@ -80,9 +81,9 @@ func TestPointRander(t *T.T) {
 		fs := pts[0].Fields()
 		require.True(t, len(fs) > 0)
 
-		require.True(t, fs.Has([]byte("message")), "fields: %s", fs.Pretty())
-		require.True(t, fs.Has([]byte("error_message")))
-		require.True(t, fs.Has([]byte("error_stack")))
+		require.True(t, fs.Has("message"), "fields: %s", fs.Pretty())
+		require.True(t, fs.Has("error_message"))
+		require.True(t, fs.Has("error_stack"))
 
 		t.Logf("point: %s", pts[0].Pretty())
 	})
@@ -131,7 +132,7 @@ func TestPointRander(t *T.T) {
 
 		for _, tag := range tags {
 			require.Equal(t, klen, len(tag.Key))
-			require.Equal(t, vlen, len(tag.GetD()))
+			require.Equal(t, vlen, len(tag.GetS()))
 		}
 	})
 }
@@ -165,6 +166,10 @@ func TestWithFixKeys(t *T.T) {
 		pt1 := r.Rand(1)[0]
 		pt2 := r.Rand(1)[0]
 
+		// NOTE: sort kvs to keep assert ok
+		sort.Sort(pt1.kvs)
+		sort.Sort(pt2.kvs)
+
 		pt1tags := pt1.Tags()
 		pt2tags := pt2.Tags()
 		for idx, tag := range pt1tags {
@@ -175,7 +180,13 @@ func TestWithFixKeys(t *T.T) {
 		pt2fs := pt2.Fields()
 		t.Logf("field keys: %v", r.fieldKeys)
 		for idx, f := range pt1fs {
-			require.Equal(t, pt2fs[idx].Key, f.Key, "%d not equal:\npt1: %s\n\npt2: %s", idx, pt1.kvs.Pretty(), pt2.kvs.Pretty())
+			require.Equal(t,
+				pt2fs[idx].Key,
+				f.Key,
+				"%d not equal:\npt1: %s\n\npt2: %s",
+				idx,
+				pt1.kvs.Pretty(),
+				pt2.kvs.Pretty())
 		}
 	})
 }

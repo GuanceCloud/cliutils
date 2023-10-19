@@ -15,13 +15,13 @@ import (
 
 func TestSet(t *testing.T) {
 	t.Run(`set-name`, func(t *T.T) {
-		p := NewPointV2([]byte(`abc`), nil)
+		p := NewPointV2(`abc`, nil)
 		p.SetName("def")
-		assert.Equal(t, []byte(`def`), p.Name())
+		assert.Equal(t, `def`, p.Name())
 	})
 
 	t.Run(`set-time`, func(t *T.T) {
-		p := NewPointV2([]byte(`abc`), nil, WithTime(time.Unix(0, 123)))
+		p := NewPointV2(`abc`, nil, WithTime(time.Unix(0, 123)))
 		p.SetTime(time.Unix(0, 456))
 		assert.Equal(t, time.Unix(0, 456), p.Time())
 	})

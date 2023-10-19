@@ -6,12 +6,29 @@
 package point
 
 import (
+	"bytes"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestTimeRound(t *testing.T) {
+	t.Run(`decode-time`, func(t *testing.T) {
+		pt := NewPointV2("some", nil, WithTime(time.Now()))
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		data, err := enc.Encode([]*Point{pt})
+		assert.NoError(t, err)
+
+		dec := GetDecoder(WithDecEncoding(Protobuf))
+		pts, err := dec.Decode(data[0])
+		assert.NoError(t, err)
+
+		assert.Equal(t, pt.Pretty(), pts[0].Pretty())
+	})
+}
 
 func TestDecode(t *testing.T) {
 	var fnCalled int
@@ -269,18 +286,16 @@ func BenchmarkDecode(b *testing.B) {
 	r := NewRander(WithFixedTags(true), WithRandText(3))
 	pts := r.Rand(1000)
 
-	b.Logf("pts[0]: %s", pts[0].Pretty())
-	b.Logf("pts[-1]: %s", pts[999].Pretty())
-
 	b.Run("bench-decode-lp", func(b *testing.B) {
 		enc := GetEncoder()
 		defer PutEncoder(enc)
 
 		data, _ := enc.Encode(pts)
 
-		d := GetDecoder()
+		d := GetDecoder(WithDecEncoding(LineProtocol))
 		defer PutDecoder(d)
 
+		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			d.Decode(data[0])
 		}
@@ -295,6 +310,7 @@ func BenchmarkDecode(b *testing.B) {
 		d := GetDecoder(WithDecEncoding(Protobuf))
 		defer PutDecoder(d)
 
+		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			d.Decode(data[0])
 		}
@@ -309,8 +325,49 @@ func BenchmarkDecode(b *testing.B) {
 		d := GetDecoder(WithDecEncoding(JSON))
 		defer PutDecoder(d)
 
+		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			d.Decode(data[0])
+		}
+	})
+}
+
+func BenchmarkBytes2String(b *testing.B) {
+	repeat := 1
+	raw := []byte("xxxxxxxxxxxxxxxx")
+
+	bytesData := bytes.Repeat(raw, repeat)
+	strData := strings.Repeat(string(raw), repeat)
+
+	str := string(raw)
+	b.Logf("str:   %p", &str)
+	b.Logf("bytes: %p", raw)
+	b.Logf("repeat: %p", &repeat)
+
+	b.Logf("str:   %p", &strData)
+	b.Logf("bytes: %p", []byte(strData))
+
+	{
+		y := string(bytesData)
+		_ = y
+		b.Errorf("y: %p, d: %p", &y, bytesData)
+	}
+
+	{
+		b.Errorf("y: %p, d: %p", []byte(strData), &strData)
+	}
+
+	b.Run("bytes2str", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			y := string(raw)
+			_ = y
+		}
+	})
+
+	b.Run("str2bytes", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			y := []byte(strData)
+			_ = y
 		}
 	})
 }
