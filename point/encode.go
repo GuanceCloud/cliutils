@@ -15,23 +15,34 @@ import (
 
 type Encoding int
 
+const (
+	encProtobuf      = "protobuf"
+	encProtobufAlias = "v2"
+	encJSON          = "json"
+
+	encLineprotocolAlias = "v1"
+	encLineprotocol      = "line-protocol"
+
+	contentTypeJSON      = "application/json"
+	contentTypeProtobuf  = "application/protobuf; proto=com.guance.Point"
+	contentTypeLineproto = "application/line-protocol"
+)
+
 // EncodingStr convert encoding-string in configure file to
 // encoding enum.
 //
 // Here v1/v2 are alias for lineprotocol and protobuf, this makes
 // people easy to switch between lineprotocol and protobuf. For
 // json, you should not configure json encoding in production
-// environments.
+// environments(json do not classify int and float).
 func EncodingStr(s string) Encoding {
 	switch strings.ToLower(s) {
-	case "protobuf", "v2":
+	case encProtobuf, encProtobufAlias:
 		return Protobuf
-	case "json":
+	case encJSON:
 		return JSON
-	case "lineproto",
-		"lineprotocol",
-		"line-protocol",
-		"v1":
+	case encLineprotocol,
+		encLineprotocolAlias:
 		return LineProtocol
 	default:
 		return LineProtocol
@@ -40,11 +51,11 @@ func EncodingStr(s string) Encoding {
 
 func HTTPContentType(ct string) Encoding {
 	switch ct {
-	case "application/json":
+	case contentTypeJSON:
 		return JSON
-	case "application/protobuf; proto=com.guance.Point":
+	case contentTypeProtobuf:
 		return Protobuf
-	case "application/line-protocol":
+	case contentTypeLineproto:
 		return LineProtocol
 	default: // default use line-protocol to be compatible with lagacy code
 		return LineProtocol
@@ -54,26 +65,26 @@ func HTTPContentType(ct string) Encoding {
 func (e Encoding) HTTPContentType() string {
 	switch e {
 	case JSON:
-		return "application/json"
+		return contentTypeJSON
 	case Protobuf:
-		return "application/protobuf; proto=com.guance.Point"
+		return contentTypeProtobuf
 	case LineProtocol:
-		return "application/line-protocol"
+		return contentTypeLineproto
 	default: // default use line-protocol to be compatible with lagacy code
-		return "application/line-protocol"
+		return contentTypeLineproto
 	}
 }
 
 func (e Encoding) String() string {
 	switch e {
 	case JSON:
-		return "json"
+		return encJSON
 	case Protobuf:
-		return "protobuf"
+		return encProtobuf
 	case LineProtocol:
-		return "line-protocol"
+		return encLineprotocol
 	default: // default use line-protocol to be compatible with lagacy code
-		return "line-protocol"
+		return encLineprotocol
 	}
 }
 
