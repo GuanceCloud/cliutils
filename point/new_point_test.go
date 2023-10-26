@@ -396,6 +396,7 @@ func TestNewPoint(t *T.T) {
 			// NOTE: tag key `class` override field `class`, then the tag disabled
 			warns: 2,
 		},
+
 		{
 			tname:  "normal",
 			opts:   []Option{WithTime(time.Unix(0, 123))},
