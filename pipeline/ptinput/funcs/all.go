@@ -77,6 +77,7 @@ var FuncsMap = map[string]runtime.FuncCall{
 	"create_point":           CreatePoint,
 	"parse_int":              ParseInt,
 	"format_int":             FormatInt,
+	"pt_name":                PtName,
 	// disable
 	"json_all": JSONAll,
 }
@@ -141,6 +142,7 @@ var FuncsCheckMap = map[string]runtime.FuncCheck{
 	"create_point":           CreatePointChecking,
 	"parse_int":              ParseIntChecking,
 	"format_int":             FormatIntChecking,
+	"pt_name":                PtNameChecking,
 	// disable
 	"json_all": JSONAllChecking,
 }
