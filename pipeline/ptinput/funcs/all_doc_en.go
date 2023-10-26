@@ -182,6 +182,9 @@ var (
 
 	//go:embed md/format_int.en.md
 	docFormatIntEN string
+
+	//go:embed md/pt_name.en.md
+	docPtNameEN string
 )
 
 const (
@@ -557,6 +560,13 @@ var (
 		Doc: docFormatIntEN,
 		FnCategory: map[string][]string{
 			langTagEnUS: {eStringOp},
+		},
+	}
+
+	ptNameMarkdownEN = PLDoc{
+		Doc: docPtNameEN,
+		FnCategory: map[string][]string{
+			langTagEnUS: {eOther},
 		},
 	}
 )
