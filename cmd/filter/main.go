@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 
@@ -31,5 +32,5 @@ func main() {
 		os.Exit(-1)
 	}
 
-	log.Printf("conditions:\n%s", where.String())
+	fmt.Printf("Parse %d conditions ok\n", len(where))
 }
