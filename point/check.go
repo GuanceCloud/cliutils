@@ -32,6 +32,10 @@ func (c *checker) check(pt *Point) *Point {
 }
 
 func (c *checker) addWarn(t, msg string) {
+	defer func() {
+		pointCheckWarnVec.WithLabelValues(t).Inc()
+	}()
+
 	c.warns = append(c.warns, &Warn{
 		Type: t, Msg: msg,
 	})

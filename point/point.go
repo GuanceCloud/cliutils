@@ -361,6 +361,9 @@ func (p *Point) Del(k string) {
 	p.kvs = p.kvs.Del(k)
 }
 
+// AddDebug used to add one or more debug info to the point.
+// These debug info will not build into point's key-values, and
+// only for debugging.
 func (p *Point) AddDebug(d *Debug) {
 	p.debugs = append(p.debugs, d)
 }
