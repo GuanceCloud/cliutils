@@ -113,6 +113,7 @@ retry:
 			if _, serr := c.rfd.Seek(-int64(dataHeaderLen+nbytes), io.SeekCurrent); serr != nil {
 				return serr
 			}
+
 			seekBackVec.WithLabelValues(c.path).Inc()
 			goto __end // do not update .pos
 		}
@@ -122,8 +123,8 @@ __updatePos:
 	// update seek position
 	if !c.noPos {
 		c.pos.Seek += int64(dataHeaderLen + nbytes)
-		if err = c.pos.dumpFile(); err != nil {
-			return err
+		if derr := c.pos.dumpFile(); derr != nil {
+			return derr
 		}
 	}
 
