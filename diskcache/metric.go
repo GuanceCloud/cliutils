@@ -19,6 +19,7 @@ var (
 	getVec,
 	putBytesVec,
 	wakeupVec,
+	seekBackVec,
 	getBytesVec *prometheus.CounterVec
 
 	sizeVec,
@@ -126,6 +127,15 @@ func setupMetrics() {
 		[]string{"path"},
 	)
 
+	seekBackVec = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: ns,
+			Name:      "seek_back_total",
+			Help:      "Seek back when Get() got any error",
+		},
+		[]string{"path"},
+	)
+
 	getBytesVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: ns,
@@ -213,6 +223,7 @@ func setupMetrics() {
 		getVec,
 		putBytesVec,
 		wakeupVec,
+		seekBackVec,
 		getBytesVec,
 
 		openTimeVec,
@@ -237,6 +248,7 @@ func register(reg *prometheus.Registry) {
 		getVec,
 		putBytesVec,
 		wakeupVec,
+		seekBackVec,
 		getBytesVec,
 
 		capVec,
@@ -258,6 +270,7 @@ func ResetMetrics() {
 	getVec.Reset()
 	putBytesVec.Reset()
 	wakeupVec.Reset()
+	seekBackVec.Reset()
 	getBytesVec.Reset()
 	capVec.Reset()
 	batchSizeVec.Reset()
@@ -283,6 +296,7 @@ func Metrics() []prometheus.Collector {
 		getVec,
 		putBytesVec,
 		wakeupVec,
+		seekBackVec,
 		getBytesVec,
 
 		sizeVec,

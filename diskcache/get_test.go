@@ -19,6 +19,8 @@ import (
 
 func TestFallbackOnError(t *T.T) {
 	t.Run(`fallback-on-error`, func(t *T.T) {
+		ResetMetrics()
+
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
 		assert.NoError(t, err)
@@ -28,15 +30,30 @@ func TestFallbackOnError(t *T.T) {
 
 		assert.NoError(t, c.rotate())
 
-		c.Get(func(_ []byte) error { //nolint: errcheck
+		// should get error when callback fail
+		require.Error(t, c.Get(func(_ []byte) error {
 			return fmt.Errorf("get error")
-		})
+		}))
 
 		assert.Equal(t, int64(0), c.pos.Seek)
 
-		c.Get(func(x []byte) error { // nolint:errcheck
+		// should no error when callback ok
+		assert.NoError(t, c.Get(func(x []byte) error {
 			assert.Equal(t, data, x)
 			return nil
+		}))
+
+		reg := prometheus.NewRegistry()
+		register(reg)
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+
+		assert.Equalf(t, float64(1),
+			metrics.GetMetricOnLabels(mfs, "diskcache_seek_back", c.path).GetCounter().GetValue(),
+			"got metrics\n%s", metrics.MetricFamily2Text(mfs))
+
+		t.Cleanup(func() {
+			ResetMetrics()
 		})
 	})
 
