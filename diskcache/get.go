@@ -110,9 +110,10 @@ retry:
 	if err = fn(databuf); err != nil {
 		// seek back
 		if !c.noFallbackOnError {
-			if _, err = c.rfd.Seek(-int64(dataHeaderLen+nbytes), io.SeekCurrent); err != nil {
-				return err
+			if _, serr := c.rfd.Seek(-int64(dataHeaderLen+nbytes), io.SeekCurrent); serr != nil {
+				return serr
 			}
+			seekBackVec.WithLabelValues(c.path).Inc()
 			goto __end // do not update .pos
 		}
 	}
