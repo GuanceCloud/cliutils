@@ -19,7 +19,6 @@ import (
 
 func TestFallbackOnError(t *T.T) {
 	t.Run(`fallback-on-error`, func(t *T.T) {
-
 		ResetMetrics()
 
 		p := t.TempDir()

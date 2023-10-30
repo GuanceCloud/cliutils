@@ -130,7 +130,7 @@ func setupMetrics() {
 	seekBackVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: ns,
-			Name:      "seek_back",
+			Name:      "seek_back_total",
 			Help:      "Seek back when Get() got any error",
 		},
 		[]string{"path"},
