@@ -6,18 +6,47 @@
 package metrics
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	T "testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestGoMetrics(t *T.T) {
+
+	listen := fmt.Sprintf("0.0.0.0:%d", time.Now().UnixNano()%65535)
+	ms := &MetricServer{
+		URL:              "/metrics",
+		Listen:           listen,
+		Enable:           true,
+		DisableGoMetrics: false,
+	}
+
+	go func() {
+		require.NoError(t, ms.Start())
+	}()
+
+	time.Sleep(time.Second)
+
+	resp, err := http.Get(fmt.Sprintf("http://%s/metrics", listen))
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Truef(t, bytes.Contains(body, []byte("go_gc")), "body not contains `go_gc`, body:\n%s", string(body))
+}
 
 func TestRouteForGin(t *T.T) {
 	t.Run("gin", func(t *T.T) {
