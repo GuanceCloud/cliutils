@@ -17,8 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFallbackOnError(t *T.T) {
-
+func TestDropInvalidDataFile(t *T.T) {
 	t.Run(`get-on-0bytes-data-file`, func(t *T.T) {
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
@@ -38,19 +37,30 @@ func TestFallbackOnError(t *T.T) {
 
 		t.Logf("%q", c.dataFiles)
 
-		assert.NoError(t, c.Get(func(data []byte) error {
-			assert.Truef(t, false, "should not been here")
-			return nil
-		}))
-
-		// switch to 2nd file
-		assert.Len(t, c.dataFiles, 1)
-
 		assert.NoError(t, c.Get(func(get []byte) error {
+			// switch to 2nd file
+			assert.Len(t, c.dataFiles, 1)
 			assert.Equal(t, data, get)
+
 			return nil
 		}))
+
+		reg := prometheus.NewRegistry()
+		register(reg)
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+
+		assert.Equalf(t, float64(1),
+			metrics.GetMetricOnLabels(mfs,
+				"diskcache_dropped_total",
+				c.path,
+				reasonBadDataFile,
+			).GetCounter().GetValue(),
+			"got metrics\n%s", metrics.MetricFamily2Text(mfs))
 	})
+}
+
+func TestFallbackOnError(t *T.T) {
 
 	t.Run(`get-erro-on-EOF`, func(t *T.T) {
 

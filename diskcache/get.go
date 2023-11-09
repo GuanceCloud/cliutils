@@ -16,6 +16,10 @@ import (
 type Fn func([]byte) error
 
 func (c *DiskCache) skipBadFile() error {
+	defer func() {
+		droppedBatchVec.WithLabelValues(c.path, reasonBadDataFile).Inc()
+	}()
+
 	if err := c.removeCurrentReadingFile(); err != nil {
 		return fmt.Errorf("removeCurrentReadingFile: %w", err)
 	}
@@ -92,7 +96,11 @@ retry:
 
 	hdr := make([]byte, dataHeaderLen)
 	if n, err = c.rfd.Read(hdr); err != nil || n != dataHeaderLen {
-		return c.skipBadFile()
+		if err = c.skipBadFile(); err != nil {
+			return err
+		}
+
+		goto retry // read next new file
 	}
 
 	nbytes = int(binary.LittleEndian.Uint32(hdr[0:]))
