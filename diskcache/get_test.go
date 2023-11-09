@@ -18,6 +18,69 @@ import (
 )
 
 func TestFallbackOnError(t *T.T) {
+
+	t.Run(`get-on-0bytes-data-file`, func(t *T.T) {
+		p := t.TempDir()
+		c, err := Open(WithPath(p))
+		require.NoError(t, err)
+
+		// put some data
+		data := make([]byte, 100)
+		assert.NoError(t, c.Put(data))
+		assert.NoError(t, c.rotate())
+
+		// rotate 2 data file
+		assert.NoError(t, c.Put(data))
+		assert.NoError(t, c.rotate())
+
+		// distroy 1st data file
+		assert.NoError(t, os.Truncate(c.dataFiles[0], 0))
+
+		t.Logf("%q", c.dataFiles)
+
+		assert.NoError(t, c.Get(func(data []byte) error {
+			assert.Truef(t, false, "should not been here")
+			return nil
+		}))
+
+		// switch to 2nd file
+		assert.Len(t, c.dataFiles, 1)
+
+		assert.NoError(t, c.Get(func(get []byte) error {
+			assert.Equal(t, data, get)
+			return nil
+		}))
+	})
+
+	t.Run(`get-erro-on-EOF`, func(t *T.T) {
+
+		p := t.TempDir()
+		c, err := Open(WithPath(p))
+		require.NoError(t, err)
+
+		// put some data
+		data := make([]byte, 100)
+		assert.NoError(t, c.Put(data))
+
+		assert.NoError(t, c.rotate())
+
+		require.NoError(t, c.Get(func(_ []byte) error {
+			return nil // ignore the data
+		}))
+
+		err = c.Get(func(_ []byte) error {
+			assert.True(t, 1 == 2) // should not been here
+			return nil
+		})
+
+		assert.ErrorIs(t, err, ErrEOF)
+		t.Logf("get: %s", err)
+
+		if errors.Is(err, ErrEOF) {
+			t.Logf("we should ignore the error")
+		}
+	})
+
 	t.Run(`fallback-on-error`, func(t *T.T) {
 		ResetMetrics()
 
@@ -49,7 +112,7 @@ func TestFallbackOnError(t *T.T) {
 		require.NoError(t, err)
 
 		assert.Equalf(t, float64(1),
-			metrics.GetMetricOnLabels(mfs, "diskcache_seek_back", c.path).GetCounter().GetValue(),
+			metrics.GetMetricOnLabels(mfs, "diskcache_seek_back_total", c.path).GetCounter().GetValue(),
 			"got metrics\n%s", metrics.MetricFamily2Text(mfs))
 
 		t.Cleanup(func() {

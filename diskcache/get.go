@@ -15,6 +15,30 @@ import (
 // Fn is the handler to eat cache from diskcache.
 type Fn func([]byte) error
 
+func (c *DiskCache) skipBadFile() error {
+	if err := c.removeCurrentReadingFile(); err != nil {
+		return fmt.Errorf("removeCurrentReadingFile: %w", err)
+	}
+
+	// clear .pos
+	if !c.noPos {
+		if err := c.pos.reset(); err != nil {
+			return err
+		}
+	}
+
+	// reopen next file to read
+	if err := c.switchNextFile(); err != nil {
+		return err
+	}
+
+	// swith to next file: to skip the bad file.
+	if err := c.switchNextFile(); err != nil {
+		return fmt.Errorf("switch to next file on bad file: %w", err)
+	}
+	return nil
+}
+
 // Get fetch new data from disk cache, then passing to fn
 // if any error occurred during call fn, the reading data is
 // dropped, and will not read again.
@@ -67,10 +91,8 @@ retry:
 	}
 
 	hdr := make([]byte, dataHeaderLen)
-	if n, err = c.rfd.Read(hdr); err != nil {
-		return fmt.Errorf("rfd.Read(%s): %w", c.curReadfile, err)
-	} else if n != dataHeaderLen {
-		return ErrBadHeader
+	if n, err = c.rfd.Read(hdr); err != nil || n != dataHeaderLen {
+		return c.skipBadFile()
 	}
 
 	nbytes = int(binary.LittleEndian.Uint32(hdr[0:]))
