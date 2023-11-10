@@ -70,7 +70,7 @@ func setupMetrics() {
 			Name:      "dropped_total",
 			Help:      "Dropped files during Put() when capacity reached.",
 		},
-		[]string{"path"},
+		[]string{"path", "reason"},
 	)
 
 	rotateVec = prometheus.NewCounterVec(
