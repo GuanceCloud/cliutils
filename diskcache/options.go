@@ -69,9 +69,11 @@ func WithBatchSize(size int64) CacheOption {
 }
 
 // WithMaxDataSize set max single data size, default 32MB.
+// NOTE: the max size of single data is 0xdeadbeef(~ 3.47GB), if size
+// larger than 0xdeadbeef, reset to default value(32MB).
 func WithMaxDataSize(size int32) CacheOption {
 	return func(c *DiskCache) {
-		if size > 0 {
+		if size > 0 && uint32(size) < EOFHint /* about 3.47GB */ {
 			c.maxDataSize = size
 		}
 	}

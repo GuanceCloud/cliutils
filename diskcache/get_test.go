@@ -23,34 +23,39 @@ func TestDropInvalidDataFile(t *T.T) {
 		c, err := Open(WithPath(p))
 		require.NoError(t, err)
 
-		// put some data
+		// put some data and rotate 10 datafiles
 		data := make([]byte, 100)
-		assert.NoError(t, c.Put(data))
-		assert.NoError(t, c.rotate())
+		for i := 0; i < 10; i++ {
+			assert.NoError(t, c.Put(data))
+			assert.NoError(t, c.rotate())
 
-		// rotate 2 data file
-		assert.NoError(t, c.Put(data))
-		assert.NoError(t, c.rotate())
+			// destroy the datafile
+			if i%2 == 0 {
+				assert.NoError(t, os.Truncate(c.dataFiles[i], 0))
+			}
+		}
 
-		// distroy 1st data file
-		assert.NoError(t, os.Truncate(c.dataFiles[0], 0))
+		assert.Len(t, c.datafiles, 10)
 
-		t.Logf("%q", c.dataFiles)
+		for {
+			err := c.Get(func(get []byte) error {
+				// switch to 2nd file
+				assert.Equal(t, data, get)
+				return nil
+			})
 
-		assert.NoError(t, c.Get(func(get []byte) error {
-			// switch to 2nd file
-			assert.Len(t, c.dataFiles, 1)
-			assert.Equal(t, data, get)
-
-			return nil
-		}))
+			if err != nil {
+				require.ErrorIs(t, err, ErrEOF)
+				break
+			}
+		}
 
 		reg := prometheus.NewRegistry()
 		register(reg)
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
 
-		assert.Equalf(t, float64(1),
+		assert.Equalf(t, float64(5),
 			metrics.GetMetricOnLabels(mfs,
 				"diskcache_dropped_total",
 				c.path,

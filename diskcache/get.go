@@ -15,13 +15,11 @@ import (
 // Fn is the handler to eat cache from diskcache.
 type Fn func([]byte) error
 
-func (c *DiskCache) skipBadFile() error {
-	defer func() {
-		droppedBatchVec.WithLabelValues(c.path, reasonBadDataFile).Inc()
-	}()
-
-	if err := c.removeCurrentReadingFile(); err != nil {
-		return fmt.Errorf("removeCurrentReadingFile: %w", err)
+func (c *DiskCache) switchNextFile() error {
+	if c.curReadfile != "" {
+		if err := c.removeCurrentReadingFile(); err != nil {
+			return fmt.Errorf("removeCurrentReadingFile: %w", err)
+		}
 	}
 
 	// clear .pos
@@ -32,15 +30,15 @@ func (c *DiskCache) skipBadFile() error {
 	}
 
 	// reopen next file to read
-	if err := c.switchNextFile(); err != nil {
-		return err
-	}
+	return c.doSwitchNextFile()
+}
 
-	// swith to next file: to skip the bad file.
-	if err := c.switchNextFile(); err != nil {
-		return fmt.Errorf("switch to next file on bad file: %w", err)
-	}
-	return nil
+func (c *DiskCache) skipBadFile() error {
+	defer func() {
+		droppedBatchVec.WithLabelValues(c.path, reasonBadDataFile).Inc()
+	}()
+
+	return c.switchNextFile()
 }
 
 // Get fetch new data from disk cache, then passing to fn
@@ -96,33 +94,25 @@ retry:
 
 	hdr := make([]byte, dataHeaderLen)
 	if n, err = c.rfd.Read(hdr); err != nil || n != dataHeaderLen {
+		//
+		// On bad datafile, just ignore and delete the file.
+		//
 		if err = c.skipBadFile(); err != nil {
 			return err
 		}
 
-		goto retry // read next new file
+		goto retry // read next new file to save another Get() calling.
 	}
 
+	// how many bytes of current data?
 	nbytes = int(binary.LittleEndian.Uint32(hdr[0:]))
 
 	if uint32(nbytes) == EOFHint { // EOF
-		if err = c.removeCurrentReadingFile(); err != nil {
-			return fmt.Errorf("removeCurrentReadingFile: %w", err)
+		if err := c.switchNextFile(); err != nil {
+			return fmt.Errorf("switchNextFile: %w", err)
 		}
 
-		// clear .pos
-		if !c.noPos {
-			if err = c.pos.reset(); err != nil {
-				return err
-			}
-		}
-
-		// reopen next file to read
-		if err = c.switchNextFile(); err != nil {
-			return err
-		}
-
-		goto retry // read next new file
+		goto retry // read next new file to save another Get() calling.
 	}
 
 	databuf := make([]byte, nbytes)
