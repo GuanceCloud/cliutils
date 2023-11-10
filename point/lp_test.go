@@ -35,11 +35,26 @@ func TestLargeJSONTag(t *T.T) {
 	t.Run(`build-json-tag-lp`, func(t *T.T) {
 
 		data := map[string]string{
-			"pp":     `{"code":200,"content":{"data":[],"pageInfo":{"count":0,"pageIndex":1,"pageSize":20,"totalCount":0}},"errorCode":"","message":"","success":true,"traceId":"3000102136068209121"}`,
+			"pp": `{
+"code":200,
+"content":{
+"data":[],
+"pageInfo":{
+"count":0,
+"pageIndex":1,
+"pageSize":20,
+"totalCount":0
+}
+},
+"errorCode":"",
+"message":"",
+"success":true,
+"traceId":"3000102136068209121"
+}`,
 			"source": "logging_yy",
 		}
 
-		dataj, err := json.Marshal(data)
+		dataj, err := json.MarshalIndent(data, "", " ")
 		assert.NoError(t, err)
 
 		t.Logf("data json: %q", string(dataj))
