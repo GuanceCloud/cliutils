@@ -16,6 +16,8 @@ import (
 	"github.com/GuanceCloud/cliutils"
 )
 
+const defaultTCPTimeout = 30 * time.Second
+
 type TCPResponseTime struct {
 	IsContainDNS bool   `json:"is_contain_dns"`
 	Target       string `json:"target"`
@@ -329,7 +331,7 @@ func (t *TCPTask) Run() error {
 	} else {
 		t.reqCost = time.Since(start)
 		if t.Message != "" { // send message and get response
-			if err := conn.SetDeadline(time.Now().Add(30 * time.Second)); err != nil {
+			if err := conn.SetDeadline(time.Now().Add(defaultTCPTimeout)); err != nil {
 				t.reqError = err.Error()
 			} else if _, err := conn.Write([]byte(t.Message)); err != nil {
 				t.reqError = err.Error()
