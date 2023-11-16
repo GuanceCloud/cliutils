@@ -5,7 +5,6 @@
 package point
 
 import (
-	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -31,9 +30,7 @@ func parseLineProto(t *testing.T, data []byte, precision string) (models.Points,
 }
 
 func TestLargeJSONTag(t *T.T) {
-
 	t.Run(`build-json-tag-lp`, func(t *T.T) {
-
 		data := map[string]string{
 			"pp": `{
 "code":200,
@@ -75,14 +72,11 @@ func TestLargeJSONTag(t *T.T) {
 	})
 
 	t.Run(`parse-tag-with-json`, func(t *T.T) {
-
-		j := `test_lp,tag={"pp":"{\\"code\\":200\,\\"content\\":{\\"data\\":[]\,\\"pageInfo\\":{\\"count\\":0\,\\"pageIndex\\":1\,\\"pageSize\\":20\,\\"totalCount\\":0}}\,\\"errorCode\\":\\"\\"\,\\"message\\":\\"\\"\,\\"success\\":true\,\\"traceId\\":\\"3000102136068209121\\"}"\,"source":"logging_yy"} value=200i 1699525883000000000`
+		j := `test_lp,tag={"pp":"{\"code\":200\,\"content\":{\"data\":[]\,\"pageInfo\":{\"count\":0\,\"pageIndex\":1\,\"pageSize\":20\,\"totalCount\":0}}\,\"errorCode\":\"\"\,\"message\":\"\"\,\"success\":true\,\"traceId\":\"3000102136068209121\"}"\,"source":"logging_yy"} value=200i 1699525883000000000`
 
 		pts, err := parseLPPoints([]byte(j), nil) // 将行协议转成 []*Point
 		assert.NoError(t, err)
 		t.Logf("pt: %s", pts[0].Pretty())
-		t.Log("-=-=-=-=-=-=-=-=-=-=-=-=")
-		t.Logf("origin lp md5: %x", md5.Sum([]byte(j)))
 
 		tagVal := pts[0].GetTag("tag")
 

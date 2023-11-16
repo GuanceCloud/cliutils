@@ -35,7 +35,7 @@ func TestDropInvalidDataFile(t *T.T) {
 			}
 		}
 
-		assert.Len(t, c.datafiles, 10)
+		assert.Len(t, c.dataFiles, 10)
 
 		for {
 			err := c.Get(func(get []byte) error {
@@ -43,7 +43,6 @@ func TestDropInvalidDataFile(t *T.T) {
 				assert.Equal(t, data, get)
 				return nil
 			})
-
 			if err != nil {
 				require.ErrorIs(t, err, ErrEOF)
 				break
@@ -66,9 +65,7 @@ func TestDropInvalidDataFile(t *T.T) {
 }
 
 func TestFallbackOnError(t *T.T) {
-
 	t.Run(`get-erro-on-EOF`, func(t *T.T) {
-
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
 		require.NoError(t, err)
