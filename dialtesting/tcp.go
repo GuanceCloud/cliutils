@@ -118,7 +118,6 @@ func (t *TCPTask) init(debug bool) error {
 				return err
 			}
 		}
-
 	}
 
 	return nil

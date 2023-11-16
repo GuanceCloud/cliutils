@@ -200,6 +200,7 @@ func CORSMiddleware(c *gin.Context) {
 	}
 	c.Next()
 }
+
 func CORSMiddlewareV2(allowedOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		allowOrigin := c.GetHeader("origin")
