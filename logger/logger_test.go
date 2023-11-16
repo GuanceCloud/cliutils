@@ -7,13 +7,17 @@ package logger
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap/zapcore"
 )
 
 func BenchmarkMuitiLogs(b *testing.B) {
@@ -416,6 +420,96 @@ func TestRotateOnDevNull(t *testing.T) {
 		if i >= 200 { // 2MB
 			break
 		}
+	}
+}
+
+type BufferSync struct {
+	io.ReadWriter
+}
+
+func (b *BufferSync) Sync() error {
+	return nil
+}
+
+func TestTrace(t *testing.T) {
+	tests := []struct {
+		name            string
+		enabled         bool
+		traceLoggerName string
+		spanLoggerName  string
+		message         string
+		extractTrace    ExtractTrace
+		expectedOutput  string
+	}{
+		{
+			name:            "parse trace",
+			enabled:         true,
+			traceLoggerName: "traceID",
+			spanLoggerName:  "span_id",
+			message:         "test",
+			extractTrace: func(ctx context.Context) Trace {
+				return Trace{
+					SpanID:  "2",
+					TraceID: "1",
+				}
+			},
+			expectedOutput: `{"level":"DEBUG","message":"test","traceID":"1","span_id":"2"}` + "\n",
+		},
+		{
+			name:           "not trace",
+			enabled:        false,
+			message:        "test",
+			extractTrace:   nil,
+			expectedOutput: `{"level":"DEBUG","message":"test"}` + "\n",
+		},
+		{
+			name:            "not parse",
+			enabled:         true,
+			traceLoggerName: "traceID",
+			spanLoggerName:  "span_id",
+			message:         "test",
+			extractTrace:    nil,
+			expectedOutput:  `{"level":"DEBUG","message":"test","traceID":"","span_id":""}` + "\n",
+		},
+	}
+
+	buf := bytes.NewBufferString("")
+	bsync := &BufferSync{buf}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ast := assert.New(t)
+			opt := make([]CtxOption, 0)
+			opt = append(opt,
+				WithTraceKey(test.traceLoggerName, test.spanLoggerName),
+				WithParseTrace(test.extractTrace),
+			)
+			if test.enabled {
+				opt = append(opt, EnableTrace())
+			}
+
+			opt = append(opt, WithZapCore(
+				zapcore.NewCore(
+					zapcore.NewJSONEncoder(zapcore.EncoderConfig{
+						MessageKey:  "message",
+						LevelKey:    "level",
+						EncodeLevel: zapcore.CapitalLevelEncoder,
+					}),
+					bsync,
+					zapcore.DebugLevel,
+				)))
+
+			logger := NewLoggerCtx(opt...)
+
+			ctx := context.Background()
+
+			logger.DebugfCtx(ctx, test.message)
+			re, err := io.ReadAll(bsync)
+			if err != nil {
+				log.Fatal(err)
+			}
+			ast.Equal(test.expectedOutput, string(re))
+		})
 	}
 }
 
