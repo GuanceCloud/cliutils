@@ -28,25 +28,25 @@ func BenchmarkAllMiddlewares(b *testing.B) {
 		{
 			name: "all",
 			ms: []gin.HandlerFunc{
-				CORSMiddleware([]string{}), TraceIDMiddleware, RequestLoggerMiddleware,
+				CORSMiddleware, TraceIDMiddleware, RequestLoggerMiddleware,
 			},
 		},
 		{
 			name: "cors-0",
 			ms: []gin.HandlerFunc{
-				CORSMiddleware([]string{}),
+				CORSMiddlewareV2([]string{}),
 			},
 		},
 		{
 			name: "cors-1",
 			ms: []gin.HandlerFunc{
-				CORSMiddleware([]string{"http://foobar.com"}),
+				CORSMiddlewareV2([]string{"http://foobar.com"}),
 			},
 		},
 		{
 			name: "cors-2",
 			ms: []gin.HandlerFunc{
-				CORSMiddleware([]string{"www.baidu.com"}),
+				CORSMiddlewareV2([]string{"www.baidu.com"}),
 			},
 		},
 		{
@@ -150,7 +150,7 @@ func TestCORSHeaders_Add(t *testing.T) {
 func TestMiddlewares(t *testing.T) {
 	r := gin.New()
 
-	r.Use(CORSMiddleware([]string{}))
+	r.Use(CORSMiddleware)
 	r.Use(TraceIDMiddleware)
 	r.Use(RequestLoggerMiddleware)
 	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
