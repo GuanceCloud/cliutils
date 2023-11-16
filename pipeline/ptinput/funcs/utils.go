@@ -325,13 +325,21 @@ func renamePtKey(in any, to, from string) error {
 	return pt.RenameKey(from, to)
 }
 
-func setMeasurement(in any, val string) error {
+func setPtName(in any, val string) error {
 	pt, err := getPoint(in)
 	if err != nil {
 		return err
 	}
 	pt.SetPtName(val)
 	return nil
+}
+
+func getPtName(in any) string {
+	pt, err := getPoint(in)
+	if err != nil {
+		return ""
+	}
+	return pt.GetPtName()
 }
 
 func markPtDrop(in any) error {

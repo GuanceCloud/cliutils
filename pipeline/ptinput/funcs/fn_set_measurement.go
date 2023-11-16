@@ -46,7 +46,7 @@ func SetMeasurement(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlEr
 	}
 	if dtype == ast.String {
 		if val, ok := val.(string); ok {
-			_ = setMeasurement(ctx.InData(), val)
+			_ = setPtName(ctx.InData(), val)
 		}
 	}
 

@@ -7,6 +7,8 @@ package point
 
 import (
 	"bytes"
+	"reflect"
+	"strings"
 	"testing"
 	T "testing"
 	"time"
@@ -77,6 +79,22 @@ func TestIdempotent(t *testing.T) {
 			assert.Equal(t, p1, p2)
 		})
 	}
+}
+
+func TestEncodeWithoutTime(t *testing.T) {
+	t.Run("encode-without-time", func(t *T.T) {
+		pt := NewPointV2("p1", NewKVs(map[string]any{"f1": 123}))
+
+		pt.time = time.Unix(0, 0)
+
+		enc := GetEncoder(WithEncEncoding(LineProtocol))
+		defer PutEncoder(enc)
+
+		arr, err := enc.Encode([]*Point{pt})
+		require.NoError(t, err)
+		assert.Len(t, arr, 1)
+		t.Logf("data: %s", string(arr[0]))
+	})
 }
 
 func TestEncode(t *testing.T) {
@@ -255,6 +273,59 @@ func TestEncode(t *testing.T) {
 			assert.Equal(t, string(bytes.Join(tc.expect, []byte("\n"))), lpbody)
 		})
 	}
+}
+
+func TestPBEncode(t *T.T) {
+	t.Run(`invalid-utf8-string-field`, func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("invalid-utf8", "a\xffb\xC0\xAFc\xff", false, false)
+
+		pt := NewPointV2("p1", kvs)
+
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		defer PutEncoder(enc)
+		arr, err := enc.Encode([]*Point{pt})
+		require.NoError(t, err)
+		assert.Len(t, arr, 1)
+		assert.Len(t, pt.warns, 1)
+		assert.Equal(t, WarnInvalidUTF8String, pt.warns[0].Type)
+		t.Logf("get error %s, typeof %s, pt: %s", err, reflect.TypeOf(err), pt.Pretty())
+	})
+
+	t.Run(`invalid-utf8-string-field`, func(t *T.T) {
+		var kvs KVs
+
+		invalidUTF8Str := "a\xffb\xC0\xAFc\xff"
+
+		validUTF8Str := strings.ToValidUTF8(invalidUTF8Str, "0X")
+		kvs = kvs.Add("invalid-utf8", validUTF8Str, false, false)
+
+		pt := NewPointV2("p1", kvs)
+
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		defer PutEncoder(enc)
+		arr, err := enc.Encode([]*Point{pt})
+		require.NoError(t, err)
+		assert.Len(t, arr, 1)
+		t.Logf("get error %s, typeof %s, pt: %s", err, reflect.TypeOf(err), pt.Pretty())
+	})
+
+	t.Run(`invalid-utf8-[]byte-field`, func(t *T.T) {
+		var kvs KVs
+
+		invalidUTF8Bytes := []byte("a\xffb\xC0\xAFc\xff")
+
+		kvs = kvs.Add("invalid-utf8", invalidUTF8Bytes, false, false)
+
+		pt := NewPointV2("p1", kvs)
+
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		defer PutEncoder(enc)
+		arr, err := enc.Encode([]*Point{pt})
+		require.NoError(t, err)
+		assert.Len(t, arr, 1)
+		t.Logf("get error %s, typeof %s, pt: %s", err, reflect.TypeOf(err), pt.Pretty())
+	})
 }
 
 func TestEncodeWithBytesLimit(t *T.T) {
