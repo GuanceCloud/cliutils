@@ -9,6 +9,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 )
 
 var tcpCases = []struct {
@@ -42,6 +43,36 @@ var tcpCases = []struct {
 				},
 			},
 			ExternalID: "xxxx", Frequency: "10s", Name: "response_time_large",
+		},
+	},
+	{
+		fail:      false,
+		reasonCnt: 0,
+		t: &TCPTask{
+			Message: "hello",
+			SuccessWhen: []*TCPSuccess{
+				{
+					ResponseMessage: []*SuccessOption{{
+						Contains: "hello",
+					}},
+				},
+			},
+			ExternalID: "xxxx", Frequency: "10s", Name: "response_message_valid",
+		},
+	},
+	{
+		fail:      false,
+		reasonCnt: 1,
+		t: &TCPTask{
+			Message: "hello",
+			SuccessWhen: []*TCPSuccess{
+				{
+					ResponseMessage: []*SuccessOption{{
+						Contains: "invalid",
+					}},
+				},
+			},
+			ExternalID: "xxxx", Frequency: "10s", Name: "response_message_invalid",
 		},
 	},
 }
@@ -104,6 +135,27 @@ func tcpServer() (server net.Listener, err error) {
 	if err != nil {
 		return
 	}
+
+	go func() {
+		time.Sleep(30 * time.Second)
+		server.Close()
+	}()
+
+	go func() {
+		if conn, err := server.Accept(); err != nil {
+			return
+		} else {
+			defer conn.Close()
+			conn.SetDeadline(time.Now().Add(5 * time.Second))
+			buf := make([]byte, 1024)
+			n, err := conn.Read(buf)
+			if err != nil {
+				return
+			}
+
+			_, _ = conn.Write(buf[:n])
+		}
+	}()
 
 	return
 }

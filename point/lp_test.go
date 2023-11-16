@@ -5,15 +5,18 @@
 package point
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"testing"
+	T "testing"
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
 	"github.com/influxdata/influxdb1-client/models"
 	influxdb "github.com/influxdata/influxdb1-client/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func parseLineProto(t *testing.T, data []byte, precision string) (models.Points, error) {
@@ -24,6 +27,75 @@ func parseLineProto(t *testing.T, data []byte, precision string) (models.Points,
 	}
 
 	return models.ParsePointsWithPrecision(data, time.Now().UTC(), precision)
+}
+
+func TestLargeJSONTag(t *T.T) {
+	t.Run(`build-json-tag-lp`, func(t *T.T) {
+		data := map[string]string{
+			"pp": `{
+"code":200,
+"content":{
+"data":[],
+"pageInfo":{
+"count":0,
+"pageIndex":1,
+"pageSize":20,
+"totalCount":0
+}
+},
+"errorCode":"",
+"message":"",
+"success":true,
+"traceId":"3000102136068209121"
+}`,
+			"source": "logging_yy",
+		}
+
+		dataj, err := json.MarshalIndent(data, "", " ")
+		assert.NoError(t, err)
+
+		t.Logf("data json: %q", string(dataj))
+
+		assert.True(t, json.Valid([]byte(data["pp"])))
+
+		var kvs KVs
+		kvs = kvs.AddTag("T", string(dataj))
+		kvs = kvs.Add("value", 200, false, true)
+		pt := NewPointV2("test_lp", kvs)
+		t.Logf("lp-1 in %%s: %s", pt.LineProto())
+
+		var kvs2 KVs
+		kvs2 = kvs2.Add("value", 200, false, true)
+		kvs2 = kvs2.Add("F", string(dataj), false, true)
+		pt2 := NewPointV2("test_lp", kvs2)
+		t.Logf("lp-2 in %%s: %s", pt2.LineProto())
+	})
+
+	t.Run(`parse-tag-with-json`, func(t *T.T) {
+		j := `test_lp,tag={"pp":"{\"code\":200\,\"content\":{\"data\":[]\,\"pageInfo\":{\"count\":0\,\"pageIndex\":1\,\"pageSize\":20\,\"totalCount\":0}}\,\"errorCode\":\"\"\,\"message\":\"\"\,\"success\":true\,\"traceId\":\"3000102136068209121\"}"\,"source":"logging_yy"} value=200i 1699525883000000000`
+
+		pts, err := parseLPPoints([]byte(j), nil) // 将行协议转成 []*Point
+		assert.NoError(t, err)
+		t.Logf("pt: %s", pts[0].Pretty())
+
+		tagVal := pts[0].GetTag("tag")
+
+		assert.True(t, json.Valid([]byte(tagVal)), "tag value not json:\n%s", tagVal)
+
+		tagMap := map[string]string{}
+		assert.NoError(t, json.Unmarshal([]byte(pts[0].GetTag("tag")), &tagMap))
+		assert.True(t, json.Valid([]byte(tagMap["pp"])))
+
+		enc := GetEncoder(WithEncEncoding(LineProtocol))
+		defer PutEncoder(enc)
+
+		arr, err := enc.Encode(pts) // 将 []*Point 编码成行协议块 arr（此处只会有一个块返回）
+		require.NoError(t, err)
+
+		assert.Equal(t, []byte(j), arr[0])
+
+		t.Logf("arr[0]: %q", string(arr[0]))
+	})
 }
 
 func TestNewLPPoint(t *testing.T) {

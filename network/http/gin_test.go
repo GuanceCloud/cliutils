@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GuanceCloud/cliutils/testutil"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 )
 
 func BenchmarkAllMiddlewares(b *testing.B) {
@@ -133,19 +133,19 @@ func TestCORSHeaders_Add(t *testing.T) {
 	defaultHeaders := defaultCORSHeader.String()
 
 	h1 := defaultCORSHeader.Add("content-type  , X-PRECISION")
-	testutil.Equals(t, defaultHeaders, h1)
+	assert.Equal(t, defaultHeaders, h1)
 
 	h2 := defaultCORSHeader.Add("  ")
-	testutil.Equals(t, defaultHeaders, h2)
+	assert.Equal(t, defaultHeaders, h2)
 
 	h3 := defaultCORSHeader.Add("x-Foo ,cache-control , X-BAR")
-	testutil.Equals(t, "X-Foo, X-Bar, "+defaultHeaders, h3)
+	assert.Equal(t, "X-Foo, X-Bar, "+defaultHeaders, h3)
 
 	h4 := defaultCORSHeader.Add(" * ")
-	testutil.Equals(t, defaultHeaders, h4)
+	assert.Equal(t, defaultHeaders, h4)
 
 	h5 := defaultCORSHeader.Add("x-forwarded-for ,x-real-ip , x-client-ip")
-	testutil.Equals(t, "X-Forwarded-For, X-Real-Ip, X-Client-Ip, "+defaultHeaders, h5)
+	assert.Equal(t, "X-Forwarded-For, X-Real-Ip, X-Client-Ip, "+defaultHeaders, h5)
 }
 
 func TestMiddlewares(t *testing.T) {
