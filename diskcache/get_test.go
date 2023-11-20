@@ -10,12 +10,59 @@ import (
 	"fmt"
 	"os"
 	T "testing"
+	"time"
 
 	"github.com/GuanceCloud/cliutils/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestGetPut(t *T.T) {
+	testDir := t.TempDir()
+
+	err := os.MkdirAll(testDir, 0755)
+	assert.NoError(t, err)
+
+	dq, err := Open(WithPath(testDir), WithCapacity(1<<30))
+	assert.NoError(t, err)
+
+	assert.NoError(t, dq.Put([]byte("hello message-1")))
+
+	for {
+		if err := dq.Get(func(msg []byte) error {
+			t.Logf("get message: %q\n", string(msg))
+			return nil
+		}); err != nil {
+			t.Log(time.Now().Format(time.RFC3339Nano), " fail to get message: ", err)
+			time.Sleep(time.Second * 1)
+		} else {
+			break
+		}
+	}
+
+	assert.NoError(t, dq.Put([]byte("hello message-2")))
+
+	ok := false
+
+	for i := 0; i < 10; i++ {
+		if err := dq.Get(func(msg []byte) error {
+			t.Logf("get message: %q\n", string(msg))
+			ok = true
+			return nil
+		}); err != nil {
+			t.Log(time.Now().Format(time.RFC3339Nano), " fail to get message: ", err)
+			time.Sleep(time.Second * 1)
+		} else {
+			break
+		}
+	}
+
+	assert.True(t, ok, "expected consume 1 message in 10 seconds, but got no message")
+
+	assert.NoError(t, dq.Close())
+
+}
 
 func TestDropInvalidDataFile(t *T.T) {
 	t.Run(`get-on-0bytes-data-file`, func(t *T.T) {
