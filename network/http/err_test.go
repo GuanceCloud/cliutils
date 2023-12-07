@@ -129,6 +129,10 @@ func TestHTTPErr(t *testing.T) {
 		err := Errorf(errTest, "%s: %v", "this is a message with fmt", map[string]int{"abc": 123})
 		HttpErr(c, err)
 	})
+	g.GET("/errfmsg-with-nil-args", func(c *gin.Context) {
+		err := Errorf(ErrTooManyRequest, "Errorf without args")
+		HttpErr(c, err)
+	})
 
 	srv := http.Server{
 		Addr:    ":8090",
@@ -218,6 +222,21 @@ func TestHTTPErr(t *testing.T) {
 			u:      "http://localhost:8090/oknilbody",
 			expect: "",
 		},
+		{
+			u: "http://localhost:8090/errfmsg-with-nil-args",
+			expect: func() string {
+				msg := `{"error_code":"reachMaxAPIRateLimit","message":"Errorf without args"}`
+				var x interface{}
+				if err := json.Unmarshal([]byte(msg), &x); err != nil {
+					t.Fatal(err)
+				}
+				j, err := json.Marshal(x)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return string(j)
+			}(),
+		},
 	}
 
 	for _, tc := range cases {
@@ -244,6 +263,82 @@ func TestHTTPErr(t *testing.T) {
 			} else {
 				t.Error("body should not be nil")
 			}
+		})
+	}
+}
+
+func TestErrorf(t *testing.T) {
+	var nilArgs []interface{} = nil
+	format := "sprintf with nil args"
+	str := fmt.Sprintf(format, nilArgs...)
+	fmt.Println(str)
+
+	errWithEmptyFmt := Errorf(NewErr(errors.New("bad gateway"), http.StatusBadGateway), "")
+	assert.Nil(t, errWithEmptyFmt.Args)
+
+	errWithoutArgs := Errorf(ErrUnexpectedInternalServerError, "Errorf without args")
+	assert.Nil(t, errWithoutArgs.Args)
+
+	errWithArgs := Errorf(ErrTooManyRequest, "Errorf with args: %s", "###ERROR###")
+	assert.NotNil(t, errWithArgs.Args)
+
+	g := gin.New()
+
+	type testCase struct {
+		name        string
+		url         string
+		err         *MsgError
+		expectedMsg string
+	}
+
+	cases := []testCase{
+		{
+			name:        "Errorf With Empty fmt",
+			url:         "/errorf-with-empty-fmt",
+			err:         errWithEmptyFmt,
+			expectedMsg: "",
+		},
+		{
+			name:        "Errorf without args",
+			url:         "/errorf-without-args",
+			err:         errWithoutArgs,
+			expectedMsg: "Errorf without args",
+		},
+		{
+			name:        "Errorf with args",
+			url:         "/errorf-with-args",
+			err:         errWithArgs,
+			expectedMsg: "Errorf with args: ###ERROR###",
+		},
+	}
+
+	for i := range cases {
+		tc := cases[i]
+		g.GET(tc.url, func(c *gin.Context) {
+			HttpErr(c, tc.err)
+		})
+	}
+
+	type response struct {
+		ErrCode string `json:"error_code"`
+		Message string `json:"message"`
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tc.url, nil)
+			g.ServeHTTP(resp, req)
+
+			assert.Equal(t, resp.Result().StatusCode, tc.err.HttpCode)
+
+			var rp response
+			decoder := json.NewDecoder(resp.Body)
+			err := decoder.Decode(&rp)
+			assert.NoError(t, err)
+
+			assert.NotEmpty(t, rp.ErrCode)
+			assert.Equal(t, tc.expectedMsg, rp.Message)
 		})
 	}
 }
