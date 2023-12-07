@@ -120,7 +120,7 @@ func (p *Point) TimeSeriesHash() []string {
 
 	for idx, f := range fields {
 		hash := append(hash, []byte(f.Key)...)
-		ts[idx] = fmt.Sprintf("%x", md5.Sum(hash))
+		ts[idx] = fmt.Sprintf("%x", md5.Sum(hash)) //nolint:gosec
 	}
 
 	return ts
