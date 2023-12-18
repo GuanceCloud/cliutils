@@ -6,7 +6,10 @@
 package point
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"strings"
 	sync "sync"
 
@@ -109,9 +112,36 @@ func WithEncBatchBytes(bytes int) EncoderOption {
 	return func(e *Encoder) { e.bytesSize = bytes }
 }
 
+func WithGZip(level ...int) EncoderOption {
+	return func(e *Encoder) {
+		e.gzLevel = gzip.DefaultCompression
+
+		if len(level) > 0 {
+			e.gzLevel = level[0]
+		}
+
+		if err := e.switchBuf(); err != nil {
+			panic(fmt.Sprintf("setupGZ: %s", err.Error()))
+		}
+	}
+}
+
+func WithoutBufferPool(on bool) EncoderOption {
+	return func(e *Encoder) {
+		e.noBufferPool = on
+	}
+}
+
 type Encoder struct {
 	bytesSize,
 	batchSize int
+
+	noBufferPool bool
+	bufIdx       int
+	bufs         []*bytes.Buffer // on non-gzip, encode result set to buf
+	gz           *gzip.Writer    // on gzip, encode result set to gz
+	gzSize       int
+	gzLevel      int
 
 	fn  EncodeFn
 	enc Encoding
@@ -142,14 +172,76 @@ func PutEncoder(e *Encoder) {
 
 func newEncoder() *Encoder {
 	return &Encoder{
-		enc: DefaultEncoding,
+		enc:    DefaultEncoding,
+		bufIdx: -1,
 	}
 }
 
 func (e *Encoder) reset() {
 	e.batchSize = 0
 	e.fn = nil
+	for _, buf := range e.bufs {
+		buf.Reset()
+	}
+	e.bufIdx = -1
+	e.gzSize = 0
 	e.enc = DefaultEncoding
+}
+
+func (e *Encoder) addBufferPool() (x *bytes.Buffer) {
+	x = bytes.NewBuffer(nil)
+	e.bufs = append(e.bufs, x)
+	return
+}
+
+func (e *Encoder) setupGZ() error {
+	if x, err := gzip.NewWriterLevel(e.bufs[e.bufIdx], e.gzLevel); err != nil {
+		return err
+	} else {
+		e.gz = x
+		return nil
+	}
+}
+
+func (e *Encoder) switchBuf() error {
+	if len(e.bufs)-1 == e.bufIdx {
+		e.addBufferPool()
+	}
+
+	e.bufIdx++
+	if e.gz != nil {
+		if err := e.setupGZ(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// bufPayload buffer the payload in raw or gzipped.
+func (e *Encoder) bufPayload(payload []byte) error {
+	if e.gz != nil {
+		if e.gzSize+len(payload) > e.batchSize { // switch next buffer
+			if err := e.switchBuf(); err != nil {
+				return err
+			}
+		}
+
+		if n, err := e.gz.Write(payload); err != nil {
+			return err
+		} else {
+			e.gzSize += n
+		}
+	} else {
+		if err := e.switchBuf(); err != nil { // write payload to new buffer
+			return err
+		}
+
+		if _, err := e.bufs[e.bufIdx].Write(payload); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (e *Encoder) getPayload(pts []*Point) ([]byte, error) {
@@ -192,6 +284,13 @@ func (e *Encoder) getPayload(pts []*Point) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if !e.noBufferPool {
+		if err := e.bufPayload(payload); err != nil {
+			return nil, err
+		}
+		payload = e.bufs[e.bufIdx].Bytes()
 	}
 
 	if e.fn != nil {

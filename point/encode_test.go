@@ -7,6 +7,7 @@ package point
 
 import (
 	"bytes"
+	"compress/gzip"
 	"reflect"
 	"strings"
 	"testing"
@@ -420,6 +421,63 @@ func TestEncodeLen(t *testing.T) {
 		t.Logf("ratio: %f, gz ration: %f",
 			100*float64(len(data2[0]))/float64(len(data1[0])),
 			100*float64(len(gzData2))/float64(len(gzData1)))
+	})
+}
+
+func BenchmarkEncodeGZPool(b *testing.B) { // pool with gzip
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	pts := r.Rand(1000)
+
+	b.ResetTimer()
+	b.Run("bench-encode-with-pool", func(b *testing.B) {
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithGZip())
+
+		for i := 0; i < b.N; i++ {
+			_, err := enc.Encode(pts)
+			assert.NoError(b, err)
+		}
+
+		PutEncoder(enc)
+	})
+}
+
+func BenchmarkEncodePool(b *testing.B) { // pool without gzip
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	pts := r.Rand(1000)
+
+	b.ResetTimer()
+	b.Run("bench-encode-with-pool", func(b *testing.B) {
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+
+		for i := 0; i < b.N; i++ {
+			_, err := enc.Encode(pts)
+			assert.NoError(b, err)
+		}
+
+		PutEncoder(enc)
+	})
+}
+
+func BenchmarkEncodeNoPool(b *testing.B) { // no pool
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	pts := r.Rand(1000)
+
+	b.ResetTimer()
+	b.Run("bench-encode-no-pool", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			enc := GetEncoder(WithoutBufferPool(true), WithEncEncoding(Protobuf))
+			batches, err := enc.Encode(pts)
+			assert.NoError(b, err)
+
+			// simulate HTTP behavor: gzip the buffer and POST
+			for _, b := range batches {
+				gzbuf := bytes.Buffer{}
+				gz := gzip.NewWriter(&gzbuf)
+				gz.Write(b)
+			}
+
+			PutEncoder(enc)
+		}
 	})
 }
 

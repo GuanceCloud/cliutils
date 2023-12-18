@@ -4,6 +4,8 @@ coverage.out
 .Test*
 .vscode
 .idea
+*.out
+*.test
 gen/
 dist/
 *.exe

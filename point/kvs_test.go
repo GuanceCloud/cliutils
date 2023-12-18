@@ -26,6 +26,16 @@ func TestKVsAdd(t *T.T) {
 	})
 }
 
+func BenchmarkKVs(b *T.B) {
+	b.Run("with-pool", func(t *T.B) {
+		var kvs KVs
+		for i := 0; i < b.N; i++ {
+			kvs = kvs.Add("k1", i, false, true)
+			PutKV(kvs[0])
+		}
+	})
+}
+
 func TestKVs(t *T.T) {
 	t.Run("add-tag", func(t *T.T) {
 		kvs := NewKVs(map[string]any{"f1": 123})

@@ -389,168 +389,33 @@ func WithKVTagSet(on bool) KVOption {
 	}
 }
 
-// NewKV get kv from specified key and value.
-func NewKV(k string, v any, opts ...KVOption) *Field {
-	var kv *Field
+func GetKV(k string, v any, opts ...KVOption) *Field {
+	if x := kvpool.Get(); x == nil {
+		return NewKV(k, v, opts...)
+	} else {
+		return setupKV(x.(*Field), k, v, opts...)
+	}
+}
 
-	switch x := v.(type) {
-	case int8:
-		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
-	case []int8:
-		iarr, err := NewIntArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
+func resetKV(kv *Field) *Field {
+	kv.Key = ""
+	kv.Val = nil
+	kv.IsTag = false
+	kv.Type = MetricType_UNSPECIFIED
+	kv.Unit = ""
+	return kv
+}
 
-	case uint8:
-		kv = &Field{Key: k, Val: &Field_U{uint64(x)}}
-		// case []uint8 is []byte, skip it.
+func PutKV(kv *Field) {
+	if kv != nil {
+		kv = resetKV(kv)
+		kvpool.Put(kv)
+	}
+}
 
-	case int16:
-		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
-
-	case []int16:
-		iarr, err := NewIntArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case uint16:
-		kv = &Field{Key: k, Val: &Field_U{uint64(x)}}
-
-	case []uint16:
-		iarr, err := NewUintArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case int32:
-		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
-
-	case []int32:
-		iarr, err := NewIntArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case uint32:
-		kv = &Field{Key: k, Val: &Field_U{uint64(x)}}
-
-	case []uint32:
-		iarr, err := NewUintArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case int:
-		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
-
-	case []int:
-		iarr, err := NewIntArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case uint:
-		kv = &Field{Key: k, Val: &Field_U{uint64(x)}}
-
-	case []uint:
-		iarr, err := NewUintArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case int64:
-		kv = &Field{Key: k, Val: &Field_I{x}}
-
-	case []int64:
-		iarr, err := NewIntArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case uint64:
-		kv = &Field{Key: k, Val: &Field_U{x}}
-
-	case []uint64:
-		iarr, err := NewUintArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case float64:
-		kv = &Field{Key: k, Val: &Field_F{x}}
-
-	case []float64:
-		farr, err := NewFloatArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{farr}}
-		}
-
-	case float32:
-		kv = &Field{Key: k, Val: &Field_F{float64(x)}}
-
-	case []float32:
-		farr, err := NewFloatArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{farr}}
-		}
-
-	case string:
-		kv = &Field{Key: k, Val: &Field_S{x}}
-
-	case []string:
-		sarr, err := NewStringArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{sarr}}
-		}
-
-	case []byte:
-		kv = &Field{Key: k, Val: &Field_D{x}}
-
-	case bool:
-		kv = &Field{Key: k, Val: &Field_B{x}}
-
-	case []bool:
-		barr, err := NewBoolArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{barr}}
-		}
-
-	case *anypb.Any:
-		kv = &Field{Key: k, Val: &Field_A{x}}
-
-	case nil: // pass
-		kv = &Field{Key: k, Val: nil}
-
-	default: // value ignored
-		kv = &Field{Key: k, Val: nil}
+func setupKV(kv *Field, k string, v any, opts ...KVOption) *Field {
+	if kv == nil {
+		kv = &Field{Key: k}
 	}
 
 	for _, opt := range opts {
@@ -559,7 +424,173 @@ func NewKV(k string, v any, opts ...KVOption) *Field {
 		}
 	}
 
+	switch x := v.(type) {
+	case int8:
+		kv.Val = &Field_I{int64(x)}
+	case []int8:
+		iarr, err := NewIntArray(x...)
+		if err != nil {
+			kv.Val = nil
+		} else {
+			kv.Val = &Field_A{iarr}
+		}
+
+	case uint8:
+		kv.Val = &Field_U{uint64(x)}
+
+		// NOTE: case []uint8 is []byte, skip it.
+
+	case int16:
+		kv.Val = &Field_I{int64(x)}
+
+	case []int16:
+		iarr, err := NewIntArray(x...)
+		if err != nil {
+			kv.Val = nil
+		} else {
+			kv.Val = &Field_A{iarr}
+		}
+
+	case uint16:
+		kv.Val = &Field_U{uint64(x)}
+
+	case []uint16:
+		iarr, err := NewUintArray(x...)
+		if err != nil {
+			kv.Val = nil
+		} else {
+			kv.Val = &Field_A{iarr}
+		}
+
+	case int32:
+		kv.Val = &Field_I{int64(x)}
+
+	case []int32:
+		iarr, err := NewIntArray(x...)
+		if err != nil {
+			kv.Val = nil
+		} else {
+			kv.Val = &Field_A{iarr}
+		}
+
+	case uint32:
+		kv.Val = &Field_U{uint64(x)}
+
+	case []uint32:
+		iarr, err := NewUintArray(x...)
+		if err != nil {
+			kv.Val = nil
+		} else {
+			kv.Val = &Field_A{iarr}
+		}
+
+	case int:
+		kv.Val = &Field_I{int64(x)}
+
+	case []int:
+		iarr, err := NewIntArray(x...)
+		if err != nil {
+			kv.Val = nil
+		} else {
+			kv.Val = &Field_A{iarr}
+		}
+
+	case uint:
+		kv.Val = &Field_U{uint64(x)}
+
+	case []uint:
+		iarr, err := NewUintArray(x...)
+		if err != nil {
+			kv.Val = nil
+		} else {
+			kv.Val = &Field_A{iarr}
+		}
+
+	case int64:
+		kv.Val = &Field_I{x}
+
+	case []int64:
+		iarr, err := NewIntArray(x...)
+		if err != nil {
+			kv.Val = nil
+		} else {
+			kv.Val = &Field_A{iarr}
+		}
+
+	case uint64:
+		kv.Val = &Field_U{x}
+
+	case []uint64:
+		iarr, err := NewUintArray(x...)
+		if err != nil {
+			kv.Val = nil
+		} else {
+			kv.Val = &Field_A{iarr}
+		}
+
+	case float64:
+		kv.Val = &Field_F{x}
+
+	case []float64:
+		farr, err := NewFloatArray(x...)
+		if err != nil {
+			kv.Val = nil
+		} else {
+			kv.Val = &Field_A{farr}
+		}
+
+	case float32:
+		kv.Val = &Field_F{float64(x)}
+
+	case []float32:
+		farr, err := NewFloatArray(x...)
+		if err != nil {
+			kv.Val = nil
+		} else {
+			kv.Val = &Field_A{farr}
+		}
+
+	case string:
+		kv.Val = &Field_S{x}
+
+	case []string:
+		sarr, err := NewStringArray(x...)
+		if err != nil {
+			kv.Val = nil
+		} else {
+			kv.Val = &Field_A{sarr}
+		}
+
+	case []byte:
+		kv.Val = &Field_D{x}
+
+	case bool:
+		kv.Val = &Field_B{x}
+
+	case []bool:
+		barr, err := NewBoolArray(x...)
+		if err != nil {
+			kv.Val = nil
+		} else {
+			kv.Val = &Field_A{barr}
+		}
+
+	case *anypb.Any:
+		kv.Val = &Field_A{x}
+
+	case nil: // pass
+		kv.Val = nil
+
+	default: // value ignored
+		kv.Val = nil
+	}
+
 	return kv
+}
+
+// NewKV get kv from specified key and value.
+func NewKV(k string, v any, opts ...KVOption) *Field {
+	return setupKV(nil, k, v, opts...)
 }
 
 // NewKVs create kvs slice from map structure.
