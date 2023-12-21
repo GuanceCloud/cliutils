@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTimeRound(t *testing.T) {
@@ -27,6 +28,64 @@ func TestTimeRound(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, pt.Pretty(), pts[0].Pretty())
+	})
+}
+
+func TestDecodeGZip(t *testing.T) {
+	t.Run(`basic`, func(t *testing.T) {
+		r := NewRander(WithFixedTags(true))
+		pts := r.Rand(3)
+
+		enc := GetEncoder(WithEncGZip(), WithEncEncoding(Protobuf))
+		defer PutEncoder(enc)
+
+		arr, err := enc.Encode(pts)
+		assert.NoError(t, err)
+
+		dec := GetDecoder(WithDecGZip(true), WithDecEncoding(Protobuf))
+		defer PutDecoder(dec)
+		idx := 0
+		for _, elem := range arr {
+			dpts, err := dec.Decode(elem)
+			require.NoError(t, err)
+
+			for _, pt := range dpts {
+				assert.Equal(t, pt.Pretty(), pts[idx].Pretty())
+				idx++
+			}
+		}
+	})
+
+	t.Run(`large-batches`, func(t *testing.T) {
+		r := NewRander(WithFixedTags(true), WithRandText(3))
+		pts := r.Rand(1000)
+
+		enc := GetEncoder(WithEncGZip(), WithEncEncoding(Protobuf), WithEncBatchBytes(32*1024))
+		defer PutEncoder(enc)
+
+		arr, err := enc.Encode(pts)
+		assert.NoError(t, err)
+
+		dec := GetDecoder(WithDecGZip(true), WithDecEncoding(Protobuf))
+		defer PutDecoder(dec)
+		idx := 0
+
+		t.Logf("total batches: %d", len(arr))
+		var samplePt *Point
+		for i, elem := range arr {
+			dpts, err := dec.Decode(elem)
+			require.NoError(t, err)
+
+			t.Logf("batch %02d: %d bytes, %d points", i, len(arr[i]), len(dpts))
+
+			for _, pt := range dpts {
+				assert.Equal(t, pt.Pretty(), pts[idx].Pretty())
+				idx++
+				samplePt = pt
+			}
+		}
+
+		t.Logf("sample point:\n%s", samplePt.Pretty())
 	})
 }
 

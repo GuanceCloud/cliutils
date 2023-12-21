@@ -6,7 +6,10 @@
 package point
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
+	"io"
 	sync "sync"
 	"time"
 
@@ -24,6 +27,12 @@ func WithDecEncoding(enc Encoding) DecoderOption {
 	return func(d *Decoder) { d.enc = enc }
 }
 
+func WithDecGZip(on bool) DecoderOption {
+	return func(d *Decoder) {
+		d.gzEnabled = on
+	}
+}
+
 func WithDecFn(fn DecodeFn) DecoderOption {
 	return func(d *Decoder) { d.fn = fn }
 }
@@ -31,6 +40,8 @@ func WithDecFn(fn DecodeFn) DecoderOption {
 type Decoder struct {
 	enc Encoding
 	fn  DecodeFn
+
+	gzEnabled bool
 
 	// For line-protocol parsing, keep original error.
 	detailedError error
@@ -65,6 +76,7 @@ func newDecoder() *Decoder {
 func (d *Decoder) reset() {
 	d.enc = 0
 	d.fn = nil
+	d.gzEnabled = false
 	d.detailedError = nil
 }
 
@@ -77,6 +89,19 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 	// point options
 	cfg := GetCfg(opts...)
 	defer PutCfg(cfg)
+
+	if d.gzEnabled {
+		gzr, err := gzip.NewReader(bytes.NewReader(data))
+		if err != nil {
+			return nil, err
+		}
+
+		if raw, err := io.ReadAll(gzr); err != nil {
+			return nil, err
+		} else {
+			data = raw
+		}
+	}
 
 	switch d.enc {
 	case JSON:

@@ -8,6 +8,7 @@ package point
 import (
 	"bytes"
 	"compress/gzip"
+	"io"
 	"reflect"
 	"strings"
 	"testing"
@@ -121,7 +122,7 @@ func TestEncode(t *testing.T) {
 				AddTag(`t3`, `tv3`), WithTime(time.Unix(0, 123))),
 		}
 
-		__fn = func(n int, data []byte) error {
+		__fn = func(n int, raw int64, data []byte) error {
 			t.Logf("batch size: %d, payload: %d", n, len(data))
 			return nil
 		}
@@ -271,9 +272,103 @@ func TestEncode(t *testing.T) {
 			}
 
 			lpbody := string(bytes.Join(lps, []byte("\n")))
-			assert.Equal(t, string(bytes.Join(tc.expect, []byte("\n"))), lpbody)
+			assert.Equalf(t,
+				string(bytes.Join(tc.expect, []byte("\n"))),
+				lpbody, "encoder: %+#v", enc)
+		})
+
+		t.Run(tc.name+"-cached", func(t *testing.T) {
+			enc := GetEncoder(WithEncBatchSize(tc.bsize),
+				WithEncFn(tc.fn),
+				WithBufferPool(true),
+				WithEncEncoding(Protobuf))
+			defer PutEncoder(enc)
+
+			payloads, err := enc.Encode(tc.pts)
+
+			require.NoError(t, err)
+
+			require.Equal(t, len(tc.expect), len(payloads))
+
+			var lps [][]byte
+			// check PB unmarshal and compress ratio
+			for idx := range tc.expect {
+				assert.Truef(t, len(payloads[idx]) > 0, "empty payload")
+				var pbpts PBPoints
+				require.NoError(t, proto.Unmarshal(payloads[idx], &pbpts))
+
+				// convert PB to line-protocol, check equality
+				lp, err := PB2LP(payloads[idx])
+				assert.NoError(t, err)
+				lps = append(lps, lp)
+			}
+
+			lpbody := string(bytes.Join(lps, []byte("\n")))
+			require.Equal(t, string(bytes.Join(tc.expect, []byte("\n"))), lpbody)
+		})
+
+		t.Run(tc.name+"-gzip-cached", func(t *testing.T) {
+			enc := GetEncoder(WithEncBatchSize(tc.bsize),
+				WithEncFn(tc.fn),
+				WithEncGZip(),
+				WithEncEncoding(Protobuf))
+			defer PutEncoder(enc)
+
+			payloads, err := enc.Encode(tc.pts)
+
+			require.NoError(t, err)
+
+			require.Equal(t, len(tc.expect), len(payloads))
+
+			var lps [][]byte
+			// check PB unmarshal and compress ratio
+			for idx := range tc.expect {
+				assert.Truef(t, len(payloads[idx]) > 0, "empty payload")
+
+				gzr, err := gzip.NewReader(bytes.NewReader(payloads[idx]))
+				require.NoErrorf(t, err, "encoder: %+#v", enc)
+
+				rawPayload, err := io.ReadAll(gzr)
+				require.NoError(t, err)
+
+				t.Logf("gzip ratio: %f", (1.0 - float64(len(payloads[idx]))/float64(len(rawPayload))))
+
+				var pbpts PBPoints
+				require.NoError(t, proto.Unmarshal(rawPayload, &pbpts))
+
+				// convert PB to line-protocol, check equality
+				lp, err := PB2LP(rawPayload)
+				assert.NoError(t, err)
+				lps = append(lps, lp)
+			}
+
+			lpbody := string(bytes.Join(lps, []byte("\n")))
+			require.Equal(t, string(bytes.Join(tc.expect, []byte("\n"))), lpbody)
 		})
 	}
+}
+
+func TestGZipEncoding(t *T.T) {
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	pts := r.Rand(10000)
+
+	t.Run(`gzip-multiple-batches`, func(t *T.T) {
+		enc := GetEncoder(WithEncGZip(), WithEncEncoding(Protobuf), WithEncBatchBytes(1024*1024))
+		defer PutEncoder(enc)
+
+		batchs, err := enc.Encode(pts)
+		assert.NoError(t, err)
+
+		for _, b := range batchs {
+			gzr, err := gzip.NewReader(bytes.NewBuffer(b))
+			assert.NoError(t, err)
+
+			raw, err := io.ReadAll(gzr)
+			assert.NoError(t, err)
+
+			t.Logf("batch size: %d/raw: %d", len(b), len(raw))
+		}
+	})
 }
 
 func TestPBEncode(t *T.T) {
@@ -329,6 +424,150 @@ func TestPBEncode(t *T.T) {
 	})
 }
 
+func TestGZip(t *T.T) {
+
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	pts := r.Rand(1000)
+
+	enc := GetEncoder(WithEncEncoding(Protobuf), WithEncBatchSize(100))
+	defer PutEncoder(enc)
+
+	batches, err := enc.Encode(pts)
+	assert.NoError(t, err)
+
+	t.Run("flush-or-not", func(t *T.T) {
+		noFlushBuf := bytes.NewBuffer(nil)
+		gzNoflush := gzip.NewWriter(noFlushBuf)
+
+		flushBuf := bytes.NewBuffer(nil)
+		gzWithFlush := gzip.NewWriter(flushBuf)
+
+		totalBytes := 0
+
+		for _, b := range batches {
+			_, err := gzNoflush.Write(b)
+			assert.NoError(t, err)
+			totalBytes += len(b)
+		}
+		assert.NoError(t, gzNoflush.Close())
+
+		for _, b := range batches {
+			_, err := gzWithFlush.Write(b)
+			assert.NoError(t, err)
+			assert.NoError(t, gzWithFlush.Flush())
+
+			t.Logf("buf: %d", flushBuf.Len())
+		}
+		assert.NoError(t, gzWithFlush.Close())
+
+		t.Logf("without flush: %d, with flush: %d, total: %d", noFlushBuf.Len(), flushBuf.Len(), totalBytes)
+
+		// unzip
+		gzrNoflush, err := gzip.NewReader(noFlushBuf)
+		assert.NoError(t, err)
+		gzrFlush, err := gzip.NewReader(flushBuf)
+		assert.NoError(t, err)
+
+		noflushRaw, err := io.ReadAll(gzrNoflush)
+		assert.NoError(t, err)
+		flushRaw, err := io.ReadAll(gzrFlush)
+		assert.NoError(t, err)
+
+		assert.Equal(t, noflushRaw, flushRaw)
+	})
+}
+
+func TestEncodeWithPointsLimit(t *T.T) {
+
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	pts := r.Rand(1000)
+
+	// add anypb data
+	for _, pt := range pts {
+		pt.MustAdd("s-arr", []string{"s1", "s2"})
+		pt.MustAdd("i-arr", []int{1, 2})
+		pt.MustAdd("b-arr", []bool{true, false})
+		pt.MustAdd("f-arr", []float64{1.414, 3.14})
+	}
+
+	t.Run(`points-limite`, func(t *T.T) {
+		pointsBatchSize := 100
+		enc := GetEncoder(WithEncBatchSize(pointsBatchSize),
+			WithEncEncoding(Protobuf),
+			WithEncFn(func(n int, raw int64, payload []byte) error {
+				var pbpts PBPoints
+				assert.NoError(t, proto.Unmarshal(payload, &pbpts))
+
+				assert.Equal(t, n, pointsBatchSize)
+				assert.Equal(t, len(pbpts.Arr), pointsBatchSize)
+				t.Logf("points: %d, payload: %d bytes", n, len(payload))
+				return nil
+			}))
+		defer PutEncoder(enc)
+
+		batches, err := enc.Encode(pts)
+		assert.NoError(t, err)
+		for idx, b := range batches {
+			t.Logf("[%d] batch: %d", idx, len(b))
+		}
+	})
+
+	t.Run(`points-limite-on-buf`, func(t *T.T) {
+		pointsBatchSize := 100
+		enc := GetEncoder(
+			WithBufferPool(true),
+			WithEncBatchSize(pointsBatchSize),
+			WithEncEncoding(Protobuf),
+			WithEncFn(func(n int, raw int64, payload []byte) error {
+				var pbpts PBPoints
+				assert.NoError(t, proto.Unmarshal(payload, &pbpts))
+
+				assert.Equal(t, n, pointsBatchSize)
+				assert.Equal(t, len(pbpts.Arr), pointsBatchSize)
+				t.Logf("points: %d, payload: %d bytes", n, len(payload))
+				return nil
+			}))
+		defer PutEncoder(enc)
+
+		batches, err := enc.Encode(pts)
+		assert.NoError(t, err)
+		for idx, b := range batches {
+			t.Logf("[%d] batch: %d", idx, len(b))
+		}
+	})
+
+	t.Run(`points-limite-on-buf-gzip`, func(t *T.T) {
+		pointsBatchSize := 100
+		enc := GetEncoder(
+			WithBufferPool(true),
+			WithEncGZip(),
+			WithEncBatchSize(pointsBatchSize),
+			WithEncEncoding(Protobuf),
+			WithEncFn(func(n int, rawSize int64, payload []byte) error {
+				gzr, err := gzip.NewReader(bytes.NewBuffer(payload))
+				assert.NoError(t, err)
+
+				raw, err := io.ReadAll(gzr)
+				assert.NoError(t, err)
+
+				var pbpts PBPoints
+				assert.NoError(t, proto.Unmarshal(raw, &pbpts))
+
+				assert.Equal(t, n, pointsBatchSize)
+				assert.Equal(t, len(pbpts.Arr), pointsBatchSize)
+				t.Logf("points: %d, payload: %d bytes", n, len(payload))
+				return nil
+			}))
+		defer PutEncoder(enc)
+
+		batches, err := enc.Encode(pts)
+		assert.NoError(t, err)
+		for idx, b := range batches {
+			t.Logf("[%d] batch: %d", idx, len(b))
+		}
+	})
+}
+
 func TestEncodeWithBytesLimit(t *T.T) {
 	t.Run(`bytes-limite`, func(t *T.T) {
 		r := NewRander(WithFixedTags(true), WithRandText(3))
@@ -343,8 +582,9 @@ func TestEncodeWithBytesLimit(t *T.T) {
 		}
 
 		bytesBatchSize := 128 * 1024
-		enc := GetEncoder(WithEncBatchBytes(bytesBatchSize), WithEncFn(func(n int, payload []byte) error {
+		enc := GetEncoder(WithEncBatchBytes(bytesBatchSize), WithEncFn(func(n int, raw int64, payload []byte) error {
 			t.Logf("points: %d, payload: %dbytes", n, len(payload))
+			assert.True(t, len(payload) <= bytesBatchSize)
 			return nil
 		}))
 		defer PutEncoder(enc)
@@ -430,7 +670,7 @@ func BenchmarkEncodeGZPool(b *testing.B) { // pool with gzip
 
 	b.ResetTimer()
 	b.Run("bench-encode-with-pool", func(b *testing.B) {
-		enc := GetEncoder(WithEncEncoding(Protobuf), WithGZip())
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithEncGZip())
 
 		for i := 0; i < b.N; i++ {
 			_, err := enc.Encode(pts)
@@ -447,7 +687,7 @@ func BenchmarkEncodePool(b *testing.B) { // pool without gzip
 
 	b.ResetTimer()
 	b.Run("bench-encode-with-pool", func(b *testing.B) {
-		enc := GetEncoder(WithEncEncoding(Protobuf))
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithBufferPool(true))
 
 		for i := 0; i < b.N; i++ {
 			_, err := enc.Encode(pts)
@@ -465,7 +705,7 @@ func BenchmarkEncodeNoPool(b *testing.B) { // no pool
 	b.ResetTimer()
 	b.Run("bench-encode-no-pool", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			enc := GetEncoder(WithoutBufferPool(true), WithEncEncoding(Protobuf))
+			enc := GetEncoder(WithEncEncoding(Protobuf))
 			batches, err := enc.Encode(pts)
 			assert.NoError(b, err)
 
