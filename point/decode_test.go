@@ -36,7 +36,7 @@ func TestDecodeGZip(t *testing.T) {
 		r := NewRander(WithFixedTags(true))
 		pts := r.Rand(3)
 
-		enc := GetEncoder(WithEncGZip(), WithEncEncoding(Protobuf))
+		enc := GetEncoder(WithEncGZip(true), WithEncEncoding(Protobuf))
 		defer PutEncoder(enc)
 
 		arr, err := enc.Encode(pts)
@@ -60,7 +60,7 @@ func TestDecodeGZip(t *testing.T) {
 		r := NewRander(WithFixedTags(true), WithRandText(3))
 		pts := r.Rand(1000)
 
-		enc := GetEncoder(WithEncGZip(), WithEncEncoding(Protobuf), WithEncBatchBytes(32*1024))
+		enc := GetEncoder(WithEncGZip(true), WithEncEncoding(Protobuf), WithEncBatchBytes(32*1024))
 		defer PutEncoder(enc)
 
 		arr, err := enc.Encode(pts)

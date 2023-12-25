@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"io"
 	"strings"
 	sync "sync"
 
@@ -111,10 +112,10 @@ func WithEncBatchBytes(bytes int) EncoderOption {
 	return func(e *Encoder) { e.bytesSize = bytes }
 }
 
-func WithEncGZip(level ...int) EncoderOption {
+func WithEncGZip(bufferPoolOn bool, level ...int) EncoderOption {
 	return func(e *Encoder) {
 		// Auto enable buffer pool, gzip need buffers to write
-		e.bufferPool = true
+		e.bufferPool = bufferPoolOn
 
 		e.gzLevel = gzip.DefaultCompression
 		if len(level) > 0 {
@@ -125,12 +126,6 @@ func WithEncGZip(level ...int) EncoderOption {
 	}
 }
 
-func WithBufferPool(on bool) EncoderOption {
-	return func(e *Encoder) {
-		e.bufferPool = on
-	}
-}
-
 type Encoder struct {
 	bytesSize,
 	batchSize int
@@ -138,9 +133,12 @@ type Encoder struct {
 	bufferPool bool
 	gzEnabled  bool
 	bufIdx     int
-	bufs       []*bytes.Buffer // on non-gzip, encode result set to buf
-	gz         *gzip.Writer
-	gzLevel    int
+
+	bufs []*bytes.Buffer // on non-gzip, encode result set to buf
+	buf  *bytes.Buffer
+
+	gz      *gzip.Writer
+	gzLevel int
 
 	fn  EncodeFn
 	enc Encoding
@@ -178,24 +176,28 @@ func newEncoder() *Encoder {
 
 func (e *Encoder) reset() {
 	e.batchSize = 0
+	e.bytesSize = 0
 	e.fn = nil
 	for _, buf := range e.bufs {
 		buf.Reset()
 	}
+	e.buf = nil
+	e.bufferPool = false
 	e.bufIdx = -1
 	e.gzEnabled = false
 	e.gzLevel = gzip.NoCompression
 	e.enc = DefaultEncoding
+	e.gz = nil
 }
 
 func (e *Encoder) addBufferPool() (x *bytes.Buffer) {
-	x = bytes.NewBuffer(nil)
+	x = bytes.NewBuffer(make([]byte, 1<<20))
 	e.bufs = append(e.bufs, x)
 	return
 }
 
-func (e *Encoder) setupGZ() error {
-	if x, err := gzip.NewWriterLevel(e.bufs[e.bufIdx], e.gzLevel); err != nil {
+func (e *Encoder) setupGZ(w io.Writer) error {
+	if x, err := gzip.NewWriterLevel(w, e.gzLevel); err != nil {
 		return err
 	} else {
 		e.gz = x
@@ -204,13 +206,22 @@ func (e *Encoder) setupGZ() error {
 }
 
 func (e *Encoder) switchBuf() error {
-	if len(e.bufs)-1 == e.bufIdx {
-		e.addBufferPool()
+	var w io.Writer
+
+	if e.bufferPool {
+		if len(e.bufs)-1 == e.bufIdx {
+			e.addBufferPool()
+		}
+
+		e.bufIdx++
+		e.buf = e.bufs[e.bufIdx]
+	} else {
+		e.buf = bytes.NewBuffer(nil)
 	}
 
-	e.bufIdx++
+	w = e.buf
 	if e.gzEnabled {
-		if err := e.setupGZ(); err != nil {
+		if err := e.setupGZ(w); err != nil {
 			return err
 		}
 	}
@@ -218,8 +229,8 @@ func (e *Encoder) switchBuf() error {
 	return nil
 }
 
-// bufPayload buffer the payload in raw or gzipped.
-func (e *Encoder) bufPayload(payload []byte) error {
+// gzPayload gzip the payload.
+func (e *Encoder) gzPayload(payload []byte) error {
 	if err := e.switchBuf(); err != nil {
 		return err
 	}
@@ -282,11 +293,11 @@ func (e *Encoder) getPayload(pts []*Point) ([]byte, error) {
 
 	rawSize := int64(len(payload))
 
-	if e.bufferPool {
-		if err := e.bufPayload(payload); err != nil {
+	if e.gzEnabled {
+		if err := e.gzPayload(payload); err != nil {
 			return nil, err
 		}
-		payload = e.bufs[e.bufIdx].Bytes()
+		payload = e.buf.Bytes()
 	}
 
 	if e.fn != nil {

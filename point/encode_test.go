@@ -277,40 +277,10 @@ func TestEncode(t *testing.T) {
 				lpbody, "encoder: %+#v", enc)
 		})
 
-		t.Run(tc.name+"-cached", func(t *testing.T) {
-			enc := GetEncoder(WithEncBatchSize(tc.bsize),
-				WithEncFn(tc.fn),
-				WithBufferPool(true),
-				WithEncEncoding(Protobuf))
-			defer PutEncoder(enc)
-
-			payloads, err := enc.Encode(tc.pts)
-
-			require.NoError(t, err)
-
-			require.Equal(t, len(tc.expect), len(payloads))
-
-			var lps [][]byte
-			// check PB unmarshal and compress ratio
-			for idx := range tc.expect {
-				assert.Truef(t, len(payloads[idx]) > 0, "empty payload")
-				var pbpts PBPoints
-				require.NoError(t, proto.Unmarshal(payloads[idx], &pbpts))
-
-				// convert PB to line-protocol, check equality
-				lp, err := PB2LP(payloads[idx])
-				assert.NoError(t, err)
-				lps = append(lps, lp)
-			}
-
-			lpbody := string(bytes.Join(lps, []byte("\n")))
-			require.Equal(t, string(bytes.Join(tc.expect, []byte("\n"))), lpbody)
-		})
-
 		t.Run(tc.name+"-gzip-cached", func(t *testing.T) {
 			enc := GetEncoder(WithEncBatchSize(tc.bsize),
 				WithEncFn(tc.fn),
-				WithEncGZip(),
+				WithEncGZip(true),
 				WithEncEncoding(Protobuf))
 			defer PutEncoder(enc)
 
@@ -353,7 +323,29 @@ func TestGZipEncoding(t *T.T) {
 	pts := r.Rand(10000)
 
 	t.Run(`gzip-multiple-batches`, func(t *T.T) {
-		enc := GetEncoder(WithEncGZip(), WithEncEncoding(Protobuf), WithEncBatchBytes(1024*1024))
+		enc := GetEncoder(WithEncGZip(true),
+			WithEncEncoding(Protobuf),
+			WithEncBatchBytes(1024*1024))
+		defer PutEncoder(enc)
+
+		batchs, err := enc.Encode(pts)
+		assert.NoError(t, err)
+
+		for _, b := range batchs {
+			gzr, err := gzip.NewReader(bytes.NewBuffer(b))
+			assert.NoError(t, err)
+
+			raw, err := io.ReadAll(gzr)
+			assert.NoError(t, err)
+
+			t.Logf("batch size: %d/raw: %d", len(b), len(raw))
+		}
+	})
+
+	t.Run(`gzip-without-bufpool`, func(t *T.T) {
+		enc := GetEncoder(WithEncGZip(false),
+			WithEncEncoding(Protobuf),
+			WithEncBatchBytes(1024*1024))
 		defer PutEncoder(enc)
 
 		batchs, err := enc.Encode(pts)
@@ -512,35 +504,10 @@ func TestEncodeWithPointsLimit(t *T.T) {
 		}
 	})
 
-	t.Run(`points-limite-on-buf`, func(t *T.T) {
-		pointsBatchSize := 100
-		enc := GetEncoder(
-			WithBufferPool(true),
-			WithEncBatchSize(pointsBatchSize),
-			WithEncEncoding(Protobuf),
-			WithEncFn(func(n int, raw int64, payload []byte) error {
-				var pbpts PBPoints
-				assert.NoError(t, proto.Unmarshal(payload, &pbpts))
-
-				assert.Equal(t, n, pointsBatchSize)
-				assert.Equal(t, len(pbpts.Arr), pointsBatchSize)
-				t.Logf("points: %d, payload: %d bytes", n, len(payload))
-				return nil
-			}))
-		defer PutEncoder(enc)
-
-		batches, err := enc.Encode(pts)
-		assert.NoError(t, err)
-		for idx, b := range batches {
-			t.Logf("[%d] batch: %d", idx, len(b))
-		}
-	})
-
 	t.Run(`points-limite-on-buf-gzip`, func(t *T.T) {
 		pointsBatchSize := 100
 		enc := GetEncoder(
-			WithBufferPool(true),
-			WithEncGZip(),
+			WithEncGZip(true),
 			WithEncBatchSize(pointsBatchSize),
 			WithEncEncoding(Protobuf),
 			WithEncFn(func(n int, rawSize int64, payload []byte) error {
@@ -664,60 +631,47 @@ func TestEncodeLen(t *testing.T) {
 	})
 }
 
-func BenchmarkEncodeGZPool(b *testing.B) { // pool with gzip
+func BenchmarkEncodeGZip(b *testing.B) { // pool with gzip
 	r := NewRander(WithFixedTags(true), WithRandText(3))
-	pts := r.Rand(1000)
+	pts := r.Rand(10000)
 
 	b.ResetTimer()
-	b.Run("bench-encode-with-pool", func(b *testing.B) {
-		enc := GetEncoder(WithEncEncoding(Protobuf), WithEncGZip())
+	b.Run("bench-encode-with-gzip-pool", func(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
-			_, err := enc.Encode(pts)
-			assert.NoError(b, err)
-		}
-
-		PutEncoder(enc)
-	})
-}
-
-func BenchmarkEncodePool(b *testing.B) { // pool without gzip
-	r := NewRander(WithFixedTags(true), WithRandText(3))
-	pts := r.Rand(1000)
-
-	b.ResetTimer()
-	b.Run("bench-encode-with-pool", func(b *testing.B) {
-		enc := GetEncoder(WithEncEncoding(Protobuf), WithBufferPool(true))
-
-		for i := 0; i < b.N; i++ {
-			_, err := enc.Encode(pts)
-			assert.NoError(b, err)
-		}
-
-		PutEncoder(enc)
-	})
-}
-
-func BenchmarkEncodeNoPool(b *testing.B) { // no pool
-	r := NewRander(WithFixedTags(true), WithRandText(3))
-	pts := r.Rand(1000)
-
-	b.ResetTimer()
-	b.Run("bench-encode-no-pool", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			enc := GetEncoder(WithEncEncoding(Protobuf))
-			batches, err := enc.Encode(pts)
-			assert.NoError(b, err)
-
-			// simulate HTTP behavor: gzip the buffer and POST
-			for _, b := range batches {
-				gzbuf := bytes.Buffer{}
-				gz := gzip.NewWriter(&gzbuf)
-				gz.Write(b)
-			}
-
+			enc := GetEncoder(
+				WithEncEncoding(Protobuf),
+				WithEncGZip(true),
+				WithEncBatchBytes(4*1024),
+			)
+			res, _ := enc.Encode(pts)
+			//assert.NoError(b, err)
+			_ = res
 			PutEncoder(enc)
 		}
+
+	})
+}
+
+func BenchmarkEncodeNoPoolGZip(b *testing.B) { // no pool
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	pts := r.Rand(10000)
+
+	b.ResetTimer()
+	b.Run("bench-encode-with-gzip-no-pool", func(b *testing.B) {
+
+		for i := 0; i < b.N; i++ {
+			enc := GetEncoder(
+				WithEncEncoding(Protobuf),
+				WithEncGZip(false),
+				WithEncBatchBytes(4*1024),
+			)
+			res, _ := enc.Encode(pts)
+			//assert.NoError(b, err)
+			_ = res
+			PutEncoder(enc)
+		}
+
 	})
 }
 
