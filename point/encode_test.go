@@ -376,6 +376,18 @@ func BenchmarkEncode(b *testing.B) {
 		}
 	})
 
+	b.Run("bench-encode-gogopb-with-buffer", func(b *testing.B) {
+
+		buf := make([]byte, 0, 1<<20)
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithEncGoGoPB(true), WithEncBuffer(buf))
+		defer PutEncoder(enc)
+
+		for i := 0; i < b.N; i++ {
+			_, err := enc.Encode(pts)
+			assert.NoError(b, err)
+		}
+	})
+
 	b.Run("bench-encode-json", func(b *testing.B) {
 		enc := GetEncoder(WithEncEncoding(JSON))
 		defer PutEncoder(enc)

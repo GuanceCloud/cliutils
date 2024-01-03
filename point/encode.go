@@ -11,6 +11,7 @@ import (
 	sync "sync"
 
 	//"google.golang.org/protobuf/proto"
+	"github.com/GuanceCloud/cliutils/point/gogopb"
 	proto "github.com/gogo/protobuf/proto"
 )
 
@@ -75,6 +76,16 @@ type EncodeFn func(batchSize int, payload []byte) error
 
 type EncoderOption func(e *Encoder)
 
+func WithEncBuffer(buf []byte) EncoderOption {
+	return func(e *Encoder) {
+		e.encodeBuffer = buf
+	}
+}
+
+func WithEncGoGoPB(on bool) EncoderOption {
+	return func(e *Encoder) { e.gogopb = on }
+}
+
 func WithEncEncoding(enc Encoding) EncoderOption {
 	return func(e *Encoder) { e.enc = enc }
 }
@@ -94,6 +105,9 @@ func WithEncBatchBytes(bytes int) EncoderOption {
 type Encoder struct {
 	bytesSize,
 	batchSize int
+	gogopb bool
+
+	encodeBuffer []byte
 
 	fn  EncodeFn
 	enc Encoding
@@ -131,6 +145,8 @@ func newEncoder() *Encoder {
 func (e *Encoder) reset() {
 	e.batchSize = 0
 	e.fn = nil
+	e.encodeBuffer = nil
+	e.gogopb = false
 	e.enc = DefaultEncoding
 }
 
@@ -146,15 +162,33 @@ func (e *Encoder) getPayload(pts []*Point) ([]byte, error) {
 
 	switch e.enc {
 	case Protobuf:
-		pbpts := &PBPoints{}
+		if e.gogopb {
+			pbpts := &gogopb.PBPoints{}
+			for _, pt := range pts {
+				pbpts.Arr = append(pbpts.Arr, pt.GoGoPBPoint())
+			}
 
-		for _, pt := range pts {
-			pbpts.Arr = append(pbpts.Arr, pt.PBPoint())
-		}
+			if e.encodeBuffer != nil {
+				if _, err = pbpts.MarshalTo(e.encodeBuffer); err != nil {
+					return nil, err
+				} else {
+					payload = e.encodeBuffer
+				}
+			} else {
+				if payload, err = pbpts.Marshal(); err != nil {
+					return nil, err
+				}
+			}
+		} else {
+			pbpts := &PBPoints{}
+			for _, pt := range pts {
+				pbpts.Arr = append(pbpts.Arr, pt.PBPoint())
+			}
 
-		payload, err = proto.Marshal(pbpts)
-		if err != nil {
-			return nil, err
+			payload, err = proto.Marshal(pbpts)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 	case LineProtocol:

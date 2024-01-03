@@ -446,6 +446,7 @@ google.golang.org/protobuf/reflect/protoregistry
 google.golang.org/protobuf/runtime/protoiface
 google.golang.org/protobuf/runtime/protoimpl
 google.golang.org/protobuf/types/descriptorpb
+google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/timestamppb
 # gopkg.in/CodapeWild/dd-trace-go.v1 v1.35.17
 ## explicit; go 1.12
