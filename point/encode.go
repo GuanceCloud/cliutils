@@ -11,7 +11,7 @@ import (
 	sync "sync"
 
 	//"google.golang.org/protobuf/proto"
-	"github.com/GuanceCloud/cliutils/point/gogopb"
+
 	proto "github.com/gogo/protobuf/proto"
 )
 
@@ -163,22 +163,22 @@ func (e *Encoder) getPayload(pts []*Point) ([]byte, error) {
 	switch e.enc {
 	case Protobuf:
 		if e.gogopb {
-			pbpts := &gogopb.PBPoints{}
-			for _, pt := range pts {
-				pbpts.Arr = append(pbpts.Arr, pt.GoGoPBPoint())
-			}
+			//pbpts := &gogopb.PBPoints{}
+			//for _, pt := range pts {
+			//	pbpts.Arr = append(pbpts.Arr, pt.GoGoPBPoint())
+			//}
 
-			if e.encodeBuffer != nil {
-				if _, err = pbpts.MarshalTo(e.encodeBuffer); err != nil {
-					return nil, err
-				} else {
-					payload = e.encodeBuffer
-				}
-			} else {
-				if payload, err = pbpts.Marshal(); err != nil {
-					return nil, err
-				}
-			}
+			//if e.encodeBuffer != nil {
+			//	if _, err = pbpts.MarshalTo(e.encodeBuffer); err != nil {
+			//		return nil, err
+			//	} else {
+			//		payload = e.encodeBuffer
+			//	}
+			//} else {
+			//	if payload, err = pbpts.Marshal(); err != nil {
+			//		return nil, err
+			//	}
+			//}
 		} else {
 			pbpts := &PBPoints{}
 			for _, pt := range pts {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	//"google.golang.org/protobuf/proto"
+
 	proto "github.com/gogo/protobuf/proto"
 )
 
@@ -29,9 +30,20 @@ func WithDecFn(fn DecodeFn) DecoderOption {
 	return func(d *Decoder) { d.fn = fn }
 }
 
+func WithDecGoGoPBPoint(on bool) DecoderOption {
+	return func(d *Decoder) { d.gogopb = on }
+}
+
+func WithDecBuffer(buf []byte) DecoderOption {
+	return func(d *Decoder) { d.decodeBuffer = buf }
+}
+
 type Decoder struct {
 	enc Encoding
 	fn  DecodeFn
+
+	gogopb       bool
+	decodeBuffer []byte
 
 	// For line-protocol parsing, keep original error.
 	detailedError error
@@ -67,6 +79,7 @@ func (d *Decoder) reset() {
 	d.enc = 0
 	d.fn = nil
 	d.detailedError = nil
+	d.gogopb = false
 }
 
 func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {

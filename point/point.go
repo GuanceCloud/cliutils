@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GuanceCloud/cliutils/point/gogopb"
 	influxm "github.com/influxdata/influxdb1-client/models"
 
 	protojson "github.com/gogo/protobuf/jsonpb"
@@ -381,18 +380,6 @@ func (p *Point) AddDebug(d *Debug) {
 // PBPoint create Point based on a protobuf point.
 func (p *Point) PBPoint() *PBPoint {
 	return &PBPoint{ // we have to create the pbpoint
-		Name:   p.name,
-		Fields: p.kvs,
-		Time:   p.Time().UnixNano(),
-
-		Warns:  p.warns,
-		Debugs: p.debugs,
-	}
-}
-
-// PBPoint create Point based on a protobuf point.
-func (p *Point) GoGoPBPoint() *gogopb.PBPoint {
-	return &gogopb.PBPoint{ // we have to create the pbpoint
 		Name:   p.name,
 		Fields: p.kvs,
 		Time:   p.Time().UnixNano(),

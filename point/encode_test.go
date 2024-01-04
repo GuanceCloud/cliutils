@@ -7,18 +7,19 @@ package point
 
 import (
 	"bytes"
-	"testing"
+	"encoding/json"
 	T "testing"
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
+	"github.com/GuanceCloud/cliutils/point/gogopb"
 	proto "github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // Test if encode change points' payload
-func TestIdempotent(t *testing.T) {
+func TestIdempotent(t *T.T) {
 	cases := []struct {
 		name  string
 		pts   []*Point
@@ -50,7 +51,7 @@ func TestIdempotent(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *T.T) {
 			enc := GetEncoder(WithEncBatchSize(tc.batch))
 			defer PutEncoder(enc)
 
@@ -64,7 +65,7 @@ func TestIdempotent(t *testing.T) {
 		})
 
 		// test encode pb
-		t.Run(tc.name+"-pb", func(t *testing.T) {
+		t.Run(tc.name+"-pb", func(t *T.T) {
 			enc := GetEncoder(WithEncBatchSize(tc.batch), WithEncEncoding(Protobuf))
 			defer PutEncoder(enc)
 
@@ -79,7 +80,7 @@ func TestIdempotent(t *testing.T) {
 	}
 }
 
-func TestEncode(t *testing.T) {
+func TestEncode(t *T.T) {
 	r := NewRander(WithKVSorted(true))
 
 	var (
@@ -210,7 +211,7 @@ func TestEncode(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *T.T) {
 			enc := GetEncoder(WithEncBatchSize(tc.bsize), WithEncFn(tc.fn))
 			defer PutEncoder(enc)
 
@@ -225,7 +226,7 @@ func TestEncode(t *testing.T) {
 			}
 		})
 
-		t.Run(tc.name+"-pb", func(t *testing.T) {
+		t.Run(tc.name+"-pb", func(t *T.T) {
 			enc := GetEncoder(WithEncBatchSize(tc.bsize),
 				WithEncFn(tc.fn),
 				WithEncEncoding(Protobuf))
@@ -316,7 +317,7 @@ func TestEncodeTags(t *T.T) {
 	})
 }
 
-func TestEncodeLen(t *testing.T) {
+func TestEncodeLen(t *T.T) {
 	t.Run("encode-len", func(t *T.T) {
 		r := NewRander(WithFixedTags(true), WithRandText(3))
 		pts := r.Rand(1000)
@@ -352,11 +353,11 @@ func TestEncodeLen(t *testing.T) {
 	})
 }
 
-func BenchmarkEncode(b *testing.B) {
+func BenchmarkEncode(b *T.B) {
 	r := NewRander(WithFixedTags(true), WithRandText(3))
 	pts := r.Rand(1000)
 
-	b.Run("bench-encode-lp", func(b *testing.B) {
+	b.Run("bench-encode-lp", func(b *T.B) {
 		enc := GetEncoder()
 		defer PutEncoder(enc)
 
@@ -366,7 +367,7 @@ func BenchmarkEncode(b *testing.B) {
 		}
 	})
 
-	b.Run("bench-encode-pb", func(b *testing.B) {
+	b.Run("bench-encode-pb", func(b *T.B) {
 		enc := GetEncoder(WithEncEncoding(Protobuf))
 		defer PutEncoder(enc)
 
@@ -376,19 +377,7 @@ func BenchmarkEncode(b *testing.B) {
 		}
 	})
 
-	b.Run("bench-encode-gogopb-with-buffer", func(b *testing.B) {
-
-		buf := make([]byte, 0, 1<<20)
-		enc := GetEncoder(WithEncEncoding(Protobuf), WithEncGoGoPB(true), WithEncBuffer(buf))
-		defer PutEncoder(enc)
-
-		for i := 0; i < b.N; i++ {
-			_, err := enc.Encode(pts)
-			assert.NoError(b, err)
-		}
-	})
-
-	b.Run("bench-encode-json", func(b *testing.B) {
+	b.Run("bench-encode-json", func(b *T.B) {
 		enc := GetEncoder(WithEncEncoding(JSON))
 		defer PutEncoder(enc)
 
@@ -397,4 +386,23 @@ func BenchmarkEncode(b *testing.B) {
 			assert.NoError(b, err)
 		}
 	})
+}
+
+func TestGoGoPBDecodePB(t *T.T) {
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	pts := r.Rand(3)
+
+	enc := GetEncoder(WithEncEncoding(Protobuf))
+	defer PutEncoder(enc)
+
+	arr, err := enc.Encode(pts)
+	assert.NoError(t, err)
+
+	var gogopts gogopb.PBPoints
+	assert.NoError(t, gogopts.Unmarshal(arr[0]))
+
+	j, err := json.MarshalIndent(gogopts, "", "  ")
+	assert.NoError(t, err)
+
+	t.Logf("gogopts:\n%s", string(j))
 }
