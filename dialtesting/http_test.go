@@ -336,6 +336,52 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 			},
 		},
 
+		{
+			reasonCnt: 1,
+			fail:      true,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dtst_"),
+				Method:     "GET",
+				URL:        fmt.Sprintf("%s/_test_http_timeout", httpServer.URL),
+				Name:       "_test_http_timeout_failed",
+				Region:     "hangzhou",
+				Frequency:  "1s",
+				AdvanceOptions: &HTTPAdvanceOption{
+					RequestTimeout: "1ms",
+				},
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{Is: "200"},
+						},
+					},
+				},
+			},
+		},
+
+		{
+			reasonCnt: 0,
+			fail:      true,
+			t: &HTTPTask{
+				ExternalID: cliutils.XID("dtst_"),
+				Method:     "GET",
+				URL:        fmt.Sprintf("%s/_test_http_timeout", httpServer.URL),
+				Name:       "_test_http_timeout_ok",
+				Region:     "hangzhou",
+				Frequency:  "1s",
+				AdvanceOptions: &HTTPAdvanceOption{
+					RequestTimeout: "1s",
+				},
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{Is: "200"},
+						},
+					},
+				},
+			},
+		},
+
 		// test dial with response time checking
 		{
 			reasonCnt: 1,
@@ -612,6 +658,11 @@ func addTestingRoutes(t *testing.T, r *gin.Engine, proxyServer *httptest.Server,
 		}
 
 		c.Data(http.StatusOK, ``, nil)
+	})
+
+	r.GET("/_test_http_timeout", func(c *gin.Context) {
+		time.Sleep(10 * time.Millisecond)
+		c.Data(http.StatusOK, "", nil)
 	})
 
 	r.POST("/_test_with_body", func(c *gin.Context) {
