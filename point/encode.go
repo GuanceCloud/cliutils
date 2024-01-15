@@ -7,6 +7,7 @@ package point
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	sync "sync"
 
@@ -76,16 +77,6 @@ type EncodeFn func(batchSize int, payload []byte) error
 
 type EncoderOption func(e *Encoder)
 
-func WithEncBuffer(buf []byte) EncoderOption {
-	return func(e *Encoder) {
-		e.encodeBuffer = buf
-	}
-}
-
-func WithEncGoGoPB(on bool) EncoderOption {
-	return func(e *Encoder) { e.gogopb = on }
-}
-
 func WithEncEncoding(enc Encoding) EncoderOption {
 	return func(e *Encoder) { e.enc = enc }
 }
@@ -105,9 +96,14 @@ func WithEncBatchBytes(bytes int) EncoderOption {
 type Encoder struct {
 	bytesSize,
 	batchSize int
-	gogopb bool
 
-	encodeBuffer []byte
+	pts []*Point
+	lastPtsIdx,
+	trimmed,
+	parts int
+	lastErr error
+
+	pbpts *PBPoints
 
 	fn  EncodeFn
 	enc Encoding
@@ -138,16 +134,21 @@ func PutEncoder(e *Encoder) {
 
 func newEncoder() *Encoder {
 	return &Encoder{
-		enc: DefaultEncoding,
+		enc:   DefaultEncoding,
+		pbpts: &PBPoints{},
 	}
 }
 
 func (e *Encoder) reset() {
 	e.batchSize = 0
+	e.bytesSize = 0
 	e.fn = nil
-	e.encodeBuffer = nil
-	e.gogopb = false
+	e.pts = nil
 	e.enc = DefaultEncoding
+	e.lastPtsIdx = 0
+	e.lastErr = nil
+	e.parts = 0
+	e.pbpts.Arr = e.pbpts.Arr[:0]
 }
 
 func (e *Encoder) getPayload(pts []*Point) ([]byte, error) {
@@ -162,33 +163,13 @@ func (e *Encoder) getPayload(pts []*Point) ([]byte, error) {
 
 	switch e.enc {
 	case Protobuf:
-		if e.gogopb {
-			//pbpts := &gogopb.PBPoints{}
-			//for _, pt := range pts {
-			//	pbpts.Arr = append(pbpts.Arr, pt.GoGoPBPoint())
-			//}
+		var pbpts PBPoints
+		for _, pt := range pts {
+			pbpts.Arr = append(pbpts.Arr, pt.PBPoint())
+		}
 
-			//if e.encodeBuffer != nil {
-			//	if _, err = pbpts.MarshalTo(e.encodeBuffer); err != nil {
-			//		return nil, err
-			//	} else {
-			//		payload = e.encodeBuffer
-			//	}
-			//} else {
-			//	if payload, err = pbpts.Marshal(); err != nil {
-			//		return nil, err
-			//	}
-			//}
-		} else {
-			pbpts := &PBPoints{}
-			for _, pt := range pts {
-				pbpts.Arr = append(pbpts.Arr, pt.PBPoint())
-			}
-
-			payload, err = proto.Marshal(pbpts)
-			if err != nil {
-				return nil, err
-			}
+		if payload, err = pbpts.Marshal(); err != nil {
+			return nil, err
 		}
 
 	case LineProtocol:
@@ -288,6 +269,77 @@ func (e *Encoder) doEncode(pts []*Point) ([][]byte, error) {
 // batchSize used to split huge points into multiple part. Set batchSize to 0 to disable the split.
 func (e *Encoder) Encode(pts []*Point) ([][]byte, error) {
 	return e.doEncode(pts)
+}
+
+func (e *Encoder) EncodeV2(pts []*Point) {
+	e.pts = pts
+}
+
+func (e *Encoder) Next(buf []byte) ([]byte, bool) {
+	if e.enc != Protobuf {
+		e.lastErr = fmt.Errorf("EncodeV2 only support encoding Protocol")
+		return nil, false
+	}
+
+	var (
+		curSize,
+		pbptsSize int
+		trimmed = 1
+	)
+
+	defer func() {
+		e.pbpts.Arr = e.pbpts.Arr[:0]
+	}()
+
+	for _, pt := range e.pts[e.lastPtsIdx:] {
+		if pt == nil {
+			continue
+		}
+
+		curSize += pt.Size()
+
+		if curSize >= len(buf) {
+			// e.pbpts size larger than buf, we must trim some of points
+			// until size fit ok or MarshalTo will panic.
+			for {
+				if pbptsSize = e.pbpts.Size(); pbptsSize > len(buf) {
+					e.pbpts.Arr = e.pbpts.Arr[:len(e.pbpts.Arr)-trimmed]
+					e.lastPtsIdx -= trimmed
+					trimmed *= 2
+				} else {
+					goto __doEncode
+				}
+			}
+		} else {
+			e.pbpts.Arr = append(e.pbpts.Arr, pt.pt)
+			e.lastPtsIdx++
+		}
+	}
+
+__doEncode:
+	e.trimmed = trimmed
+
+	if len(e.pbpts.Arr) == 0 {
+		return nil, false
+	}
+
+	if n, err := e.pbpts.MarshalTo(buf); err != nil {
+		e.lastErr = err
+		return nil, false
+	} else {
+		e.parts++
+		return buf[:n], true
+	}
+}
+
+func (e *Encoder) LastErr() error {
+	return e.lastErr
+}
+
+func (e *Encoder) String() string {
+	return fmt.Sprintf("encoding: %s, parts: %d, byte size: %d, e.batchSize: %d, lastPtsIdx: %d, trimmed: %d",
+		e.enc, e.parts, e.bytesSize, e.batchSize, e.lastPtsIdx, e.trimmed,
+	)
 }
 
 // PB2LP convert protobuf Point to line-protocol Point.

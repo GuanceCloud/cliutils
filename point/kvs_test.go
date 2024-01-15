@@ -129,4 +129,14 @@ func TestKVs(t *T.T) {
 		sort.Sort(kvs)
 		assert.True(t, sort.IsSorted(kvs))
 	})
+
+	t.Run(`test-update-on-kvs`, func(t *T.T) {
+		pt := NewPointV2("ptname", nil)
+
+		pt.pt.Fields = KVs(pt.pt.Fields).Add("f1", 1.23, false, false)
+
+		t.Logf("point: %s", pt.Pretty())
+
+		assert.NotNil(t, pt.Get("f1"))
+	})
 }

@@ -43,8 +43,10 @@ func NewPoint(name string, tags map[string]string, fields map[string]any, opts .
 
 func doNewPoint(name string, kvs KVs, c *cfg) *Point {
 	pt := &Point{
-		name: name,
-		kvs:  kvs,
+		pt: &PBPoint{
+			Name:   name,
+			Fields: kvs,
+		},
 	}
 
 	// add extra tags
@@ -59,27 +61,29 @@ func doNewPoint(name string, kvs KVs, c *cfg) *Point {
 	}
 
 	if c.keySorted {
-		sort.Sort(pt.kvs)
+		kvs := KVs(pt.pt.Fields)
+		sort.Sort(kvs)
+		pt.pt.Fields = kvs
 	}
 
 	if c.precheck {
 		chk := checker{cfg: c}
 		pt = chk.check(pt)
 		pt.SetFlag(Pcheck)
-		pt.warns = chk.warns
+		pt.pt.Warns = chk.warns
 	}
 
 	// sort again: during check, kv maybe update
 	if c.keySorted {
-		sort.Sort(pt.kvs)
+		sort.Sort(KVs(pt.pt.Fields))
 	}
 
 	if !c.t.IsZero() {
-		pt.time = c.t.Round(0) // trim monotonic clock
+		pt.pt.Time = c.t.Round(0).UnixNano() // trim monotonic clock
 	}
 
-	if pt.time.IsZero() {
-		pt.time = time.Now().Round(0) // trim monotonic clock
+	if pt.pt.Time == 0 {
+		pt.pt.Time = time.Now().Round(0).UnixNano() // trim monotonic clock
 	}
 
 	return pt

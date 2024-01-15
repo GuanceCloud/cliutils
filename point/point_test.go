@@ -108,12 +108,14 @@ func BenchmarkFromModelsLP(b *T.B) {
 			pt := FromModelsLP(lppts[0])
 
 			pt = chk.check(pt)
-			pt.warns = chk.warns
+			pt.pt.Warns = chk.warns
 			chk.reset()
 
 			// re-sort again: check may update pt.kvs
 			if c.keySorted {
-				sort.Sort(pt.kvs)
+				kvs := KVs(pt.pt.Fields)
+				sort.Sort(kvs)
+				pt.pt.Fields = kvs
 			}
 		}
 	})
@@ -127,7 +129,7 @@ func TestGet(t *T.T) {
 		assert.Equal(t, "", pt.GetTag(`not-exist`))
 
 		// get non-tag key
-		pt.kvs = pt.kvs.MustAddKV(NewKV(`f1`, 1.23,
+		pt.pt.Fields = KVs(pt.pt.Fields).MustAddKV(NewKV(`f1`, 1.23,
 			WithKVUnit("bytes"),
 			WithKVTagSet(true), // set failed
 			WithKVType(COUNT)))
@@ -136,7 +138,7 @@ func TestGet(t *T.T) {
 		pt.AddTag(`empty-tag`, ``)
 		assert.Equal(t, ``, pt.GetTag(`empty-tag`))
 
-		t.Logf("kvs:\n%s", pt.kvs.Pretty())
+		t.Logf("kvs:\n%s", KVs(pt.pt.Fields).Pretty())
 	})
 
 	t.Run("get", func(t *T.T) {
@@ -525,8 +527,10 @@ func TestPBJSON(t *T.T) {
 			"mixed-arr": MustNewAnyArray(1, 2.0, "hello", false),
 		}))
 
-		pt.kvs = pt.kvs.MustAddTag(`t1`, `v1`).
+		kvs := KVs(pt.pt.Fields)
+		kvs = kvs.MustAddTag(`t1`, `v1`).
 			MustAddKV(NewKV(`f2`, 3.14, WithKVUnit("kb"), WithKVType(COUNT)))
+		pt.pt.Fields = kvs
 
 		j, _ := pt.PBJson()
 		t.Logf("raw: %s", string(j))
@@ -558,6 +562,10 @@ func TestPointPB(t *T.T) {
 			"f10": 3.14,
 		}), WithTime(time.Unix(0, 123)), WithKeySorted(true))
 
+		kvs := KVs(pt.pt.Fields)
+		sort.Sort(kvs)
+		pt.pt.Fields = kvs
+
 		j := fmt.Sprintf(`{
 	"name": "%s",
 	"fields": [
@@ -585,13 +593,16 @@ func TestPointPB(t *T.T) {
 			`f10`, float64(3.14))
 
 		expect := MustFromPBJson([]byte(j))
+		kvs = KVs(expect.pt.Fields)
+		sort.Sort(kvs)
+		expect.pt.Fields = kvs
 
 		cfg := GetCfg()
 		defer PutCfg(cfg)
 		chk := checker{cfg: cfg}
 		expect = chk.check(expect)
 		expect.SetFlag(Pcheck)
-		expect.warns = chk.warns
+		expect.pt.Warns = chk.warns
 
 		assert.Equal(t, expect.Pretty(), pt.Pretty(), "got\n%s\nexpect\n%s", expect.Pretty(), pt.Pretty())
 
@@ -750,7 +761,8 @@ func TestFields(t *T.T) {
 			assert.NotNil(t, tc.pt.MustLPPoint())
 
 			eq, reason = kvsEq(fs, NewKVs(tc.expect))
-			assert.True(t, eq, "not equal, reason: %s, pt: %s", reason, tc.pt.kvs.Pretty())
+			kvs := KVs(tc.pt.pt.Fields)
+			assert.True(t, eq, "not equal, reason: %s, pt: %s", reason, kvs.Pretty())
 		})
 	}
 }
@@ -981,7 +993,8 @@ func TestPointAddKey(t *T.T) {
 	t.Run("add", func(t *T.T) {
 		pt := NewPointV2("abc", NewKVs(map[string]any{"f1": 123}))
 		pt.Add("new-key", "hello")
-		assert.True(t, pt.kvs.Has(`new-key`), "fields: %s", pt.kvs.Pretty())
+		kvs := KVs(pt.pt.Fields)
+		assert.True(t, kvs.Has(`new-key`), "fields: %s", kvs.Pretty())
 	})
 }
 

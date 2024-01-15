@@ -171,11 +171,11 @@ func TestPBPointJSON(t *testing.T) {
 			assert.NoError(t, err)
 
 			// test if debug/warns included in json
-			if len(pt.debugs) > 0 {
+			if len(pt.pt.Debugs) > 0 {
 				assert.Contains(t, string(pbjson), "debugs", "%s not include `debugs'", string(pbjson))
 			}
 
-			if len(pt.warns) > 0 {
+			if len(pt.pt.Warns) > 0 {
 				assert.Contains(t, string(pbjson), "warns", "%s not include `warns'", string(pbjson))
 			}
 
@@ -212,7 +212,7 @@ func TestPBPointJSON(t *testing.T) {
 
 			t.Logf("pb json after:\n%s", pts[0].Pretty())
 
-			if len(pt.warns) > 0 {
+			if len(pt.pt.Warns) > 0 {
 				assert.Contains(t, string(pbjson), "warns")
 			}
 

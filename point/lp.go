@@ -123,7 +123,9 @@ func parseLPPoints(data []byte, c *cfg) ([]*Point, error) {
 		pt := FromModelsLP(x)
 
 		if c.keySorted {
-			sort.Sort(pt.kvs)
+			kvs := KVs(pt.pt.Fields)
+			sort.Sort(kvs)
+			pt.pt.Fields = kvs
 		}
 
 		if c.callback != nil {
@@ -138,12 +140,14 @@ func parseLPPoints(data []byte, c *cfg) ([]*Point, error) {
 		}
 
 		pt = chk.check(pt)
-		pt.warns = chk.warns
+		pt.pt.Warns = chk.warns
 		chk.reset()
 
-		// re-sort again: check may update pt.kvs
+		// re-sort again: check may update pt.pt.Fields
 		if c.keySorted {
-			sort.Sort(pt.kvs)
+			kvs := KVs(pt.pt.Fields)
+			sort.Sort(kvs)
+			pt.pt.Fields = kvs
 		}
 
 		res = append(res, pt)

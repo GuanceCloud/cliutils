@@ -502,7 +502,7 @@ func TestNewLPPoint(t *testing.T) {
 				}
 			}
 
-			assert.Equal(t, tc.warns, len(pt.warns), "got pt with warns: %s", pt.Pretty())
+			assert.Equal(t, tc.warns, len(pt.pt.Warns), "got pt with warns: %s", pt.Pretty())
 
 			x := pt.LineProto()
 			assert.Equal(t, tc.expect, x, "got pt %s", pt.Pretty())

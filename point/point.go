@@ -31,16 +31,18 @@ type Callback func(*Point) (*Point, error)
 type Point struct {
 	// warnnings and debug info about the point, for pbPoint,
 	// they will wrapped in payload, but optional write to storage.
-	warns  []*Warn
-	debugs []*Debug
-	keys   *Keys // bufferred keys
+	//warns  []*Warn
+	//debugs []*Debug
+
+	keys *Keys // bufferred keys
 
 	// flags about the point
 	flags uint64
+	pt    *PBPoint
 
-	name string
-	kvs  KVs
-	time time.Time
+	//name string
+	//kvs  KVs
+	//time time.Time
 }
 
 // ClearFlag clear specific bit.
@@ -85,24 +87,26 @@ func (p *Point) MustLPPoint() influxm.Point {
 
 // LPPoint get line-protocol part of the point.
 func (p *Point) LPPoint() (influxm.Point, error) {
-	return influxm.NewPoint(p.name, p.InfluxTags(), p.InfluxFields(), p.time)
+	return influxm.NewPoint(p.pt.Name, p.InfluxTags(), p.InfluxFields(), time.Unix(0, p.pt.Time))
 }
 
 // InfluxFields convert fields to map structure.
 func (p *Point) InfluxFields() map[string]any {
-	return p.kvs.InfluxFields()
+	kvs := KVs(p.pt.Fields)
+	return kvs.InfluxFields()
 }
 
 // InfluxTags convert tags to map structure.
 func (p *Point) InfluxTags() influxm.Tags {
-	return p.kvs.InfluxTags()
+	kvs := KVs(p.pt.Fields)
+	return kvs.InfluxTags()
 }
 
 // MapTags convert all key-value to map.
 func (p *Point) MapTags() map[string]string {
 	res := map[string]string{}
 
-	for _, kv := range p.kvs {
+	for _, kv := range p.pt.Fields {
 		if !kv.IsTag {
 			continue
 		}
@@ -117,7 +121,7 @@ func (p *Point) MapTags() map[string]string {
 func (p *Point) KVMap() map[string]any {
 	res := map[string]any{}
 
-	for _, kv := range p.kvs {
+	for _, kv := range p.pt.Fields {
 		res[kv.Key] = kv.Raw()
 	}
 
@@ -127,28 +131,30 @@ func (p *Point) KVMap() map[string]any {
 // Pretty get string representation of point, suffixed with all warning(if any)
 // during build the point.
 func (p *Point) Pretty() string {
+	kvs := KVs(p.pt.Fields)
+
 	arr := []string{
 		"\n",
 		p.Name(),
 		"-----------",
-		p.kvs.Pretty(),
+		kvs.Pretty(),
 		"-----------",
 		fmt.Sprintf("%s | %d",
 			p.Time().String(),
 			p.Time().UnixNano()),
 	}
 
-	if len(p.warns) > 0 {
+	if len(p.pt.Warns) > 0 {
 		arr = append(arr, "-----------")
 	}
 
 	// only pbpoint attached with warns
-	for _, w := range p.warns {
+	for _, w := range p.pt.Warns {
 		arr = append(arr, fmt.Sprintf("[W] %s: %s", w.Type, w.Msg))
 	}
 
 	// only pbpoint attached with debugs
-	for _, d := range p.debugs {
+	for _, d := range p.pt.Debugs {
 		arr = append(arr, fmt.Sprintf("[D] %s", d.Info))
 	}
 
@@ -157,13 +163,13 @@ func (p *Point) Pretty() string {
 
 // Warns return warnning info when build the point.
 func (p *Point) Warns() []*Warn {
-	return p.warns
+	return p.pt.Warns
 }
 
 // WarnsPretty return human readable warnning info.
 func (p *Point) WarnsPretty() string {
 	var arr []string
-	for _, w := range p.warns {
+	for _, w := range p.pt.Warns {
 		arr = append(arr, w.String())
 	}
 	return strings.Join(arr, "\n")
@@ -204,9 +210,11 @@ func FromPBJson(j []byte) (*Point, error) {
 
 func FromJSONPoint(j *JSONPoint) *Point {
 	pt := &Point{
-		name: j.Measurement,
-		kvs:  NewKVs(j.Fields),
-		time: time.Unix(0, j.Time),
+		pt: &PBPoint{
+			Name:   j.Measurement,
+			Fields: NewKVs(j.Fields),
+			Time:   time.Unix(0, j.Time).UnixNano(),
+		},
 	}
 
 	for k, v := range j.Tags {
@@ -223,9 +231,11 @@ func FromLP(lp influxm.Point) *Point {
 	}
 
 	pt := &Point{
-		name: string(lp.Name()),
-		kvs:  NewKVs(lpfs),
-		time: lp.Time(),
+		pt: &PBPoint{
+			Name:   string(lp.Name()),
+			Fields: NewKVs(lpfs),
+			Time:   lp.Time().UnixNano(),
+		},
 	}
 
 	for _, tag := range lp.Tags() {
@@ -242,9 +252,11 @@ func FromModelsLP(lp influxm.Point) *Point {
 	}
 
 	pt := &Point{
-		name: string(lp.Name()),
-		kvs:  NewKVs(lpfs),
-		time: lp.Time(),
+		pt: &PBPoint{
+			Name:   string(lp.Name()),
+			Fields: NewKVs(lpfs),
+			Time:   lp.Time().UnixNano(),
+		},
 	}
 
 	tags := lp.Tags()
@@ -256,15 +268,8 @@ func FromModelsLP(lp influxm.Point) *Point {
 }
 
 func FromPB(pb *PBPoint) *Point {
-	kvs := KVs(pb.Fields)
-	sort.Sort(kvs)
-
 	pt := &Point{
-		name:   pb.Name,
-		kvs:    kvs,
-		time:   time.Unix(0, pb.Time),
-		warns:  pb.Warns,
-		debugs: pb.Debugs,
+		pt: pb,
 	}
 
 	pt.SetFlag(Ppb)
@@ -301,42 +306,48 @@ func (p *Point) PBJsonPretty() ([]byte, error) {
 
 // Tags return point's key-values except fields.
 func (p *Point) Tags() (arr KVs) {
-	return p.kvs.Tags()
+	kvs := KVs(p.pt.Fields)
+	return kvs.Tags()
 }
 
 // Fields return point's key-values except tags.
 func (p *Point) Fields() (arr KVs) {
-	return p.kvs.Fields()
+	kvs := KVs(p.pt.Fields)
+	return kvs.Fields()
 }
 
 // KVs return point's all key-values.
 func (p *Point) KVs() (arr KVs) {
-	return p.kvs
+	return KVs(p.pt.Fields)
 }
 
 // AddKV add kv, if the key exist, do nothing.
 func (p *Point) AddKV(kv *Field) {
-	p.kvs = p.kvs.AddKV(kv, false)
+	kvs := KVs(p.pt.Fields)
+	p.pt.Fields = kvs.AddKV(kv, false)
 }
 
 // MustAddKV add kv, if the key exist, override it.
 func (p *Point) MustAddKV(kv *Field) {
-	p.kvs = p.kvs.AddKV(kv, true)
+	kvs := KVs(p.pt.Fields)
+	p.pt.Fields = kvs.AddKV(kv, true)
 }
 
 // Name return point's measurement name.
 func (p *Point) Name() string {
-	return p.name
+	return p.pt.Name
 }
 
 // Time return point's time.
 func (p *Point) Time() time.Time {
-	return p.time
+	return time.Unix(0, p.pt.Time)
 }
 
 // Get get specific key from point.
 func (p *Point) Get(k string) any {
-	if kv := p.kvs.Get(k); kv != nil {
+	kvs := KVs(p.pt.Fields)
+
+	if kv := kvs.Get(k); kv != nil {
 		return kv.Raw()
 	}
 	return nil
@@ -345,56 +356,58 @@ func (p *Point) Get(k string) any {
 // GetTag get value of tag k.
 // If key k not tag or k not eixst, return nil.
 func (p *Point) GetTag(k string) string {
-	return p.kvs.GetTag(k)
+	kvs := KVs(p.pt.Fields)
+	return kvs.GetTag(k)
 }
 
 // MustAdd add specific key value to fields, if k exist, override it.
 func (p *Point) MustAdd(k string, v any) {
-	p.kvs = p.kvs.Add(k, v, false, true)
+	kvs := KVs(p.pt.Fields)
+	kvs = kvs.Add(k, v, false, true)
+	p.pt.Fields = kvs
 }
 
 // Add add specific key value to fields, if k exist, do nothing.
 func (p *Point) Add(k string, v any) {
-	p.kvs = p.kvs.Add(k, v, false, false)
+	kvs := KVs(p.pt.Fields)
+	p.pt.Fields = kvs.Add(k, v, false, false)
 }
 
 // MustAddTag add specific key value to fields, if k exist, override it.
 func (p *Point) MustAddTag(k, v string) {
-	p.kvs = p.kvs.Add(k, v, true, true)
+	kvs := KVs(p.pt.Fields)
+	p.pt.Fields = kvs.Add(k, v, true, true)
 }
 
 // AddTag add specific key value to fields, if k exist, do nothing.
 func (p *Point) AddTag(k, v string) {
-	p.kvs = p.kvs.Add(k, v, true, false)
+	kvs := KVs(p.pt.Fields)
+	p.pt.Fields = kvs.Add(k, v, true, false)
 }
 
 // Del delete specific key from tags/fields.
 func (p *Point) Del(k string) {
-	p.kvs = p.kvs.Del(k)
+	kvs := KVs(p.pt.Fields)
+	p.pt.Fields = kvs.Del(k)
 }
 
 func (p *Point) AddDebug(d *Debug) {
-	p.debugs = append(p.debugs, d)
+	p.pt.Debugs = append(p.pt.Debugs, d)
 }
 
 // PBPoint create Point based on a protobuf point.
 func (p *Point) PBPoint() *PBPoint {
-	return &PBPoint{ // we have to create the pbpoint
-		Name:   p.name,
-		Fields: p.kvs,
-		Time:   p.Time().UnixNano(),
-
-		Warns:  p.warns,
-		Debugs: p.debugs,
-	}
+	return p.pt
 }
 
 // Keys get points all keys.
 func (p *Point) Keys() *Keys {
+	kvs := KVs(p.pt.Fields)
+
 	if p.keys == nil {
 		res := &Keys{
 			hash: uint64(0),
-			arr:  p.kvs.Keys().arr,
+			arr:  kvs.Keys().arr,
 		}
 
 		sort.Sort(res)
@@ -406,8 +419,8 @@ func (p *Point) Keys() *Keys {
 
 // Size get underling data size in byte(exclude warning/debug info).
 func (p *Point) Size() int {
-	n := len(p.name)
-	for _, kv := range p.kvs {
+	n := len(p.pt.Name)
+	for _, kv := range p.pt.Fields {
 		n += len(kv.Key)
 		n += 1 // IsTag
 		n += 8 // time
@@ -439,11 +452,11 @@ func (p *Point) Size() int {
 		}
 	}
 
-	for _, w := range p.warns {
+	for _, w := range p.pt.Warns {
 		n += (len(w.Type) + len(w.Msg))
 	}
 
-	for _, d := range p.debugs {
+	for _, d := range p.pt.Debugs {
 		n += (len(d.Info))
 	}
 

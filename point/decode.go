@@ -9,10 +9,7 @@ import (
 	"encoding/json"
 	sync "sync"
 	"time"
-
 	//"google.golang.org/protobuf/proto"
-
-	proto "github.com/gogo/protobuf/proto"
 )
 
 var decPool sync.Pool
@@ -132,23 +129,19 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 
 	case Protobuf:
 		var pbpts PBPoints
-		if err = proto.Unmarshal(data, &pbpts); err != nil {
+		if err = pbpts.Unmarshal(data); err != nil {
 			return nil, err
 		}
 
 		chk := checker{cfg: cfg}
 		for _, pbpt := range pbpts.Arr {
 			pt := &Point{
-				name:   pbpt.Name,
-				kvs:    pbpt.Fields,
-				time:   time.Unix(0, pbpt.Time),
-				warns:  pbpt.Warns,
-				debugs: pbpt.Debugs,
+				pt: pbpt,
 			}
 			pt.SetFlag(Ppb)
 
 			pt = chk.check(pt)
-			pt.warns = chk.warns
+			pt.pt.Warns = chk.warns
 			chk.reset()
 
 			pts = append(pts, pt)

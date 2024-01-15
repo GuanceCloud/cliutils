@@ -524,7 +524,7 @@ func BenchmarkCheck(b *T.B) {
 		pt, err := NewPoint(tc.m, tc.t, tc.f, tc.opts...)
 		assert.NoError(b, err)
 
-		b.Logf("pt with warns: %d", len(pt.warns))
+		b.Logf("pt with warns: %d", len(pt.pt.Warns))
 
 		cfg := GetCfg()
 		defer PutCfg(cfg)

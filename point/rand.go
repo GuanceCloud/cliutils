@@ -118,10 +118,14 @@ func (r *ptRander) Rand(count int) []*Point {
 
 	var pts []*Point
 	for i := 0; i < count; i++ {
-		pt := r.doRand()
-		if pt != nil {
-			pts = append(pts, r.doRand())
+		kvs := r.doRand()
+		pt := NewPointV2(r.measurementPrefix+randStr(r.keyLen), kvs, WithTime(r.ts))
+
+		if r.pb {
+			pt.SetFlag(Ppb)
 		}
+
+		pts = append(pts, pt)
 	}
 
 	return pts
@@ -139,7 +143,7 @@ func (r *ptRander) getFieldKey(i int) string {
 	}
 }
 
-func (r *ptRander) doRand() *Point {
+func (r *ptRander) doRand() KVs {
 	var kvs KVs
 
 	// fields := map[string]interface{}{}
@@ -207,17 +211,10 @@ func (r *ptRander) doRand() *Point {
 		n--
 	}
 
-	pt := NewPointV2(r.measurementPrefix+randStr(r.keyLen), kvs, WithTime(r.ts))
-
-	if r.pb {
-		pt.SetFlag(Ppb)
-	}
-
 	if r.kvSorted {
-		sort.Sort(pt.kvs)
+		sort.Sort(kvs)
 	}
-
-	return pt
+	return kvs
 }
 
 //nolint:lll

@@ -59,7 +59,7 @@ func (p *Point) MarshalJSON() ([]byte, error) {
 		Measurement: p.Name(),
 		Tags:        p.MapTags(),
 		Fields:      p.InfluxFields(),
-		Time:        p.time.UnixNano(),
+		Time:        p.pt.Time,
 		// NOTE: warns & debugs skipped.
 	})
 }

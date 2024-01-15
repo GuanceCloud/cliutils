@@ -430,13 +430,13 @@ func TestNewPoint(t *T.T) {
 			x := pt.LineProto()
 
 			if tc.expect != "" {
-				assert.Equal(t, tc.expect, x, "pt: %s, kvs: %s", pt.Pretty(), pt.kvs.Pretty())
+				assert.Equal(t, tc.expect, x, "pt: %s, kvs: %s", pt.Pretty(), KVs(pt.pt.Fields).Pretty())
 			} else {
 				assert.NotEqual(t, x, "", "got %s", pt.Pretty())
 				t.Logf("got %s", x)
 			}
 
-			assert.Equal(t, tc.warns, len(pt.warns), "pt: %s", pt.Pretty())
+			assert.Equal(t, tc.warns, len(pt.pt.Warns), "pt: %s", pt.Pretty())
 		})
 	}
 }
@@ -470,7 +470,7 @@ func TestPointKeySorted(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		assert.True(t, sort.IsSorted(pt.kvs))
+		assert.True(t, sort.IsSorted(KVs(pt.pt.Fields)))
 
 		t.Logf("pt: %s", pt.Pretty())
 	})
@@ -503,7 +503,7 @@ func TestPointKeySorted(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		assert.False(t, sort.IsSorted(pt.kvs))
+		assert.False(t, sort.IsSorted(KVs(pt.pt.Fields)))
 
 		t.Logf("pt: %s", pt.Pretty())
 	})

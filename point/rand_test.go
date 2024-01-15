@@ -167,8 +167,8 @@ func TestWithFixKeys(t *T.T) {
 		pt2 := r.Rand(1)[0]
 
 		// NOTE: sort kvs to keep assert ok
-		sort.Sort(pt1.kvs)
-		sort.Sort(pt2.kvs)
+		sort.Sort(KVs(pt1.pt.Fields))
+		sort.Sort(KVs(pt2.pt.Fields))
 
 		pt1tags := pt1.Tags()
 		pt2tags := pt2.Tags()
@@ -185,8 +185,8 @@ func TestWithFixKeys(t *T.T) {
 				f.Key,
 				"%d not equal:\npt1: %s\n\npt2: %s",
 				idx,
-				pt1.kvs.Pretty(),
-				pt2.kvs.Pretty())
+				KVs(pt1.pt.Fields).Pretty(),
+				KVs(pt2.pt.Fields).Pretty())
 		}
 	})
 }
