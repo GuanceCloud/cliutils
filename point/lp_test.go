@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	T "testing"
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
 	"github.com/influxdata/influxdb1-client/models"
+	influxm "github.com/influxdata/influxdb1-client/models"
 	influxdb "github.com/influxdata/influxdb1-client/v2"
 	"github.com/stretchr/testify/assert"
 )
@@ -1101,4 +1103,69 @@ func TestParseLineProto(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAppendString(t *T.T) {
+	r := NewRander()
+	pts := r.Rand(3)
+
+	var lppts []influxm.Point
+	for _, pt := range pts {
+		lppt, err := pt.LPPoint()
+		assert.NoError(t, err)
+		lppts = append(lppts, lppt)
+	}
+
+	//ptbuf := make([]byte, 4096)
+	var ptbuf []byte
+	totalBuf := make([]byte, 0, 4<<20)
+
+	for _, pt := range lppts {
+		ptbuf = pt.AppendString(ptbuf)
+		totalBuf = append(totalBuf, ptbuf[:pt.StringSize()]...)
+		totalBuf = append(totalBuf, '\n')
+
+		//t.Logf("ptbuf: %s", string(ptbuf))
+		ptbuf = ptbuf[:0]
+	}
+
+	t.Logf("total: %s", string(totalBuf))
+}
+
+func BenchmarkLPString(b *T.B) {
+	r := NewRander()
+	pts := r.Rand(100)
+
+	var lppts []influxm.Point
+	for _, pt := range pts {
+		lppt, err := pt.LPPoint()
+		assert.NoError(b, err)
+		lppts = append(lppts, lppt)
+	}
+
+	var ptbuf []byte
+	totalBuf := make([]byte, 0, 8<<20)
+
+	b.ResetTimer()
+	b.Run("AppendString", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			for _, pt := range lppts {
+				ptbuf = pt.AppendString(ptbuf)
+				totalBuf = append(totalBuf, ptbuf[:pt.StringSize()]...)
+				totalBuf = append(totalBuf, '\n')
+
+				ptbuf = ptbuf[:0]
+			}
+		}
+	})
+
+	b.Run("String", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			for _, pt := range lppts {
+				ptstr := pt.String()
+				totalBuf = append(totalBuf, []byte(ptstr)...)
+				totalBuf = append(totalBuf, '\n')
+			}
+		}
+	})
 }
