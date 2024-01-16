@@ -128,8 +128,7 @@ func (p *Point) KVMap() map[string]any {
 	return res
 }
 
-// Pretty get string representation of point, suffixed with all warning(if any)
-// during build the point.
+// Pretty get string representation of point, all key-valus will be sorted in output.
 func (p *Point) Pretty() string {
 	kvs := KVs(p.pt.Fields)
 

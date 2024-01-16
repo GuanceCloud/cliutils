@@ -362,7 +362,6 @@ func BenchmarkEncode(b *T.B) {
 	b.ResetTimer()
 
 	b.Run("bench-encode-json", func(b *T.B) {
-
 		for i := 0; i < b.N; i++ {
 			enc := GetEncoder(WithEncEncoding(JSON))
 			enc.Encode(pts)
@@ -387,14 +386,29 @@ func BenchmarkEncode(b *T.B) {
 		}
 	})
 
-	b.Run("v2-encode", func(b *T.B) {
+	b.Run("v2-encode-pb", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			enc := GetEncoder(WithEncEncoding(Protobuf))
 			enc.EncodeV2(pts)
 
 			for {
 				if _, ok := enc.Next(buf); ok {
-					buf = buf[0:]
+				} else {
+					break
+				}
+			}
+
+			PutEncoder(enc)
+		}
+	})
+
+	b.Run("v2-encode-lp", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			enc := GetEncoder(WithEncEncoding(LineProtocol))
+			enc.EncodeV2(pts)
+
+			for {
+				if _, ok := enc.Next(buf); ok {
 				} else {
 					break
 				}
@@ -457,41 +471,113 @@ func TestEncodeV2(t *T.T) {
 	r := NewRander(WithFixedTags(true), WithRandText(3))
 	randPts := r.Rand(10000)
 
-	enc := GetEncoder(WithEncEncoding(Protobuf))
-	enc.EncodeV2(randPts)
-	defer PutEncoder(enc)
+	t.Run("encode-pb", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		enc.EncodeV2(randPts)
+		defer PutEncoder(enc)
 
-	dec := GetDecoder(WithDecEncoding(Protobuf))
-	defer PutDecoder(dec)
+		dec := GetDecoder(WithDecEncoding(Protobuf))
+		defer PutDecoder(dec)
 
-	buf := make([]byte, 1<<20) // KB
+		var (
+			decodePts []*Point
+			round     int
+			buf       = make([]byte, 1<<20) // KB
+		)
 
-	t.Logf("len(buf): %d, cap(buf): %d", len(buf), cap(buf))
+		for {
+			if x, ok := enc.Next(buf); ok {
+				decPts, err := dec.Decode(x)
+				assert.NoErrorf(t, err, "decode %s failed", x)
 
-	var (
-		decodePts []*Point
-		round     int
-	)
+				t.Logf("encoded %d(%d remain) bytes, %d points, encoder: %s",
+					len(x), (len(buf) - len(x)), len(decPts), enc.String())
+				decodePts = append(decodePts, decPts...)
+				round++
+				assert.Equal(t, round, enc.parts)
+			} else {
+				break
+			}
+		}
 
-	for {
-		if x, ok := enc.Next(buf); ok {
-			decPts, err := dec.Decode(x)
-			assert.NoErrorf(t, err, "decode %s failed", x)
+		assert.NoError(t, enc.LastErr())
 
-			t.Logf("encoded %d(%d remain) bytes, %d points, encoder: %s",
-				len(x), (len(buf) - len(x)), len(decPts), enc.String())
-			buf = buf[0:]
-			decodePts = append(decodePts, decPts...)
-			round++
-			assert.Equal(t, round, enc.parts)
-		} else {
+		for i, pt := range decodePts {
+			assert.Equal(t, randPts[i].Pretty(), pt.Pretty())
+		}
+	})
+
+	t.Run("encode-lp", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(LineProtocol))
+		enc.EncodeV2(randPts)
+		defer PutEncoder(enc)
+
+		dec := GetDecoder(WithDecEncoding(LineProtocol))
+		defer PutDecoder(dec)
+
+		var (
+			decodePts []*Point
+			round     int
+			buf       = make([]byte, 1<<20)
+		)
+
+		for {
+			if x, ok := enc.Next(buf); ok {
+
+				decPts, err := dec.Decode(x)
+				assert.NoErrorf(t, err, "decode %s failed", x)
+
+				t.Logf("encoded %d(%d remain) bytes, %d points, encoder: %s",
+					len(x), (len(buf) - len(x)), len(decPts), enc.String())
+
+				decodePts = append(decodePts, decPts...)
+				round++
+				assert.Equal(t, round, enc.parts)
+			} else {
+				break
+			}
+		}
+
+		assert.NoError(t, enc.LastErr())
+
+		for i, pt := range decodePts {
+			assert.Equal(t, randPts[i].Pretty(), pt.Pretty())
+		}
+	})
+
+	t.Run("too-small-buffer-lp", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(LineProtocol))
+		enc.EncodeV2(randPts)
+		defer PutEncoder(enc)
+
+		buf := make([]byte, 4) // too small
+
+		for {
+			_, ok := enc.Next(buf)
+			require.False(t, ok)
 			break
 		}
-	}
 
-	for i, pt := range decodePts {
-		assert.Equal(t, randPts[i].Pretty(), pt.Pretty())
-	}
+		assert.Error(t, enc.LastErr())
+		t.Logf("go error: %s", enc.LastErr())
+	})
+
+	t.Run("too-small-buffer-pb", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		enc.EncodeV2(randPts)
+		defer PutEncoder(enc)
+
+		buf := make([]byte, 4) // too small
+
+		for {
+			_, ok := enc.Next(buf)
+			require.False(t, ok)
+			break
+		}
+
+		assert.Error(t, enc.LastErr())
+		t.Logf("go error: %s", enc.LastErr())
+	})
 }
 
 func BenchmarkPointsSize(b *T.B) {

@@ -16,6 +16,7 @@ import (
 	influxm "github.com/influxdata/influxdb1-client/models"
 	influxdb "github.com/influxdata/influxdb1-client/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func parseLineProto(t *testing.T, data []byte, precision string) (models.Points, error) {
@@ -1116,20 +1117,30 @@ func TestAppendString(t *T.T) {
 		lppts = append(lppts, lppt)
 	}
 
-	//ptbuf := make([]byte, 4096)
 	var ptbuf []byte
-	totalBuf := make([]byte, 0, 4<<20)
+	totalBuf := make([]byte, 4<<20)
 
 	for _, pt := range lppts {
 		ptbuf = pt.AppendString(ptbuf)
 		totalBuf = append(totalBuf, ptbuf[:pt.StringSize()]...)
 		totalBuf = append(totalBuf, '\n')
 
-		//t.Logf("ptbuf: %s", string(ptbuf))
 		ptbuf = ptbuf[:0]
 	}
 
-	t.Logf("total: %s", string(totalBuf))
+	t.Logf("total:\n%s", string(totalBuf))
+
+	dec := GetDecoder(WithDecEncoding(LineProtocol))
+	decPts, err := dec.Decode(totalBuf)
+	assert.NoError(t, err)
+
+	for i, pt := range decPts {
+		exp := pts[i].Pretty()
+		got := pt.Pretty()
+		require.Equalf(t, exp, got, "exp %s\ngot %s", exp, got)
+
+		t.Logf("got %s", got)
+	}
 }
 
 func BenchmarkLPString(b *T.B) {

@@ -7,6 +7,7 @@ package point
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	sync "sync"
@@ -103,7 +104,8 @@ type Encoder struct {
 	parts int
 	lastErr error
 
-	pbpts *PBPoints
+	lpPointBuf []byte
+	pbpts      *PBPoints
 
 	fn  EncodeFn
 	enc Encoding
@@ -149,6 +151,7 @@ func (e *Encoder) reset() {
 	e.lastErr = nil
 	e.parts = 0
 	e.pbpts.Arr = e.pbpts.Arr[:0]
+	e.lpPointBuf = e.lpPointBuf[:0]
 }
 
 func (e *Encoder) getPayload(pts []*Point) ([]byte, error) {
@@ -275,21 +278,12 @@ func (e *Encoder) EncodeV2(pts []*Point) {
 	e.pts = pts
 }
 
-func (e *Encoder) Next(buf []byte) ([]byte, bool) {
-	if e.enc != Protobuf {
-		e.lastErr = fmt.Errorf("EncodeV2 only support encoding Protocol")
-		return nil, false
-	}
-
+func (e *Encoder) doEncodeProtobuf(buf []byte) ([]byte, bool) {
 	var (
 		curSize,
 		pbptsSize int
 		trimmed = 1
 	)
-
-	defer func() {
-		e.pbpts.Arr = e.pbpts.Arr[:0]
-	}()
 
 	for _, pt := range e.pts[e.lastPtsIdx:] {
 		if pt == nil {
@@ -298,9 +292,14 @@ func (e *Encoder) Next(buf []byte) ([]byte, bool) {
 
 		curSize += pt.Size()
 
+		// e.pbpts size larger than buf, we must trim some of points
+		// until size fit ok or MarshalTo will panic.
 		if curSize >= len(buf) {
-			// e.pbpts size larger than buf, we must trim some of points
-			// until size fit ok or MarshalTo will panic.
+			if len(e.pbpts.Arr) <= 1 { // nothing to trim
+				e.lastErr = errTooSmallBuffer
+				return nil, false
+			}
+
 			for {
 				if pbptsSize = e.pbpts.Size(); pbptsSize > len(buf) {
 					e.pbpts.Arr = e.pbpts.Arr[:len(e.pbpts.Arr)-trimmed]
@@ -323,12 +322,75 @@ __doEncode:
 		return nil, false
 	}
 
+	defer func() {
+		e.pbpts.Arr = e.pbpts.Arr[:0]
+	}()
+
 	if n, err := e.pbpts.MarshalTo(buf); err != nil {
 		e.lastErr = err
 		return nil, false
 	} else {
 		e.parts++
 		return buf[:n], true
+	}
+}
+
+var (
+	errTooSmallBuffer = errors.New("too small buffer")
+)
+
+func (e *Encoder) doEncodeLineProtocol(buf []byte) ([]byte, bool) {
+	curSize := 0
+	for _, pt := range e.pts[e.lastPtsIdx:] {
+		if pt == nil {
+			continue
+		}
+
+		lppt, err := pt.LPPoint()
+		if err != nil {
+			e.lastErr = err
+			continue
+		}
+
+		ptsize := lppt.StringSize()
+
+		if curSize+ptsize+1 > len(buf) {
+			if curSize == 0 { // nothing added
+				e.lastErr = errTooSmallBuffer
+				return nil, false
+			}
+
+			e.parts++
+			return buf[:curSize], true
+		} else {
+			e.lpPointBuf = lppt.AppendString(e.lpPointBuf)
+
+			copy(buf[curSize:], e.lpPointBuf[:ptsize])
+			buf[curSize+ptsize] = '\n'
+			curSize += (ptsize + 1)
+
+			// clean buffer, next time AppendString() append from byte 0
+			e.lpPointBuf = e.lpPointBuf[:0]
+			e.lastPtsIdx++
+		}
+	}
+
+	if curSize > 0 {
+		e.parts++
+		return buf[:curSize], true
+	} else {
+		return nil, false
+	}
+}
+
+func (e *Encoder) Next(buf []byte) ([]byte, bool) {
+	switch e.enc {
+	case Protobuf:
+		return e.doEncodeProtobuf(buf)
+	case LineProtocol:
+		return e.doEncodeLineProtocol(buf)
+	default: // TODO: json
+		return nil, false
 	}
 }
 
