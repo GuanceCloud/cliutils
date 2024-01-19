@@ -42,6 +42,7 @@ func TestSizeofPoint(t *T.T) {
 }
 
 func BenchmarkLPPoint(b *T.B) {
+	now := time.Now()
 	b.Run("pt-lppt", func(b *T.B) {
 		fields := map[string]any{
 			"f1": 123,
@@ -51,7 +52,6 @@ func BenchmarkLPPoint(b *T.B) {
 			influxm.Tag{Key: []byte("t1"), Value: []byte("v1")},
 			influxm.Tag{Key: []byte("t2"), Value: []byte("v2")},
 		}
-		now := time.Now()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -68,7 +68,20 @@ func BenchmarkLPPoint(b *T.B) {
 			kvs = kvs.MustAddTag("t1", "v1")
 			kvs = kvs.MustAddTag("t2", "v2")
 
-			NewPointV2("some", kvs)
+			NewPointV2("some", kvs, WithPrecheck(false), WithTime(now))
+		}
+	})
+
+	b.Run("pt-pbpt-with-check", func(b *T.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			var kvs KVs
+			kvs = kvs.Add("f1", 123, false, true)
+			kvs = kvs.Add("f2", 3.14, false, true)
+			kvs = kvs.MustAddTag("t1", "v1")
+			kvs = kvs.MustAddTag("t2", "v2")
+
+			NewPointV2("some", kvs, WithTime(now))
 		}
 	})
 }

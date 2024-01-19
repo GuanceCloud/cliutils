@@ -85,6 +85,50 @@ func TestCheckMeasurement(t *testing.T) {
 	}
 }
 
+func TestCheckPoints(t *T.T) {
+	t.Run("string", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f1", 1.23, false, false)
+		kvs = kvs.Add("str", "hello", false, false)
+		kvs = kvs.Add("u64", uint64(math.MaxUint64), false, false)
+
+		pt := NewPointV2("m1", kvs, WithPrecheck(false))
+		pts := CheckPoints([]*Point{pt}, WithStrField(false))
+		assert.Len(t, pts, 1)
+		assert.Nil(t, pts[0].Get("str"))
+		assert.Equal(t, 1.23, pts[0].Get("f1"))
+	})
+
+	t.Run("u64", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f1", 1.23, false, false)
+		kvs = kvs.Add("str", "hello", false, false)
+		kvs = kvs.Add("u64", uint64(math.MaxUint64), false, false)
+
+		pt := NewPointV2("m1", kvs, WithPrecheck(false))
+		pts := CheckPoints([]*Point{pt}, WithU64Field(false))
+		assert.Len(t, pts, 1)
+		assert.Nil(t, pts[0].Get("u64"))
+		assert.Equal(t, "hello", pts[0].Get("str"))
+	})
+
+	t.Run("dot-in-key", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f.1", 1.23, false, false)
+		kvs = kvs.Add("u64", uint64(math.MaxUint64), false, false)
+
+		pt := NewPointV2("m1", kvs, WithPrecheck(false))
+
+		pts := CheckPoints([]*Point{pt}, WithDotInKey(false))
+		assert.Len(t, pts, 1)
+		assert.Equal(t, uint64(math.MaxUint64), pts[0].Get("u64"))
+		assert.Equal(t, 1.23, pts[0].Get("f_1"))
+		assert.Len(t, pts[0].Warns(), 1)
+
+		t.Logf("point: %s", pts[0].Pretty())
+	})
+}
+
 func TestCheckTags(t *T.T) {
 	cases := []struct {
 		name   string
@@ -534,10 +578,43 @@ func BenchmarkCheck(b *T.B) {
 		}
 		c := checker{cfg: cfg}
 
+		b.ResetTimer()
 		b.Run(tc.name, func(b *T.B) {
 			for i := 0; i < b.N; i++ {
 				c.check(pt)
 			}
 		})
 	}
+}
+
+func BenchmarkCheckPoints(b *T.B) {
+	b.Run("check-rand-pts", func(b *T.B) {
+		r := NewRander()
+		pts := r.Rand(1000)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			CheckPoints(pts)
+		}
+	})
+
+	b.Run("check-pts-without-str-field", func(b *T.B) {
+		r := NewRander()
+		pts := r.Rand(1000)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			CheckPoints(pts, WithStrField(false))
+		}
+	})
+
+	b.Run("check-pts-without-u64-field", func(b *T.B) {
+		r := NewRander()
+		pts := r.Rand(1000)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			CheckPoints(pts, WithU64Field(false))
+		}
+	})
 }

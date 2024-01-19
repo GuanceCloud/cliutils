@@ -150,6 +150,7 @@ func (e *Encoder) reset() {
 	e.lastPtsIdx = 0
 	e.lastErr = nil
 	e.parts = 0
+	e.trimmed = 0
 	e.pbpts.Arr = e.pbpts.Arr[:0]
 	e.lpPointBuf = e.lpPointBuf[:0]
 }

@@ -29,20 +29,8 @@ const (
 type Callback func(*Point) (*Point, error)
 
 type Point struct {
-	// warnnings and debug info about the point, for pbPoint,
-	// they will wrapped in payload, but optional write to storage.
-	//warns  []*Warn
-	//debugs []*Debug
-
-	keys *Keys // bufferred keys
-
-	// flags about the point
 	flags uint64
 	pt    *PBPoint
-
-	//name string
-	//kvs  KVs
-	//time time.Time
 }
 
 // ClearFlag clear specific bit.
@@ -403,17 +391,14 @@ func (p *Point) PBPoint() *PBPoint {
 func (p *Point) Keys() *Keys {
 	kvs := KVs(p.pt.Fields)
 
-	if p.keys == nil {
-		res := &Keys{
-			hash: uint64(0),
-			arr:  kvs.Keys().arr,
-		}
-
-		sort.Sort(res)
-		p.keys = res
+	res := &Keys{
+		hash: uint64(0),
+		arr:  kvs.Keys().arr,
 	}
 
-	return p.keys
+	sort.Sort(res)
+
+	return res
 }
 
 // Size get underling data size in byte(exclude warning/debug info).

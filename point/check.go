@@ -157,7 +157,7 @@ func (c *checker) checkTag(f *Field) *Field {
 		f.Key = strings.ReplaceAll(f.Key, ".", "_")
 	}
 
-	if c.keyDisabled(NewTagKey(f.Key, "")) {
+	if c.keyDisabled(f.Key) {
 		c.addWarn(WarnTagDisabled, fmt.Sprintf("tag key `%s' disabled", f.Key))
 		return nil
 	}
@@ -182,7 +182,7 @@ func (c *checker) checkField(f *Field) *Field {
 		f.Key = strings.ReplaceAll(f.Key, ".", "_")
 	}
 
-	if c.keyDisabled(KVKey(f)) {
+	if c.keyDisabled(f.Key) {
 		c.addWarn(WarnFieldDisabled,
 			fmt.Sprintf("field key `%s' disabled", f.Key))
 		return nil
@@ -270,8 +270,8 @@ func trimSuffixAll(s, sfx string) string {
 	return x
 }
 
-func (c *checker) keyDisabled(k *Key) bool {
-	if k == nil {
+func (c *checker) keyDisabled(k string) bool {
+	if k == "" {
 		return true
 	}
 
@@ -280,7 +280,7 @@ func (c *checker) keyDisabled(k *Key) bool {
 	}
 
 	for _, item := range c.cfg.disabledKeys {
-		if k.key == item.key {
+		if k == item.key {
 			return true
 		}
 	}
@@ -305,4 +305,28 @@ func (c *checker) keyMiss(kvs KVs) KVs {
 	}
 
 	return kvs
+}
+
+// CheckPoints used to check pts on various opts.
+func CheckPoints(pts []*Point, opts ...Option) (arr []*Point) {
+	c := GetCfg(opts...)
+	defer PutCfg(c)
+
+	chk := checker{cfg: c}
+
+	arr = pts[:0]
+
+	for _, pt := range pts {
+		if pt.pt == nil {
+			continue
+		}
+
+		pt = chk.check(pt)
+		pt.SetFlag(Pcheck)
+		pt.pt.Warns = chk.warns
+		arr = append(arr, pt)
+		chk.reset()
+	}
+
+	return arr
 }
