@@ -25,7 +25,32 @@ func TestKVsAdd(t *T.T) {
 	})
 }
 
+func TestKVsReset(t *T.T) {
+
+	t.Run("reset", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f0", 1.23, false, false)
+		kvs = kvs.Add("f1", -123, false, false)
+		kvs = kvs.Add("f2", uint64(123), false, false)
+		kvs = kvs.Add("f3", "hello", false, false)
+		kvs = kvs.Add("f4", []byte("world"), false, false)
+		kvs = kvs.Add("f5", false, false, false)
+
+		kvs.Reset()
+
+		assert.Equal(t, "", kvs[0].Key)
+		assert.Equal(t, 0.0, kvs[0].Raw().(float64))
+
+		assert.Equal(t, int64(0), kvs[1].Raw().(int64))
+		assert.Equal(t, uint64(0), kvs[2].Raw().(uint64))
+		assert.Equal(t, "", kvs[3].Raw().(string))
+		assert.Len(t, kvs[4].Raw().([]byte), 0)
+		assert.False(t, kvs[5].Raw().(bool))
+	})
+}
+
 func TestKVs(t *T.T) {
+
 	t.Run("add-tag", func(t *T.T) {
 		kvs := NewKVs(map[string]any{"f1": 123})
 

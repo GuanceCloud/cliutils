@@ -128,6 +128,51 @@ func (x KVs) InfluxTags() (res influxm.Tags) {
 	return
 }
 
+func clearKV(kv *Field) *Field {
+	kv.Key = ""
+	kv.IsTag = false
+	kv.Type = UNSPECIFIED
+	kv.Unit = ""
+	return kv
+}
+
+// ResetFull reset and reuse key-value
+func (x KVs) ResetFull() {
+	for i, kv := range x {
+		kv = clearKV(kv)
+		switch v := kv.Val.(type) {
+		case *Field_I:
+			v.I = 0
+		case *Field_U:
+			v.U = 0
+		case *Field_F:
+			v.F = 0.0
+		case *Field_D:
+			v.D = v.D[:0]
+		case *Field_B:
+			v.B = false
+		case *Field_S:
+			v.S = ""
+		case *Field_A:
+			v.A.TypeUrl = ""
+			v.A.Value = v.A.Value[:0]
+		default:
+			// pass
+		}
+
+		x[i] = kv
+	}
+}
+
+// Reset reset but drop value
+func (x KVs) Reset() {
+	for i, kv := range x {
+		kv = clearKV(kv)
+		kv.Val = nil
+		x[i] = kv
+	}
+}
+
 // Has test if k exist.
 func (x KVs) Has(k string) bool {
 	for _, f := range x {

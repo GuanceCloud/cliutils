@@ -69,6 +69,8 @@ type cfg struct {
 
 	callback Callback
 
+	pointPool IPointPool
+
 	// Limitations on point
 	maxTags,
 	maxFields,
@@ -126,8 +128,10 @@ func (c *cfg) reset() {
 	c.disabledKeys = nil
 	c.requiredKeys = nil
 	c.callback = nil
+	c.pointPool = nil
 }
 
+func WithPointPool(pp IPointPool) Option { return func(c *cfg) { c.pointPool = pp } }
 func WithMaxKVComposeLen(n int) Option   { return func(c *cfg) { c.maxTagKeyValComposeLen = n } }
 func WithMaxMeasurementLen(n int) Option { return func(c *cfg) { c.maxMeasurementLen = n } }
 func WithCallback(fn Callback) Option    { return func(c *cfg) { c.callback = fn } }

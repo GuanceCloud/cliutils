@@ -769,6 +769,73 @@ func BenchmarkNewPointV2(b *T.B) {
 	})
 }
 
+func BenchmarkNewPointPool(b *T.B) {
+	b.Run("with-point-pool", func(b *T.B) {
+		pp := NewPointPool()
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			kvs := make(KVs, 0, 20)
+			kvs = kvs.MustAddTag("t1", "val1")
+			kvs = kvs.MustAddTag("t2", "val2")
+			kvs = kvs.MustAddTag("t3", "val3")
+			kvs = kvs.MustAddTag("t4", "val4")
+			kvs = kvs.MustAddTag("t5", "val5")
+			kvs = kvs.MustAddTag("t6", "val6")
+			kvs = kvs.MustAddTag("t7", "val7")
+			kvs = kvs.MustAddTag("t8", "val8")
+			kvs = kvs.MustAddTag("t9", "val9")
+			kvs = kvs.MustAddTag("t0", "val0")
+
+			kvs = kvs.Add("f1", 123, false, true)
+			kvs = kvs.Add("f2", "abc", false, true)
+			kvs = kvs.Add("f3", 45.6, false, true)
+			kvs = kvs.Add("f4", 123, false, true)
+			kvs = kvs.Add("f5", "abc", false, true)
+			kvs = kvs.Add("f6", 45.6, false, true)
+			kvs = kvs.Add("f7", 123, false, true)
+			kvs = kvs.Add("f8", "abc", false, true)
+			kvs = kvs.Add("f9", 45.6, false, true)
+			kvs = kvs.Add("f10", false, false, true)
+
+			pt := NewPointV2("abc", kvs, WithPointPool(pp))
+
+			pp.Put(pt)
+		}
+	})
+}
+
+func BenchmarkNewPointWithoutPool(b *T.B) {
+	b.Run("with-point-pool", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			kvs := make(KVs, 0, 20)
+			kvs = kvs.MustAddTag("t1", "val1")
+			kvs = kvs.MustAddTag("t2", "val2")
+			kvs = kvs.MustAddTag("t3", "val3")
+			kvs = kvs.MustAddTag("t4", "val4")
+			kvs = kvs.MustAddTag("t5", "val5")
+			kvs = kvs.MustAddTag("t6", "val6")
+			kvs = kvs.MustAddTag("t7", "val7")
+			kvs = kvs.MustAddTag("t8", "val8")
+			kvs = kvs.MustAddTag("t9", "val9")
+			kvs = kvs.MustAddTag("t0", "val0")
+
+			kvs = kvs.Add("f1", 123, false, true)
+			kvs = kvs.Add("f2", "abc", false, true)
+			kvs = kvs.Add("f3", 45.6, false, true)
+			kvs = kvs.Add("f4", 123, false, true)
+			kvs = kvs.Add("f5", "abc", false, true)
+			kvs = kvs.Add("f6", 45.6, false, true)
+			kvs = kvs.Add("f7", 123, false, true)
+			kvs = kvs.Add("f8", "abc", false, true)
+			kvs = kvs.Add("f9", 45.6, false, true)
+			kvs = kvs.Add("f10", false, false, true)
+
+			NewPointV2("abc", kvs)
+		}
+	})
+}
+
 func FuzzPLPBEquality(f *testing.F) {
 	cases := []struct {
 		measurement string
