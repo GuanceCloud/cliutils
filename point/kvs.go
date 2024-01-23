@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	types "github.com/gogo/protobuf/types"
 	influxm "github.com/influxdata/influxdb1-client/models"
 )
 
@@ -168,7 +167,7 @@ func (x KVs) ResetFull() {
 func (x KVs) Reset() {
 	for i, kv := range x {
 		kv = clearKV(kv)
-		kv.Val = nil
+		kv.Val = nil // drop Val
 		x[i] = kv
 	}
 }
@@ -350,6 +349,10 @@ func (x KVs) MustAddTag(k, v string) KVs {
 }
 
 func (x KVs) AddKV(kv *Field, force bool) KVs {
+	if kv == nil {
+		return x
+	}
+
 	for i := range x {
 		if x[i].Key == kv.Key {
 			if force {
@@ -440,166 +443,10 @@ func WithKVTagSet(on bool) KVOption {
 
 // NewKV get kv from specified key and value.
 func NewKV(k string, v any, opts ...KVOption) *Field {
-	var kv *Field
 
-	switch x := v.(type) {
-	case int8:
-		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
-	case []int8:
-		iarr, err := NewIntArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case uint8:
-		kv = &Field{Key: k, Val: &Field_U{uint64(x)}}
-		// case []uint8 is []byte, skip it.
-
-	case int16:
-		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
-
-	case []int16:
-		iarr, err := NewIntArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case uint16:
-		kv = &Field{Key: k, Val: &Field_U{uint64(x)}}
-
-	case []uint16:
-		iarr, err := NewUintArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case int32:
-		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
-
-	case []int32:
-		iarr, err := NewIntArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case uint32:
-		kv = &Field{Key: k, Val: &Field_U{uint64(x)}}
-
-	case []uint32:
-		iarr, err := NewUintArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case int:
-		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
-
-	case []int:
-		iarr, err := NewIntArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case uint:
-		kv = &Field{Key: k, Val: &Field_U{uint64(x)}}
-
-	case []uint:
-		iarr, err := NewUintArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case int64:
-		kv = &Field{Key: k, Val: &Field_I{x}}
-
-	case []int64:
-		iarr, err := NewIntArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case uint64:
-		kv = &Field{Key: k, Val: &Field_U{x}}
-
-	case []uint64:
-		iarr, err := NewUintArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{iarr}}
-		}
-
-	case float64:
-		kv = &Field{Key: k, Val: &Field_F{x}}
-
-	case []float64:
-		farr, err := NewFloatArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{farr}}
-		}
-
-	case float32:
-		kv = &Field{Key: k, Val: &Field_F{float64(x)}}
-
-	case []float32:
-		farr, err := NewFloatArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{farr}}
-		}
-
-	case string:
-		kv = &Field{Key: k, Val: &Field_S{x}}
-
-	case []string:
-		sarr, err := NewStringArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{sarr}}
-		}
-
-	case []byte:
-		kv = &Field{Key: k, Val: &Field_D{x}}
-
-	case bool:
-		kv = &Field{Key: k, Val: &Field_B{x}}
-
-	case []bool:
-		barr, err := NewBoolArray(x...)
-		if err != nil {
-			kv = &Field{Key: k, Val: nil}
-		} else {
-			kv = &Field{Key: k, Val: &Field_A{barr}}
-		}
-
-	case *types.Any:
-		kv = &Field{Key: k, Val: &Field_A{x}}
-
-	case nil: // pass
-		kv = &Field{Key: k, Val: nil}
-
-	default: // value ignored
-		kv = &Field{Key: k, Val: nil}
+	kv := &Field{
+		Key: k,
+		Val: newVal(v),
 	}
 
 	for _, opt := range opts {

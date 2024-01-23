@@ -7,37 +7,8 @@ package point
 
 import (
 	"sort"
-	sync "sync"
 	"time"
 )
-
-type IPointPool interface {
-	Get() *Point
-	Put(*Point)
-}
-
-func NewPointPool() IPointPool {
-	return &defaultPointPool{
-		Pool: sync.Pool{},
-	}
-}
-
-type defaultPointPool struct {
-	sync.Pool
-}
-
-func (pp *defaultPointPool) Get() *Point {
-	if x := pp.Pool.Get(); x == nil {
-		return NewPointV2("", nil, WithPrecheck(false))
-	} else {
-		return x.(*Point)
-	}
-}
-
-func (pp *defaultPointPool) Put(pt *Point) {
-	pt.Reset()
-	pp.Pool.Put(pt)
-}
 
 func NewPointV2(name string, kvs KVs, opts ...Option) *Point {
 	c := GetCfg(opts...)

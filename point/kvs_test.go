@@ -36,7 +36,7 @@ func TestKVsReset(t *T.T) {
 		kvs = kvs.Add("f4", []byte("world"), false, false)
 		kvs = kvs.Add("f5", false, false, false)
 
-		kvs.Reset()
+		kvs.ResetFull()
 
 		assert.Equal(t, "", kvs[0].Key)
 		assert.Equal(t, 0.0, kvs[0].Raw().(float64))

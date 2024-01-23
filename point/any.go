@@ -194,6 +194,28 @@ func NewBoolArray(b ...bool) (*types.Any, error) {
 	return types.MarshalAny(arr)
 }
 
+// NewBytesArray wrapped string list into types.Any.
+func NewBytesArray(bytes ...[]byte) (*types.Any, error) {
+	arr := &Array{
+		Arr: make([]*BasicTypes, 0, len(bytes)),
+	}
+
+	for _, b := range bytes {
+		arr.Arr = append(arr.Arr, &BasicTypes{X: &BasicTypes_D{b}})
+	}
+
+	return types.MarshalAny(arr)
+}
+
+// MustNewBytesArray wrapped string list into types.Any, and panic if any error.
+func MustNewBytesArray(bytes ...[]byte) *types.Any {
+	if x, err := NewBytesArray(bytes...); err != nil {
+		panic(err)
+	} else {
+		return x
+	}
+}
+
 // MustNewStringArray wrapped string list into types.Any, and panic if any error.
 func MustNewStringArray(s ...string) *types.Any {
 	if x, err := NewStringArray(s...); err != nil {

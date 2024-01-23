@@ -771,7 +771,7 @@ func BenchmarkNewPointV2(b *T.B) {
 
 func BenchmarkNewPointPool(b *T.B) {
 	b.Run("with-point-pool", func(b *T.B) {
-		pp := NewPointPool()
+		pp := NewPointPoolLevel1()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {

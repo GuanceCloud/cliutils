@@ -308,16 +308,33 @@ func (p *Point) KVs() (arr KVs) {
 	return KVs(p.pt.Fields)
 }
 
-// AddKV add kv, if the key exist, do nothing.
-func (p *Point) AddKV(kv *Field) {
-	kvs := KVs(p.pt.Fields)
-	p.pt.Fields = kvs.AddKV(kv, false)
+// AddKVs add kvs, if keys exist, do nothing.
+func (p *Point) AddKVs(kvs ...*Field) {
+	old := KVs(p.pt.Fields)
+	for _, kv := range kvs {
+		old = old.AddKV(kv, false)
+	}
+	p.pt.Fields = old
+}
+
+// SetKVs set kvs as p's new KVs
+func (p *Point) SetKVs(kvs ...*Field) {
+	old := KVs(p.pt.Fields)
+	old = old[:0] //clear old
+
+	for _, kv := range kvs {
+		old = old.AddKV(kv, false)
+	}
+	p.pt.Fields = old
 }
 
 // MustAddKV add kv, if the key exist, override it.
-func (p *Point) MustAddKV(kv *Field) {
-	kvs := KVs(p.pt.Fields)
-	p.pt.Fields = kvs.AddKV(kv, true)
+func (p *Point) MustAddKVs(kvs ...*Field) {
+	old := KVs(p.pt.Fields)
+	for _, kv := range kvs {
+		old = old.AddKV(kv, true)
+	}
+	p.pt.Fields = old
 }
 
 // Name return point's measurement name.

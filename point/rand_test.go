@@ -81,9 +81,14 @@ func TestPointRander(t *T.T) {
 		fs := pts[0].Fields()
 		require.True(t, len(fs) > 0)
 
-		require.True(t, fs.Has("message"), "fields: %s", fs.Pretty())
-		require.True(t, fs.Has("error_message"))
-		require.True(t, fs.Has("error_stack"))
+		ntext := 0
+		for _, f := range fs {
+			if strings.HasPrefix(f.Key, "long-text") {
+				ntext++
+			}
+		}
+
+		require.Equal(t, 4, ntext)
 
 		t.Logf("point: %s", pts[0].Pretty())
 	})
@@ -187,6 +192,31 @@ func TestWithFixKeys(t *T.T) {
 				idx,
 				KVs(pt1.pt.Fields).Pretty(),
 				KVs(pt2.pt.Fields).Pretty())
+		}
+	})
+}
+
+func BenchmarkRandWithPool(b *T.B) {
+	b.Run("with-pool-v3", func(b *T.B) {
+		pp := NewPointPoolLevel3()
+		r := NewRander(WithRandPointPool(pp), WithFixedKeys(true), WithFixedTags(true), WithRandStringValues(false))
+
+		for i := 0; i < b.N; i++ {
+			pts := r.Rand(1000)
+			for _, pt := range pts {
+				pp.Put(pt)
+			}
+		}
+	})
+
+}
+
+func BenchmarkRandWithoutPool(b *T.B) {
+	b.Run("without-pool", func(b *T.B) {
+		r := NewRander(WithFixedKeys(true), WithFixedTags(true), WithRandStringValues(false))
+
+		for i := 0; i < b.N; i++ {
+			r.Rand(1000)
 		}
 	})
 }
