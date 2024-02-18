@@ -443,7 +443,6 @@ func WithKVTagSet(on bool) KVOption {
 
 // NewKV get kv from specified key and value.
 func NewKV(k string, v any, opts ...KVOption) *Field {
-
 	kv := &Field{
 		Key: k,
 		Val: newVal(v),

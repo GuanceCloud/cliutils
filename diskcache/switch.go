@@ -23,6 +23,10 @@ func (c *DiskCache) loadUnfinishedFile() error {
 		return fmt.Errorf("posFromFile: %w", err)
 	}
 
+	if pos == nil {
+		return nil
+	}
+
 	// check file's healty
 	if _, err := os.Stat(string(pos.Name)); err != nil { // not exist
 		if err := c.pos.reset(); err != nil {
@@ -55,7 +59,7 @@ func (c *DiskCache) loadUnfinishedFile() error {
 }
 
 // open next read file.
-func (c *DiskCache) switchNextFile() error {
+func (c *DiskCache) doSwitchNextFile() error {
 	c.rwlock.Lock()
 	defer c.rwlock.Unlock()
 

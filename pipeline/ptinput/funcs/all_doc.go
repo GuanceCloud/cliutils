@@ -76,6 +76,7 @@ var PipelineFunctionDocs = map[string]*PLDoc{
 	"create_point()":           &createPointMarkdown,
 	"parse_int()":              &parseIntMarkdown,
 	"format_int()":             &formatIntMarkdown,
+	"pt_name()":                &ptNameMarkdown,
 }
 
 var PipelineFunctionDocsEN = map[string]*PLDoc{
@@ -136,6 +137,7 @@ var PipelineFunctionDocsEN = map[string]*PLDoc{
 	"create_point()":           &createPointMarkdownEN,
 	"parse_int()":              &parseIntMarkdownEN,
 	"format_int()":             &formatIntMarkdownEN,
+	"pt_name()":                &ptNameMarkdownEN,
 }
 
 // embed docs.
@@ -311,6 +313,9 @@ var (
 
 	//go:embed md/format_int.md
 	docFormatInt string
+
+	//go:embed md/pt_name.md
+	docPtName string
 )
 
 const (
@@ -683,6 +688,13 @@ var (
 		Doc: docFormatInt,
 		FnCategory: map[string][]string{
 			langTagZhCN: {cStringOp},
+		},
+	}
+
+	ptNameMarkdown = PLDoc{
+		Doc: docPtName,
+		FnCategory: map[string][]string{
+			langTagZhCN: {cOther},
 		},
 	}
 )

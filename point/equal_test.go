@@ -415,3 +415,52 @@ func TestHash(t *T.T) {
 		})
 	}
 }
+
+func TestTimeSeriesHash(t *T.T) {
+	cases := []struct {
+		name        string
+		p           *Point
+		expectCount int
+	}{
+		{
+			name:        "zero tags and 1 fields",
+			expectCount: 1,
+			p: func() *Point {
+				x, err := NewPoint("abc",
+					map[string]string{},
+					map[string]interface{}{"f1": 123.1},
+					WithTime(time.Unix(0, 123)))
+				assert.NoError(t, err)
+				return x
+			}(),
+		},
+		{
+			name:        "two fields",
+			expectCount: 2,
+			p: func() *Point {
+				x, err := NewPoint("abc",
+					map[string]string{"t1": "v1"},
+					map[string]interface{}{"f1": 123.1, "f2": 123.2},
+					WithTime(time.Unix(0, 123)))
+				assert.NoError(t, err)
+				return x
+			}(),
+		},
+		{
+			name:        "no fields",
+			expectCount: 0,
+			p: func() *Point {
+				x := NewPointV2("abc",
+					NewTags(map[string]string{"t1": "v1"}),
+					WithTime(time.Unix(0, 123)))
+				return x
+			}(),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *T.T) {
+			assert.Equal(t, tc.expectCount, len(tc.p.TimeSeriesHash()))
+		})
+	}
+}

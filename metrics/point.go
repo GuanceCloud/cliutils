@@ -15,13 +15,16 @@ import (
 )
 
 // mergePts merge pts when:
-//  - they got same measurement name
-//  - they got same tag key and tag values
-//  - they got same time(nano-second)
 //
-//  NOTE: you should ensure that these time is equal, point's hash not
-//  covered the time field. For prometheus metrics, these time value are
-//  the same.
+//   - they got same measurement name
+//
+//   - they got same tag key and tag values
+//
+//   - they got same time(nano-second)
+//
+//     NOTE: you should ensure that these time is equal, point's hash not
+//     covered the time field. For prometheus metrics, these time value are
+//     the same.
 //
 // When point.Point are logging, due to the lack of `time-series',
 // we hava to merge multiple points' fields together to build a single point.

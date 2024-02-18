@@ -251,9 +251,12 @@ func TestPutOnCapacityReached(t *T.T) {
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
 
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
-		m := metrics.GetMetricOnLabels(mfs, "diskcache_dropped_total", c.path)
-		require.NotNil(t, m)
+		m := metrics.GetMetricOnLabels(mfs,
+			"diskcache_dropped_total",
+			c.path,
+			reasonExceedCapacity)
+
+		require.NotNil(t, m, "got metrics:\n%s", metrics.MetricFamily2Text(mfs))
 		assert.True(t, m.GetCounter().GetValue() > 0.0)
 
 		t.Cleanup(func() {
@@ -310,10 +313,12 @@ func TestPutOnCapacityReached(t *T.T) {
 
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
-		m := metrics.GetMetricOnLabels(mfs, "diskcache_dropped_total", c.path)
-		require.NotNil(t, m)
+		m := metrics.GetMetricOnLabels(mfs,
+			"diskcache_dropped_total",
+			c.path,
+			reasonExceedCapacity)
+		require.NotNil(t, m, "got metrics:\n%s", metrics.MetricFamily2Text(mfs))
 
 		assert.True(t, m.GetCounter().GetValue() > 0.0)
 

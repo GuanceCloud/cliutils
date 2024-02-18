@@ -14,9 +14,8 @@ import (
 	"strings"
 	"time"
 
-	influxm "github.com/influxdata/influxdb1-client/models"
-
 	protojson "github.com/gogo/protobuf/jsonpb"
+	influxm "github.com/influxdata/influxdb1-client/models"
 )
 
 const (

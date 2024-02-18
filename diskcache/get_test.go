@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	T "testing"
+	"time"
 
 	"github.com/GuanceCloud/cliutils/metrics"
 	"github.com/prometheus/client_golang/prometheus"
@@ -17,8 +18,131 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestGetPut(t *T.T) {
+	testDir := t.TempDir()
+
+	err := os.MkdirAll(testDir, 0755)
+	assert.NoError(t, err)
+
+	dq, err := Open(WithPath(testDir), WithCapacity(1<<30))
+	assert.NoError(t, err)
+
+	assert.NoError(t, dq.Put([]byte("hello message-1")))
+
+	for {
+		if err := dq.Get(func(msg []byte) error {
+			t.Logf("get message: %q\n", string(msg))
+			return nil
+		}); err != nil {
+			t.Log(time.Now().Format(time.RFC3339Nano), " fail to get message: ", err)
+			time.Sleep(time.Second * 1)
+		} else {
+			break
+		}
+	}
+
+	assert.NoError(t, dq.Put([]byte("hello message-2")))
+
+	ok := false
+
+	for i := 0; i < 10; i++ {
+		if err := dq.Get(func(msg []byte) error {
+			t.Logf("get message: %q\n", string(msg))
+			ok = true
+			return nil
+		}); err != nil {
+			t.Log(time.Now().Format(time.RFC3339Nano), " fail to get message: ", err)
+			time.Sleep(time.Second * 1)
+		} else {
+			break
+		}
+	}
+
+	assert.True(t, ok, "expected consume 1 message in 10 seconds, but got no message")
+
+	assert.NoError(t, dq.Close())
+
+}
+
+func TestDropInvalidDataFile(t *T.T) {
+	t.Run(`get-on-0bytes-data-file`, func(t *T.T) {
+		p := t.TempDir()
+		c, err := Open(WithPath(p))
+		require.NoError(t, err)
+
+		// put some data and rotate 10 datafiles
+		data := make([]byte, 100)
+		for i := 0; i < 10; i++ {
+			assert.NoError(t, c.Put(data))
+			assert.NoError(t, c.rotate())
+
+			// destroy the datafile
+			if i%2 == 0 {
+				assert.NoError(t, os.Truncate(c.dataFiles[i], 0))
+			}
+		}
+
+		assert.Len(t, c.dataFiles, 10)
+
+		for {
+			err := c.Get(func(get []byte) error {
+				// switch to 2nd file
+				assert.Equal(t, data, get)
+				return nil
+			})
+			if err != nil {
+				require.ErrorIs(t, err, ErrEOF)
+				break
+			}
+		}
+
+		reg := prometheus.NewRegistry()
+		register(reg)
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+
+		assert.Equalf(t, float64(5),
+			metrics.GetMetricOnLabels(mfs,
+				"diskcache_dropped_total",
+				c.path,
+				reasonBadDataFile,
+			).GetCounter().GetValue(),
+			"got metrics\n%s", metrics.MetricFamily2Text(mfs))
+	})
+}
+
 func TestFallbackOnError(t *T.T) {
+	t.Run(`get-erro-on-EOF`, func(t *T.T) {
+		p := t.TempDir()
+		c, err := Open(WithPath(p))
+		require.NoError(t, err)
+
+		// put some data
+		data := make([]byte, 100)
+		assert.NoError(t, c.Put(data))
+
+		assert.NoError(t, c.rotate())
+
+		require.NoError(t, c.Get(func(_ []byte) error {
+			return nil // ignore the data
+		}))
+
+		err = c.Get(func(_ []byte) error {
+			assert.True(t, 1 == 2) // should not been here
+			return nil
+		})
+
+		assert.ErrorIs(t, err, ErrEOF)
+		t.Logf("get: %s", err)
+
+		if errors.Is(err, ErrEOF) {
+			t.Logf("we should ignore the error")
+		}
+	})
+
 	t.Run(`fallback-on-error`, func(t *T.T) {
+		ResetMetrics()
+
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
 		assert.NoError(t, err)
@@ -28,15 +152,30 @@ func TestFallbackOnError(t *T.T) {
 
 		assert.NoError(t, c.rotate())
 
-		c.Get(func(_ []byte) error { //nolint: errcheck
+		// should get error when callback fail
+		require.Error(t, c.Get(func(_ []byte) error {
 			return fmt.Errorf("get error")
-		})
+		}))
 
 		assert.Equal(t, int64(0), c.pos.Seek)
 
-		c.Get(func(x []byte) error { // nolint:errcheck
+		// should no error when callback ok
+		assert.NoError(t, c.Get(func(x []byte) error {
 			assert.Equal(t, data, x)
 			return nil
+		}))
+
+		reg := prometheus.NewRegistry()
+		register(reg)
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+
+		assert.Equalf(t, float64(1),
+			metrics.GetMetricOnLabels(mfs, "diskcache_seek_back_total", c.path).GetCounter().GetValue(),
+			"got metrics\n%s", metrics.MetricFamily2Text(mfs))
+
+		t.Cleanup(func() {
+			ResetMetrics()
 		})
 	})
 

@@ -141,6 +141,39 @@ func TestOpen(t *T.T) {
 
 		wg.Wait()
 	})
+
+	t.Run("test-empty-pos-file", func(t *T.T) {
+		p := t.TempDir()
+		posFile := filepath.Join(p, ".pos")
+
+		f, err := os.Create(posFile)
+		assert.NoError(t, err)
+
+		dq, err := Open(WithPath(p), WithCapacity(1<<29), WithNoFallbackOnError(true))
+		assert.NoError(t, err)
+		assert.NoError(t, dq.Close())
+
+		_, err = f.WriteString("1234")
+		assert.NoError(t, err)
+		assert.NoError(t, f.Sync())
+
+		dq, err = Open(WithPath(p), WithCapacity(1<<29), WithNoFallbackOnError(true))
+		assert.NoError(t, err)
+		assert.Equal(t, int64(0), dq.pos.Seek)
+		assert.NoError(t, dq.Close())
+
+		_, err = f.WriteString("5678")
+		assert.NoError(t, err)
+		assert.NoError(t, f.Sync())
+
+		dq, err = Open(WithPath(p), WithCapacity(1<<29), WithNoFallbackOnError(true))
+		assert.NoError(t, err)
+		assert.Equal(t, int64(0), dq.pos.Seek)
+		assert.NoError(t, dq.Close())
+
+		assert.NoError(t, f.Close())
+
+	})
 }
 
 func TestClose(t *T.T) {

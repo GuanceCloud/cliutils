@@ -202,6 +202,55 @@ func TestGet(t *T.T) {
 		assert.Equal(t, []any{int64(1), 2.0, false}, pt.Get("arr"))
 		assert.Equal(t, map[string]any{"i": int64(1), "f": 3.14, "s": "world"}, pt.Get("map"))
 	})
+
+	t.Run("get", func(t *T.T) {
+		var kvs KVs
+
+		kvs = kvs.Add("si1", int8(1), false, true)
+		kvs = kvs.Add("si2", int16(1), false, true)
+		kvs = kvs.Add("si3", int32(1), false, true)
+		kvs = kvs.Add("si4", int(1), false, true)
+		kvs = kvs.Add("si5", int64(1), false, true)
+
+		kvs = kvs.Add("ui1", uint8(1), false, true)
+		kvs = kvs.Add("ui2", uint16(1), false, true)
+		kvs = kvs.Add("ui3", uint32(1), false, true)
+		kvs = kvs.Add("ui4", uint(1), false, true)
+		kvs = kvs.Add("ui5", uint64(1), false, true)
+
+		kvs = kvs.Add("b1", false, false, true)
+		kvs = kvs.Add("b2", true, false, true)
+
+		kvs = kvs.Add("d", []byte(`hello`), false, true)
+		kvs = kvs.Add("s", `hello`, false, true)
+
+		kvs = kvs.Add("arr", MustNewAnyArray(1, 2.0, false), false, true)
+		kvs = kvs.Add("map", MustNewAny(MustNewMap(map[string]any{"i": 1, "f": 3.14, "s": "world"})), false, true)
+
+		pt := NewPointV2("get", kvs)
+
+		t.Logf("pt: %s", pt.Pretty())
+
+		assert.Equal(t, int64(1), pt.Get("si1"))
+		assert.Equal(t, int64(1), pt.Get("si2"))
+		assert.Equal(t, int64(1), pt.Get("si3"))
+		assert.Equal(t, int64(1), pt.Get("si4"))
+		assert.Equal(t, int64(1), pt.Get("si5"))
+
+		assert.Equal(t, uint64(1), pt.Get("ui1"))
+		assert.Equal(t, uint64(1), pt.Get("ui2"))
+		assert.Equal(t, uint64(1), pt.Get("ui3"))
+		assert.Equal(t, uint64(1), pt.Get("ui4"))
+		assert.Equal(t, uint64(1), pt.Get("ui5"))
+
+		assert.Equal(t, false, pt.Get("b1"))
+		assert.Equal(t, true, pt.Get("b2"))
+		assert.Equal(t, []byte(`hello`), pt.Get("d"))
+		assert.Equal(t, `hello`, pt.Get("s"))
+
+		assert.Equal(t, []any{int64(1), 2.0, false}, pt.Get("arr"))
+		assert.Equal(t, map[string]any{"i": int64(1), "f": 3.14, "s": "world"}, pt.Get("map"))
+	})
 }
 
 func TestFlags(t *T.T) {

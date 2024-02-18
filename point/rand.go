@@ -287,6 +287,3 @@ func (r *ptRander) doRand() *Point {
 	pt.SetKVs(kvs...)
 	return pt
 }
-
-//nolint:lll
-var ()
