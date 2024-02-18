@@ -43,7 +43,7 @@ func mergePts(pts []*point.Point) []*point.Point {
 			for i := 1; i < len(pts); i++ {
 				fs := pts[i].Fields()
 				for _, f := range fs {
-					pts[0].AddKV(f)
+					pts[0].AddKVs(f)
 				}
 			}
 

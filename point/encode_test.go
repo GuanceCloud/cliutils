@@ -448,6 +448,16 @@ func BenchmarkV2Encode(b *T.B) {
 
 	b.ResetTimer()
 
+	b.Run("encode-v1", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			enc := GetEncoder(WithEncEncoding(Protobuf))
+			enc.Encode(randPts)
+
+			assert.NoError(b, enc.LastErr())
+			PutEncoder(enc)
+		}
+	})
+
 	b.Run("Next", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 
@@ -462,6 +472,7 @@ func BenchmarkV2Encode(b *T.B) {
 				}
 			}
 
+			assert.NoError(b, enc.LastErr())
 			PutEncoder(enc)
 		}
 	})

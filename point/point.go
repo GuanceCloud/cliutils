@@ -328,7 +328,7 @@ func (p *Point) SetKVs(kvs ...*Field) {
 	p.pt.Fields = old
 }
 
-// MustAddKV add kv, if the key exist, override it.
+// MustAddKVs add kv, if the key exist, override it.
 func (p *Point) MustAddKVs(kvs ...*Field) {
 	old := KVs(p.pt.Fields)
 	for _, kv := range kvs {
