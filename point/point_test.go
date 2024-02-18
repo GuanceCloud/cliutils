@@ -533,8 +533,11 @@ line" 123`,
 func TestPBJSON(t *T.T) {
 	t.Run("pbjson", func(t *T.T) {
 		pt := NewPointV2(`abc`, NewKVs(map[string]any{
-			"f1":        1234567890,
-			"f2":        3.14,
+			"i":         1234567890,
+			"u":         uint64(1234567890),
+			"f":         3.14,
+			"s":         "hello",
+			"bool":      false,
 			"d":         []byte("hello world"),
 			"int-arr":   MustNewIntArray([]int{1, 2, 3}...),
 			"mixed-arr": MustNewAnyArray(1, 2.0, "hello", false),
