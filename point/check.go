@@ -24,7 +24,7 @@ func (c *checker) reset() {
 func (c *checker) check(pt *Point) *Point {
 	pt.pt.Name = c.checkMeasurement(pt.pt.Name)
 	pt.pt.Fields = c.checkKVs(pt.pt.Fields)
-	pt.pt.Warns = c.warns
+	pt.pt.Warns = append(pt.pt.Warns, c.warns...)
 
 	// Add more checkings...
 	return pt
