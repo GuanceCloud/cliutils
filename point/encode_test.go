@@ -589,6 +589,51 @@ func TestEncodeV2(t *T.T) {
 		assert.Error(t, enc.LastErr())
 		t.Logf("go error: %s", enc.LastErr())
 	})
+
+	t.Run("with-encode-callback-line-proto", func(t *T.T) {
+		fn := func(n int, buf []byte) error {
+			assert.Equal(t, 2, n)
+			assert.True(t, len(buf) > 0)
+
+			t.Logf("buf: %q", buf)
+			return nil
+		}
+
+		buf := make([]byte, 1<<20)
+		randPts := r.Rand(2)
+		enc := GetEncoder(WithEncFn(fn), WithEncEncoding(LineProtocol))
+		enc.EncodeV2(randPts)
+		for {
+			if _, ok := enc.Next(buf); !ok {
+				break
+			}
+		}
+		PutEncoder(enc)
+	})
+
+	t.Run("with-encode-callback-protobuf", func(t *T.T) {
+		fn := func(n int, buf []byte) error {
+			assert.Equal(t, 2, n)
+			assert.NotNil(t, buf)
+
+			t.Logf("buf: %q", buf)
+			return nil
+		}
+
+		randPts := r.Rand(2)
+
+		enc := GetEncoder(WithEncFn(fn), WithEncEncoding(Protobuf))
+		enc.EncodeV2(randPts)
+		buf := make([]byte, 1<<20)
+
+		for {
+			if _, ok := enc.Next(buf); !ok {
+				break
+			}
+		}
+		PutEncoder(enc)
+
+	})
 }
 
 func BenchmarkPointsSize(b *T.B) {

@@ -350,6 +350,10 @@ __doEncode:
 		e.lastErr = err
 		return nil, false
 	} else {
+		if e.fn != nil {
+			e.fn(len(e.pbpts.Arr), buf[:n])
+		}
+
 		e.parts++
 		return buf[:n], true
 	}
@@ -361,6 +365,8 @@ var (
 
 func (e *Encoder) doEncodeLineProtocol(buf []byte) ([]byte, bool) {
 	curSize := 0
+	npts := 0
+
 	for _, pt := range e.pts[e.lastPtsIdx:] {
 		if pt == nil {
 			continue
@@ -380,6 +386,9 @@ func (e *Encoder) doEncodeLineProtocol(buf []byte) ([]byte, bool) {
 				return nil, false
 			}
 
+			if e.fn != nil {
+				e.fn(npts, buf[:curSize])
+			}
 			e.parts++
 			return buf[:curSize], true
 		} else {
@@ -392,11 +401,15 @@ func (e *Encoder) doEncodeLineProtocol(buf []byte) ([]byte, bool) {
 			// clean buffer, next time AppendString() append from byte 0
 			e.lpPointBuf = e.lpPointBuf[:0]
 			e.lastPtsIdx++
+			npts++
 		}
 	}
 
 	if curSize > 0 {
 		e.parts++
+		if e.fn != nil {
+			e.fn(npts, buf[:curSize])
+		}
 		return buf[:curSize], true
 	} else {
 		return nil, false
