@@ -19,9 +19,10 @@ import (
 )
 
 const (
-	Psent  = 1 << iota // The Point has been sent
-	Ppb                // the point is Protobuf point
-	Pcheck             // checked
+	Psent   = 1 << iota // The Point has been sent
+	Ppb                 // the point is Protobuf point
+	Pcheck              // checked
+	Ppooled             // from point pool
 	// more...
 )
 

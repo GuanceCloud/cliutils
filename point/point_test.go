@@ -273,6 +273,11 @@ func TestFlags(t *T.T) {
 
 		pt.ClearFlag(Psent)
 		assert.False(t, pt.HasFlag(Psent))
+
+		pt.SetFlag(Ppooled)
+		assert.True(t, pt.HasFlag(Ppooled))
+		pt.ClearFlag(Ppooled)
+		assert.False(t, pt.HasFlag(Ppooled))
 	})
 }
 

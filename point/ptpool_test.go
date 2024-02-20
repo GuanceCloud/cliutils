@@ -170,22 +170,52 @@ func BenchmarkPoolV2(b *T.B) {
 func BenchmarkPoolV3(b *T.B) {
 	now := time.Now()
 
-	var fpp fullPointPool
-
 	b.Run("v3-pool", func(b *T.B) {
+		var fpp = NewPointPoolLevel3()
+
+		defer func() {
+			//b.Logf("pool: %s", fpp)
+			SetPointPool(nil)
+		}()
+
+		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			pt := fpp.Get()
 
 			pt.SetName("m1")
 			pt.SetTime(now)
 
-			pt.AddKVs(fpp.GetKV("f0", 123),
+			pt.AddKVs(
+				fpp.GetKV("f0", 123),
 				fpp.GetKV("f1", 3.14),
 				fpp.GetKV("f2", "hello"),
 				fpp.GetKV("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text")),
 				fpp.GetKV("f4", false),
 				fpp.GetKV("f5", -123))
 
+			fpp.Put(pt)
+		}
+	})
+
+	b.Run("v3-new-point", func(b *T.B) {
+		var fpp = NewPointPoolLevel3()
+		SetPointPool(fpp)
+		defer func() {
+			//b.Logf("pool: %s", fpp)
+			SetPointPool(nil)
+		}()
+
+		b.ResetTimer()
+		var kvs KVs
+		for i := 0; i < b.N; i++ {
+			kvs = kvs.Add("f0", 123, false, false)
+			kvs = kvs.Add("f1", 3.14, false, false)
+			kvs = kvs.Add("f2", "hello", false, false)
+			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, false)
+			kvs = kvs.Add("f4", false, false, false)
+			kvs = kvs.Add("f5", -123, false, false)
+
+			pt := NewPointV2("m1", kvs, WithPrecheck(false))
 			fpp.Put(pt)
 		}
 	})

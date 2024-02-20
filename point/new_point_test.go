@@ -14,7 +14,6 @@ import (
 	T "testing"
 	"time"
 
-	"github.com/GuanceCloud/cliutils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -50,6 +49,7 @@ func getNFields(n int) map[string]interface{} {
 	}
 }
 
+/*
 func TestV3NewPoint(t *T.T) {
 	t.Run("valid-fields", func(t *T.T) {
 		pp := NewPointPoolLevel3()
@@ -139,7 +139,7 @@ func BenchmarkNewPointV3(b *T.B) {
 			_ = pt
 		}
 	})
-}
+} */
 
 func TestV2NewPoint(t *T.T) {
 	t.Run("valid-fields", func(t *T.T) {
@@ -215,8 +215,39 @@ func TestNewPoint(t *T.T) {
 		t map[string]string
 		f map[string]interface{}
 
-		warns int
+		warns    int
+		withPool bool
 	}{
+		{
+			tname:    "valid-fields-with-point-pool",
+			opts:     []Option{WithTime(time.Unix(0, 123))},
+			name:     "valid-fields",
+			withPool: true,
+			f: map[string]interface{}{
+				"[]byte":  []byte("abc"),
+				"[]uint8": []uint8("abc"),
+
+				"b-false":   false,
+				"b-true":    true,
+				"float":     1.0,
+				"float32":   float32(1.0),
+				"float64":   float64(1.0),
+				"float64-2": float64(1.1),
+				"i":         int(1),
+				"i16":       int16(1),
+				"i32":       int32(1),
+				"i64":       int64(1),
+				"i8":        int8(1),
+				"u":         uint(1),
+				"u16":       uint16(1),
+				"u32":       uint32(1),
+				"u64":       uint64(1),
+				"u64-large": uint64(math.MaxInt64 + 1), // skipped in expect string
+				"u8":        uint8(1),
+			},
+			expect: `valid-fields []byte="abc",[]uint8="abc",b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1i,u16=1i,u32=1i,u64=1i,u8=1i 123`,
+		},
+
 		{
 			tname: "valid-fields",
 			opts:  []Option{WithTime(time.Unix(0, 123))},
@@ -515,7 +546,24 @@ func TestNewPoint(t *T.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.tname, func(t *T.T) {
-			pt, err := NewPoint(tc.name, tc.t, tc.f, tc.opts...)
+
+			var (
+				pt  *Point
+				err error
+			)
+
+			if tc.withPool {
+				pp := NewPointPoolLevel3()
+				SetPointPool(pp)
+				defer func() {
+					ClearPointPool()
+
+					assert.True(t, pt.HasFlag(Ppooled))
+					pp.Put(pt)
+				}()
+			}
+
+			pt, err = NewPoint(tc.name, tc.t, tc.f, tc.opts...)
 
 			assert.NoError(t, err)
 
@@ -601,147 +649,7 @@ func TestPointKeySorted(t *testing.T) {
 	})
 }
 
-var (
-	__largeKeyForBench = cliutils.CreateRandomString(128)
-	__largeValForBench = cliutils.CreateRandomString(1024)
-)
-
-var benchCases = []struct {
-	name string
-	t    map[string]string
-	f    map[string]interface{}
-}{
-	{
-		name: "3-tag-10-field",
-		t: map[string]string{
-			"t1": "val1",
-			"t2": "val2",
-			"t3": "val3",
-		},
-		f: map[string]interface{}{
-			"f1":  123,
-			"f2":  "abc",
-			"f3":  45.6,
-			"f4":  123,
-			"f5":  "abc",
-			"f6":  45.6,
-			"f7":  123,
-			"f8":  "abc",
-			"f9":  45.6,
-			"f10": false,
-		},
-	},
-	{
-		name: "3-tag-10-long-key-field",
-		t: map[string]string{
-			"t1": "val1",
-			"t2": "val2",
-			"t3": "val3",
-		},
-		f: map[string]interface{}{
-			"f1" + __largeKeyForBench: 123,
-			"f2" + __largeKeyForBench: "abc",
-			"f3" + __largeKeyForBench: 45.6,
-			"f4" + __largeKeyForBench: 123,
-			"f5" + __largeKeyForBench: "abc",
-			"f6" + __largeKeyForBench: 45.6,
-			"f7" + __largeKeyForBench: 123,
-			"f8" + __largeKeyForBench: "abc",
-			"f9" + __largeKeyForBench: 45.6,
-			"f0" + __largeKeyForBench: 3.14,
-		},
-	},
-
-	{
-		name: "3-tag-10-long-key-tag",
-		t: map[string]string{
-			"t1" + __largeKeyForBench: "val1",
-			"t2" + __largeKeyForBench: "val2",
-			"t3" + __largeKeyForBench: "val3",
-			"t4" + __largeKeyForBench: "val4",
-			"t5" + __largeKeyForBench: "val5",
-			"t6" + __largeKeyForBench: "val6",
-			"t7" + __largeKeyForBench: "val7",
-			"t8" + __largeKeyForBench: "val8",
-			"t9" + __largeKeyForBench: "val9",
-			"t0" + __largeKeyForBench: "val0",
-		},
-		f: map[string]interface{}{
-			"f1":  123,
-			"f2":  "abc",
-			"f3":  45.6,
-			"f4":  123,
-			"f5":  "abc",
-			"f6":  45.6,
-			"f7":  123,
-			"f8":  "abc",
-			"f9":  45.6,
-			"f10": false,
-		},
-	},
-}
-
-func BenchmarkNewPoint(b *T.B) {
-	b.Run(`with-pool-cfg`, func(b *T.B) {
-		ptName := `abc`
-		kvs := NewKVs(map[string]any{"f1": 123, "f2": 3.14})
-		for i := 0; i < b.N; i++ {
-			NewPointV2(ptName, kvs)
-		}
-	})
-
-	b.Run(`without-pool-cfg`, func(b *T.B) {
-		ptName := `abc`
-		kvs := NewKVs(map[string]any{"f1": 123, "f2": 3.14})
-		for i := 0; i < b.N; i++ {
-			doNewPoint(ptName, kvs, newCfg()) // slower ~17% than pooled
-		}
-	})
-
-	b.Run(`with-key-sorted`, func(b *T.B) {
-		ptName := `abc`
-		kvs := NewKVs(map[string]any{
-			"f1": 123,
-			"f2": 3.14,
-			"f3": "str",
-
-			"_f1": 123,
-			"_f2": 3.14,
-			"_f3": "str",
-
-			"_f1_": 123,
-			"_f2_": 3.14,
-			"_f3_": "str",
-		})
-
-		for i := 0; i < b.N; i++ {
-			NewPointV2(ptName, kvs, WithKeySorted(true))
-		}
-	})
-
-	b.Run(`without-key-sorted`, func(b *T.B) {
-		ptName := `abc`
-		kvs := NewKVs(map[string]any{
-			"f1": 123,
-			"f2": 3.14,
-			"f3": "str",
-
-			"_f1": 123,
-			"_f2": 3.14,
-			"_f3": "str",
-
-			"_f1_": 123,
-			"_f2_": 3.14,
-			"_f3_": "str",
-		})
-
-		for i := 0; i < b.N; i++ {
-			NewPointV2(ptName, kvs)
-		}
-	})
-}
-
-func BenchmarkNewPointV2(b *T.B) {
+func BenchmarkV2NewPoint(b *T.B) {
 	b.Run(`with-maps`, func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			tags := map[string]string{
@@ -859,11 +767,14 @@ func BenchmarkNewPointV2(b *T.B) {
 			NewPointV2("abc", kvs)
 		}
 	})
-}
 
-func BenchmarkNewPointPool(b *T.B) {
-	b.Run("with-point-pool", func(b *T.B) {
-		pp := NewPointPoolLevel1()
+	b.Run("with-point-pool-level3", func(b *T.B) {
+		pp := NewPointPoolLevel3()
+		SetPointPool(pp)
+
+		defer func() {
+			SetPointPool(nil)
+		}()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -890,40 +801,50 @@ func BenchmarkNewPointPool(b *T.B) {
 			kvs = kvs.Add("f9", 45.6, false, true)
 			kvs = kvs.Add("f10", false, false, true)
 
-			pt := NewPointV2("abc", kvs, WithPointPool(pp))
-
+			pt := NewPointV2("abc", kvs)
 			pp.Put(pt)
 		}
 	})
-}
 
-func BenchmarkNewPointWithoutPool(b *T.B) {
-	b.Run("with-point-pool", func(b *T.B) {
+	b.Run(`key-sorted`, func(b *T.B) {
+		ptName := `abc`
+		kvs := NewKVs(map[string]any{
+			"f1": 123,
+			"f2": 3.14,
+			"f3": "str",
+
+			"_f1": 123,
+			"_f2": 3.14,
+			"_f3": "str",
+
+			"_f1_": 123,
+			"_f2_": 3.14,
+			"_f3_": "str",
+		})
+
 		for i := 0; i < b.N; i++ {
-			kvs := make(KVs, 0, 20)
-			kvs = kvs.MustAddTag("t1", "val1")
-			kvs = kvs.MustAddTag("t2", "val2")
-			kvs = kvs.MustAddTag("t3", "val3")
-			kvs = kvs.MustAddTag("t4", "val4")
-			kvs = kvs.MustAddTag("t5", "val5")
-			kvs = kvs.MustAddTag("t6", "val6")
-			kvs = kvs.MustAddTag("t7", "val7")
-			kvs = kvs.MustAddTag("t8", "val8")
-			kvs = kvs.MustAddTag("t9", "val9")
-			kvs = kvs.MustAddTag("t0", "val0")
+			NewPointV2(ptName, kvs, WithKeySorted(true))
+		}
+	})
 
-			kvs = kvs.Add("f1", 123, false, true)
-			kvs = kvs.Add("f2", "abc", false, true)
-			kvs = kvs.Add("f3", 45.6, false, true)
-			kvs = kvs.Add("f4", 123, false, true)
-			kvs = kvs.Add("f5", "abc", false, true)
-			kvs = kvs.Add("f6", 45.6, false, true)
-			kvs = kvs.Add("f7", 123, false, true)
-			kvs = kvs.Add("f8", "abc", false, true)
-			kvs = kvs.Add("f9", 45.6, false, true)
-			kvs = kvs.Add("f10", false, false, true)
+	b.Run(`key-not-sorted`, func(b *T.B) {
+		ptName := `abc`
+		kvs := NewKVs(map[string]any{
+			"f1": 123,
+			"f2": 3.14,
+			"f3": "str",
 
-			NewPointV2("abc", kvs)
+			"_f1": 123,
+			"_f2": 3.14,
+			"_f3": "str",
+
+			"_f1_": 123,
+			"_f2_": 3.14,
+			"_f3_": "str",
+		})
+
+		for i := 0; i < b.N; i++ {
+			NewPointV2(ptName, kvs)
 		}
 	})
 }

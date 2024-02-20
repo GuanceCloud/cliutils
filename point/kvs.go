@@ -329,7 +329,7 @@ func (x KVs) Add(k string, v any, isTag, force bool) KVs {
 				x[i] = kv // override exist tag/field
 			}
 
-			goto out
+			goto out // ignore the key
 		}
 	}
 
@@ -441,11 +441,20 @@ func WithKVTagSet(on bool) KVOption {
 	}
 }
 
-// NewKV get kv from specified key and value.
-func NewKV(k string, v any, opts ...KVOption) *Field {
-	kv := &Field{
+func doNewKV(k string, v any, opts ...KVOption) *Field {
+	return &Field{
 		Key: k,
 		Val: newVal(v),
+	}
+}
+
+// NewKV get kv on specified key and value.
+func NewKV(k string, v any, opts ...KVOption) *Field {
+	var kv *Field
+	if defaultPTPool != nil {
+		kv = defaultPTPool.GetKV(k, v)
+	} else {
+		kv = doNewKV(k, v, opts...)
 	}
 
 	for _, opt := range opts {

@@ -1,10 +1,22 @@
 package point
 
 import (
+	"fmt"
 	sync "sync"
+	"sync/atomic"
 
 	types "github.com/gogo/protobuf/types"
 )
+
+var defaultPTPool PointPool
+
+func SetPointPool(pp PointPool) {
+	defaultPTPool = pp
+}
+
+func ClearPointPool() {
+	defaultPTPool = nil
+}
 
 func (p *Point) clear() {
 	if p.pt != nil {
@@ -26,10 +38,13 @@ type PointPool interface {
 	Put(*Point)
 
 	GetKV(k string, v any) *Field
+	String() string
 }
 
 func emptyPoint() *Point {
-	return NewPointV2("", nil, WithPrecheck(false))
+	return &Point{
+		pt: &PBPoint{},
+	}
 }
 
 func isEmptyPoint(pt *Point) bool {
@@ -54,6 +69,10 @@ type ppv1 struct {
 	sync.Pool
 }
 
+func (pp *ppv1) String() string {
+	return ""
+}
+
 func (pp *ppv1) Get() *Point {
 	if x := pp.Pool.Get(); x == nil {
 		return emptyPoint()
@@ -68,12 +87,16 @@ func (pp *ppv1) Put(pt *Point) {
 }
 
 func (pp *ppv1) GetKV(k string, v any) *Field {
-	return NewKV(k, v) // ppv1 always return new Field
+	return doNewKV(k, v) // ppv1 always return new Field
 }
 
 type partialPointPool struct {
 	ptpool,
 	kvspool sync.Pool
+}
+
+func (pp *partialPointPool) String() string {
+	return ""
 }
 
 // NewPointPoolLevel2 get point cache that cache all but drop Field's Val
@@ -103,7 +126,7 @@ func (ppp *partialPointPool) Put(pt *Point) {
 
 func (ppp *partialPointPool) GetKV(k string, v any) *Field {
 	if x := ppp.kvspool.Get(); x == nil {
-		return NewKV(k, v)
+		return doNewKV(k, v)
 	} else {
 		kv := x.(*Field)
 		kv.Key = k
@@ -117,7 +140,21 @@ func NewPointPoolLevel3() PointPool {
 	return &fullPointPool{}
 }
 
+func (pp *fullPointPool) String() string {
+	return fmt.Sprintf("kvCreated: % 8d, kvReused: % 8d, ptCreated: % 8d, ptReused: % 8d",
+		pp.kvCreated.Load(),
+		pp.kvReused.Load(),
+		pp.ptCreated.Load(),
+		pp.ptReused.Load(),
+	)
+}
+
 type fullPointPool struct {
+	kvCreated,
+	kvReused,
+	ptCreated,
+	ptReused atomic.Int64
+
 	ptpool,
 	fpool,
 	ipool,
@@ -158,64 +195,80 @@ func (fpp *fullPointPool) Put(p *Point) {
 
 func (fpp *fullPointPool) Get() *Point {
 	if x := fpp.ptpool.Get(); x == nil {
+		fpp.ptCreated.Add(1)
 		return emptyPoint()
 	} else {
+		fpp.ptReused.Add(1)
 		return x.(*Point)
 	}
 }
 
 func (fpp *fullPointPool) getI() *Field {
 	if x := fpp.ipool.Get(); x == nil {
+		fpp.kvCreated.Add(1)
 		return &Field{Val: &Field_I{}}
 	} else {
+		fpp.kvReused.Add(1)
 		return x.(*Field)
 	}
 }
 
 func (fpp *fullPointPool) getF() *Field {
 	if x := fpp.fpool.Get(); x == nil {
+		fpp.kvCreated.Add(1)
 		return &Field{Val: &Field_F{}}
 	} else {
+		fpp.kvReused.Add(1)
 		return x.(*Field)
 	}
 }
 
 func (fpp *fullPointPool) getU() *Field {
 	if x := fpp.upool.Get(); x == nil {
+		fpp.kvCreated.Add(1)
 		return &Field{Val: &Field_U{}}
 	} else {
+		fpp.kvReused.Add(1)
 		return x.(*Field)
 	}
 }
 
 func (fpp *fullPointPool) getD() *Field {
 	if x := fpp.dpool.Get(); x == nil {
+		fpp.kvCreated.Add(1)
 		return &Field{Val: &Field_D{}}
 	} else {
+		fpp.kvReused.Add(1)
 		return x.(*Field)
 	}
 }
 
 func (fpp *fullPointPool) getS() *Field {
 	if x := fpp.spool.Get(); x == nil {
+		fpp.kvCreated.Add(1)
 		return &Field{Val: &Field_S{}}
 	} else {
+		fpp.kvReused.Add(1)
 		return x.(*Field)
 	}
 }
 
 func (fpp *fullPointPool) getA() *Field {
 	if x := fpp.apool.Get(); x == nil {
+		fpp.kvCreated.Add(1)
 		return &Field{Val: &Field_A{}}
 	} else {
+		fpp.kvReused.Add(1)
 		return x.(*Field)
 	}
 }
 
 func (fpp *fullPointPool) getB() *Field {
 	if x := fpp.bpool.Get(); x == nil {
+		fpp.kvCreated.Add(1)
 		return &Field{Val: &Field_B{}}
 	} else {
+		fpp.kvReused.Add(1)
 		return x.(*Field)
 	}
 }

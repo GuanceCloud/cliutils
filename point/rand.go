@@ -9,7 +9,6 @@ package point
 import (
 	"fmt"
 	mrand "math/rand"
-	"sort"
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
@@ -128,6 +127,12 @@ func (r *ptRander) Rand(count int) []*Point {
 	}
 
 	pts := make([]*Point, 0, count)
+
+	if pp := r.pointPool; pp != nil {
+		SetPointPool(pp)
+	}
+	defer ClearPointPool()
+
 	for i := 0; i < count; i++ {
 		pts = append(pts, r.doRand())
 	}
@@ -256,34 +261,19 @@ func (r *ptRander) randFields() KVs {
 }
 
 func (r *ptRander) doRand() *Point {
-	var pt *Point
-
-	if pp := r.pointPool; pp != nil {
-		pt = pp.Get()
-	} else {
-		pt = emptyPoint()
-	}
-
-	pt.SetTime(r.ts)
 	var ptName string
-
 	if r.measurePrefix != "" {
 		ptName = r.measurePrefix + randStr(r.keyLen)
 	} else {
 		ptName = randStr(r.keyLen)
 	}
-	pt.SetName(ptName)
+
+	kvs := append(r.randTags(), r.randFields()...)
+	pt := NewPointV2(ptName, kvs, WithTime(r.ts), WithKeySorted(r.kvSorted))
 
 	if r.pb {
 		pt.SetFlag(Ppb)
 	}
 
-	kvs := append(r.randTags(), r.randFields()...)
-
-	if r.kvSorted {
-		sort.Sort(kvs)
-	}
-
-	pt.SetKVs(kvs...)
 	return pt
 }
