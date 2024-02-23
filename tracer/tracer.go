@@ -10,7 +10,7 @@ import (
 	"net"
 
 	"github.com/GuanceCloud/cliutils/logger"
-	"gopkg.in/CodapeWild/dd-trace-go.v1/ddtrace/tracer"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 )
 
 var log = logger.DefaultSLogger("ddtrace")
