@@ -169,9 +169,10 @@ func UnmarshalString(buf string, val interface{}) error {
 // and returns its representing ast.Node.
 //
 // Each path arg must be integer or string:
-//     - Integer means searching current node as array
-//     - String means searching current node as object
+//     - Integer is target index(>=0), means searching current node as array.
+//     - String is target key, means searching current node as object.
 //
+// 
 // Note, the api expects the json is well-formed at least,
 // otherwise it may return unexpected result.
 func Get(src []byte, path ...interface{}) (ast.Node, error) {
@@ -182,4 +183,9 @@ func Get(src []byte, path ...interface{}) (ast.Node, error) {
 // which can reduce unnecessary memory copy.
 func GetFromString(src string, path ...interface{}) (ast.Node, error) {
     return ast.NewSearcher(src).GetByPath(path...)
+}
+
+// Valid reports whether data is a valid JSON encoding.
+func Valid(data []byte) bool {
+    return ConfigDefault.Valid(data)
 }
