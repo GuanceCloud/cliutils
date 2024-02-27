@@ -8,6 +8,16 @@ import (
 	types "github.com/gogo/protobuf/types"
 )
 
+type PointPool interface {
+	Get() *Point
+	Put(*Point)
+
+	GetKV(k string, v any) *Field
+	PutKV(f *Field)
+
+	String() string
+}
+
 var defaultPTPool PointPool
 
 func SetPointPool(pp PointPool) {
@@ -31,14 +41,6 @@ func (p *Point) clear() {
 func (p *Point) Reset() {
 	p.flags = 0
 	p.clear()
-}
-
-type PointPool interface {
-	Get() *Point
-	Put(*Point)
-
-	GetKV(k string, v any) *Field
-	String() string
 }
 
 func emptyPoint() *Point {
@@ -86,6 +88,10 @@ func (pp *ppv1) Put(pt *Point) {
 	pp.Pool.Put(pt)
 }
 
+func (pp *ppv1) PutKV(f *Field) {
+	// do nothing: all kvs are not cached.
+}
+
 func (pp *ppv1) GetKV(k string, v any) *Field {
 	return doNewKV(k, v) // ppv1 always return new Field
 }
@@ -95,13 +101,13 @@ type partialPointPool struct {
 	kvspool sync.Pool
 }
 
-func (pp *partialPointPool) String() string {
-	return ""
-}
-
 // NewPointPoolLevel2 get point cache that cache all but drop Field's Val
 func NewPointPoolLevel2() PointPool {
 	return &partialPointPool{}
+}
+
+func (pp *partialPointPool) String() string {
+	return ""
 }
 
 func (ppp *partialPointPool) Get() *Point {
@@ -113,11 +119,9 @@ func (ppp *partialPointPool) Get() *Point {
 }
 
 func (ppp *partialPointPool) Put(pt *Point) {
-	kvs := pt.KVs()
-	kvs.Reset()
 
-	for _, kv := range kvs {
-		ppp.kvspool.Put(kv)
+	for _, kv := range pt.KVs() {
+		ppp.PutKV(kv)
 	}
 
 	pt.Reset()
@@ -133,6 +137,11 @@ func (ppp *partialPointPool) GetKV(k string, v any) *Field {
 		kv.Val = newVal(v)
 		return kv
 	}
+}
+
+func (ppp *partialPointPool) PutKV(f *Field) {
+	clearKV(f)
+	ppp.kvspool.Put(f)
 }
 
 // NewPointPoolLevel3 cache everything within point.
@@ -155,42 +164,45 @@ type fullPointPool struct {
 	ptCreated,
 	ptReused atomic.Int64
 
-	ptpool,
-	fpool,
-	ipool,
-	upool,
-	spool,
-	bpool,
-	dpool,
-	apool sync.Pool
+	ptpool, // pool for *Point
+	// other pools for various *Fields
+	fpool, // float
+	ipool, // int
+	upool, // uint
+	spool, // string
+	bpool, // bool
+	dpool, // []byte
+	apool sync.Pool // any
+}
+
+func (fpp *fullPointPool) PutKV(f *Field) {
+	f = resetKV(clearKV(f))
+
+	switch f.Val.(type) {
+	case *Field_A:
+		fpp.apool.Put(f)
+	case *Field_B:
+		fpp.bpool.Put(f)
+	case *Field_D:
+		fpp.dpool.Put(f)
+	case *Field_F:
+		fpp.fpool.Put(f)
+	case *Field_I:
+		fpp.ipool.Put(f)
+	case *Field_S:
+		fpp.spool.Put(f)
+	case *Field_U:
+		fpp.upool.Put(f)
+	}
 }
 
 func (fpp *fullPointPool) Put(p *Point) {
-	kvs := p.KVs()
-	kvs.ResetFull()
+	for _, f := range p.KVs() {
+		fpp.PutKV(f)
+	}
 
 	p.Reset()
 	fpp.ptpool.Put(p)
-
-	for _, kv := range kvs {
-		switch kv.Val.(type) {
-		case *Field_A:
-			fpp.apool.Put(kv)
-		case *Field_B:
-			fpp.bpool.Put(kv)
-		case *Field_D:
-			fpp.dpool.Put(kv)
-		case *Field_F:
-			fpp.fpool.Put(kv)
-		case *Field_I:
-			fpp.ipool.Put(kv)
-		case *Field_S:
-			fpp.spool.Put(kv)
-		case *Field_U:
-			fpp.upool.Put(kv)
-		default: // pass
-		}
-	}
 }
 
 func (fpp *fullPointPool) Get() *Point {

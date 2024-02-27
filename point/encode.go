@@ -395,6 +395,10 @@ func (e *Encoder) doEncodeLineProtocol(buf []byte) ([]byte, bool) {
 			e.lpPointBuf = lppt.AppendString(e.lpPointBuf)
 
 			copy(buf[curSize:], e.lpPointBuf[:ptsize])
+
+			// Always add '\n' to the end of current point, this may
+			// cause a _unneeded_ '\n' to the end of buf, it's ok for
+			// line-protocol parsing.
 			buf[curSize+ptsize] = '\n'
 			curSize += (ptsize + 1)
 

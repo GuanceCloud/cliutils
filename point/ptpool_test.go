@@ -1,6 +1,8 @@
 package point
 
 import (
+	"fmt"
+	sync "sync"
 	T "testing"
 	"time"
 
@@ -240,10 +242,68 @@ func TestPointPool(t *T.T) {
 
 		assert.True(t, cap(pt.pt.Fields) > 0) // reuse field array
 	})
+
+	t.Run("level3-put-kv", func(t *T.T) {
+		pp := &fullPointPool{}
+		SetPointPool(pp)
+		defer ClearPointPool()
+
+		// total add 100 * 4 Field
+		for i := 0; i < 100; i++ {
+			var kvs KVs
+			kvs = kvs.Add(fmt.Sprintf("f%d", i), 123, false, false)
+			kvs = kvs.Add(fmt.Sprintf("f%d", i+1), 123, false, false)
+			kvs = kvs.Add(fmt.Sprintf("f%d", i+2), 123, false, false)
+			kvs = kvs.Add(fmt.Sprintf("f%d", i+3), 123, false, false)
+
+			for _, kv := range kvs {
+				pp.PutKV(kv)
+			}
+		}
+
+		assert.Equal(t, int64(396), pp.kvReused.Load())
+		assert.Equal(t, int64(4), pp.kvCreated.Load())
+
+		t.Logf("point pool: %s", pp)
+	})
+
+	t.Run("level-3-concurrent", func(t *T.T) {
+		pp := &fullPointPool{}
+		SetPointPool(pp)
+		defer ClearPointPool()
+
+		var wg sync.WaitGroup
+
+		f := func() {
+			defer wg.Done()
+
+			for i := 0; i < 100; i++ {
+				var kvs KVs
+				kvs = kvs.Add(fmt.Sprintf("f-%d", i*100), 123, false, false)
+				kvs = kvs.Add(fmt.Sprintf("f-%d", i*100+1), 123, false, false)
+				kvs = kvs.Add(fmt.Sprintf("f-%d", i*100+2), 123, false, false)
+				kvs = kvs.Add(fmt.Sprintf("f-%d", i*100+3), 123, false, false)
+
+				for _, kv := range kvs {
+					pp.PutKV(kv)
+				}
+			}
+		}
+
+		n := 100
+		wg.Add(n)
+		for i := 0; i < n; i++ {
+			go f()
+		}
+
+		wg.Wait()
+
+		assert.Equal(t, int64(n*100*4), pp.kvReused.Load()+pp.kvCreated.Load())
+		t.Logf("point pool: %s", pp)
+	})
 }
 
 func TestReset(t *T.T) {
-
 	t.Run("reset", func(t *T.T) {
 		var kvs KVs
 		kvs = kvs.Add("f1", 123, false, false)

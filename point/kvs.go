@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	influxm "github.com/influxdata/influxdb1-client/models"
+	"golang.org/x/exp/slices"
 )
 
 type KVs []*Field
@@ -64,7 +65,7 @@ func (x KVs) Pretty() string {
 	// For key-values are not sorted while building the point, we
 	// think they are equal, so sort the string array to remove the
 	// ordering difference between points.
-	sort.Strings(arr)
+	//sort.Strings(arr)
 
 	return strings.Join(arr, "\n")
 }
@@ -135,31 +136,33 @@ func clearKV(kv *Field) *Field {
 	return kv
 }
 
+func resetKV(kv *Field) *Field {
+	switch v := kv.Val.(type) {
+	case *Field_I:
+		v.I = 0
+	case *Field_U:
+		v.U = 0
+	case *Field_F:
+		v.F = 0.0
+	case *Field_D:
+		v.D = v.D[:0]
+	case *Field_B:
+		v.B = false
+	case *Field_S:
+		v.S = ""
+	case *Field_A:
+		v.A.TypeUrl = ""
+		v.A.Value = v.A.Value[:0]
+
+	}
+
+	return kv
+}
+
 // ResetFull reset and reuse key-value
 func (x KVs) ResetFull() {
 	for i, kv := range x {
-		kv = clearKV(kv)
-		switch v := kv.Val.(type) {
-		case *Field_I:
-			v.I = 0
-		case *Field_U:
-			v.U = 0
-		case *Field_F:
-			v.F = 0.0
-		case *Field_D:
-			v.D = v.D[:0]
-		case *Field_B:
-			v.B = false
-		case *Field_S:
-			v.S = ""
-		case *Field_A:
-			v.A.TypeUrl = ""
-			v.A.Value = v.A.Value[:0]
-		default:
-			// pass
-		}
-
-		x[i] = kv
+		x[i] = resetKV(clearKV(kv))
 	}
 }
 
@@ -237,17 +240,28 @@ func (x KVs) Fields() (arr KVs) {
 	return arr
 }
 
-// TrimFields keep max-n field kvs.
+// TrimFields keep max-n field kvs and drop the rest.
 func (x KVs) TrimFields(n int) (arr KVs) {
 	cnt := 0
+
+	if len(x) <= n {
+		return x
+	}
 
 	for _, kv := range x {
 		if kv.IsTag {
 			arr = append(arr, kv)
 			continue
-		} else if cnt < n {
-			arr = append(arr, kv)
-			cnt++
+		} else {
+			if cnt < n {
+				arr = append(arr, kv)
+				cnt++
+			} else {
+				// drop the kv
+				if defaultPTPool != nil {
+					defaultPTPool.PutKV(kv)
+				}
+			}
 		}
 	}
 
@@ -262,9 +276,15 @@ func (x KVs) TrimTags(n int) (arr KVs) {
 		if !kv.IsTag {
 			arr = append(arr, kv)
 			continue
-		} else if cnt < n {
-			arr = append(arr, kv)
-			cnt++
+		} else {
+			if cnt < n {
+				arr = append(arr, kv)
+				cnt++
+			} else {
+				if defaultPTPool != nil {
+					defaultPTPool.PutKV(kv)
+				}
+			}
 		}
 	}
 
@@ -289,22 +309,17 @@ func (x KVs) FieldCount() (i int) {
 	return
 }
 
-// Del delete specified k.
+// Del delete field from x with Key == k.
 func (x KVs) Del(k string) KVs {
-	i := 0
-	for _, f := range x {
-		if f.Key != k {
-			x[i] = f
-			i++
+	for i, f := range x {
+		if f.Key == k {
+			x = slices.Delete(x, i, i+1)
+			if defaultPTPool != nil {
+				defaultPTPool.PutKV(f)
+			}
 		}
 	}
 
-	// remove not-needed elements.
-	for j := i; j < len(x); j++ {
-		x[j] = nil
-	}
-
-	x = x[:i]
 	return x
 }
 
@@ -418,12 +433,14 @@ func KVKey(f *Field) *Key {
 
 type KVOption func(kv *Field)
 
+// WithKVUnit set value's unit.
 func WithKVUnit(u string) KVOption {
 	return func(kv *Field) {
 		kv.Unit = u
 	}
 }
 
+// WithKVUnit set field type(count/gauge/rate).
 func WithKVType(t MetricType) KVOption {
 	return func(kv *Field) {
 		kv.Type = t
@@ -478,7 +495,7 @@ func NewKVs(kvs map[string]interface{}) (res KVs) {
 // NewTags create tag kvs from map structure.
 func NewTags(tags map[string]string) (arr KVs) {
 	for k, v := range tags {
-		arr = append(arr, &Field{IsTag: true, Key: k, Val: &Field_S{S: v}})
+		arr = append(arr, NewKV(k, v, WithKVTagSet(true)))
 	}
 
 	return arr
