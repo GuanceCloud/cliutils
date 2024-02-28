@@ -121,6 +121,9 @@ func parseLPPoints(data []byte, c *cfg) ([]*Point, error) {
 		}
 
 		pt := FromModelsLP(x)
+		if pt == nil {
+			continue
+		}
 
 		if c.keySorted {
 			kvs := KVs(pt.pt.Fields)
