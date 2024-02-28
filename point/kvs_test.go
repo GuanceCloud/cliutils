@@ -206,6 +206,14 @@ func TestKVsAdd(t *T.T) {
 		kvs = kvs.Add("f1", 123, false, false)
 		assert.Len(t, kvs, 1)
 	})
+
+	t.Run("add-v2", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.AddV2("f1", 123, false, WithKVUnit("dollar"), WithKVType(GAUGE))
+		kvs = kvs.AddV2("cap", 123, false, WithKVUnit("bytes"), WithKVType(COUNT))
+
+		t.Logf("kvs: %s", kvs.Pretty())
+	})
 }
 
 func TestKVsReset(t *T.T) {

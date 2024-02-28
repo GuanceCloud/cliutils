@@ -34,6 +34,9 @@ github.com/Microsoft/go-winio/internal/fs
 github.com/Microsoft/go-winio/internal/socket
 github.com/Microsoft/go-winio/internal/stringbuffer
 github.com/Microsoft/go-winio/pkg/guid
+# github.com/VictoriaMetrics/easyproto v0.1.4
+## explicit; go 1.18
+github.com/VictoriaMetrics/easyproto
 # github.com/aliyun/aliyun-oss-go-sdk v2.1.2+incompatible
 ## explicit
 github.com/aliyun/aliyun-oss-go-sdk/oss

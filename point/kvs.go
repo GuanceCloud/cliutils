@@ -323,8 +323,29 @@ func (x KVs) Del(k string) KVs {
 	return x
 }
 
-// Add add new field
-//
+// Add2 add new field with opts.
+// If force enabled, overwrite exist key.
+func (x KVs) AddV2(k string, v any, force bool, opts ...KVOption) KVs {
+	kv := NewKV(k, v, opts...)
+
+	for i := range x {
+		if x[i].Key == k { // k exist
+			if force {
+				x[i] = kv // override exist tag/field
+			}
+
+			goto out // ignore the key
+		}
+	}
+
+	x = append(x, kv)
+
+out:
+	return x
+}
+
+// Add add new field.
+// Deprecated: use AddV2
 // If force enabled, overwrite exist key.
 func (x KVs) Add(k string, v any, isTag, force bool) KVs {
 	kv := NewKV(k, v)
