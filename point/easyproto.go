@@ -7,6 +7,7 @@ package point
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/VictoriaMetrics/easyproto"
 )
@@ -95,11 +96,10 @@ func (pts *PBPoints) UnmarshalProtobuf(src []byte) (err error) {
 				return fmt.Errorf("cannot read read Arr for PBPoints")
 			}
 
-			pt := &PBPoint{}
-			pts.Arr = append(pts.Arr, pt)
-
-			if err := pt.UnmarshalProtobuf(data); err != nil {
+			if pt, err := unmarshalPoint(data); err != nil {
 				return fmt.Errorf("unmarshal point failed: %w", err)
+			} else {
+				pts.Arr = append(pts.Arr, pt)
 			}
 		}
 	}
@@ -107,109 +107,201 @@ func (pts *PBPoints) UnmarshalProtobuf(src []byte) (err error) {
 	return nil
 }
 
-func (pt *PBPoint) UnmarshalProtobuf(src []byte) (err error) {
-	var fc easyproto.FieldContext
+func unmarshalPoint(src []byte) (*PBPoint, error) {
+	var (
+		fc     easyproto.FieldContext
+		kvs    KVs
+		warns  []*Warn
+		debugs []*Debug
+		name   string
+		ts     int64
+		err    error
+	)
+
 	for len(src) > 0 {
 		src, err = fc.NextField(src)
 		if err != nil {
-			return fmt.Errorf("read next field for PBPoint failed: %w", err)
+			return nil, fmt.Errorf("read next field for PBPoint failed: %w", err)
 		}
 
 		switch fc.FieldNum {
 		case 1:
-			if name, ok := fc.String(); ok {
-				pt.Name = name
+			if x, ok := fc.String(); ok {
+				name = x
 			} else {
-				return fmt.Errorf("cannot read PBPoint name")
+				return nil, fmt.Errorf("cannot read PBPoint name")
 			}
 		case 2:
 			data, ok := fc.MessageData()
 			if !ok {
-				return fmt.Errorf("cannot read Fields for PBPoint")
+				return nil, fmt.Errorf("cannot read Fields for PBPoint")
 			}
 
-			f := &Field{}
-			pt.Fields = append(pt.Fields, f)
-			if err := f.UnmarshalProtobuf(data); err != nil {
-				return fmt.Errorf("cannot unmarshal field: %w", err)
+			if kv, err := unmarshalField(data); err == nil {
+				kvs = append(kvs, kv)
+			} else {
+				return nil, fmt.Errorf("cannot unmarshal field: %w", err)
 			}
 		case 3:
-			if ts, ok := fc.Int64(); ok {
-				pt.Time = ts
+			if x, ok := fc.Int64(); ok {
+				ts = x
 			} else {
-				return fmt.Errorf("cannot read PBPoint time")
+				return nil, fmt.Errorf("cannot read PBPoint time")
 			}
 
 		case 4: // Warns
+			data, ok := fc.MessageData()
+			if !ok {
+				return nil, fmt.Errorf("cannot read Warn for PBPoint")
+			}
+
+			if x, err := unmarshalWarn(data); err == nil {
+				warns = append(warns, x)
+			}
+
 		case 5: // Debugs
+			data, ok := fc.MessageData()
+			if !ok {
+				return nil, fmt.Errorf("cannot read Debug for PBPoint")
+			}
+
+			if x, err := unmarshalDebug(data); err == nil {
+				debugs = append(debugs, x)
+			}
 		}
 	}
 
-	return err
+	pt := NewPointV2(name, kvs, WithTime(time.Unix(0, ts)))
+	return pt.pt, err
 }
 
-func (f *Field) UnmarshalProtobuf(src []byte) (err error) {
-	var fc easyproto.FieldContext
+func unmarshalWarn(src []byte) (*Warn, error) {
+	var (
+		wtype, wmsg string
+		fc          easyproto.FieldContext
+		err         error
+	)
 
 	for len(src) > 0 {
 		src, err = fc.NextField(src)
 		if err != nil {
-			return fmt.Errorf("read next field for Field failed: %w", err)
+			return nil, fmt.Errorf("read next field for Warn failed: %w", err)
 		}
 
 		switch fc.FieldNum {
 		case 1:
-			if key, ok := fc.String(); ok {
-				f.Key = key
+			if x, ok := fc.String(); ok {
+				wtype = x
+			}
+		case 2:
+			if x, ok := fc.String(); ok {
+				wmsg = x
+			}
+		}
+	}
+
+	return &Warn{Type: wtype, Msg: wmsg}, nil
+}
+
+func unmarshalDebug(src []byte) (*Debug, error) {
+	var (
+		info string
+		fc   easyproto.FieldContext
+		err  error
+	)
+
+	for len(src) > 0 {
+		src, err = fc.NextField(src)
+		if err != nil {
+			return nil, fmt.Errorf("read next field for Debug failed: %w", err)
+		}
+
+		switch fc.FieldNum {
+		case 1:
+			if x, ok := fc.String(); ok {
+				info = x
+			}
+		}
+	}
+
+	return &Debug{Info: info}, nil
+}
+
+func unmarshalField(src []byte) (*Field, error) {
+	var (
+		fc         easyproto.FieldContext
+		key, unit  string
+		isTag      bool
+		f          *Field
+		metricType MetricType
+		err        error
+	)
+
+	for len(src) > 0 {
+		src, err = fc.NextField(src)
+		if err != nil {
+			return nil, fmt.Errorf("read next field for Field failed: %w", err)
+		}
+
+		switch fc.FieldNum {
+		case 1:
+			if x, ok := fc.String(); ok {
+				key = x
 			} else {
-				return fmt.Errorf("cannot read Field key")
+				return nil, fmt.Errorf("cannot read Field key")
 			}
 
 		case 8:
-			if isTag, ok := fc.Bool(); ok {
-				f.IsTag = isTag
+			if x, ok := fc.Bool(); ok {
+				isTag = x
 			} else {
-				return fmt.Errorf("cannot unmarshal is-tag for Field")
+				return nil, fmt.Errorf("cannot unmarshal is-tag for Field")
 			}
 
 		case 2:
 			if x, ok := fc.Int64(); ok {
-				f.Val = &Field_I{I: x}
+				f = NewKV(key, x)
 			}
+
 		case 3:
 			if x, ok := fc.Uint64(); ok {
-				f.Val = &Field_U{U: x}
+				f = NewKV(key, x)
 			}
 		case 4:
 			if x, ok := fc.Double(); ok {
-				f.Val = &Field_F{F: x}
+				f = NewKV(key, x)
 			}
 		case 5:
 			if x, ok := fc.Bool(); ok {
-				f.Val = &Field_B{B: x}
+				f = NewKV(key, x)
 			}
 		case 6:
 			if x, ok := fc.Bytes(); ok {
-				f.Val = &Field_D{D: x}
+				f = NewKV(key, x)
 			}
 
 		case 11:
 			if x, ok := fc.String(); ok {
-				f.Val = &Field_S{S: x}
+				f = NewKV(key, x)
 			}
 
 		case 9:
 			if x, ok := fc.Int32(); ok {
-				f.Type = MetricType(x)
+				metricType = MetricType(x)
 			}
 		case 10:
 			if x, ok := fc.String(); ok {
-				f.Unit = x
+				unit = x
 			}
-
 		default: // pass
 		}
 	}
 
-	return err
+	if f != nil {
+		f.Unit = unit
+		f.Type = metricType
+		f.IsTag = isTag
+	}
+
+	return f, err
 }
