@@ -164,7 +164,7 @@ github.com/hashicorp/go-cleanhttp
 # github.com/hashicorp/go-retryablehttp v0.7.4
 ## explicit; go 1.13
 github.com/hashicorp/go-retryablehttp
-# github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c => github.com/GuanceCloud/influxdb1-client v0.1.4
+# github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c => github.com/GuanceCloud/influxdb1-client v0.1.5
 ## explicit; go 1.19
 github.com/influxdata/influxdb1-client/models
 github.com/influxdata/influxdb1-client/pkg/escape
@@ -523,4 +523,4 @@ modernc.org/strutil
 # modernc.org/token v1.0.1
 ## explicit
 modernc.org/token
-# github.com/influxdata/influxdb1-client => github.com/GuanceCloud/influxdb1-client v0.1.4
+# github.com/influxdata/influxdb1-client => github.com/GuanceCloud/influxdb1-client v0.1.5
