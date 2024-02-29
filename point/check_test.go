@@ -207,6 +207,35 @@ func TestCheckTags(t *T.T) {
 			}
 		})
 	}
+
+	t.Run("key-updated-but-conflict", func(t *T.T) {
+
+		///////////////////////
+		// dot in tag key
+		var kvs KVs
+		kvs = kvs.AddV2("f.1", "some string", false, WithKVTagSet(true))
+		kvs = kvs.AddV2("f_1", 1.23, false)
+
+		pt := NewPointV2("m", kvs, WithDotInKey(false))
+
+		assert.Len(t, pt.pt.Fields, 1)
+		// drop tag
+		assert.Len(t, pt.pt.Fields, 1)
+		assert.Equal(t, 1.23, pt.Get(`f_1`).(float64))
+		t.Logf("pt: %s", pt.Pretty())
+
+		///////////////////////
+		// too long tag key
+		kvs = kvs[:0]
+		kvs = kvs.AddV2("f111", "some string", false, WithKVTagSet(true))
+		kvs = kvs.AddV2("f1", 1.23, false)
+		pt = NewPointV2("m", kvs, WithMaxTagKeyLen(2))
+
+		assert.Len(t, pt.pt.Fields, 1)
+		// drop tag
+		assert.Equal(t, 1.23, pt.Get(`f1`).(float64))
+		t.Logf("pt: %s", pt.Pretty())
+	})
 }
 
 func TestCheckFields(t *T.T) {

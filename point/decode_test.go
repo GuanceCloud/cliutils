@@ -338,6 +338,39 @@ func TestDecode(t *T.T) {
 			}
 		})
 	}
+
+	t.Run("decode-with-check", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.AddV2("f.1", 1.23, false)
+		kvs = kvs.AddV2("f_1", 321, false)
+		kvs = kvs.AddV2("tag.1", "some-val", false, WithKVTagSet(true))
+
+		pt := NewPointV2("m1", kvs, WithTime(time.Unix(0, 123)))
+
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		defer PutEncoder(enc)
+		enc.EncodeV2([]*Point{pt})
+
+		src := make([]byte, 1<<20)
+		src, ok := enc.Next(src)
+		assert.True(t, ok)
+
+		dec := GetDecoder(WithDecEncoding(Protobuf))
+		defer PutDecoder(dec)
+
+		pts, err := dec.Decode(src, WithDotInKey(false)) // disable dot(.) in key
+		assert.NoError(t, err)
+		assert.Len(t, pts, 1)
+
+		assert.NotNil(t, pts[0].Get("f_1"))
+		//assert.NotNil(t, pts[0].Get("f_2"))
+		assert.NotNil(t, pts[0].Get("tag_1"))
+
+		assert.Len(t, pts[0].pt.Warns, 2)
+
+		t.Logf("pt: %s", pts[0].Pretty())
+		t.Logf("pt: %s", pts[0].LineProto())
+	})
 }
 
 func BenchmarkDecode(b *T.B) {

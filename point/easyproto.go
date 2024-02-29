@@ -15,12 +15,16 @@ import (
 var mp easyproto.MarshalerPool
 
 // marshal
-func (pts *PBPoints) MarshalProtobuf(dst []byte) []byte {
+func marshalPoints(pts []*Point, dst []byte) []byte {
 	m := mp.Get()
 	mm := m.MessageMarshaler()
 
-	for _, pt := range pts.Arr {
-		pt.marshalProtobuf(mm.AppendMessage(1))
+	for _, pt := range pts {
+		if pt == nil || pt.pt == nil {
+			continue
+		}
+
+		marshalPoint(pt, mm.AppendMessage(1))
 	}
 
 	dst = m.Marshal(dst)
@@ -28,19 +32,19 @@ func (pts *PBPoints) MarshalProtobuf(dst []byte) []byte {
 	return dst
 }
 
-func (pt *PBPoint) marshalProtobuf(mm *easyproto.MessageMarshaler) {
-	mm.AppendString(1, pt.Name)
-	for _, f := range pt.Fields {
+func marshalPoint(pt *Point, mm *easyproto.MessageMarshaler) {
+	mm.AppendString(1, pt.pt.Name)
+	for _, f := range pt.pt.Fields {
 		f.marshalProtobuf(mm.AppendMessage(2))
 	}
 
-	mm.AppendInt64(3, pt.Time)
+	mm.AppendInt64(3, pt.pt.Time)
 
-	for _, w := range pt.Warns {
+	for _, w := range pt.pt.Warns {
 		w.marshalProtobuf(mm.AppendMessage(4))
 	}
 
-	for _, d := range pt.Debugs {
+	for _, d := range pt.pt.Debugs {
 		d.marshalProtobuf(mm.AppendMessage(5))
 	}
 }
@@ -79,35 +83,41 @@ func (d *Debug) marshalProtobuf(mm *easyproto.MessageMarshaler) {
 	mm.AppendString(1, d.Info)
 }
 
-// unmarshal
+type Points []*Point
 
-func (pts *PBPoints) UnmarshalProtobuf(src []byte) (err error) {
-	var fc easyproto.FieldContext
+// unmarshal
+func unmarshalPoints(src []byte) ([]*Point, error) {
+	var (
+		fc  easyproto.FieldContext
+		pts []*Point
+		err error
+	)
+
 	for len(src) > 0 {
 		src, err = fc.NextField(src)
 		if err != nil {
-			return fmt.Errorf("read next field for PBPoints failed: %w", err)
+			return nil, fmt.Errorf("read next field for PBPoints failed: %w", err)
 		}
 
 		switch fc.FieldNum {
 		case 1:
 			data, ok := fc.MessageData()
 			if !ok {
-				return fmt.Errorf("cannot read read Arr for PBPoints")
+				return nil, fmt.Errorf("cannot read read Arr for PBPoints")
 			}
 
 			if pt, err := unmarshalPoint(data); err != nil {
-				return fmt.Errorf("unmarshal point failed: %w", err)
+				return nil, fmt.Errorf("unmarshal point failed: %w", err)
 			} else {
-				pts.Arr = append(pts.Arr, pt)
+				pts = append(pts, pt)
 			}
 		}
 	}
 
-	return nil
+	return pts, nil
 }
 
-func unmarshalPoint(src []byte) (*PBPoint, error) {
+func unmarshalPoint(src []byte) (*Point, error) {
 	var (
 		fc     easyproto.FieldContext
 		kvs    KVs
@@ -138,7 +148,7 @@ func unmarshalPoint(src []byte) (*PBPoint, error) {
 			}
 
 			if kv, err := unmarshalField(data); err == nil {
-				kvs = append(kvs, kv)
+				kvs = kvs.AddKV(kv, false)
 			} else {
 				return nil, fmt.Errorf("cannot unmarshal field: %w", err)
 			}
@@ -172,7 +182,10 @@ func unmarshalPoint(src []byte) (*PBPoint, error) {
 	}
 
 	pt := NewPointV2(name, kvs, WithTime(time.Unix(0, ts)))
-	return pt.pt, err
+	pt.pt.Warns = warns
+	pt.pt.Debugs = debugs
+
+	return pt, err
 }
 
 func unmarshalWarn(src []byte) (*Warn, error) {

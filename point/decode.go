@@ -27,20 +27,15 @@ func WithDecFn(fn DecodeFn) DecoderOption {
 	return func(d *Decoder) { d.fn = fn }
 }
 
-func WithDecGoGoPBPoint(on bool) DecoderOption {
-	return func(d *Decoder) { d.gogopb = on }
-}
-
-func WithDecBuffer(buf []byte) DecoderOption {
-	return func(d *Decoder) { d.decodeBuffer = buf }
+func WithDecEasyproto(on bool) DecoderOption {
+	return func(d *Decoder) { d.easyproto = on }
 }
 
 type Decoder struct {
 	enc Encoding
 	fn  DecodeFn
 
-	gogopb       bool
-	decodeBuffer []byte
+	easyproto bool
 
 	// For line-protocol parsing, keep original error.
 	detailedError error
@@ -76,7 +71,7 @@ func (d *Decoder) reset() {
 	d.enc = 0
 	d.fn = nil
 	d.detailedError = nil
-	d.gogopb = false
+	d.easyproto = false
 }
 
 func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
@@ -128,23 +123,34 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 		}
 
 	case Protobuf:
-		var pbpts PBPoints
-		if err = pbpts.Unmarshal(data); err != nil {
-			return nil, err
+		if d.easyproto {
+			pts, err = unmarshalPoints(data)
+		} else {
+			var pbpts PBPoints
+			if err = pbpts.Unmarshal(data); err != nil {
+				return nil, err
+			}
+
+			for _, pbpt := range pbpts.Arr {
+				pt := &Point{
+					pt: pbpt,
+				}
+
+				pts = append(pts, pt)
+			}
 		}
 
-		chk := checker{cfg: cfg}
-		for _, pbpt := range pbpts.Arr {
-			pt := &Point{
-				pt: pbpt,
-			}
+		var chk *checker
+		if cfg.precheck {
+			chk = &checker{cfg: cfg}
+		}
+
+		for _, pt := range pts {
 			pt.SetFlag(Ppb)
 
-			pt = chk.check(pt)
-			pt.pt.Warns = chk.warns
-			chk.reset()
-
-			pts = append(pts, pt)
+			if cfg.precheck {
+				pt = chk.check(pt)
+			}
 		}
 
 	case LineProtocol:
