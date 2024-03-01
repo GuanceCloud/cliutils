@@ -186,12 +186,11 @@ func (e *Encoder) getPayload(pts []*Point) ([]byte, error) {
 
 	switch e.enc {
 	case Protobuf:
-		var pbpts PBPoints
 		for _, pt := range pts {
-			pbpts.Arr = append(pbpts.Arr, pt.PBPoint())
+			e.pbpts.Arr = append(e.pbpts.Arr, pt.PBPoint())
 		}
 
-		if payload, err = pbpts.Marshal(); err != nil {
+		if payload, err = e.pbpts.Marshal(); err != nil {
 			return nil, err
 		}
 

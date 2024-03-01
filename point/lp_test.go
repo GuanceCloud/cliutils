@@ -1205,11 +1205,11 @@ func TestAppendString(t *T.T) {
 	assert.NoError(t, err)
 
 	for i, pt := range decPts {
-		exp := pts[i].Pretty()
-		got := pt.Pretty()
-		require.Equalf(t, exp, got, "exp %s\ngot %s", exp, got)
+		ok, why := pt.EqualWithReason(pts[i])
+		assert.True(t, ok, "reason: %s", why)
 
-		t.Logf("got %s", got)
+		t.Logf("got:\n%s", pt.Pretty())
+		t.Logf("exp:\n%s", pts[i].Pretty())
 	}
 }
 
