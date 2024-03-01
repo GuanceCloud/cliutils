@@ -209,7 +209,6 @@ func TestCheckTags(t *T.T) {
 	}
 
 	t.Run("key-updated-but-conflict", func(t *T.T) {
-
 		///////////////////////
 		// dot in tag key
 		var kvs KVs
@@ -233,6 +232,18 @@ func TestCheckTags(t *T.T) {
 
 		assert.Len(t, pt.pt.Fields, 1)
 		// drop tag
+		assert.Equal(t, 1.23, pt.Get(`f1`).(float64))
+		t.Logf("pt: %s", pt.Pretty())
+
+		///////////////////////
+		// too long field key
+		kvs = kvs[:0]
+		kvs = kvs.AddV2("f1", 1.23, false)
+		kvs = kvs.AddV2("f111", "some string", false)
+		pt = NewPointV2("m", kvs, WithMaxFieldKeyLen(2))
+
+		assert.Len(t, pt.pt.Fields, 1)
+		// drop field
 		assert.Equal(t, 1.23, pt.Get(`f1`).(float64))
 		t.Logf("pt: %s", pt.Pretty())
 	})

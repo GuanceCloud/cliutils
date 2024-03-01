@@ -21,7 +21,7 @@ func TestLPFieldArray(t *T.T) {
 
 		dec := GetDecoder(WithDecEncoding(LineProtocol))
 		_, err := dec.Decode(lp)
-		assert.Errorf(t, err, "should got error") // line-protocol can not decode array for now.
+		assert.NoError(t, err)
 	})
 
 	t.Run(`encode-lp-array-field`, func(t *T.T) {
@@ -341,7 +341,7 @@ func TestDecode(t *T.T) {
 
 	t.Run("decode-with-check", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.AddV2("f.1", 1.23, false)
+		kvs = kvs.AddV2("f.1", 1.23, false) // f.1 rename to f_1 and key conflict
 		kvs = kvs.AddV2("f_1", 321, false)
 		kvs = kvs.AddV2("tag.1", "some-val", false, WithKVTagSet(true))
 
@@ -356,20 +356,34 @@ func TestDecode(t *T.T) {
 		assert.True(t, ok)
 
 		dec := GetDecoder(WithDecEncoding(Protobuf))
-		defer PutDecoder(dec)
 
 		pts, err := dec.Decode(src, WithDotInKey(false)) // disable dot(.) in key
 		assert.NoError(t, err)
 		assert.Len(t, pts, 1)
 
-		assert.NotNil(t, pts[0].Get("f_1"))
-		//assert.NotNil(t, pts[0].Get("f_2"))
-		assert.NotNil(t, pts[0].Get("tag_1"))
+		assert.Equal(t, int64(321), pts[0].Get("f_1").(int64))
+		assert.Equal(t, "some-val", pts[0].Get("tag_1").(string))
 
-		assert.Len(t, pts[0].pt.Warns, 2)
+		assert.Len(t, pts[0].pt.Warns, 3)
 
 		t.Logf("pt: %s", pts[0].Pretty())
 		t.Logf("pt: %s", pts[0].LineProto())
+		defer PutDecoder(dec)
+
+		// test on easyproto
+		dec = GetDecoder(WithDecEncoding(Protobuf), WithDecEasyproto(true))
+		pts, err = dec.Decode(src, WithDotInKey(false)) // disable dot(.) in key
+		assert.NoError(t, err)
+		assert.Len(t, pts, 1)
+
+		assert.Equal(t, int64(321), pts[0].Get("f_1").(int64))
+		assert.Equal(t, "some-val", pts[0].Get("tag_1").(string))
+
+		assert.Len(t, pts[0].pt.Warns, 3)
+
+		t.Logf("pt: %s", pts[0].Pretty())
+		t.Logf("pt: %s", pts[0].LineProto())
+		defer PutDecoder(dec)
 	})
 }
 
