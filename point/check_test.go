@@ -246,6 +246,18 @@ func TestCheckTags(t *T.T) {
 		// drop field
 		assert.Equal(t, 1.23, pt.Get(`f1`).(float64))
 		t.Logf("pt: %s", pt.Pretty())
+
+		///////////////////////
+		// conflict on updated-key
+		kvs = kvs[:0]
+		kvs = kvs.AddV2("f.1", 1.23, false)            // f.1 => f_1
+		kvs = kvs.AddV2("f_111", "some string", false) // f_111 => f_1: conflict
+		pt = NewPointV2("m", kvs, WithMaxFieldKeyLen(3), WithDotInKey(false))
+
+		assert.Len(t, pt.pt.Fields, 1)
+		// drop field
+		assert.Equal(t, 1.23, pt.Get(`f_1`).(float64))
+		t.Logf("pt: %s", pt.Pretty())
 	})
 }
 
