@@ -153,20 +153,19 @@ func resetKV(kv *Field) *Field {
 	case *Field_A:
 		v.A.TypeUrl = ""
 		v.A.Value = v.A.Value[:0]
-
 	}
 
 	return kv
 }
 
-// ResetFull reset and reuse key-value
+// ResetFull reset and reuse key-value.
 func (x KVs) ResetFull() {
 	for i, kv := range x {
 		x[i] = resetKV(clearKV(kv))
 	}
 }
 
-// Reset reset but drop value
+// Reset reset but drop value.
 func (x KVs) Reset() {
 	for i, kv := range x {
 		kv = clearKV(kv)

@@ -26,19 +26,19 @@ func TestIdempotent(t *T.T) {
 		batch int
 	}{
 		{
-			name:  "ok-32/3",
+			name:  "ok-32#3",
 			pts:   RandPoints(32),
 			batch: 3,
 		},
 
 		{
-			name:  "ok-32/1",
+			name:  "ok-32#1",
 			pts:   RandPoints(32),
 			batch: 1,
 		},
 
 		{
-			name:  "ok-32/0",
+			name:  "ok-32#0",
 			pts:   RandPoints(32),
 			batch: 0,
 		},
@@ -53,13 +53,15 @@ func TestIdempotent(t *T.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
 			enc := GetEncoder(WithEncBatchSize(tc.batch))
-			defer PutEncoder(enc)
 
 			p1, err := enc.Encode(tc.pts)
 			assert.NoError(t, err)
+			PutEncoder(enc)
 
+			enc = GetEncoder(WithEncBatchSize(tc.batch))
 			p2, err := enc.Encode(tc.pts)
 			assert.NoError(t, err)
+			PutEncoder(enc)
 
 			assert.Equal(t, p1, p2)
 		})
@@ -67,24 +69,32 @@ func TestIdempotent(t *T.T) {
 		// test encode pb
 		t.Run(tc.name+"-pb", func(t *T.T) {
 			enc := GetEncoder(WithEncBatchSize(tc.batch), WithEncEncoding(Protobuf))
-			defer PutEncoder(enc)
 
 			p1, err := enc.Encode(tc.pts)
 			assert.NoError(t, err)
+			PutEncoder(enc)
 
+			enc = GetEncoder(WithEncBatchSize(tc.batch), WithEncEncoding(Protobuf))
 			p2, err := enc.Encode(tc.pts)
 			assert.NoError(t, err)
+			PutEncoder(enc)
 
 			assert.Equal(t, p1, p2)
 		})
 	}
 }
 
-func TestEncode(t *T.T) {
-	r := NewRander(WithKVSorted(true))
+// TestEncodeEqualty test equality on
+//   - multi-part encode: multiple points splited into multiple parts
+//   - line-protocol/protobuf: points encode between line-protocol and protobuf are equal
+func TestEncodeEqualty(t *T.T) {
+	r := NewRander(WithKVSorted(true), WithRandFields(1), WithRandTags(1))
+
+	nrand := 6
+	randBsize := 3
 
 	var (
-		randPts = r.Rand(1000)
+		randPts = r.Rand(nrand)
 
 		simplePts = []*Point{
 			NewPointV2(`abc`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
@@ -144,10 +154,10 @@ func TestEncode(t *T.T) {
 
 		{
 			name:  "random-point",
-			bsize: 256,
+			bsize: randBsize,
 			pts:   randPts,
 			expect: func() [][]byte {
-				enc := GetEncoder(WithEncBatchSize(256))
+				enc := GetEncoder(WithEncBatchSize(randBsize))
 				defer PutEncoder(enc)
 
 				x, err := enc.Encode(randPts)
@@ -158,26 +168,26 @@ func TestEncode(t *T.T) {
 
 		{
 			name:  "random-point-with-callback",
-			bsize: 256,
+			bsize: randBsize,
 			pts:   randPts,
 			fn:    __fn,
 			expect: func() [][]byte {
-				enc := GetEncoder(WithEncBatchSize(256))
+				enc := GetEncoder(WithEncBatchSize(randBsize))
 				defer PutEncoder(enc)
 
 				bufs, err := enc.Encode(randPts)
 				assert.NoError(t, err)
 
-				if len(randPts)%256 == 0 {
-					assert.Equal(t, len(randPts)/256, len(bufs))
+				if len(randPts)%randBsize == 0 {
+					assert.Equal(t, len(randPts)/randBsize, len(bufs))
 				} else {
-					assert.Equal(t, len(randPts)/256+1, len(bufs), "randPts: %d", len(randPts))
+					assert.Equal(t, len(randPts)/randBsize+1, len(bufs), "randPts: %d", len(randPts))
 				}
 
 				for i, buf := range bufs {
-					t.Logf("get %dth %q", i, buf)
+					t.Logf("get %dth batch:\n%s", i, buf)
 					if i != len(bufs)-1 {
-						assert.Equal(t, 256, len(bytes.Split(buf, []byte("\n"))))
+						assert.Equal(t, randBsize, len(bytes.Split(buf, []byte("\n"))))
 					}
 				}
 
@@ -200,7 +210,7 @@ func TestEncode(t *T.T) {
 				assert.Equal(t, len(simplePts), len(bufs))
 
 				for i, buf := range bufs {
-					t.Logf("get %dth %q", i, buf)
+					t.Logf("get %dth batch:\n%s", i, buf)
 					assert.Equal(t, 1, len(bytes.Split(buf, []byte("\n"))))
 				}
 
@@ -232,33 +242,31 @@ func TestEncode(t *T.T) {
 				WithEncEncoding(Protobuf))
 			defer PutEncoder(enc)
 
+			assert.Len(t, enc.pbpts.Arr, 0)
+
 			payloads, err := enc.Encode(tc.pts)
 
 			assert.NoError(t, err)
 
 			assert.Equal(t, len(tc.expect), len(payloads))
 
-			// check PB unmarshal and compress ratio
+			// check PB unmarshal
 			for idx := range tc.expect {
 				var pbpts PBPoints
 				assert.NoError(t, proto.Unmarshal(payloads[idx], &pbpts))
 			}
 
-			var lps [][]byte
 			// convert PB to line-protocol, check equality
-			for _, p := range payloads {
+			for idx, p := range payloads {
 				lp, err := PB2LP(p)
 				assert.NoError(t, err)
-				lps = append(lps, lp)
-			}
+				t.Logf("pb -> lp:\n%s", lp)
 
-			lpbody := string(bytes.Join(lps, []byte("\n")))
-			assert.Equal(t, string(bytes.Join(tc.expect, []byte("\n"))), lpbody)
+				assert.Equal(t, string(tc.expect[idx]), string(lp))
+			}
 		})
 	}
-}
 
-func TestEncodeWithBytesLimit(t *T.T) {
 	t.Run(`bytes-limite`, func(t *T.T) {
 		r := NewRander(WithFixedTags(true), WithRandText(3))
 		pts := r.Rand(1000)
@@ -378,7 +386,6 @@ func BenchmarkEncode(b *T.B) {
 	})
 
 	b.Run("bench-encode-pb", func(b *T.B) {
-
 		for i := 0; i < b.N; i++ {
 			enc := GetEncoder(WithEncEncoding(Protobuf), WithEncBatchBytes(1<<20))
 			enc.Encode(pts)
@@ -460,7 +467,6 @@ func BenchmarkV2Encode(b *T.B) {
 
 	b.Run("Next", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
-
 			enc := GetEncoder(WithEncEncoding(Protobuf))
 			enc.EncodeV2(randPts)
 
@@ -478,7 +484,7 @@ func BenchmarkV2Encode(b *T.B) {
 	})
 }
 
-func TestEncodeV2(t *T.T) {
+func TestV2Encode(t *T.T) {
 	r := NewRander(WithFixedTags(true), WithRandText(3))
 	randPts := r.Rand(10000)
 
@@ -534,7 +540,6 @@ func TestEncodeV2(t *T.T) {
 
 		for {
 			if x, ok := enc.Next(buf); ok {
-
 				decPts, err := dec.Decode(x)
 				assert.NoErrorf(t, err, "decode %s failed", x)
 
@@ -632,7 +637,6 @@ func TestEncodeV2(t *T.T) {
 			}
 		}
 		PutEncoder(enc)
-
 	})
 }
 

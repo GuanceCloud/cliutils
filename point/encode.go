@@ -12,9 +12,6 @@ import (
 	"strings"
 	sync "sync"
 
-	//"google.golang.org/protobuf/proto"
-
-	proto "github.com/gogo/protobuf/proto"
 )
 
 type Encoding int
@@ -186,11 +183,19 @@ func (e *Encoder) getPayload(pts []*Point) ([]byte, error) {
 
 	switch e.enc {
 	case Protobuf:
+		pbpts := e.pbpts
+
+		defer func() {
+			// Reset e.pbpts buffer: getPayload maybe called multiple times
+			// during a single Encode().
+			e.pbpts.Arr = e.pbpts.Arr[:0]
+		}()
+
 		for _, pt := range pts {
-			e.pbpts.Arr = append(e.pbpts.Arr, pt.PBPoint())
+			pbpts.Arr = append(pbpts.Arr, pt.PBPoint())
 		}
 
-		if payload, err = e.pbpts.Marshal(); err != nil {
+		if payload, err = pbpts.Marshal(); err != nil {
 			return nil, err
 		}
 
@@ -358,9 +363,7 @@ __doEncode:
 	}
 }
 
-var (
-	errTooSmallBuffer = errors.New("too small buffer")
-)
+var errTooSmallBuffer = errors.New("too small buffer")
 
 func (e *Encoder) doEncodeLineProtocol(buf []byte) ([]byte, bool) {
 	curSize := 0
@@ -442,21 +445,20 @@ func (e *Encoder) String() string {
 
 // PB2LP convert protobuf Point to line-protocol Point.
 func PB2LP(pb []byte) (lp []byte, err error) {
-	var pbpts PBPoints
-	if err := proto.Unmarshal(pb, &pbpts); err != nil {
+	dec := GetDecoder(WithDecEncoding(Protobuf))
+	defer PutDecoder(dec)
+
+	pts, err := dec.Decode(pb)
+	if err != nil {
 		return nil, err
 	}
 
-	lines := []string{}
-	for _, pbpt := range pbpts.Arr {
-		pt := FromPB(pbpt)
+	enc := GetEncoder(WithEncEncoding(LineProtocol))
+	defer PutEncoder(enc)
 
-		if x := pt.LineProto(); x == "" {
-			continue
-		} else {
-			lines = append(lines, x)
-		}
+	arr, err := enc.Encode(pts)
+	if err != nil {
+		return nil, err
 	}
-
-	return []byte(strings.Join(lines, "\n")), nil
+	return arr[0], nil
 }

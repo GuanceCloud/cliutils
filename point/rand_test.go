@@ -208,7 +208,6 @@ func BenchmarkRandWithPool(b *T.B) {
 			}
 		}
 	})
-
 }
 
 func BenchmarkRandWithoutPool(b *T.B) {

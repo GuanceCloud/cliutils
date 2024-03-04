@@ -317,10 +317,10 @@ func (p *Point) AddKVs(kvs ...*Field) {
 	p.pt.Fields = old
 }
 
-// SetKVs set kvs as p's new KVs
+// SetKVs set kvs as p's new KVs.
 func (p *Point) SetKVs(kvs ...*Field) {
 	old := KVs(p.pt.Fields)
-	old = old[:0] //clear old
+
 
 	for _, kv := range kvs {
 		old = old.AddKV(kv, false)

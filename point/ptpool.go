@@ -101,7 +101,7 @@ type partialPointPool struct {
 	kvspool sync.Pool
 }
 
-// NewPointPoolLevel2 get point cache that cache all but drop Field's Val
+// NewPointPoolLevel2 get point cache that cache all but drop Field's Val.
 func NewPointPoolLevel2() PointPool {
 	return &partialPointPool{}
 }
@@ -119,7 +119,6 @@ func (ppp *partialPointPool) Get() *Point {
 }
 
 func (ppp *partialPointPool) Put(pt *Point) {
-
 	for _, kv := range pt.KVs() {
 		ppp.PutKV(kv)
 	}

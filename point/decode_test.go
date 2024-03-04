@@ -70,7 +70,6 @@ func TestLPFieldArray(t *T.T) {
 			t.Logf("json pt: %s", pt.LineProto())
 		}
 	})
-
 }
 
 func TestTimeRound(t *T.T) {

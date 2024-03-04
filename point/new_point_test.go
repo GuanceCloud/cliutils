@@ -546,7 +546,6 @@ func TestNewPoint(t *T.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.tname, func(t *T.T) {
-
 			var (
 				pt  *Point
 				err error

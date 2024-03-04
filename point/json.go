@@ -11,7 +11,7 @@ import (
 	"log"
 	"time"
 
-	//"google.golang.org/protobuf/encoding/protojson"
+
 	protojson "github.com/gogo/protobuf/jsonpb"
 )
 
@@ -42,7 +42,7 @@ func (p *Point) MarshalJSON() ([]byte, error) {
 	if p.HasFlag(Ppb) {
 		m := &protojson.Marshaler{}
 		pb := p.PBPoint()
-		//if x, err := m.MarshalToString(pb); err != nil {
+		// if x, err := m.MarshalToString(pb); err != nil {
 		//	return nil, err
 		//} else {
 		//	return x, nil

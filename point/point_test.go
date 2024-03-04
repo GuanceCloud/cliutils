@@ -717,7 +717,6 @@ func TestLPPoint(t *T.T) {
 }
 
 func TestFields(t *T.T) {
-
 	cases := []struct {
 		name   string
 		pt     *Point
@@ -798,7 +797,7 @@ func TestFields(t *T.T) {
 			}(),
 
 			expect: map[string]interface{}{
-				//"any":    someAny,
+				// "any":    someAny,
 				"bool_1": false,
 				"bool_2": true,
 				"data":   []byte("abc123"),

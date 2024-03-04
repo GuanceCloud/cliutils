@@ -81,7 +81,7 @@ func TestAny(t *T.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, "type.googleapis.com/point.Map", x.TypeUrl)
-		//assert.True(t, x.MessageIs(&Map{}))
+
 
 		t.Logf("any type URL: %s", x.GetTypeUrl())
 

@@ -14,7 +14,7 @@ import (
 
 var mp easyproto.MarshalerPool
 
-// marshal
+// marshal.
 func marshalPoints(pts []*Point, dst []byte) []byte {
 	m := mp.Get()
 	mm := m.MessageMarshaler()
@@ -85,7 +85,7 @@ func (d *Debug) marshalProtobuf(mm *easyproto.MessageMarshaler) {
 
 type Points []*Point
 
-// unmarshal
+// unmarshal.
 func unmarshalPoints(src []byte) ([]*Point, error) {
 	var (
 		fc  easyproto.FieldContext

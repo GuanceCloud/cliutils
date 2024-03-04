@@ -41,7 +41,7 @@ func TestTrim(t *T.T) {
 
 		kvs = kvs.Add("f0", 1.23, false, false)
 		kvs = kvs.AddTag("t1", "v1")
-		//kvs = kvs.Add("f1", -123, false, false)
+
 
 		for {
 			kvs = kvs.TrimFields(0)
@@ -49,7 +49,7 @@ func TestTrim(t *T.T) {
 			assert.Lenf(t, kvs, 1, "go kvs: %s", kvs.Pretty())
 
 			kvs = kvs.Add("f-1", 123, false, false)
-			//kvs = kvs.Add("f-2", 123, false, false)
+
 			//kvs = kvs.Add("f-3", 123, false, false)
 			//kvs = kvs.Add("f-4", 123, false, false)
 			//kvs = kvs.Add("f-5", 123, false, false)
@@ -217,7 +217,6 @@ func TestKVsAdd(t *T.T) {
 }
 
 func TestKVsReset(t *T.T) {
-
 	t.Run("reset", func(t *T.T) {
 		var kvs KVs
 		kvs = kvs.Add("f0", 1.23, false, false)
@@ -241,7 +240,6 @@ func TestKVsReset(t *T.T) {
 }
 
 func TestKVs(t *T.T) {
-
 	t.Run("add-tag", func(t *T.T) {
 		kvs := NewKVs(map[string]any{"f1": 123})
 
@@ -412,7 +410,6 @@ func TestKVs(t *T.T) {
 
 func TestKVsDel(t *T.T) {
 	t.Run("del", func(t *T.T) {
-
 		var kvs KVs
 
 		kvs = kvs.Add(`f1`, false, false, false)
@@ -427,7 +424,6 @@ func TestKVsDel(t *T.T) {
 	})
 
 	t.Run(`del-on-point-pool`, func(t *T.T) {
-
 		var kvs KVs
 
 		pp := &fullPointPool{}
@@ -457,7 +453,6 @@ func TestKVsDel(t *T.T) {
 }
 
 func BenchmarkKVsDel(b *T.B) {
-
 	addTestKVs := func(kvs KVs) KVs {
 		kvs = kvs.Add(`f1`, false, false, false)
 		kvs = kvs.Add(`f2`, 123, false, false)

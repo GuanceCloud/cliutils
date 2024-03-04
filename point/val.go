@@ -108,7 +108,6 @@ func setVal(v isField_Val, raw any) isField_Val {
 
 func newVal(v any) isField_Val {
 	switch x := v.(type) {
-
 	case int8:
 		return &Field_I{int64(x)}
 	case []int8:

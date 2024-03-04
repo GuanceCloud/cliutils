@@ -155,9 +155,7 @@ func (r *ptRander) getFieldKey(i int) string {
 func (r *ptRander) randTags() KVs {
 	var kvs KVs
 	for i := 0; i < r.ntags; i++ {
-		var (
-			key, val string
-		)
+		var key, val string
 
 		switch {
 		case r.fixedTags:

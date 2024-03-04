@@ -277,7 +277,7 @@ func NewArray(ents ...any) (arr *Array, err error) {
 			arr.Arr = append(arr.Arr, &BasicTypes{X: &BasicTypes_D{x}})
 		case bool:
 			arr.Arr = append(arr.Arr, &BasicTypes{X: &BasicTypes_B{x}})
-		//case nil:
+
 		//	arr.Arr = append(arr.Arr, nil)
 		default:
 			return nil, fmt.Errorf("unknown type %q within array", reflect.TypeOf(v).String())
