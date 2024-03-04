@@ -173,7 +173,6 @@ func BenchmarkPoolV3(b *T.B) {
 		fpp := NewPointPoolLevel3()
 
 		defer func() {
-
 			SetPointPool(nil)
 		}()
 
@@ -200,7 +199,6 @@ func BenchmarkPoolV3(b *T.B) {
 		fpp := NewPointPoolLevel3()
 		SetPointPool(fpp)
 		defer func() {
-
 			SetPointPool(nil)
 		}()
 

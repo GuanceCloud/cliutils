@@ -41,21 +41,18 @@ func setVal(v isField_Val, raw any) isField_Val {
 		}
 
 	case *Field_S:
-		switch x := raw.(type) {
-		case string:
+		if x, ok := raw.(string); ok {
 			f.S = x
 		}
 
 	case *Field_D:
-		switch x := raw.(type) {
-		case []byte:
+		if x, ok := raw.([]byte); ok {
 			f.D = f.D[:0] // reset
 			f.D = append(f.D, x...)
 		}
 
 	case *Field_B:
-		switch x := raw.(type) {
-		case bool:
+		if x, ok := raw.(bool); ok {
 			f.B = x
 		}
 

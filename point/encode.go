@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"strings"
 	sync "sync"
-
 )
 
 type Encoding int
@@ -355,7 +354,10 @@ __doEncode:
 		return nil, false
 	} else {
 		if e.fn != nil {
-			e.fn(len(e.pbpts.Arr), buf[:n])
+			if err := e.fn(len(e.pbpts.Arr), buf[:n]); err != nil {
+				e.lastErr = err
+				return nil, false
+			}
 		}
 
 		e.parts++
@@ -389,7 +391,10 @@ func (e *Encoder) doEncodeLineProtocol(buf []byte) ([]byte, bool) {
 			}
 
 			if e.fn != nil {
-				e.fn(npts, buf[:curSize])
+				if err := e.fn(npts, buf[:curSize]); err != nil {
+					e.lastErr = err
+					return nil, false
+				}
 			}
 			e.parts++
 			return buf[:curSize], true
@@ -413,8 +418,11 @@ func (e *Encoder) doEncodeLineProtocol(buf []byte) ([]byte, bool) {
 
 	if curSize > 0 {
 		e.parts++
-		if e.fn != nil {
-			e.fn(npts, buf[:curSize])
+		if e.fn != nil { // NOTE: encode callback error will terminate encode
+			if err := e.fn(npts, buf[:curSize]); err != nil {
+				e.lastErr = err
+				return nil, false
+			}
 		}
 		return buf[:curSize], true
 	} else {
@@ -428,6 +436,8 @@ func (e *Encoder) Next(buf []byte) ([]byte, bool) {
 		return e.doEncodeProtobuf(buf)
 	case LineProtocol:
 		return e.doEncodeLineProtocol(buf)
+	case JSON:
+		return nil, false
 	default: // TODO: json
 		return nil, false
 	}

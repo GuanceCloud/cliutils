@@ -81,8 +81,6 @@ func TestAny(t *T.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, "type.googleapis.com/point.Map", x.TypeUrl)
-
-
 		t.Logf("any type URL: %s", x.GetTypeUrl())
 
 		kvs = kvs.Add("k1", x, false, false)

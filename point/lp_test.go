@@ -1188,7 +1188,7 @@ func TestAppendString(t *T.T) {
 	}
 
 	var ptbuf []byte
-	totalBuf := make([]byte, 4<<20)
+	totalBuf := make([]byte, 0, 4<<20)
 
 	for _, pt := range lppts {
 		ptbuf = pt.AppendString(ptbuf)

@@ -42,7 +42,6 @@ func TestTrim(t *T.T) {
 		kvs = kvs.Add("f0", 1.23, false, false)
 		kvs = kvs.AddTag("t1", "v1")
 
-
 		for {
 			kvs = kvs.TrimFields(0)
 
@@ -50,12 +49,9 @@ func TestTrim(t *T.T) {
 
 			kvs = kvs.Add("f-1", 123, false, false)
 
-			//kvs = kvs.Add("f-3", 123, false, false)
-			//kvs = kvs.Add("f-4", 123, false, false)
-			//kvs = kvs.Add("f-5", 123, false, false)
-			//kvs = kvs.Add("f-6", 123, false, false)
-			//kvs = kvs.Add("f-7", 123, false, false)
-			//kvs = kvs.Add("f-8", 123, false, false)
+			// kvs = kvs.Add("f-5", 123, false, false)
+
+			// kvs = kvs.Add("f-8", 123, false, false)
 			if pp.kvReused.Load() > 0 {
 				t.Logf("[%d] %s", i, pp)
 				break
@@ -89,7 +85,7 @@ func TestTrim(t *T.T) {
 			kvs = kvs.Add("f-2", 123, false, false)
 			kvs = kvs.Add("f-3", 123, false, false)
 			kvs = kvs.Add("f-4", 123, false, false)
-			kvs = kvs.Add("f-5", 123, false, false)
+			_ = kvs.Add("f-5", 123, false, false)
 		}
 
 		// XXX: why set loop to 1, the kvReused == 0?
@@ -136,7 +132,7 @@ func TestTrim(t *T.T) {
 			kvs = kvs.Add("f-2", 123, false, false)
 			kvs = kvs.Add("f-3", 123, false, false)
 			kvs = kvs.Add("f-4", 123, false, false)
-			kvs = kvs.Add("f-5", 123, false, false)
+			_ = kvs.Add("f-5", 123, false, false)
 		}
 
 		// XXX: why set loop to 1, the kvReused == 0?
@@ -167,7 +163,7 @@ func BenchmarkKVsTrim(b *T.B) {
 			kvs = kvs.Add("f-2", 123, false, false)
 			kvs = kvs.Add("f-3", 123, false, false)
 			kvs = kvs.Add("f-4", 123, false, false)
-			kvs = kvs.Add("f-5", 123, false, false)
+			_ = kvs.Add("f-5", 123, false, false)
 		}
 	})
 
@@ -191,7 +187,7 @@ func BenchmarkKVsTrim(b *T.B) {
 			kvs = kvs.Add("f-2", 123, false, false)
 			kvs = kvs.Add("f-3", 123, false, false)
 			kvs = kvs.Add("f-4", 123, false, false)
-			kvs = kvs.Add("f-5", 123, false, false)
+			_ = kvs.Add("f-5", 123, false, false)
 		}
 	})
 }
@@ -443,7 +439,7 @@ func TestKVsDel(t *T.T) {
 		assert.Len(t, kvs, 1)
 		assert.NotNil(t, kvs.Get(`f2`))
 
-		kvs = kvs.Add(`f-x`, 123, false, false)
+		_ = kvs.Add(`f-x`, 123, false, false)
 
 		assert.True(t, pp.kvReused.Load() > 0) // key f-x reused
 		assert.True(t, pp.kvCreated.Load() > 0)
@@ -468,7 +464,7 @@ func BenchmarkKVsDel(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
 			kvs = addTestKVs(kvs)
-			kvs = kvs.Del(`f1`)
+			_ = kvs.Del(`f1`)
 		}
 	})
 
@@ -483,7 +479,7 @@ func BenchmarkKVsDel(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
 			kvs = addTestKVs(kvs)
-			kvs = kvs.Del(`f1`)
+			_ = kvs.Del(`f1`)
 		}
 	})
 
@@ -501,7 +497,7 @@ func BenchmarkKVsDel(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
 			kvs = addTestKVs(kvs)
-			kvs = del(kvs, `f1`)
+			_ = del(kvs, `f1`)
 		}
 	})
 }

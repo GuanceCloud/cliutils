@@ -106,7 +106,7 @@ func NewPointPoolLevel2() PointPool {
 	return &partialPointPool{}
 }
 
-func (pp *partialPointPool) String() string {
+func (ppp *partialPointPool) String() string {
 	return ""
 }
 
@@ -148,12 +148,12 @@ func NewPointPoolLevel3() PointPool {
 	return &fullPointPool{}
 }
 
-func (pp *fullPointPool) String() string {
+func (fpp *fullPointPool) String() string {
 	return fmt.Sprintf("kvCreated: % 8d, kvReused: % 8d, ptCreated: % 8d, ptReused: % 8d",
-		pp.kvCreated.Load(),
-		pp.kvReused.Load(),
-		pp.ptCreated.Load(),
-		pp.ptReused.Load(),
+		fpp.kvCreated.Load(),
+		fpp.kvReused.Load(),
+		fpp.ptCreated.Load(),
+		fpp.ptReused.Load(),
 	)
 }
 
@@ -318,13 +318,13 @@ func (fpp *fullPointPool) GetKV(k string, v any) *Field {
 		kv.Val.(*Field_U).U = uint64(x)
 	case int64:
 		kv = fpp.getI()
-		kv.Val.(*Field_I).I = int64(x)
+		kv.Val.(*Field_I).I = x
 	case uint64:
 		kv = fpp.getU()
-		kv.Val.(*Field_U).U = uint64(x)
+		kv.Val.(*Field_U).U = x
 	case float64:
 		kv = fpp.getF()
-		kv.Val.(*Field_F).F = float64(x)
+		kv.Val.(*Field_F).F = x
 	case float32:
 		kv = fpp.getF()
 		kv.Val.(*Field_F).F = float64(x)

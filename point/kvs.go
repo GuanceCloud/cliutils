@@ -255,11 +255,8 @@ func (x KVs) TrimFields(n int) (arr KVs) {
 			if cnt < n {
 				arr = append(arr, kv)
 				cnt++
-			} else {
-				// drop the kv
-				if defaultPTPool != nil {
-					defaultPTPool.PutKV(kv)
-				}
+			} else if defaultPTPool != nil { // drop the kv
+				defaultPTPool.PutKV(kv)
 			}
 		}
 	}
@@ -279,10 +276,8 @@ func (x KVs) TrimTags(n int) (arr KVs) {
 			if cnt < n {
 				arr = append(arr, kv)
 				cnt++
-			} else {
-				if defaultPTPool != nil {
-					defaultPTPool.PutKV(kv)
-				}
+			} else if defaultPTPool != nil {
+				defaultPTPool.PutKV(kv)
 			}
 		}
 	}
@@ -322,7 +317,7 @@ func (x KVs) Del(k string) KVs {
 	return x
 }
 
-// Add2 add new field with opts.
+// AddV2 add new field with opts.
 // If force enabled, overwrite exist key.
 func (x KVs) AddV2(k string, v any, force bool, opts ...KVOption) KVs {
 	kv := NewKV(k, v, opts...)
@@ -445,10 +440,10 @@ func (x KVs) Keys() *Keys {
 	return &Keys{arr: arr}
 }
 
-func KVKey(f *Field) *Key {
-	t := PBType(f.Val)
+func KVKey(kv *Field) *Key {
+	t := PBType(kv.Val)
 
-	return NewKey(f.Key, t)
+	return NewKey(kv.Key, t)
 }
 
 type KVOption func(kv *Field)
@@ -460,7 +455,7 @@ func WithKVUnit(u string) KVOption {
 	}
 }
 
-// WithKVUnit set field type(count/gauge/rate).
+// WithKVType set field type(count/gauge/rate).
 func WithKVType(t MetricType) KVOption {
 	return func(kv *Field) {
 		kv.Type = t

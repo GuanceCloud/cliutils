@@ -49,10 +49,10 @@ func marshalPoint(pt *Point, mm *easyproto.MessageMarshaler) {
 	}
 }
 
-func (f *Field) marshalProtobuf(mm *easyproto.MessageMarshaler) {
-	mm.AppendString(1, f.Key)
+func (kv *Field) marshalProtobuf(mm *easyproto.MessageMarshaler) {
+	mm.AppendString(1, kv.Key)
 
-	switch x := f.Val.(type) {
+	switch x := kv.Val.(type) {
 	case *Field_I:
 		mm.AppendInt64(2, x.I)
 	case *Field_U:
@@ -69,9 +69,9 @@ func (f *Field) marshalProtobuf(mm *easyproto.MessageMarshaler) {
 		// TODO
 	}
 
-	mm.AppendBool(8, f.IsTag)
-	mm.AppendInt32(9, int32(f.Type))
-	mm.AppendString(10, f.Unit)
+	mm.AppendBool(8, kv.IsTag)
+	mm.AppendInt32(9, int32(kv.Type))
+	mm.AppendString(10, kv.Unit)
 }
 
 func (w *Warn) marshalProtobuf(mm *easyproto.MessageMarshaler) {
@@ -99,8 +99,7 @@ func unmarshalPoints(src []byte) ([]*Point, error) {
 			return nil, fmt.Errorf("read next field for PBPoints failed: %w", err)
 		}
 
-		switch fc.FieldNum {
-		case 1:
+		if fc.FieldNum == 1 {
 			data, ok := fc.MessageData()
 			if !ok {
 				return nil, fmt.Errorf("cannot read read Arr for PBPoints")
@@ -229,8 +228,7 @@ func unmarshalDebug(src []byte) (*Debug, error) {
 			return nil, fmt.Errorf("read next field for Debug failed: %w", err)
 		}
 
-		switch fc.FieldNum {
-		case 1:
+		if fc.FieldNum == 1 {
 			if x, ok := fc.String(); ok {
 				info = x
 			}

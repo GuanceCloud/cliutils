@@ -11,7 +11,6 @@ import (
 	"log"
 	"time"
 
-
 	protojson "github.com/gogo/protobuf/jsonpb"
 )
 
@@ -44,7 +43,7 @@ func (p *Point) MarshalJSON() ([]byte, error) {
 		pb := p.PBPoint()
 		// if x, err := m.MarshalToString(pb); err != nil {
 		//	return nil, err
-		//} else {
+		// } else {
 		//	return x, nil
 		//}
 

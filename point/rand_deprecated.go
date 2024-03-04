@@ -20,6 +20,7 @@ func doRandomPoints(count int) ([]*Point, error) {
 		return nil, nil
 	}
 
+	// nolint: lll
 	sampleLogs := []string{
 		`2022-10-27T16:12:46.699+0800	DEBUG	io	io/io.go:265	on tick(10s) to flush /v1/write/logging(0 pts), last flush 10.000006916s ago...`,
 		`2022-10-27T16:12:46.306+0800	DEBUG	dataway	dataway/send.go:219	send request https://openway.guance.com/v1/datakit/pull?token=tkn_2af4b19d7f5a4xxxxxxxxxxxxxxxxxxx&filters=true, proxy: , dwcli: 0x1400049e000, timeout: 30s(30s)`,

@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	sync "sync"
 	"time"
-
 )
 
 var decPool sync.Pool
@@ -125,6 +124,9 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 	case Protobuf:
 		if d.easyproto {
 			pts, err = unmarshalPoints(data)
+			if err != nil {
+				return nil, err
+			}
 		} else {
 			var pbpts PBPoints
 			if err = pbpts.Unmarshal(data); err != nil {
@@ -145,11 +147,11 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 			chk = &checker{cfg: cfg}
 		}
 
-		for _, pt := range pts {
+		for idx, pt := range pts {
 			pt.SetFlag(Ppb)
 
 			if cfg.precheck {
-				pt = chk.check(pt)
+				pts[idx] = chk.check(pt)
 			}
 		}
 
