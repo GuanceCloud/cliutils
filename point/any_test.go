@@ -34,7 +34,7 @@ func TestAny(t *T.T) {
 	t.Run("mixed-array", func(t *T.T) {
 		var kvs KVs
 
-		arr, err := NewArray(1, 2.0, false)
+		_, err := NewArray(1, 2.0, false)
 		assert.Error(t, err)
 		assert.Nil(t, nil)
 
@@ -43,7 +43,7 @@ func TestAny(t *T.T) {
 			EnableMixedArrayField = false
 		}()
 
-		arr, err = NewArray(1, 2.0, false)
+		arr, err := NewArray(1, 2.0, false)
 		assert.NoError(t, err)
 		assert.Len(t, arr.Arr, 3)
 

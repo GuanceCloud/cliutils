@@ -338,7 +338,6 @@ func TestInfluxTags(t *T.T) {
 }
 
 func TestPointLineProtocol(t *T.T) {
-
 	EnableDictField = true
 	EnableMixedArrayField = true
 	defer func() {
@@ -534,9 +533,7 @@ line" 123`,
 }
 
 func TestPBJSON(t *T.T) {
-
 	t.Run("pbjson", func(t *T.T) {
-
 		EnableDictField = true
 		EnableMixedArrayField = true
 		defer func() {
