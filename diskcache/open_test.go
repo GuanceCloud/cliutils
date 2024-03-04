@@ -172,7 +172,6 @@ func TestOpen(t *T.T) {
 		assert.NoError(t, dq.Close())
 
 		assert.NoError(t, f.Close())
-
 	})
 }
 

@@ -21,7 +21,7 @@ import (
 func TestGetPut(t *T.T) {
 	testDir := t.TempDir()
 
-	err := os.MkdirAll(testDir, 0755)
+	err := os.MkdirAll(testDir, 0o755)
 	assert.NoError(t, err)
 
 	dq, err := Open(WithPath(testDir), WithCapacity(1<<30))
@@ -61,7 +61,6 @@ func TestGetPut(t *T.T) {
 	assert.True(t, ok, "expected consume 1 message in 10 seconds, but got no message")
 
 	assert.NoError(t, dq.Close())
-
 }
 
 func TestDropInvalidDataFile(t *T.T) {
