@@ -23,6 +23,8 @@ func TestAny(t *T.T) {
 		x, err := NewAny(arr)
 		assert.NoError(t, err)
 
+		assert.Equal(t, ArrayFieldType, x.TypeUrl)
+
 		kvs = kvs.Add("k1", x, false, false)
 		pt := NewPointV2("basic", kvs)
 
@@ -50,6 +52,8 @@ func TestAny(t *T.T) {
 
 		kvs = kvs.Add("k1", x, false, false)
 		pt := NewPointV2("basic", kvs)
+
+		assert.Equal(t, ArrayFieldType, x.TypeUrl)
 
 		t.Logf("%s", pt.Pretty())
 	})
@@ -108,7 +112,7 @@ func TestAny(t *T.T) {
 		x, err := anypb.New(m)
 		assert.NoError(t, err)
 
-		assert.Equal(t, "type.googleapis.com/point.Map", x.TypeUrl)
+		assert.Equal(t, DictFieldType, x.TypeUrl)
 		assert.True(t, x.MessageIs(&Map{}))
 
 		t.Logf("any name: %s", x.MessageName())
