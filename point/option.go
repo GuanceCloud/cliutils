@@ -89,7 +89,7 @@ func newCfg() *cfg {
 		maxTags:           256,
 		maxFields:         1024,
 
-		precision:      NS,
+		precision:      PrecNS,
 		maxTagKeyLen:   defaultKeyLen,
 		maxFieldKeyLen: defaultKeyLen,
 		precheck:       true,
@@ -112,7 +112,7 @@ func (c *cfg) reset() {
 	c.maxTags = 256
 	c.enc = DefaultEncoding
 	c.maxFields = 1024
-	c.precision = NS
+	c.precision = PrecNS
 	c.maxTagKeyLen = defaultKeyLen
 	c.maxFieldKeyLen = defaultKeyLen
 	c.precheck = true

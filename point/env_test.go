@@ -63,7 +63,7 @@ func TestLoadEnvs(t *testing.T) {
 
 			loadEnvs()
 
-			assert.Equal(t, tc.expect, GetEncoder())
+			assert.Equal(t, tc.expect.String(), GetEncoder().String())
 
 			for k := range tc.envs {
 				os.Unsetenv(k)

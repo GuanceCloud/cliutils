@@ -9,8 +9,7 @@ import (
 	"encoding/json"
 	sync "sync"
 	"time"
-
-	"google.golang.org/protobuf/proto"
+	//"google.golang.org/protobuf/proto"
 )
 
 var decPool sync.Pool
@@ -28,9 +27,15 @@ func WithDecFn(fn DecodeFn) DecoderOption {
 	return func(d *Decoder) { d.fn = fn }
 }
 
+func WithDecEasyproto(on bool) DecoderOption {
+	return func(d *Decoder) { d.easyproto = on }
+}
+
 type Decoder struct {
 	enc Encoding
 	fn  DecodeFn
+
+	easyproto bool
 
 	// For line-protocol parsing, keep original error.
 	detailedError error
@@ -66,6 +71,7 @@ func (d *Decoder) reset() {
 	d.enc = 0
 	d.fn = nil
 	d.detailedError = nil
+	d.easyproto = false
 }
 
 func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
@@ -88,21 +94,21 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 		for _, x := range arr {
 			if x.Time > 0 { // check if precision attached
 				switch cfg.precision {
-				case US:
+				case PrecUS:
 					x.Time *= int64(time.Microsecond)
-				case MS:
+				case PrecMS:
 					x.Time *= int64(time.Millisecond)
-				case S:
+				case PrecS:
 					x.Time *= int64(time.Second)
-				case M:
+				case PrecM:
 					x.Time *= int64(time.Minute)
-				case H:
+				case PrecH:
 					x.Time *= int64(time.Hour)
 
-				case NS:
+				case PrecNS:
 					// pass
 
-				case W, D: // not used
+				case PrecW, PrecD: // not used
 
 				default:
 					// pass
@@ -117,27 +123,34 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 		}
 
 	case Protobuf:
-		var pbpts PBPoints
-		if err = proto.Unmarshal(data, &pbpts); err != nil {
-			return nil, err
+		if d.easyproto {
+			pts, err = unmarshalPoints(data)
+		} else {
+			var pbpts PBPoints
+			if err = pbpts.Unmarshal(data); err != nil {
+				return nil, err
+			}
+
+			for _, pbpt := range pbpts.Arr {
+				pt := &Point{
+					pt: pbpt,
+				}
+
+				pts = append(pts, pt)
+			}
 		}
 
-		chk := checker{cfg: cfg}
-		for _, pbpt := range pbpts.Arr {
-			pt := &Point{
-				name:   pbpt.Name,
-				kvs:    pbpt.Fields,
-				time:   time.Unix(0, pbpt.Time),
-				warns:  pbpt.Warns,
-				debugs: pbpt.Debugs,
-			}
+		var chk *checker
+		if cfg.precheck {
+			chk = &checker{cfg: cfg}
+		}
+
+		for _, pt := range pts {
 			pt.SetFlag(Ppb)
 
-			pt = chk.check(pt)
-			pt.warns = chk.warns
-			chk.reset()
-
-			pts = append(pts, pt)
+			if cfg.precheck {
+				pt = chk.check(pt)
+			}
 		}
 
 	case LineProtocol:

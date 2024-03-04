@@ -7,10 +7,14 @@ package point
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 	sync "sync"
 
-	"google.golang.org/protobuf/proto"
+	//"google.golang.org/protobuf/proto"
+
+	proto "github.com/gogo/protobuf/proto"
 )
 
 type Encoding int
@@ -113,6 +117,15 @@ type Encoder struct {
 	bytesSize,
 	batchSize int
 
+	pts []*Point
+	lastPtsIdx,
+	trimmed,
+	parts int
+	lastErr error
+
+	lpPointBuf []byte
+	pbpts      *PBPoints
+
 	fn  EncodeFn
 	enc Encoding
 }
@@ -142,14 +155,23 @@ func PutEncoder(e *Encoder) {
 
 func newEncoder() *Encoder {
 	return &Encoder{
-		enc: DefaultEncoding,
+		enc:   DefaultEncoding,
+		pbpts: &PBPoints{},
 	}
 }
 
 func (e *Encoder) reset() {
 	e.batchSize = 0
+	e.bytesSize = 0
 	e.fn = nil
+	e.pts = nil
 	e.enc = DefaultEncoding
+	e.lastPtsIdx = 0
+	e.lastErr = nil
+	e.parts = 0
+	e.trimmed = 0
+	e.pbpts.Arr = e.pbpts.Arr[:0]
+	e.lpPointBuf = e.lpPointBuf[:0]
 }
 
 func (e *Encoder) getPayload(pts []*Point) ([]byte, error) {
@@ -164,14 +186,11 @@ func (e *Encoder) getPayload(pts []*Point) ([]byte, error) {
 
 	switch e.enc {
 	case Protobuf:
-		pbpts := &PBPoints{}
-
 		for _, pt := range pts {
-			pbpts.Arr = append(pbpts.Arr, pt.PBPoint())
+			e.pbpts.Arr = append(e.pbpts.Arr, pt.PBPoint())
 		}
 
-		payload, err = proto.Marshal(pbpts)
-		if err != nil {
+		if payload, err = e.pbpts.Marshal(); err != nil {
 			return nil, err
 		}
 
@@ -272,6 +291,153 @@ func (e *Encoder) doEncode(pts []*Point) ([][]byte, error) {
 // batchSize used to split huge points into multiple part. Set batchSize to 0 to disable the split.
 func (e *Encoder) Encode(pts []*Point) ([][]byte, error) {
 	return e.doEncode(pts)
+}
+
+func (e *Encoder) EncodeV2(pts []*Point) {
+	e.pts = pts
+}
+
+func (e *Encoder) doEncodeProtobuf(buf []byte) ([]byte, bool) {
+	var (
+		curSize,
+		pbptsSize int
+		trimmed = 1
+	)
+
+	for _, pt := range e.pts[e.lastPtsIdx:] {
+		if pt == nil {
+			continue
+		}
+
+		curSize += pt.Size()
+
+		// e.pbpts size larger than buf, we must trim some of points
+		// until size fit ok or MarshalTo will panic.
+		if curSize >= len(buf) {
+			if len(e.pbpts.Arr) <= 1 { // nothing to trim
+				e.lastErr = errTooSmallBuffer
+				return nil, false
+			}
+
+			for {
+				if pbptsSize = e.pbpts.Size(); pbptsSize > len(buf) {
+					e.pbpts.Arr = e.pbpts.Arr[:len(e.pbpts.Arr)-trimmed]
+					e.lastPtsIdx -= trimmed
+					trimmed *= 2
+				} else {
+					goto __doEncode
+				}
+			}
+		} else {
+			e.pbpts.Arr = append(e.pbpts.Arr, pt.pt)
+			e.lastPtsIdx++
+		}
+	}
+
+__doEncode:
+	e.trimmed = trimmed
+
+	if len(e.pbpts.Arr) == 0 {
+		return nil, false
+	}
+
+	defer func() {
+		e.pbpts.Arr = e.pbpts.Arr[:0]
+	}()
+
+	if n, err := e.pbpts.MarshalTo(buf); err != nil {
+		e.lastErr = err
+		return nil, false
+	} else {
+		if e.fn != nil {
+			e.fn(len(e.pbpts.Arr), buf[:n])
+		}
+
+		e.parts++
+		return buf[:n], true
+	}
+}
+
+var (
+	errTooSmallBuffer = errors.New("too small buffer")
+)
+
+func (e *Encoder) doEncodeLineProtocol(buf []byte) ([]byte, bool) {
+	curSize := 0
+	npts := 0
+
+	for _, pt := range e.pts[e.lastPtsIdx:] {
+		if pt == nil {
+			continue
+		}
+
+		lppt, err := pt.LPPoint()
+		if err != nil {
+			e.lastErr = err
+			continue
+		}
+
+		ptsize := lppt.StringSize()
+
+		if curSize+ptsize+1 > len(buf) {
+			if curSize == 0 { // nothing added
+				e.lastErr = errTooSmallBuffer
+				return nil, false
+			}
+
+			if e.fn != nil {
+				e.fn(npts, buf[:curSize])
+			}
+			e.parts++
+			return buf[:curSize], true
+		} else {
+			e.lpPointBuf = lppt.AppendString(e.lpPointBuf)
+
+			copy(buf[curSize:], e.lpPointBuf[:ptsize])
+
+			// Always add '\n' to the end of current point, this may
+			// cause a _unneeded_ '\n' to the end of buf, it's ok for
+			// line-protocol parsing.
+			buf[curSize+ptsize] = '\n'
+			curSize += (ptsize + 1)
+
+			// clean buffer, next time AppendString() append from byte 0
+			e.lpPointBuf = e.lpPointBuf[:0]
+			e.lastPtsIdx++
+			npts++
+		}
+	}
+
+	if curSize > 0 {
+		e.parts++
+		if e.fn != nil {
+			e.fn(npts, buf[:curSize])
+		}
+		return buf[:curSize], true
+	} else {
+		return nil, false
+	}
+}
+
+func (e *Encoder) Next(buf []byte) ([]byte, bool) {
+	switch e.enc {
+	case Protobuf:
+		return e.doEncodeProtobuf(buf)
+	case LineProtocol:
+		return e.doEncodeLineProtocol(buf)
+	default: // TODO: json
+		return nil, false
+	}
+}
+
+func (e *Encoder) LastErr() error {
+	return e.lastErr
+}
+
+func (e *Encoder) String() string {
+	return fmt.Sprintf("encoding: %s, parts: %d, byte size: %d, e.batchSize: %d, lastPtsIdx: %d, trimmed: %d",
+		e.enc, e.parts, e.bytesSize, e.batchSize, e.lastPtsIdx, e.trimmed,
+	)
 }
 
 // PB2LP convert protobuf Point to line-protocol Point.

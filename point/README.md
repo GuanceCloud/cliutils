@@ -61,6 +61,20 @@ BenchmarkEncode/bench-encode-json
 BenchmarkEncode/bench-encode-json-10  94 11157400 ns/op 8557953 B/op 88206 allocs/op
 PASS
 ok      github.com/GuanceCloud/cliutils/point   4.816s
+
+$ CGO_CFLAGS=-Wno-undef-prefix go test -run XXX -test.benchmem -test.v -bench BenchmarkDecode
+
+goos: darwin
+goarch: arm64
+pkg: github.com/GuanceCloud/cliutils/point
+BenchmarkDecode/bench-decode-lp
+BenchmarkDecode/bench-decode-lp-10   307  3633334 ns/op 7739994 B/op   9274 allocs/op
+BenchmarkDecode/bench-decode-pb
+BenchmarkDecode/bench-decode-pb-10   253  4665668 ns/op 3991108 B/op  69996 allocs/op
+BenchmarkDecode/bench-decode-json
+BenchmarkDecode/bench-decode-json-10  75 15639139 ns/op 8177715 B/op 171342 allocs/op
+PASS
+ok      github.com/GuanceCloud/cliutils/point   6.102s
 ```
 
 ## Point 的约束 {#restrictions}

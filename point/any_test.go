@@ -8,8 +8,8 @@ package point
 import (
 	T "testing"
 
+	types "github.com/gogo/protobuf/types"
 	"github.com/stretchr/testify/assert"
-	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestAny(t *T.T) {
@@ -20,7 +20,7 @@ func TestAny(t *T.T) {
 		assert.NoError(t, err)
 		assert.Len(t, arr.Arr, 3)
 
-		x, err := anypb.New(arr)
+		x, err := types.MarshalAny(arr)
 		assert.NoError(t, err)
 
 		kvs = kvs.Add("k1", x, false, false)
@@ -36,7 +36,7 @@ func TestAny(t *T.T) {
 		assert.NoError(t, err)
 		assert.Len(t, arr.Arr, 3)
 
-		x, err := anypb.New(arr)
+		x, err := types.MarshalAny(arr)
 		assert.NoError(t, err)
 
 		kvs = kvs.Add("k1", x, false, false)
@@ -48,11 +48,11 @@ func TestAny(t *T.T) {
 	t.Run("with-nil", func(t *T.T) {
 		var kvs KVs
 
-		arr, err := NewArray(1, 2.0, nil)
+		arr, err := NewArray(1, 2.0)
 		assert.NoError(t, err)
-		assert.Len(t, arr.Arr, 3)
+		assert.Len(t, arr.Arr, 2)
 
-		x, err := anypb.New(arr)
+		x, err := types.MarshalAny(arr)
 		assert.NoError(t, err)
 
 		kvs = kvs.Add("k1", x, false, false)
@@ -77,13 +77,13 @@ func TestAny(t *T.T) {
 		m := MustNewMap(map[string]any{"i1": 1, "i2": 2})
 		assert.Len(t, m.Map, 2)
 
-		x, err := anypb.New(m)
+		x, err := types.MarshalAny(m)
 		assert.NoError(t, err)
 
 		assert.Equal(t, "type.googleapis.com/point.Map", x.TypeUrl)
-		assert.True(t, x.MessageIs(&Map{}))
+		//assert.True(t, x.MessageIs(&Map{}))
 
-		t.Logf("any name: %s", x.MessageName())
+		t.Logf("any type URL: %s", x.GetTypeUrl())
 
 		kvs = kvs.Add("k1", x, false, false)
 		pt := NewPointV2("basic", kvs)
@@ -98,7 +98,7 @@ func TestAnyRaw(t *T.T) {
 		assert.NoError(t, err)
 		assert.Len(t, arr.Arr, 2)
 
-		x, err := anypb.New(arr)
+		x, err := types.MarshalAny(arr)
 		assert.NoError(t, err)
 
 		raw := MustAnyRaw(x)

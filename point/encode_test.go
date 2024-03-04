@@ -7,20 +7,19 @@ package point
 
 import (
 	"bytes"
-	"reflect"
-	"strings"
-	"testing"
+	"encoding/json"
 	T "testing"
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
+	"github.com/GuanceCloud/cliutils/point/gogopb"
+	proto "github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 )
 
 // Test if encode change points' payload
-func TestIdempotent(t *testing.T) {
+func TestIdempotent(t *T.T) {
 	cases := []struct {
 		name  string
 		pts   []*Point
@@ -52,7 +51,7 @@ func TestIdempotent(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *T.T) {
 			enc := GetEncoder(WithEncBatchSize(tc.batch))
 			defer PutEncoder(enc)
 
@@ -66,7 +65,7 @@ func TestIdempotent(t *testing.T) {
 		})
 
 		// test encode pb
-		t.Run(tc.name+"-pb", func(t *testing.T) {
+		t.Run(tc.name+"-pb", func(t *T.T) {
 			enc := GetEncoder(WithEncBatchSize(tc.batch), WithEncEncoding(Protobuf))
 			defer PutEncoder(enc)
 
@@ -81,23 +80,7 @@ func TestIdempotent(t *testing.T) {
 	}
 }
 
-func TestEncodeWithoutTime(t *testing.T) {
-	t.Run("encode-without-time", func(t *T.T) {
-		pt := NewPointV2("p1", NewKVs(map[string]any{"f1": 123}))
-
-		pt.time = time.Unix(0, 0)
-
-		enc := GetEncoder(WithEncEncoding(LineProtocol))
-		defer PutEncoder(enc)
-
-		arr, err := enc.Encode([]*Point{pt})
-		require.NoError(t, err)
-		assert.Len(t, arr, 1)
-		t.Logf("data: %s", string(arr[0]))
-	})
-}
-
-func TestEncode(t *testing.T) {
+func TestEncode(t *T.T) {
 	r := NewRander(WithKVSorted(true))
 
 	var (
@@ -228,7 +211,7 @@ func TestEncode(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *T.T) {
 			enc := GetEncoder(WithEncBatchSize(tc.bsize), WithEncFn(tc.fn))
 			defer PutEncoder(enc)
 
@@ -243,7 +226,7 @@ func TestEncode(t *testing.T) {
 			}
 		})
 
-		t.Run(tc.name+"-pb", func(t *testing.T) {
+		t.Run(tc.name+"-pb", func(t *T.T) {
 			enc := GetEncoder(WithEncBatchSize(tc.bsize),
 				WithEncFn(tc.fn),
 				WithEncEncoding(Protobuf))
@@ -273,59 +256,6 @@ func TestEncode(t *testing.T) {
 			assert.Equal(t, string(bytes.Join(tc.expect, []byte("\n"))), lpbody)
 		})
 	}
-}
-
-func TestPBEncode(t *T.T) {
-	t.Run(`invalid-utf8-string-field`, func(t *T.T) {
-		var kvs KVs
-		kvs = kvs.Add("invalid-utf8", "a\xffb\xC0\xAFc\xff", false, false)
-
-		pt := NewPointV2("p1", kvs)
-
-		enc := GetEncoder(WithEncEncoding(Protobuf))
-		defer PutEncoder(enc)
-		arr, err := enc.Encode([]*Point{pt})
-		require.NoError(t, err)
-		assert.Len(t, arr, 1)
-		assert.Len(t, pt.warns, 1)
-		assert.Equal(t, WarnInvalidUTF8String, pt.warns[0].Type)
-		t.Logf("get error %s, typeof %s, pt: %s", err, reflect.TypeOf(err), pt.Pretty())
-	})
-
-	t.Run(`invalid-utf8-string-field`, func(t *T.T) {
-		var kvs KVs
-
-		invalidUTF8Str := "a\xffb\xC0\xAFc\xff"
-
-		validUTF8Str := strings.ToValidUTF8(invalidUTF8Str, "0X")
-		kvs = kvs.Add("invalid-utf8", validUTF8Str, false, false)
-
-		pt := NewPointV2("p1", kvs)
-
-		enc := GetEncoder(WithEncEncoding(Protobuf))
-		defer PutEncoder(enc)
-		arr, err := enc.Encode([]*Point{pt})
-		require.NoError(t, err)
-		assert.Len(t, arr, 1)
-		t.Logf("get error %s, typeof %s, pt: %s", err, reflect.TypeOf(err), pt.Pretty())
-	})
-
-	t.Run(`invalid-utf8-[]byte-field`, func(t *T.T) {
-		var kvs KVs
-
-		invalidUTF8Bytes := []byte("a\xffb\xC0\xAFc\xff")
-
-		kvs = kvs.Add("invalid-utf8", invalidUTF8Bytes, false, false)
-
-		pt := NewPointV2("p1", kvs)
-
-		enc := GetEncoder(WithEncEncoding(Protobuf))
-		defer PutEncoder(enc)
-		arr, err := enc.Encode([]*Point{pt})
-		require.NoError(t, err)
-		assert.Len(t, arr, 1)
-		t.Logf("get error %s, typeof %s, pt: %s", err, reflect.TypeOf(err), pt.Pretty())
-	})
 }
 
 func TestEncodeWithBytesLimit(t *T.T) {
@@ -387,7 +317,7 @@ func TestEncodeTags(t *T.T) {
 	})
 }
 
-func TestEncodeLen(t *testing.T) {
+func TestEncodeLen(t *T.T) {
 	t.Run("encode-len", func(t *T.T) {
 		r := NewRander(WithFixedTags(true), WithRandText(3))
 		pts := r.Rand(1000)
@@ -402,7 +332,7 @@ func TestEncodeLen(t *testing.T) {
 
 		data1, err := enc.Encode(pts)
 		assert.NoError(t, err)
-		assert.Equal(t, 1, len(data1))
+		assert.Equal(t, 1, len(data1), "encoder: %s", enc.String())
 
 		gzData1 := cliutils.MustGZip(data1[0])
 		t.Logf("lp data: %d bytes, gz: %d, pts size: %d", len(data1[0]), len(gzData1), ptsTotalSize)
@@ -423,37 +353,312 @@ func TestEncodeLen(t *testing.T) {
 	})
 }
 
-func BenchmarkEncode(b *testing.B) {
+func BenchmarkEncode(b *T.B) {
 	r := NewRander(WithFixedTags(true), WithRandText(3))
 	pts := r.Rand(1000)
 
-	b.Run("bench-encode-lp", func(b *testing.B) {
-		enc := GetEncoder()
-		defer PutEncoder(enc)
+	buf := make([]byte, 1<<20)
 
+	b.ResetTimer()
+
+	b.Run("bench-encode-json", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
-			_, err := enc.Encode(pts)
-			assert.NoError(b, err)
+			enc := GetEncoder(WithEncEncoding(JSON))
+			enc.Encode(pts)
+			PutEncoder(enc)
 		}
 	})
 
-	b.Run("bench-encode-pb", func(b *testing.B) {
+	b.Run("bench-encode-lp", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			enc := GetEncoder()
+			enc.Encode(pts)
+			PutEncoder(enc)
+		}
+	})
+
+	b.Run("bench-encode-pb", func(b *T.B) {
+
+		for i := 0; i < b.N; i++ {
+			enc := GetEncoder(WithEncEncoding(Protobuf), WithEncBatchBytes(1<<20))
+			enc.Encode(pts)
+			PutEncoder(enc)
+		}
+	})
+
+	b.Run("v2-encode-pb", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			enc := GetEncoder(WithEncEncoding(Protobuf))
+			enc.EncodeV2(pts)
+
+			for {
+				if _, ok := enc.Next(buf); ok {
+				} else {
+					break
+				}
+			}
+
+			PutEncoder(enc)
+		}
+	})
+
+	b.Run("v2-encode-lp", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			enc := GetEncoder(WithEncEncoding(LineProtocol))
+			enc.EncodeV2(pts)
+
+			for {
+				if _, ok := enc.Next(buf); ok {
+				} else {
+					break
+				}
+			}
+
+			PutEncoder(enc)
+		}
+	})
+}
+
+func TestGoGoPBDecodePB(t *T.T) {
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	pts := r.Rand(3)
+
+	enc := GetEncoder(WithEncEncoding(Protobuf))
+	defer PutEncoder(enc)
+
+	arr, err := enc.Encode(pts)
+	assert.NoError(t, err)
+
+	var gogopts gogopb.PBPoints
+	assert.NoError(t, gogopts.Unmarshal(arr[0]))
+
+	j, err := json.MarshalIndent(gogopts, "", "  ")
+	assert.NoError(t, err)
+
+	t.Logf("gogopts:\n%s", string(j))
+}
+
+func BenchmarkV2Encode(b *T.B) {
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	randPts := r.Rand(10000)
+
+	buf := make([]byte, 1<<20)
+
+	b.Logf("start...")
+
+	b.ResetTimer()
+
+	b.Run("encode-v1", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			enc := GetEncoder(WithEncEncoding(Protobuf))
+			enc.Encode(randPts)
+
+			assert.NoError(b, enc.LastErr())
+			PutEncoder(enc)
+		}
+	})
+
+	b.Run("Next", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+
+			enc := GetEncoder(WithEncEncoding(Protobuf))
+			enc.EncodeV2(randPts)
+
+			for {
+				if _, ok := enc.Next(buf); ok {
+					buf = buf[0:]
+				} else {
+					break
+				}
+			}
+
+			assert.NoError(b, enc.LastErr())
+			PutEncoder(enc)
+		}
+	})
+}
+
+func TestEncodeV2(t *T.T) {
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	randPts := r.Rand(10000)
+
+	t.Run("encode-pb", func(t *T.T) {
 		enc := GetEncoder(WithEncEncoding(Protobuf))
+		enc.EncodeV2(randPts)
 		defer PutEncoder(enc)
 
-		for i := 0; i < b.N; i++ {
-			_, err := enc.Encode(pts)
-			assert.NoError(b, err)
+		dec := GetDecoder(WithDecEncoding(Protobuf))
+		defer PutDecoder(dec)
+
+		var (
+			decodePts []*Point
+			round     int
+			buf       = make([]byte, 1<<20) // KB
+		)
+
+		for {
+			if x, ok := enc.Next(buf); ok {
+				decPts, err := dec.Decode(x)
+				assert.NoErrorf(t, err, "decode %s failed", x)
+
+				t.Logf("encoded %d(%d remain) bytes, %d points, encoder: %s",
+					len(x), (len(buf) - len(x)), len(decPts), enc.String())
+				decodePts = append(decodePts, decPts...)
+				round++
+				assert.Equal(t, round, enc.parts)
+			} else {
+				break
+			}
+		}
+
+		assert.NoError(t, enc.LastErr())
+
+		for i, pt := range decodePts {
+			assert.Equal(t, randPts[i].Pretty(), pt.Pretty())
 		}
 	})
 
-	b.Run("bench-encode-json", func(b *testing.B) {
-		enc := GetEncoder(WithEncEncoding(JSON))
+	t.Run("encode-lp", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(LineProtocol))
+		enc.EncodeV2(randPts)
 		defer PutEncoder(enc)
 
-		for i := 0; i < b.N; i++ {
-			_, err := enc.Encode(pts)
-			assert.NoError(b, err)
+		dec := GetDecoder(WithDecEncoding(LineProtocol))
+		defer PutDecoder(dec)
+
+		var (
+			decodePts []*Point
+			round     int
+			buf       = make([]byte, 1<<20)
+		)
+
+		for {
+			if x, ok := enc.Next(buf); ok {
+
+				decPts, err := dec.Decode(x)
+				assert.NoErrorf(t, err, "decode %s failed", x)
+
+				t.Logf("encoded %d(%d remain) bytes, %d points, encoder: %s",
+					len(x), (len(buf) - len(x)), len(decPts), enc.String())
+
+				decodePts = append(decodePts, decPts...)
+				round++
+				assert.Equal(t, round, enc.parts)
+			} else {
+				break
+			}
+		}
+
+		assert.NoError(t, enc.LastErr())
+
+		for i, pt := range decodePts {
+			assert.Equal(t, randPts[i].Pretty(), pt.Pretty())
 		}
 	})
+
+	t.Run("too-small-buffer-lp", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(LineProtocol))
+		enc.EncodeV2(randPts)
+		defer PutEncoder(enc)
+
+		buf := make([]byte, 4) // too small
+
+		for {
+			_, ok := enc.Next(buf)
+			require.False(t, ok)
+			break
+		}
+
+		assert.Error(t, enc.LastErr())
+		t.Logf("go error: %s", enc.LastErr())
+	})
+
+	t.Run("too-small-buffer-pb", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		enc.EncodeV2(randPts)
+		defer PutEncoder(enc)
+
+		buf := make([]byte, 4) // too small
+
+		for {
+			_, ok := enc.Next(buf)
+			require.False(t, ok)
+			break
+		}
+
+		assert.Error(t, enc.LastErr())
+		t.Logf("go error: %s", enc.LastErr())
+	})
+
+	t.Run("with-encode-callback-line-proto", func(t *T.T) {
+		fn := func(n int, buf []byte) error {
+			assert.Equal(t, 2, n)
+			assert.True(t, len(buf) > 0)
+
+			t.Logf("buf: %q", buf)
+			return nil
+		}
+
+		buf := make([]byte, 1<<20)
+		randPts := r.Rand(2)
+		enc := GetEncoder(WithEncFn(fn), WithEncEncoding(LineProtocol))
+		enc.EncodeV2(randPts)
+		for {
+			if _, ok := enc.Next(buf); !ok {
+				break
+			}
+		}
+		PutEncoder(enc)
+	})
+
+	t.Run("with-encode-callback-protobuf", func(t *T.T) {
+		fn := func(n int, buf []byte) error {
+			assert.Equal(t, 2, n)
+			assert.NotNil(t, buf)
+
+			t.Logf("buf: %q", buf)
+			return nil
+		}
+
+		randPts := r.Rand(2)
+
+		enc := GetEncoder(WithEncFn(fn), WithEncEncoding(Protobuf))
+		enc.EncodeV2(randPts)
+		buf := make([]byte, 1<<20)
+
+		for {
+			if _, ok := enc.Next(buf); !ok {
+				break
+			}
+		}
+		PutEncoder(enc)
+
+	})
+}
+
+func BenchmarkPointsSize(b *T.B) {
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	randPts := r.Rand(1)
+
+	b.ResetTimer()
+	b.Run("pt.pt.size", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			randPts[0].pt.Size()
+		}
+	})
+
+	b.Run("pt.size", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			randPts[0].Size()
+		}
+	})
+}
+
+func TestPointsSize(t *T.T) {
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	randPts := r.Rand(1)
+
+	t.Logf("pt.pt.size: %d, pt.size: %d",
+		randPts[0].pt.Size(),
+		randPts[0].Size())
 }

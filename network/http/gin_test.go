@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GuanceCloud/cliutils/testutil"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
