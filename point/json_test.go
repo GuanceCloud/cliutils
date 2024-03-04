@@ -80,6 +80,11 @@ func TestJSONPointMarshal(t *testing.T) {
 func TestJSONPointMarhsal(t *testing.T) {
 	var kvs KVs
 
+	EnableMixedArrayField = true
+	defer func() {
+		EnableMixedArrayField = false
+	}()
+
 	kvs = kvs.AddV2("f1", 123, false)
 	kvs = kvs.AddV2("f2", uint(123), false)
 	kvs = kvs.AddV2("f3", "hello", false)
