@@ -13,15 +13,17 @@ import (
 )
 
 func TestAny(t *T.T) {
-	t.Run("basic", func(t *T.T) {
+	t.Run("elem-same-type-array", func(t *T.T) {
 		var kvs KVs
 
 		arr, err := NewArray(1, 2, 3)
 		assert.NoError(t, err)
 		assert.Len(t, arr.Arr, 3)
 
-		x, err := types.MarshalAny(arr)
+		x, err := NewAny(arr)
 		assert.NoError(t, err)
+
+		assert.Equal(t, ArrayFieldType, x.TypeUrl)
 
 		kvs = kvs.Add("k1", x, false, false)
 		pt := NewPointV2("basic", kvs)
@@ -32,15 +34,26 @@ func TestAny(t *T.T) {
 	t.Run("mixed-array", func(t *T.T) {
 		var kvs KVs
 
+		_, err := NewArray(1, 2.0, false)
+		assert.Error(t, err)
+		assert.Nil(t, nil)
+
+		EnableMixedArrayField = true
+		defer func() {
+			EnableMixedArrayField = false
+		}()
+
 		arr, err := NewArray(1, 2.0, false)
 		assert.NoError(t, err)
 		assert.Len(t, arr.Arr, 3)
 
-		x, err := types.MarshalAny(arr)
+		x, err := NewAny(arr)
 		assert.NoError(t, err)
 
 		kvs = kvs.Add("k1", x, false, false)
 		pt := NewPointV2("basic", kvs)
+
+		assert.Equal(t, ArrayFieldType, x.TypeUrl)
 
 		t.Logf("%s", pt.Pretty())
 	})
@@ -48,11 +61,17 @@ func TestAny(t *T.T) {
 	t.Run("with-nil", func(t *T.T) {
 		var kvs KVs
 
+		EnableMixedArrayField = true
+		defer func() {
+			EnableMixedArrayField = false
+		}()
+
 		arr, err := NewArray(1, 2.0)
+
 		assert.NoError(t, err)
 		assert.Len(t, arr.Arr, 2)
 
-		x, err := types.MarshalAny(arr)
+		x, err := NewAny(arr)
 		assert.NoError(t, err)
 
 		kvs = kvs.Add("k1", x, false, false)
@@ -62,6 +81,11 @@ func TestAny(t *T.T) {
 	})
 
 	t.Run("with-non-baisc-type", func(t *T.T) {
+		EnableMixedArrayField = true
+		defer func() {
+			EnableMixedArrayField = false
+		}()
+
 		type custom struct {
 			some string
 		}
@@ -74,14 +98,22 @@ func TestAny(t *T.T) {
 	t.Run("map", func(t *T.T) {
 		var kvs KVs
 
-		m := MustNewMap(map[string]any{"i1": 1, "i2": 2})
+		m, err := NewMap(map[string]any{"i1": 1, "i2": 2})
+		assert.Nil(t, m)
+		assert.Error(t, err)
+
+		EnableDictField = true
+		defer func() {
+			EnableDictField = false
+		}()
+
+		m = MustNewMap(map[string]any{"i1": 1, "i2": 2})
 		assert.Len(t, m.Map, 2)
 
 		x, err := types.MarshalAny(m)
 		assert.NoError(t, err)
 
-		assert.Equal(t, "type.googleapis.com/point.Map", x.TypeUrl)
-		//assert.True(t, x.MessageIs(&Map{}))
+		assert.Equal(t, DictFieldType, x.TypeUrl)
 
 		t.Logf("any type URL: %s", x.GetTypeUrl())
 
@@ -94,11 +126,16 @@ func TestAny(t *T.T) {
 
 func TestAnyRaw(t *T.T) {
 	t.Run("arr", func(t *T.T) {
+		EnableMixedArrayField = true
+		defer func() {
+			EnableMixedArrayField = false
+		}()
+
 		arr, err := NewArray(1, 2.0)
 		assert.NoError(t, err)
 		assert.Len(t, arr.Arr, 2)
 
-		x, err := types.MarshalAny(arr)
+		x, err := NewAny(arr)
 		assert.NoError(t, err)
 
 		raw := MustAnyRaw(x)
@@ -200,5 +237,18 @@ func TestNewArray(t *T.T) {
 		assert.Len(t, raw, 3)
 		assert.Equal(t, []any{"s1", "s2", "s3"}, raw)
 		t.Logf("any.Raw: %+#v", raw)
+	})
+
+	t.Run(`basic-mixed-type`, func(t *T.T) {
+		arr := []any{
+			"s1", 123, false,
+		}
+
+		x, err := NewAnyArray(arr...)
+		assert.Error(t, err)
+
+		raw, err := AnyRaw(x)
+		assert.Error(t, err)
+		assert.Nil(t, raw)
 	})
 }

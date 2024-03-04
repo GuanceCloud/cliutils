@@ -70,8 +70,8 @@ github.com/DataDog/sketches-go v1.2.1 h1:qTBzWLnZ3kM2kw39ymh6rMcnN+5VULwFs++lEYU
 github.com/DataDog/sketches-go v1.2.1/go.mod h1:1xYmPLY1So10AwxV6MJV0J53XVH+WL9Ad1KetxVivVI=
 github.com/GuanceCloud/grok v1.1.3 h1:0Phqza1ChCro6r9YG6AfpBB7GM0aYSXFRREFmbjF5AI=
 github.com/GuanceCloud/grok v1.1.3/go.mod h1:AHkJZYf7Qbo1FTZT6htdyScpICpgnkQ5+Hc0EmA88vM=
-github.com/GuanceCloud/influxdb1-client v0.1.4 h1:v1XUud5DCvZ/IKClcSrN3MGN1gJcousPsJ2rS+3f8do=
-github.com/GuanceCloud/influxdb1-client v0.1.4/go.mod h1:bFU0ESwcwlLG1NCKaY/3pb/xVk+doxrRdHhvE8XAoCs=
+github.com/GuanceCloud/influxdb1-client v0.1.5 h1:SLsBlXs5DP840XGBHdK60+LJZOMpXLZEblOfBLun2GY=
+github.com/GuanceCloud/influxdb1-client v0.1.5/go.mod h1:bFU0ESwcwlLG1NCKaY/3pb/xVk+doxrRdHhvE8XAoCs=
 github.com/GuanceCloud/platypus v0.2.9 h1:ZQNlg/r2HKFBUn5Yrzb0fmB15zhLBkiuQbe+yX6CBr4=
 github.com/GuanceCloud/platypus v0.2.9/go.mod h1:H9Sol/SI+A9ppJUohdn9m/UA0aiNvh+G0/GnY6IVDnI=
 github.com/Masterminds/semver/v3 v3.1.1/go.mod h1:VPu/7SZ7ePZ3QOrcuXROw5FAcLl4a0cBrbBpGY/8hQs=
