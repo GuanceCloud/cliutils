@@ -115,5 +115,3 @@ require (
 )
 
 replace github.com/influxdata/influxdb1-client => github.com/GuanceCloud/influxdb1-client v0.1.7
-
-//replace github.com/influxdata/influxdb1-client => /Users/tanbiao/go/src/github.com/GuanceCloud/influxdb1-client
