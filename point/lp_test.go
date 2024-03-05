@@ -29,6 +29,45 @@ func parseLineProto(t *testing.T, data []byte, precision string) (models.Points,
 	return models.ParsePointsWithPrecision(data, time.Now().UTC(), precision)
 }
 
+func TestErrOnParseLPPoints(t *T.T) {
+	t.Run("error-on-parse", func(t *T.T) {
+		buf := []byte(`some1,t1=1,t2=v2 f1=1i,f2=3
+some2,t1=1,t2 f1=1i,f2=3
+some3,t1=1,t2=v3 f1=1i,f2=3
+some2,t1=1,t2 f1=1i,f2=`)
+		_, err := parseLPPoints(buf, nil)
+		assert.Error(t, err)
+
+		t.Logf("error: %s", err)
+	})
+
+	t.Run("ok-on-binary-empty-data", func(t *T.T) {
+		buf := make([]byte, 1024)
+		buf = append(buf, []byte(`some,t1=1,t2=v2 f1=1i,f2=3
+some,t1=1,t2=v2 f1=1i,f2=3
+some,t1=1,t2=v3 f1=1i,f2=3`)...)
+		pts, err := parseLPPoints(buf, nil)
+		assert.NoError(t, err)
+		assert.Len(t, pts, 3)
+
+		for i, pt := range pts {
+			t.Logf("[%d] %s", i, pt.Pretty())
+		}
+	})
+
+	t.Run("error-on-binary-data", func(t *T.T) {
+		buf := make([]byte, 8)
+		buf = append(buf, []byte(`some1,t1=1,t2=v2 f1=1i,f2=3
+some2,t1=1,t2 f1=1i,f2=3
+some3,t1=1,t2=v3 f1=1i,f2=3
+some2,t1=1,t2 f1=1i,f2=`)...)
+		_, err := parseLPPoints(buf, nil)
+		assert.Error(t, err)
+
+		t.Logf("error: %s", err)
+	})
+}
+
 func TestLargeJSONTag(t *T.T) {
 	t.Run(`build-json-tag-lp`, func(t *T.T) {
 		data := map[string]string{

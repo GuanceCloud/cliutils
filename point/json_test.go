@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	T "testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -75,6 +76,18 @@ func TestJSONPointMarshal(t *testing.T) {
 			t.Logf("pt: %+#v, pt.pbPoint: %s", pt2, pt.Pretty())
 		})
 	}
+}
+
+func TestJSONUnmarshal(t *T.T) {
+
+	t.Run(`unmarshal-point-array`, func(t *T.T) {
+		j := `[
+{"name":"abc","fields":[{"key":"f1","i":"123"},{"key":"f2","b":false},{"key":"t1","s":"tv1","is_tag":true},{"key":"t2","s":"tv2","is_tag":true}],"time":"123"}
+]`
+		pts := make([]*Point, 0)
+		require.NoError(t, json.Unmarshal([]byte(j), &pts))
+		t.Logf("pt: %s", pts[0].Pretty())
+	})
 }
 
 func TestJSONPoint2Point(t *testing.T) {
