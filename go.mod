@@ -114,4 +114,4 @@ require (
 	modernc.org/token v1.0.1 // indirect
 )
 
-replace github.com/influxdata/influxdb1-client => github.com/GuanceCloud/influxdb1-client v0.1.5
+replace github.com/influxdata/influxdb1-client => github.com/GuanceCloud/influxdb1-client v0.1.6
