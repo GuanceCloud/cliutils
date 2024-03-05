@@ -43,7 +43,8 @@ some2,t1=1,t2 f1=1i,f2=`)
 
 	t.Run("ok-on-binary-empty-data", func(t *T.T) {
 		buf := make([]byte, 1024)
-		buf = append(buf, []byte(`some,t1=1,t2=v2 f1=1i,f2=3
+		// nolint: makezero
+		buf = append(buf, []byte(`some,t1=1,t2=v2 f1=1i,f2=3 
 some,t1=1,t2=v2 f1=1i,f2=3
 some,t1=1,t2=v3 f1=1i,f2=3`)...)
 		pts, err := parseLPPoints(buf, nil)
@@ -57,6 +58,7 @@ some,t1=1,t2=v3 f1=1i,f2=3`)...)
 
 	t.Run("error-on-binary-data", func(t *T.T) {
 		buf := make([]byte, 8)
+		// nolint: makezero
 		buf = append(buf, []byte(`some1,t1=1,t2=v2 f1=1i,f2=3
 some2,t1=1,t2 f1=1i,f2=3
 some3,t1=1,t2=v3 f1=1i,f2=3

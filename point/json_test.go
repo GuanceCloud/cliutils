@@ -79,7 +79,6 @@ func TestJSONPointMarshal(t *testing.T) {
 }
 
 func TestJSONUnmarshal(t *T.T) {
-
 	t.Run(`unmarshal-point-array`, func(t *T.T) {
 		j := `[
 {"name":"abc","fields":[{"key":"f1","i":"123"},{"key":"f2","b":false},{"key":"t1","s":"tv1","is_tag":true},{"key":"t2","s":"tv2","is_tag":true}],"time":"123"}
