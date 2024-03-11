@@ -10,9 +10,11 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	T "testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTimeRound(t *testing.T) {
@@ -280,6 +282,22 @@ func TestDecode(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("decode-pb-json", func(t *T.T) {
+		j := `[
+{"name":"abc","fields":[{"key":"f1","i":"123"},{"key":"f2","b":false},{"key":"t1","s":"tv1","is_tag":true},{"key":"t2","s":"tv2","is_tag":true}],"time":"123"}
+]`
+		dec := GetDecoder(WithDecEncoding(JSON))
+		defer PutDecoder(dec)
+		pts, err := dec.Decode([]byte(j), DefaultLoggingOptions()...)
+		require.NoError(t, err)
+
+		for _, pt := range pts {
+			assert.Equal(t, "unknown", pt.Get("status").(string))
+
+			t.Logf("pt: %s", pt.Pretty())
+		}
+	})
 }
 
 func BenchmarkDecode(b *testing.B) {
