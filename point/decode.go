@@ -122,7 +122,6 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 			return nil, err
 		}
 
-		chk := checker{cfg: cfg}
 		for _, pbpt := range pbpts.Arr {
 			pt := &Point{
 				name:   pbpt.Name,
@@ -133,10 +132,6 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 			}
 			pt.SetFlag(Ppb)
 
-			pt = chk.check(pt)
-			pt.warns = chk.warns
-			chk.reset()
-
 			pts = append(pts, pt)
 		}
 
@@ -146,6 +141,36 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 		if err != nil {
 			d.detailedError = err
 			return nil, simplifyLPError(err)
+		}
+	}
+
+	// check point and apply callbak on each point
+	if cfg.precheck || cfg.callback != nil {
+		var (
+			chk = &checker{cfg: cfg}
+			arr []*Point
+		)
+
+		for idx, _ := range pts {
+			if cfg.precheck {
+				pts[idx] = chk.check(pts[idx])
+				chk.reset()
+			}
+
+			if cfg.callback != nil {
+				newPoint, err := cfg.callback(pts[idx])
+				if err != nil {
+					return nil, err
+				}
+
+				if newPoint != nil {
+					arr = append(arr, newPoint)
+				}
+			}
+		}
+
+		if cfg.callback != nil {
+			pts = arr
 		}
 	}
 

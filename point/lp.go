@@ -131,17 +131,6 @@ func parseLPPoints(data []byte, c *cfg) ([]*Point, error) {
 			sort.Sort(pt.kvs)
 		}
 
-		if c.callback != nil {
-			newPoint, err := c.callback(pt)
-			if err != nil {
-				return nil, err
-			}
-
-			if newPoint == nil {
-				return nil, fmt.Errorf("no point")
-			}
-		}
-
 		pt = chk.check(pt)
 		pt.warns = chk.warns
 		chk.reset()

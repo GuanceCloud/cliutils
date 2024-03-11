@@ -25,7 +25,9 @@ func (c *checker) check(pt *Point) *Point {
 	pt.name = c.checkMeasurement(pt.name)
 	pt.kvs = c.checkKVs(pt.kvs)
 
-	pt.warns = c.warns
+	if len(c.warns) > 0 {
+		pt.warns = append(pt.warns, c.warns...)
+	}
 
 	// Add more checkings...
 	return pt

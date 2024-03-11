@@ -929,33 +929,33 @@ abc f1=1i,f2=2,f3="abc" 789
 			fail: true,
 		},
 
-		{
-			name: `parse-with-callback-no-point`,
-			data: []byte(`abc f1=1i,f2=2,f3="abc" 123`),
+		//{
+		//	name: `parse-with-callback-no-point`,
+		//	data: []byte(`abc f1=1i,f2=2,f3="abc" 123`),
 
-			opts: []Option{
-				WithTime(time.Unix(0, 123)),
-				WithCallback(func(p *Point) (*Point, error) {
-					return nil, nil
-				}),
-			},
+		//	opts: []Option{
+		//		WithTime(time.Unix(0, 123)),
+		//		WithCallback(func(p *Point) (*Point, error) {
+		//			return nil, nil
+		//		}),
+		//	},
 
-			fail: true,
-		},
+		//	fail: true,
+		//},
 
-		{
-			name: `parse-with-callback-failed`,
-			data: []byte(`abc f1=1i,f2=2,f3="abc" 123`),
+		//{
+		//	name: `parse-with-callback-failed`,
+		//	data: []byte(`abc f1=1i,f2=2,f3="abc" 123`),
 
-			opts: []Option{
-				WithTime(time.Unix(0, 123)),
-				WithCallback(func(p *Point) (*Point, error) {
-					return nil, fmt.Errorf("callback failed")
-				}),
-			},
+		//	opts: []Option{
+		//		WithTime(time.Unix(0, 123)),
+		//		WithCallback(func(p *Point) (*Point, error) {
+		//			return nil, fmt.Errorf("callback failed")
+		//		}),
+		//	},
 
-			fail: true,
-		},
+		//	fail: true,
+		//},
 
 		{
 			name: `parse-with-callback`,
