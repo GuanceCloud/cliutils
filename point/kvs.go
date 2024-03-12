@@ -6,7 +6,6 @@
 package point
 
 import (
-	"math"
 	"sort"
 	"strings"
 
@@ -78,9 +77,7 @@ func (x KVs) InfluxFields() map[string]any {
 		case *Field_I:
 			res[kv.Key] = x.I
 		case *Field_U:
-			if x.U <= math.MaxInt64 {
-				res[kv.Key] = int64(x.U)
-			} // else: dropped, see lp_test.go/parse-uint
+			res[kv.Key] = x.U
 		case *Field_F:
 			res[kv.Key] = x.F
 		case *Field_B:
