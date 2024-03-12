@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/ipdb"
+	"github.com/GuanceCloud/cliutils/pipeline/ptinput/plcache"
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/plmap"
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/refertable"
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/utils"
@@ -63,6 +64,8 @@ type PlInputPt interface {
 
 	Tags() map[string]string
 	Fields() map[string]any
+
+	CreateCache() error
 }
 
 const (
@@ -114,6 +117,8 @@ type PlPoint struct {
 
 	category point.Category
 	drop     bool
+
+	cache *plcache.Cache
 }
 
 func NewPlPoint(category point.Category, name string,
@@ -341,4 +346,16 @@ func WrapPoint(cat point.Category, pt *point.Point) PlInputPt {
 
 	return NewPlPoint(cat, pt.Name(),
 		pt.MapTags(), pt.InfluxFields(), pt.Time())
+}
+
+func (pt *PlPoint) CreateCache() error {
+	if pt.cache == nil {
+		var err error
+		pt.cache, err = plcache.NewCache(time.Second, 100)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
