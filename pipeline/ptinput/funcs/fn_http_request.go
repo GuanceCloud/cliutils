@@ -27,6 +27,7 @@ params:
 	headers 	map[string]string
 */
 func HTTPRequest(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
+	// Acquire params
 	method, methodType, err := runtime.RunStmt(ctx, funcExpr.Param[0])
 	if err != nil {
 		return err
@@ -35,6 +36,7 @@ func HTTPRequest(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError
 		return runtime.NewRunError(ctx, "param data type expect string",
 			funcExpr.Param[0].StartPos())
 	}
+
 	url, urlType, err := runtime.RunStmt(ctx, funcExpr.Param[1])
 	if err != nil {
 		return err
@@ -43,23 +45,31 @@ func HTTPRequest(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError
 		return runtime.NewRunError(ctx, "param data type expect string",
 			funcExpr.Param[1].StartPos())
 	}
-	headers, headersType, err := runtime.RunStmt(ctx, funcExpr.Param[2])
-	if err != nil {
-		return err
-	}
-	if headersType != ast.Map {
-		return runtime.NewRunError(ctx, "param data type expect map",
-			funcExpr.Param[2].StartPos())
+
+	var headers any
+	if funcExpr.Param[2] != nil {
+		var headersType ast.DType
+		headers, headersType, err = runtime.RunStmt(ctx, funcExpr.Param[2])
+		if err != nil {
+			return err
+		}
+		if headersType != ast.Map {
+			return runtime.NewRunError(ctx, "param data type expect map",
+				funcExpr.Param[2].StartPos())
+		}
 	}
 
+	// Send HTTP request
 	client := &http.Client{}
 	req, errR := http.NewRequest(method.(string), url.(string), nil)
 	if errR != nil {
 		ctx.Regs.ReturnAppend(nil, ast.Nil)
 		return nil
 	}
-	for k, v := range headers.(map[string]string) {
-		req.Header.Set(k, v)
+	if headers != nil {
+		for k, v := range headers.(map[string]any) {
+			req.Header.Set(k, v.(string))
+		}
 	}
 
 	resp, errR := client.Do(req)
@@ -78,7 +88,7 @@ func HTTPRequest(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError
 
 	respData := map[string]interface{}{
 		"status_code": resp.StatusCode,
-		"body":        body,
+		"body":        string(body),
 	}
 	ctx.Regs.ReturnAppend(respData, ast.Map)
 

@@ -15,7 +15,34 @@ func TestHTTPRequest(t *testing.T) {
 		expected     interface{}
 		fail         bool
 		outkey       string
-	}{}
+	}{
+		{
+			name: "acquire_code",
+			pl: `resp = http_request("GET", "http://localhost:8080/testResp")
+			add_key(abc, resp["status_code"])`,
+			in:       `[]`,
+			expected: int64(200),
+			outkey:   "abc",
+		},
+		{
+			name: "acquire_body_without_headers",
+			pl: `resp = http_request("GET", "http://localhost:8080/testResp")
+			resp_body = load_json(resp["body"])
+			add_key(abc, resp_body["a"])`,
+			in:       `[]`,
+			expected: float64(11.1),
+			outkey:   `abc`,
+		},
+		{
+			name: "acquire_body_with_headers",
+			pl: `resp = http_request("GET", "http://localhost:8080/testResp", {"extraHeader1": "1", "extraHeader2": "1"})
+			resp_body = load_json(resp["body"])
+			add_key(abc, resp_body["a"])`,
+			in:       `[]`,
+			expected: float64(11.111),
+			outkey:   `abc`,
+		},
+	}
 
 	for idx, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
