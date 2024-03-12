@@ -8,23 +8,6 @@ import (
 	"github.com/GuanceCloud/platypus/pkg/errchain"
 )
 
-func CacheCreateChecking(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
-	if len(funcExpr.Param) != 0 {
-		return runtime.NewRunError(ctx, fmt.Sprintf(
-			"func %s expects 0 arg", funcExpr.Name), funcExpr.NamePos)
-	}
-	return nil
-}
-func CacheCreate(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
-	pt, err := getPoint(ctx.InData())
-	if err != nil {
-		return nil
-	}
-
-	pt.CreateCache()
-
-	return nil
-}
 func CacheGetChecking(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
 	if len(funcExpr.Param) != 1 {
 		return runtime.NewRunError(ctx, fmt.Sprintf(
@@ -44,4 +27,20 @@ func CacheGet(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
 			funcExpr.Param[0].StartPos())
 	}
 
+	pt, errP := getPoint(ctx.InData())
+	if errP != nil {
+		ctx.Regs.ReturnAppend(nil, ast.Nil)
+		return nil
+	}
+
+	c := pt.GetCache()
+	v, exist, errG := c.Get(val.(string))
+	if !exist || errG != nil {
+		ctx.Regs.ReturnAppend(nil, ast.Nil)
+		return nil
+	}
+
+	ctx.Regs.ReturnAppend(v, ast.String)
+
+	return nil
 }

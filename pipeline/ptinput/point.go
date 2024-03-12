@@ -65,7 +65,7 @@ type PlInputPt interface {
 	Tags() map[string]string
 	Fields() map[string]any
 
-	CreateCache() error
+	GetCache() *plcache.Cache
 }
 
 const (
@@ -348,14 +348,14 @@ func WrapPoint(cat point.Category, pt *point.Point) PlInputPt {
 		pt.MapTags(), pt.InfluxFields(), pt.Time())
 }
 
-func (pt *PlPoint) CreateCache() error {
+func (pt *PlPoint) GetCache() *plcache.Cache {
 	if pt.cache == nil {
 		var err error
 		pt.cache, err = plcache.NewCache(time.Second, 100)
 		if err != nil {
-			return err
+			return nil
 		}
 	}
 
-	return nil
+	return pt.cache
 }
