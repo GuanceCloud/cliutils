@@ -267,7 +267,7 @@ func TestNewLPPoint(t *testing.T) {
 			},
 
 			warns:  1,
-			expect: "__default,t1=abc,t2=32 f1=1i,f2=32i 123",
+			expect: "__default,t1=abc,t2=32 f1=1i,f2=32u 123",
 		},
 
 		{
@@ -280,7 +280,7 @@ func TestNewLPPoint(t *testing.T) {
 				WithTime(time.Unix(0, 123)),
 			},
 
-			expect: "abc,t.1=abc,t2=32 f.1=1i,f2=32i 123",
+			expect: "abc,t.1=abc,t2=32 f.1=1i,f2=32u 123",
 		},
 
 		{
@@ -293,7 +293,7 @@ func TestNewLPPoint(t *testing.T) {
 				WithDisabledKeys(NewKey(`f1`, KeyType_I)),
 				WithTime(time.Unix(0, 123)),
 			},
-			expect: "abc,t1=abc,t2=32 f2=32i,f3=32i 123",
+			expect: "abc,t1=abc,t2=32 f2=32u,f3=32i 123",
 		},
 
 		{
@@ -307,7 +307,7 @@ func TestNewLPPoint(t *testing.T) {
 			},
 
 			warns:  1,
-			expect: "abc,t1=abc f1=1i,f2=32i 123",
+			expect: "abc,t1=abc f1=1i,f2=32u 123",
 		},
 
 		{
@@ -1113,6 +1113,12 @@ func TestParseLineProto(t *testing.T) {
 		},
 
 		{
+			name: `parse-uint`,
+			data: []byte(`abc,t1=v1 f1=32u 123`),
+			prec: "n",
+		},
+
+		{
 			name: `missing-field`,
 			data: []byte(`abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
 		abc,tag1=1,tag2=2 f1=1i,f2=2,f3="abc"
@@ -1159,13 +1165,6 @@ func TestParseLineProto(t *testing.T) {
 				return __65kbString
 			}())),
 
-			fail: true,
-			prec: "n",
-		},
-
-		{
-			name: `parse-uint`,
-			data: []byte(`abc,t1=v1 f1=32u 123`), // Error:  unable to parse 'abc,t1=v1 f1=32u 123': invalid number
 			fail: true,
 			prec: "n",
 		},

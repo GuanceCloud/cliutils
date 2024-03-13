@@ -155,4 +155,47 @@ func TestJSONPoint2Point(t *testing.T) {
 			assert.Equal(t, tc.expect, pt.LineProto())
 		})
 	}
+
+	t.Run("array-field", func(t *T.T) {
+		jp := JSONPoint{
+			Measurement: "some",
+			Fields: map[string]any{
+				"f_i_arr": []int{1, 2, 3},
+				"f_d_arr": [][]byte{[]byte("hello"), []byte("world")},
+			},
+		}
+
+		pt, err := jp.Point()
+		assert.NoError(t, err)
+		t.Logf("pt: %s", pt.Pretty())
+
+		EnableMixedArrayField = true
+		defer func() {
+			EnableMixedArrayField = false
+		}()
+
+		j := `{
+	"measurement": "some",
+	"fields": {
+		"f_i_arr": [1,2,3],
+		"f_f_arr": [1.0,2.0,3.14],
+		"f_mix_arr": [1.0, "string", false, 3]
+	}
+}`
+		// NOTE: simple json do not support:
+		//  - signed/unsigned int
+		//  - []byte
+		var jp2 JSONPoint
+		assert.NoError(t, json.Unmarshal([]byte(j), &jp2))
+
+		t.Logf("jp2 fields: %+#v", jp2.Fields)
+
+		pt, err = jp2.Point()
+		assert.NoError(t, err)
+		assert.NotNil(t, pt.Get("f_i_arr"))
+		assert.NotNil(t, pt.Get("f_f_arr"))
+		assert.NotNil(t, pt.Get("f_mix_arr"))
+
+		t.Logf("pt: %s", pt.Pretty())
+	})
 }

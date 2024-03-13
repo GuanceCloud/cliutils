@@ -498,7 +498,7 @@ func TestPointLineProtocol(t *T.T) {
 
 				return pt
 			}(),
-			expect: `abc,t1=v1 f1="abc123" 1`,
+			expect: `abc,t1=v1 f1="YWJjMTIz"b 1`,
 		},
 
 		{
@@ -636,18 +636,18 @@ func TestPointPB(t *T.T) {
 func TestLPPoint(t *T.T) {
 	t.Run(`uint`, func(t *T.T) {
 		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": uint64(123)}), WithTime(time.Unix(0, 123)))
-		assert.Equal(t, `abc f1=123i 123`, pt.MustLPPoint().String())
+		assert.Equal(t, `abc f1=123u 123`, pt.MustLPPoint().String())
 
 		// max-int64 is ok
 		pt = NewPointV2(`abc`, NewKVs(map[string]any{"f1": uint64(math.MaxInt64)}), WithTime(time.Unix(0, 123)))
-		assert.Equal(t, fmt.Sprintf(`abc f1=%di 123`, math.MaxInt64), pt.MustLPPoint().String())
+		assert.Equal(t, fmt.Sprintf(`abc f1=%du 123`, math.MaxInt64), pt.MustLPPoint().String())
 
 		// max-int64 + 1 not ok
 		pt = NewPointV2(`abc`, NewKVs(map[string]any{
 			"f1": uint64(math.MaxInt64 + 1),
 			"f2": "foo",
 		}), WithTime(time.Unix(0, 123)))
-		assert.Equal(t, `abc f2="foo" 123`, pt.MustLPPoint().String())
+		assert.Equal(t, `abc f1=9223372036854775808u,f2="foo" 123`, pt.MustLPPoint().String())
 
 		t.Logf("lp: %s", pt.MustLPPoint().String())
 	})

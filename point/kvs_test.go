@@ -26,7 +26,7 @@ func TestKVsAdd(t *T.T) {
 	})
 }
 
-func TestKVs(t *T.T) {
+func TestNewKVs(t *T.T) {
 	t.Run("add-tag", func(t *T.T) {
 		kvs := NewKVs(map[string]any{"f1": 123})
 
@@ -161,5 +161,19 @@ func TestKVs(t *T.T) {
 
 		t.Logf("pt pretty: %s", pt.Pretty())
 		t.Logf("pt lineproto: %s", pt.LineProto())
+	})
+
+	t.Run("array-float-value", func(t *T.T) {
+		kvs := NewKVs(map[string]any{
+			"f_arr": []float64{1.0, 2.0},
+		})
+		t.Logf("kvs: %s", kvs.Pretty())
+	})
+
+	t.Run("array-bytes-value", func(t *T.T) {
+		kvs := NewKVs(map[string]any{
+			"f_arr": [][]byte{[]byte("hello"), []byte("world")},
+		})
+		t.Logf("kvs: %s", kvs.Pretty())
 	})
 }
