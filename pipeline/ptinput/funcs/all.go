@@ -80,6 +80,7 @@ var FuncsMap = map[string]runtime.FuncCall{
 	"pt_name":                PtName,
 	"http_request":           HTTPRequest,
 	"cache_get":              CacheGet,
+	"cache_set":              CacheSet,
 	// disable
 	"json_all": JSONAll,
 }
@@ -147,6 +148,7 @@ var FuncsCheckMap = map[string]runtime.FuncCheck{
 	"pt_name":                PtNameChecking,
 	"http_request":           HTTPRequestChecking,
 	"cache_get":              CacheGet,
+	"cache_set":              CacheSet,
 	// disable
 	"json_all": JSONAllChecking,
 }

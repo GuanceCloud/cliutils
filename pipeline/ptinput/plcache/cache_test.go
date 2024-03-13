@@ -1,11 +1,9 @@
 package plcache
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
-	"github.com/GuanceCloud/cliutils/pipeline/ptinput/funcs"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -53,38 +51,4 @@ func TestCache_Stop(t *testing.T) {
 
 	assert.NotNil(t, err1, "err1 is nil")
 	assert.NotNil(t, err2, "err2 is nil")
-}
-
-func TestCache_ScriptExample(t *testing.T) {
-	cache, err := NewCache(time.Second, 10)
-	if err != nil {
-		t.Error("Create cache: ", err)
-	}
-	data, exist, err := cache.Get("rate")
-	if err != nil {
-		t.Error("Get value: ", err)
-	}
-	if exist {
-		t.Log("Get value: ", data)
-	} else {
-		resp, err := funcs.HttpRequest("GET", "https://www.mobiplushrs.com/web/api/queryRate?src=HKD&dist=USD", nil)
-		if err != nil {
-			t.Error("Request from interface: ", err)
-		}
-		statusCode := resp["status_code"].(int)
-		if statusCode == 200 {
-			var respBody map[string]interface{}
-			err = json.Unmarshal([]byte(resp["body"].(string)), &respBody)
-			if err != nil {
-				t.Error("Unmarshal json: ", err)
-			}
-			if value, exist := respBody["rate"]; exist {
-				err = cache.Set("rate", value, 20)
-				if err != nil {
-					t.Error("Set Cache: ", err)
-				}
-			}
-		}
-
-	}
 }

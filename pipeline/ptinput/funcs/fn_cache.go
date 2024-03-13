@@ -2,6 +2,7 @@ package funcs
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/GuanceCloud/platypus/pkg/ast"
 	"github.com/GuanceCloud/platypus/pkg/engine/runtime"
@@ -41,6 +42,66 @@ func CacheGet(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
 	}
 
 	ctx.Regs.ReturnAppend(v, ast.String)
+
+	return nil
+}
+
+func CacheSetChecking(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
+	if err := reindexFuncArgs(funcExpr, []string{
+		"key", "value", "expiration",
+	}, 2); err != nil {
+		return runtime.NewRunError(ctx, err.Error(), funcExpr.NamePos)
+	}
+
+	return nil
+}
+
+/*
+params:
+
+	key 			string (required)
+	value	   		string (required)
+	expiration 		int (default=100)
+*/
+func CacheSet(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
+	key, keyType, err := runtime.RunStmt(ctx, funcExpr.Param[0])
+	if err != nil {
+		return err
+	}
+	if keyType != ast.String {
+		return runtime.NewRunError(ctx, "param data type expect string",
+			funcExpr.Param[0].StartPos())
+	}
+
+	value, valueType, err := runtime.RunStmt(ctx, funcExpr.Param[1])
+	if err != nil {
+		return err
+	}
+	if valueType != ast.String {
+		return runtime.NewRunError(ctx, "param data type expect string",
+			funcExpr.Param[1].StartPos())
+	}
+
+	var expiration int64
+	if funcExpr.Param[2] != nil {
+		exp, expType, err := runtime.RunStmt(ctx, funcExpr.Param[1])
+		if err != nil {
+			return err
+		}
+		if expType != ast.Int {
+			return runtime.NewRunError(ctx, "param data type expect int",
+				funcExpr.Param[2].StartPos())
+		}
+		expiration = exp.(int64)
+	}
+
+	pt, errP := getPoint(ctx.InData())
+	if errP != nil {
+		return nil
+	}
+
+	c := pt.GetCache()
+	c.Set(key.(string), value, time.Second*time.Duration(expiration))
 
 	return nil
 }
