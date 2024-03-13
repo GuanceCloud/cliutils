@@ -29,7 +29,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/rs/xid v1.2.1
 	github.com/spf13/cast v1.5.1
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/tidwall/gjson v1.17.0
 	github.com/tidwall/wal v1.1.7
 	github.com/vjeantet/grok v1.0.1
@@ -114,4 +114,5 @@ require (
 	modernc.org/token v1.0.1 // indirect
 )
 
-replace github.com/influxdata/influxdb1-client => github.com/GuanceCloud/influxdb1-client v0.1.6
+//replace github.com/influxdata/influxdb1-client => github.com/GuanceCloud/influxdb1-client v0.1.7
+replace github.com/influxdata/influxdb1-client => /Users/tanbiao/go/src/github.com/GuanceCloud/influxdb1-client

@@ -36,6 +36,7 @@ const (
 
 	WarnSameTagFieldKey = "same_tag_field_key"
 	WarnDotInkey        = "dot_in_key"
+	WarnNROrTailEscape  = "found_new_line_or_tail_espace"
 	WarnFieldB64Encoded = "field_base64_encoded"
 	WarnNilField        = "nil_field"
 )
