@@ -403,6 +403,7 @@ func NewKV(k string, v any, opts ...KVOption) *Field {
 
 	case uint8:
 		kv = &Field{Key: k, Val: &Field_U{uint64(x)}}
+
 		// case []uint8 is []byte, skip it.
 
 	case int16:
@@ -528,6 +529,13 @@ func NewKV(k string, v any, opts ...KVOption) *Field {
 
 	case []byte:
 		kv = &Field{Key: k, Val: &Field_D{x}}
+
+	case [][]byte:
+		if v, err := NewBytesArray(x...); err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{v}}
+		}
 
 	case bool:
 		kv = &Field{Key: k, Val: &Field_B{x}}

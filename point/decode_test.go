@@ -298,6 +298,26 @@ func TestDecode(t *testing.T) {
 			t.Logf("pt: %s", pt.Pretty())
 		}
 	})
+
+	t.Run("decode-bytes-array", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f_d_arr", MustNewAnyArray([]byte("hello"), []byte("world")), false, false)
+		pt := NewPointV2("m1", kvs)
+		enc := GetEncoder(WithEncEncoding(LineProtocol))
+		defer PutEncoder(enc)
+		arr, err := enc.Encode([]*Point{pt})
+		assert.NoError(t, err)
+
+		t.Logf("lp: %s", arr[0])
+
+		dec := GetDecoder(WithDecEncoding(LineProtocol))
+		defer PutDecoder(dec)
+		pts, err := dec.Decode(arr[0])
+		assert.NoError(t, err)
+		for _, pt := range pts {
+			t.Logf("pt: %s", pt.Pretty())
+		}
+	})
 }
 
 func BenchmarkDecode(b *testing.B) {
