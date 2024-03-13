@@ -60,6 +60,7 @@ func (x KVs) Pretty() string {
 	for _, kv := range x {
 		arr = append(arr, kv.String())
 	}
+	sort.Strings(arr)
 
 	return strings.Join(arr, "\n")
 }
