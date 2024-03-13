@@ -17,6 +17,11 @@ func CacheGetChecking(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.Pl
 	return nil
 }
 
+/*
+params:
+
+	key 			string (required)
+*/
 func CacheGet(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
 	val, dtype, err := runtime.RunStmt(ctx, funcExpr.Param[0])
 	if err != nil {
@@ -48,7 +53,7 @@ func CacheGet(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
 
 func CacheSetChecking(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
 	if err := reindexFuncArgs(funcExpr, []string{
-		"key", "value", "expiration",
+		"key", "value", "exp",
 	}, 2); err != nil {
 		return runtime.NewRunError(ctx, err.Error(), funcExpr.NamePos)
 	}
@@ -82,9 +87,9 @@ func CacheSet(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
 			funcExpr.Param[1].StartPos())
 	}
 
-	var expiration int64
-	if funcExpr.Param[2] != nil {
-		exp, expType, err := runtime.RunStmt(ctx, funcExpr.Param[1])
+	var expiration int64 = 100
+	if len(funcExpr.Param) == 3 {
+		exp, expType, err := runtime.RunStmt(ctx, funcExpr.Param[2])
 		if err != nil {
 			return err
 		}
