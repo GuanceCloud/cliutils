@@ -644,7 +644,6 @@ type Field_S struct {
 }
 
 type Field_A struct {
-	// XXX: not used
 	A *anypb.Any `protobuf:"bytes,7,opt,name=a,proto3,oneof"` // any data
 }
 

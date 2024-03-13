@@ -21,6 +21,16 @@ import (
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
+func TestInfluxFields(t *T.T) {
+	t.Run("bytes-array", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f1", MustNewAnyArray([]byte("hello"), []byte("world")), false, false)
+		pt := NewPointV2("m1", kvs)
+		fields := pt.InfluxFields()
+		t.Logf("fields: %+#v", fields)
+	})
+}
+
 func TestSizeofPoint(t *T.T) {
 	t.Run("small-pt", func(t *T.T) {
 		var kvs KVs

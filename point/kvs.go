@@ -83,10 +83,9 @@ func (x KVs) InfluxFields() map[string]any {
 		case *Field_B:
 			res[kv.Key] = x.B
 		case *Field_D:
-			res[kv.Key] = string(x.D)
+			res[kv.Key] = x.D
 		case *Field_S:
 			res[kv.Key] = x.S
-
 		case *Field_A:
 			if v, err := AnyRaw(kv.GetA()); err != nil {
 				// pass
