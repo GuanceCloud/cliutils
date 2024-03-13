@@ -275,6 +275,42 @@ func TestEncode(t *testing.T) {
 	}
 }
 
+func TestEscapeEncode(t *T.T) {
+	t.Run("escaped-lineproto", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f1=2=3=", 3.14, false, false)
+		kvs = kvs.Add("f2\tnr", 2, false, false)
+		kvs = kvs.Add("f3,", "some-string\nanother-line", false, false)
+		kvs = kvs.Add("f4,", false, false, false)
+		//kvs = kvs.Add("f_nil", nil, false, false)
+		kvs = kvs.Add("f\nnext-line,", []byte("hello"), false, false)
+		kvs = kvs.Add(`f\other`, []byte("hello"), false, false)
+		kvs = kvs.Add("tag=1", "value", true, false)
+		kvs = kvs.Add("tag 2", "value", true, false)
+		kvs = kvs.Add("tag\t3", "value", true, false)
+
+		kvs = kvs.Add("tag=1", "value=1", true, false)
+		kvs = kvs.Add("tag 2", "value 2", true, false)
+		kvs = kvs.Add("tag\t3", "value \t3", true, false)
+		kvs = kvs.Add("tag4", "value \n3", true, false)
+		kvs = kvs.Add("tag5", `value \`, true, false)         // tag-value got tail \
+		kvs = kvs.Add("tag\nnext-line", `value`, true, false) // tag key get \n
+
+		pt := NewPointV2("some,=abc\"", kvs)
+
+		lp := pt.LineProto()
+		t.Logf("line-protocol: %s", lp)
+		t.Logf("pretty: %s", pt.Pretty())
+
+		dec := GetDecoder(WithDecEncoding(LineProtocol))
+		defer PutDecoder(dec)
+		pts, err := dec.Decode([]byte(lp))
+		assert.NoError(t, err)
+		eq, why := pts[0].EqualWithReason(pt)
+		assert.Truef(t, eq, "not equal: %s", why)
+	})
+}
+
 func TestPBEncode(t *T.T) {
 	t.Run(`invalid-utf8-string-field`, func(t *T.T) {
 		var kvs KVs

@@ -140,13 +140,18 @@ func (c *checker) checkTag(f *Field) *Field {
 	}
 
 	// check tag key '\', '\n'
-	if strings.HasSuffix(f.Key, `\`) || strings.Contains(f.Key, "\n") {
-		c.addWarn(WarnInvalidTagKey, fmt.Sprintf("invalid tag key `%s'", f.Key))
-
-		f.Key = adjustKV(f.Key)
+	if k := adjustKV(f.Key); k != f.Key {
+		c.addWarn(WarnInvalidTagKey, fmt.Sprintf(`invalid tag key %q, replace \ or \n with ''`, f.Key))
+		f.Key = k
 	}
 
 	// check tag value: '\', '\n'
+	if str := f.GetS(); str != "" {
+		if s := adjustKV(str); str != s {
+			f.Val = &Field_S{S: adjustKV(f.GetS())}
+			c.addWarn(WarnNROrTailEscape, fmt.Sprintf(`invalid tag value %q, found \n or tail \`, str))
+		}
+	}
 	if strings.HasSuffix(f.GetS(), `\`) || strings.Contains(f.GetS(), "\n") {
 		c.addWarn(WarnInvalidTagValue, fmt.Sprintf("invalid tag value %q", f.GetS()))
 
@@ -183,6 +188,12 @@ func (c *checker) checkField(f *Field) *Field {
 			fmt.Sprintf("invalid field key `%s': found `.'", f.Key))
 
 		f.Key = strings.ReplaceAll(f.Key, ".", "_")
+	}
+
+	if k := adjustKV(f.Key); k != f.Key {
+		f.Key = k
+		c.addWarn(WarnNROrTailEscape,
+			fmt.Sprintf(`invalid field key %q: found \n, replaced with ' '`, f.Key))
 	}
 
 	if c.keyDisabled(KVKey(f)) {
