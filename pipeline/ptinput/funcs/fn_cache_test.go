@@ -15,15 +15,26 @@ func TestCache(t *testing.T) {
 		expected     interface{}
 		fail         bool
 		outkey       string
-	}{{
-		name: "test_set_get",
-		pl: `cache_set("a", "123")
-		a = cache_get("a")
-		add_key(abc, a)`,
-		in:       `[]`,
-		expected: "123",
-		outkey:   "abc",
-	}}
+	}{
+		{
+			name: "test_set_get_with_exp",
+			pl: `cache_set("a", "123", 5)
+			a = cache_get("a")
+			add_key(abc, a)`,
+			in:       `[]`,
+			expected: "123",
+			outkey:   "abc",
+		},
+		{
+			name: "test_set_get_without_exp",
+			pl: `a = cache_set("a", "123")
+			a = cache_get("a")
+			add_key(abc, a)`,
+			in:       `[]`,
+			expected: "123",
+			outkey:   "abc",
+		},
+	}
 
 	for idx, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
