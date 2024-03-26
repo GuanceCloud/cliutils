@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput"
+	"github.com/GuanceCloud/cliutils/pipeline/ptinput/plcache"
 	"github.com/GuanceCloud/cliutils/point"
 	tu "github.com/GuanceCloud/cliutils/testutil"
 )
@@ -47,13 +48,17 @@ func TestCache(t *testing.T) {
 				}
 				return
 			}
+			cache, _ := plcache.NewCache(time.Second, 100)
 			pt := ptinput.NewPlPoint(
 				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
+			pt.SetCache(cache)
 			errR := runScript(runner, pt)
 
 			if errR != nil {
 				t.Fatal(errR.Error())
 			}
+
+			cache.Stop()
 
 			v, _, _ := pt.Get(tc.outkey)
 			// tu.Equals(t, nil, err)

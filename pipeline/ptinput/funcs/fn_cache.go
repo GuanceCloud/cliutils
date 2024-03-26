@@ -40,6 +40,11 @@ func CacheGet(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
 	}
 
 	c := pt.GetCache()
+	if c == nil {
+		ctx.Regs.ReturnAppend(nil, ast.Nil)
+		return nil
+	}
+
 	v, exist, errG := c.Get(val.(string))
 	if !exist || errG != nil {
 		ctx.Regs.ReturnAppend(nil, ast.Nil)
@@ -106,6 +111,9 @@ func CacheSet(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
 	}
 
 	c := pt.GetCache()
+	if c == nil {
+		return nil
+	}
 	c.Set(key.(string), value, time.Second*time.Duration(expiration))
 
 	return nil
