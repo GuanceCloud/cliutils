@@ -16,6 +16,7 @@ import (
 
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput"
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/funcs"
+	"github.com/GuanceCloud/cliutils/pipeline/ptinput/plcache"
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/plmap"
 	"github.com/GuanceCloud/cliutils/pipeline/stats"
 )
@@ -40,6 +41,8 @@ type PlScript struct {
 	plBuks *plmap.AggBuckets
 
 	updateTS int64
+
+	cache *plcache.Cache
 }
 
 func NewScripts(scripts map[string]string, scriptPath map[string]string, ns string, category point.Category,
@@ -79,6 +82,7 @@ func NewScripts(scripts map[string]string, scriptPath map[string]string, ns stri
 		if len(scriptPath) > 0 {
 			sPath = scriptPath[name]
 		}
+		cache, _ := plcache.NewCache(time.Second, 100)
 
 		retScipt[name] = &PlScript{
 			script:   scripts[name],
@@ -89,6 +93,7 @@ func NewScripts(scripts map[string]string, scriptPath map[string]string, ns stri
 			proc:     ng,
 			updateTS: time.Now().UnixNano(),
 			plBuks:   plbuks,
+			cache:    cache,
 		}
 	}
 
@@ -115,6 +120,7 @@ func (script *PlScript) Run(plpt ptinput.PlInputPt, signal plruntime.Signal, opt
 	}
 
 	plpt.SetAggBuckets(script.plBuks)
+	plpt.SetCache(script.cache)
 
 	err := plengine.RunScriptWithRMapIn(script.proc, plpt, signal)
 	if err != nil {

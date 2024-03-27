@@ -266,6 +266,9 @@ func (store *ScriptStore) UpdateScriptsWithNS(ns string, namedScript map[string]
 			if v.plBuks != nil {
 				v.plBuks.StopAllBukScanner()
 			}
+			if v.cache != nil {
+				v.cache.Stop()
+			}
 			delete(store.storage.scripts[ns], name)
 		}
 		stats.WriteEvent(&change)
@@ -289,6 +292,9 @@ func (store *ScriptStore) UpdateScriptsWithNS(ns string, namedScript map[string]
 		if v, ok := store.storage.scripts[ns][name]; ok {
 			if v.plBuks != nil {
 				v.plBuks.StopAllBukScanner()
+			}
+			if v.cache != nil {
+				v.cache.Stop()
 			}
 			delete(store.storage.scripts[ns], name)
 		}
