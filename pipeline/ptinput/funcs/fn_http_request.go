@@ -19,13 +19,6 @@ func HTTPRequestChecking(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain
 	return nil
 }
 
-/*
-params:
-
-	method 		string (required)
-	url	   		string (required)
-	headers 	map[string]string
-*/
 func HTTPRequest(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
 	// Acquire params
 	method, methodType, err := runtime.RunStmt(ctx, funcExpr.Param[0])
@@ -78,7 +71,7 @@ func HTTPRequest(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError
 		return nil
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, errR := io.ReadAll(resp.Body)
 	if errR != nil {
