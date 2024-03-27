@@ -25,7 +25,7 @@ type cacheItem struct {
 }
 
 type Cache struct {
-	mu        sync.Mutex
+	mu        sync.RWMutex
 	interval  time.Duration
 	ticker    *time.Ticker
 	slots     []*list.List

@@ -71,23 +71,19 @@ func CacheSet(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
 			funcExpr.Param[0].StartPos())
 	}
 
-	value, valueType, err := runtime.RunStmt(ctx, funcExpr.Param[1])
+	value, _, err := runtime.RunStmt(ctx, funcExpr.Param[1])
 	if err != nil {
 		return err
 	}
-	if valueType != ast.String {
-		return runtime.NewRunError(ctx, "param data type expect string",
-			funcExpr.Param[1].StartPos())
-	}
 
 	var expiration int64 = 100
-	if len(funcExpr.Param) == 3 {
+	if funcExpr.Param[2] != nil {
 		exp, expType, err := runtime.RunStmt(ctx, funcExpr.Param[2])
 		if err != nil {
 			return err
 		}
 		if expType != ast.Int {
-			return runtime.NewRunError(ctx, "param data type expect int",
+			return runtime.NewRunError(ctx, "param data type expect int or nil",
 				funcExpr.Param[2].StartPos())
 		}
 		expiration = exp.(int64)

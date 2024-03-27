@@ -147,8 +147,8 @@ var FuncsCheckMap = map[string]runtime.FuncCheck{
 	"format_int":             FormatIntChecking,
 	"pt_name":                PtNameChecking,
 	"http_request":           HTTPRequestChecking,
-	"cache_get":              CacheGet,
-	"cache_set":              CacheSet,
+	"cache_get":              CacheGetChecking,
+	"cache_set":              CacheSetChecking,
 	// disable
 	"json_all": JSONAllChecking,
 }
