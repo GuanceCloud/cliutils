@@ -777,18 +777,19 @@ func TestFields(t *T.T) {
 		},
 	}
 
+	eopt := eqopt{}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
 			fs := tc.pt.Fields()
 			assert.True(t, len(fs) > 0)
 
-			eq, reason := kvsEq(fs, NewKVs(tc.expect))
+			eq, reason := eopt.kvsEq(fs, NewKVs(tc.expect))
 			assert.True(t, eq, "not equal, reason: %s, pt: %s", reason, tc.pt.Pretty())
 
 			assert.NotNil(t, tc.pt.PBPoint())
 			assert.NotNil(t, tc.pt.MustLPPoint())
 
-			eq, reason = kvsEq(fs, NewKVs(tc.expect))
+			eq, reason = eopt.kvsEq(fs, NewKVs(tc.expect))
 			assert.True(t, eq, "not equal, reason: %s, pt: %s", reason, tc.pt.kvs.Pretty())
 		})
 	}

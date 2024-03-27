@@ -157,8 +157,9 @@ func TestCheckTags(t *T.T) {
 
 			assert.Equal(t, tc.warns, len(c.warns), "got warns: %v", c.warns)
 
+			eopt := eqopt{}
 			if tc.expect != nil {
-				eq, r := kvsEq(tc.expect, kvs)
+				eq, r := eopt.kvsEq(tc.expect, kvs)
 				assert.True(t, eq, "reason: %s", r)
 			}
 		})
@@ -383,8 +384,9 @@ func TestCheckFields(t *T.T) {
 			kvs = c.checkKVs(kvs)
 			require.Equal(t, tc.warns, len(c.warns))
 
+			eopt := eqopt{}
 			if tc.expect != nil {
-				eq, _ := kvsEq(expect, kvs)
+				eq, _ := eopt.kvsEq(expect, kvs)
 				assert.True(t, eq, "expect:\n%s\ngot:\n%s", expect.Pretty(), kvs.Pretty())
 			}
 		})

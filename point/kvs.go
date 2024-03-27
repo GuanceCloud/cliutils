@@ -6,6 +6,7 @@
 package point
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -57,9 +58,27 @@ func (x KVs) Less(i, j int) bool {
 
 func (x KVs) Pretty() string {
 	var arr []string
-	for _, kv := range x {
-		arr = append(arr, kv.String())
+	for idx, kv := range x {
+		if kv == nil {
+			arr = append(arr, fmt.Sprintf("[%d] <nil>", idx))
+		} else {
+			arr = append(arr, fmt.Sprintf("[%d] %s", idx, kv.String()))
+		}
 	}
+
+	return strings.Join(arr, "\n")
+}
+
+func (x KVs) PrettySorted() string {
+	var arr []string
+	for _, kv := range x {
+		if kv == nil {
+			arr = append(arr, "<nil>")
+		} else {
+			arr = append(arr, kv.String())
+		}
+	}
+
 	sort.Strings(arr)
 
 	return strings.Join(arr, "\n")
