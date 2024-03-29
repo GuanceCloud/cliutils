@@ -206,6 +206,13 @@ func TestGet(t *T.T) {
 	t.Run("get", func(t *T.T) {
 		var kvs KVs
 
+		EnableDictField = true
+		EnableMixedArrayField = true
+		defer func() {
+			EnableDictField = false
+			EnableMixedArrayField = false
+		}()
+
 		kvs = kvs.Add("si1", int8(1), false, true)
 		kvs = kvs.Add("si2", int16(1), false, true)
 		kvs = kvs.Add("si3", int32(1), false, true)
@@ -399,6 +406,13 @@ func TestInfluxTags(t *T.T) {
 }
 
 func TestPointLineProtocol(t *T.T) {
+	EnableDictField = true
+	EnableMixedArrayField = true
+	defer func() {
+		EnableDictField = false
+		EnableMixedArrayField = false
+	}()
+
 	cases := []struct {
 		name string
 		pt   *Point
@@ -586,6 +600,13 @@ line" 123`,
 
 func TestPBJSON(t *T.T) {
 	t.Run("pbjson", func(t *T.T) {
+		EnableDictField = true
+		EnableMixedArrayField = true
+		defer func() {
+			EnableDictField = false
+			EnableMixedArrayField = false
+		}()
+
 		pt := NewPointV2(`abc`, NewKVs(map[string]any{
 			"i":         1234567890,
 			"u":         uint64(1234567890),
