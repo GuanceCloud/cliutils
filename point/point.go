@@ -145,6 +145,8 @@ func (p *Point) Pretty() string {
 		arr = append(arr, fmt.Sprintf("[D] %s", d.Info))
 	}
 
+	sort.Strings(arr)
+
 	return strings.Join(arr, "\n")
 }
 

@@ -65,7 +65,7 @@ func (x KVs) Pretty() string {
 	// For key-values are not sorted while building the point, we
 	// think they are equal, so sort the string array to remove the
 	// ordering difference between points.
-	//sort.Strings(arr)
+	sort.Strings(arr)
 
 	return strings.Join(arr, "\n")
 }

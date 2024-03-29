@@ -124,7 +124,7 @@ func (c *cfg) reset() {
 	c.maxTagValLen = 1024
 	c.maxTags = 256
 	c.precheck = true
-	c.precision = NS
+	c.precision = PrecNS
 	c.requiredKeys = nil
 	c.t = time.Time{}
 }

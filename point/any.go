@@ -11,7 +11,6 @@ import (
 
 	proto "github.com/gogo/protobuf/proto"
 	types "github.com/gogo/protobuf/types"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 var (
@@ -39,7 +38,7 @@ func MustAnyRaw(x *types.Any) any {
 }
 
 // AnyRaw get underlying wrapped value within types.Any.
-func AnyRaw(x *anypb.Any) (any, error) {
+func AnyRaw(x *types.Any) (any, error) {
 	if x == nil {
 		return nil, fmt.Errorf("nil value")
 	}
@@ -304,11 +303,14 @@ func NewArray(ents ...any) (arr *Array, err error) {
 			arr.Arr = append(arr.Arr, &BasicTypes{X: &BasicTypes_D{x}})
 		case bool:
 			arr.Arr = append(arr.Arr, &BasicTypes{X: &BasicTypes_B{x}})
-		//case nil:
-		//	arr.Arr = append(arr.Arr, nil)
 		default:
-			return nil, fmt.Errorf("unknown element type %q(index: %d) within array",
-				reflect.TypeOf(v).String(), idx)
+			if x == nil {
+				// gogoproto any do not support nil value.
+				return nil, fmt.Errorf("got nil(index: %d) within array", idx)
+			} else {
+				return nil, fmt.Errorf("unknown element type %q(index: %d) within array",
+					reflect.TypeOf(v).String(), idx)
+			}
 		}
 	}
 
