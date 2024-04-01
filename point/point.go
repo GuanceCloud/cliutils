@@ -145,8 +145,6 @@ func (p *Point) Pretty() string {
 		arr = append(arr, fmt.Sprintf("[D] %s", d.Info))
 	}
 
-	sort.Strings(arr)
-
 	return strings.Join(arr, "\n")
 }
 
@@ -310,11 +308,29 @@ func (p *Point) KVs() (arr KVs) {
 	return KVs(p.pt.Fields)
 }
 
-// AddKVs add kvs, if keys exist, do nothing.
+// AddKVs add(shallow-copy) kvs, if keys exist, do nothing.
 func (p *Point) AddKVs(kvs ...*Field) {
 	old := KVs(p.pt.Fields)
 	for _, kv := range kvs {
 		old = old.AddKV(kv, false)
+	}
+	p.pt.Fields = old
+}
+
+// CopyTags deep-copy tag kvs, if keys exist, do nothing.
+func (p *Point) CopyTags(kvs ...*Field) {
+	old := KVs(p.pt.Fields)
+	for _, kv := range kvs {
+		old = old.AddTag(kv.Key, kv.GetS())
+	}
+	p.pt.Fields = old
+}
+
+// CopyField deep-copy field kvs, if keys exist, do nothing.
+func (p *Point) CopyField(kvs ...*Field) {
+	old := KVs(p.pt.Fields)
+	for _, kv := range kvs {
+		old = old.Add(kv.Key, kv.Raw(), false, false)
 	}
 	p.pt.Fields = old
 }

@@ -184,7 +184,7 @@ func (c *checker) checkField(f *Field) *Field {
 
 	if c.keyDisabled(f.Key) {
 		c.addWarn(WarnFieldDisabled,
-			fmt.Sprintf("field key `%s' disabled", f.Key))
+			fmt.Sprintf("field key `%s' disabled, value: %v", f.Key, f.Raw()))
 		return nil
 	}
 
