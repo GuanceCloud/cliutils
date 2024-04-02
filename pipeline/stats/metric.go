@@ -11,7 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var defaultLabelNames = []string{"category", "name", "ns"}
+var defaultLabelNames = []string{"category", "name", "namespace"}
 
 type RecMetric struct {
 	plPtsVec,
