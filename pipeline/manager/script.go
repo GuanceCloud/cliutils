@@ -83,10 +83,11 @@ func NewScripts(scripts, scriptPath, scriptTags map[string]string, ns string, ca
 		}
 
 		sTags := map[string]string{
-			"name":     name,
-			"ns":       ns,
-			"lang":     "platypus",
-			"category": cat.String(),
+			"category":  cat.String(),
+			"name":      name,
+			"namespace": ns,
+
+			"lang": "platypus",
 		}
 
 		for k, v := range scriptTags {
