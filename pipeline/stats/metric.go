@@ -38,7 +38,7 @@ func (rec *RecMetric) WriteMetric(tags map[string]string, pt, ptDrop, ptError fl
 	}
 
 	if cost > 0 {
-		rec.plCostVec.WithLabelValues(lbVals...).Observe(float64(cost / time.Second))
+		rec.plCostVec.WithLabelValues(lbVals...).Observe(float64(cost) / float64(time.Second))
 	}
 }
 
