@@ -1,4 +1,4 @@
-### `cache_get()` {#fn-cache}
+### `cache_get()` {#fn-cache-get}
 
 函数原型：`fn cache_get(key: str) nil|str`
 

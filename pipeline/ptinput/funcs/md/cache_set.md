@@ -1,4 +1,4 @@
-### `cache_set()` {#fn-cache}
+### `cache_set()` {#fn-cache-set}
 
 函数原型：`fn cache_set(key: str, value: str, expiration: int) nil`
 
