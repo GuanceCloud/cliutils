@@ -384,7 +384,7 @@ func (e *Encoder) doEncodeLineProtocol(buf []byte) ([]byte, bool) {
 
 		ptsize := lppt.StringSize()
 
-		if curSize+ptsize+1 > len(buf) {
+		if curSize+ptsize+1 > len(buf) { // extra +1 used to store the last '\n'
 			if curSize == 0 { // nothing added
 				e.lastErr = errTooSmallBuffer
 				return nil, false

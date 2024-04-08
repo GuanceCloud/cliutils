@@ -1115,7 +1115,7 @@ func BenchmarkPointSize(b *T.B) {
 	})
 }
 
-func TestSize(t *T.T) {
+func TestPayloadSize(t *T.T) {
 	t.Run("sizes", func(t *T.T) {
 		// empty point
 		pt := NewPointV2(`abc`, nil)

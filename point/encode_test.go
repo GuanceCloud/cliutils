@@ -7,6 +7,7 @@ package point
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	T "testing"
 	"time"
@@ -665,4 +666,37 @@ func TestPointsSize(t *T.T) {
 	t.Logf("pt.pt.size: %d, pt.size: %d",
 		randPts[0].pt.Size(),
 		randPts[0].Size())
+}
+
+func TestEncodePayloadSize(t *T.T) {
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	randPts := r.Rand(1000)
+
+	enc := GetEncoder(WithEncEncoding(Protobuf))
+	arr, err := enc.Encode(randPts)
+	assert.NoError(t, err)
+	assert.Len(t, arr, 1)
+
+	pbPayload := arr[0]
+	PutEncoder(enc)
+
+	enc = GetEncoder(WithEncEncoding(LineProtocol))
+	arr, err = enc.Encode(randPts)
+	assert.NoError(t, err)
+	assert.Len(t, arr, 1)
+	lpPayload := arr[0]
+	PutEncoder(enc)
+
+	// gzip compression
+	gzSize := func(payload []byte) int {
+		var buf bytes.Buffer
+		gw := gzip.NewWriter(&buf)
+		_, err := gw.Write(payload)
+		assert.NoError(t, err)
+		assert.NoError(t, gw.Close())
+		return buf.Len()
+	}
+
+	t.Logf("pbsize: %d, lpsize: %d, gz pb: %d, gz lp: %d",
+		len(pbPayload), len(lpPayload), gzSize(pbPayload), gzSize(lpPayload))
 }

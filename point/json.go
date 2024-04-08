@@ -41,12 +41,6 @@ func (p *Point) MarshalJSON() ([]byte, error) {
 	if p.HasFlag(Ppb) {
 		m := &protojson.Marshaler{}
 		pb := p.PBPoint()
-		// if x, err := m.MarshalToString(pb); err != nil {
-		//	return nil, err
-		// } else {
-		//	return x, nil
-		//}
-
 		buf := bytes.Buffer{}
 		if err := m.Marshal(&buf, pb); err != nil {
 			return nil, err
