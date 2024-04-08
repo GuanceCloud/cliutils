@@ -3,13 +3,12 @@
 // This product includes software developed at Guance Cloud (https://www.guance.com/).
 // Copyright 2021-present Guance, Inc.
 
-package metrics
+package point
 
 import (
 	"path/filepath"
 	T "testing"
 
-	"github.com/GuanceCloud/cliutils/point"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,17 +16,17 @@ import (
 
 func TestMergePoint(t *T.T) {
 	t.Run(`basic`, func(t *T.T) {
-		pts := []*point.Point{
-			point.NewPointV2("m1",
-				append(point.NewTags(map[string]string{"t1": "v1", "t2": "v2"}),
-					point.NewKVs(map[string]any{"f1": 123})...),
-				point.DefaultLoggingOptions()...,
+		pts := []*Point{
+			NewPointV2("m1",
+				append(NewTags(map[string]string{"t1": "v1", "t2": "v2"}),
+					NewKVs(map[string]any{"f1": 123})...),
+				DefaultLoggingOptions()...,
 			),
 
-			point.NewPointV2("m1",
-				append(point.NewTags(map[string]string{"t1": "v1", "t2": "v2"}),
-					point.NewKVs(map[string]any{"f2": "hello"})...),
-				point.DefaultLoggingOptions()...,
+			NewPointV2("m1",
+				append(NewTags(map[string]string{"t1": "v1", "t2": "v2"}),
+					NewKVs(map[string]any{"f2": "hello"})...),
+				DefaultLoggingOptions()...,
 			),
 		}
 
@@ -40,29 +39,29 @@ func TestMergePoint(t *T.T) {
 	})
 
 	t.Run(`merge-multiple-time-series`, func(t *T.T) {
-		pts := []*point.Point{
-			point.NewPointV2("m1",
-				append(point.NewTags(map[string]string{"t1": "v1", "t2": "v2"}),
-					point.NewKVs(map[string]any{"f1": 123})...),
-				point.DefaultLoggingOptions()...,
+		pts := []*Point{
+			NewPointV2("m1",
+				append(NewTags(map[string]string{"t1": "v1", "t2": "v2"}),
+					NewKVs(map[string]any{"f1": 123})...),
+				DefaultLoggingOptions()...,
 			),
 
-			point.NewPointV2("m1",
-				append(point.NewTags(map[string]string{"t1": "v1", "t2": "v2"}),
-					point.NewKVs(map[string]any{"f2": "hello"})...),
-				point.DefaultLoggingOptions()...,
+			NewPointV2("m1",
+				append(NewTags(map[string]string{"t1": "v1", "t2": "v2"}),
+					NewKVs(map[string]any{"f2": "hello"})...),
+				DefaultLoggingOptions()...,
 			),
 
-			point.NewPointV2("m1",
-				append(point.NewTags(map[string]string{"tag1": "v1", "tag2": "v2"}),
-					point.NewKVs(map[string]any{"f1": 123})...),
-				point.DefaultLoggingOptions()...,
+			NewPointV2("m1",
+				append(NewTags(map[string]string{"tag1": "v1", "tag2": "v2"}),
+					NewKVs(map[string]any{"f1": 123})...),
+				DefaultLoggingOptions()...,
 			),
 
-			point.NewPointV2("m1",
-				append(point.NewTags(map[string]string{"tag1": "v1", "tag2": "v2"}),
-					point.NewKVs(map[string]any{"f2": "hello"})...),
-				point.DefaultLoggingOptions()...,
+			NewPointV2("m1",
+				append(NewTags(map[string]string{"tag1": "v1", "tag2": "v2"}),
+					NewKVs(map[string]any{"f2": "hello"})...),
+				DefaultLoggingOptions()...,
 			),
 		}
 

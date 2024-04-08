@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 
 	types "github.com/gogo/protobuf/types"
+
+	p8s "github.com/prometheus/client_golang/prometheus"
 )
 
 type PointPool interface {
@@ -16,6 +18,9 @@ type PointPool interface {
 	PutKV(f *Field)
 
 	String() string
+
+	// For promethues metrics.
+	p8s.Collector
 }
 
 var defaultPTPool PointPool
@@ -71,6 +76,9 @@ type ppv1 struct {
 	sync.Pool
 }
 
+func (pp *ppv1) Describe(ch chan<- *p8s.Desc) { p8s.DescribeByCollect(pp, ch) }
+func (pp *ppv1) Collect(ch chan<- p8s.Metric) { ch <- nil }
+
 func (pp *ppv1) String() string {
 	return ""
 }
@@ -105,6 +113,9 @@ type partialPointPool struct {
 func NewPointPoolLevel2() PointPool {
 	return &partialPointPool{}
 }
+
+func (ppp *partialPointPool) Describe(ch chan<- *p8s.Desc) { p8s.DescribeByCollect(ppp, ch) }
+func (ppp *partialPointPool) Collect(ch chan<- p8s.Metric) { ch <- nil }
 
 func (pp *partialPointPool) String() string {
 	return ""
@@ -149,20 +160,33 @@ func NewPointPoolLevel3() PointPool {
 	return &fullPointPool{}
 }
 
-func (pp *fullPointPool) String() string {
+func (fpp *fullPointPool) Describe(ch chan<- *p8s.Desc) { p8s.DescribeByCollect(fpp, ch) }
+func (fpp *fullPointPool) Collect(ch chan<- p8s.Metric) {
+	ch <- p8s.MustNewConstMetric(kvCreatedDesc, p8s.CounterValue, float64(fpp.kvCreated.Load()))
+	ch <- p8s.MustNewConstMetric(kvReusedDesc, p8s.CounterValue, float64(fpp.kvReused.Load()))
+	ch <- p8s.MustNewConstMetric(pointCreatedDesc, p8s.CounterValue, float64(fpp.ptCreated.Load()))
+	ch <- p8s.MustNewConstMetric(pointReusedDesc, p8s.CounterValue, float64(fpp.ptReused.Load()))
+
+	ch <- p8s.MustNewConstMetric(kvGetDesc, p8s.CounterValue, float64(fpp.kvGetCount.Load()))
+	ch <- p8s.MustNewConstMetric(kvPutDesc, p8s.CounterValue, float64(fpp.kvPutCount.Load()))
+	ch <- p8s.MustNewConstMetric(pointGetDesc, p8s.CounterValue, float64(fpp.ptGetCount.Load()))
+	ch <- p8s.MustNewConstMetric(pointPutDesc, p8s.CounterValue, float64(fpp.ptPutCount.Load()))
+}
+
+func (fpp *fullPointPool) String() string {
 	return fmt.Sprintf("kvCreated: % 8d, kvReused: % 8d, ptCreated: % 8d, ptReused: % 8d",
-		pp.kvCreated.Load(),
-		pp.kvReused.Load(),
-		pp.ptCreated.Load(),
-		pp.ptReused.Load(),
+		fpp.kvCreated.Load(),
+		fpp.kvReused.Load(),
+		fpp.ptCreated.Load(),
+		fpp.ptReused.Load(),
 	)
 }
 
 type fullPointPool struct {
-	kvCreated,
-	kvReused,
-	ptCreated,
-	ptReused atomic.Int64
+	kvCreated, kvReused,
+	ptCreated, ptReused,
+	kvGetCount, kvPutCount,
+	ptGetCount, ptPutCount atomic.Int64
 
 	ptpool, // pool for *Point
 	// other pools for various *Fields
@@ -177,6 +201,8 @@ type fullPointPool struct {
 
 func (fpp *fullPointPool) PutKV(f *Field) {
 	f = resetKV(clearKV(f))
+
+	fpp.kvPutCount.Add(1)
 
 	switch f.Val.(type) {
 	case *Field_A:
@@ -203,9 +229,13 @@ func (fpp *fullPointPool) Put(p *Point) {
 
 	p.Reset()
 	fpp.ptpool.Put(p)
+
+	fpp.ptPutCount.Add(1)
 }
 
 func (fpp *fullPointPool) Get() *Point {
+	fpp.ptGetCount.Add(1)
+
 	if x := fpp.ptpool.Get(); x == nil {
 		fpp.ptCreated.Add(1)
 		return emptyPoint()
@@ -292,6 +322,8 @@ func (fpp *fullPointPool) GetKV(k string, v any) *Field {
 		err error
 	)
 
+	fpp.kvGetCount.Add(1)
+
 	switch x := v.(type) {
 	case int8:
 		kv = fpp.getI()
@@ -334,7 +366,6 @@ func (fpp *fullPointPool) GetKV(k string, v any) *Field {
 		kv.Val.(*Field_S).S = x
 	case []byte:
 		kv = fpp.getD()
-		// NOTE:  kv.Val.(*Field_D).D should empty(len == 0)
 		kv.Val.(*Field_D).D = append(kv.Val.(*Field_D).D, x...)
 	case bool:
 		kv = fpp.getB()
@@ -394,3 +425,53 @@ func (fpp *fullPointPool) GetKV(k string, v any) *Field {
 
 	return kv
 }
+
+var (
+	kvCreatedDesc = p8s.NewDesc(
+		"pointpool_kv_created_total",
+		"New created key-value instance",
+		nil, nil,
+	)
+
+	kvReusedDesc = p8s.NewDesc(
+		"pointpool_kv_reused_total",
+		"Reused key-value instance count",
+		nil, nil,
+	)
+
+	pointCreatedDesc = p8s.NewDesc(
+		"pointpool_point_created_total",
+		"New created point instance count",
+		nil, nil,
+	)
+
+	pointReusedDesc = p8s.NewDesc(
+		"pointpool_point_reused_total",
+		"Reused point instance count",
+		nil, nil,
+	)
+
+	pointGetDesc = p8s.NewDesc(
+		"pointpool_point_get_total",
+		"Get point count",
+		nil, nil,
+	)
+
+	pointPutDesc = p8s.NewDesc(
+		"pointpool_point_put_total",
+		"Put point count",
+		nil, nil,
+	)
+
+	kvGetDesc = p8s.NewDesc(
+		"pointpool_kv_get_total",
+		"Get key-value count",
+		nil, nil,
+	)
+
+	kvPutDesc = p8s.NewDesc(
+		"pointpool_kv_put_total",
+		"Put key-value count",
+		nil, nil,
+	)
+)

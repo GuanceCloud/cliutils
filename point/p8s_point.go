@@ -3,13 +3,12 @@
 // This product includes software developed at Guance Cloud (https://www.guance.com/).
 // Copyright 2021-present Guance, Inc.
 
-package metrics
+package point
 
 import (
 	"strings"
 	"time"
 
-	"github.com/GuanceCloud/cliutils/point"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 )
@@ -31,10 +30,10 @@ import (
 //
 // For time-series data, we don't need to do this, the storage
 // engine merged them automatically(grouped by time-series).
-func mergePts(pts []*point.Point) []*point.Point {
+func mergePts(pts []*Point) []*Point {
 	// same-hash point put together
-	var res []*point.Point
-	ptMap := map[string][]*point.Point{}
+	var res []*Point
+	ptMap := map[string][]*Point{}
 	for _, pt := range pts {
 		hash := pt.MD5()
 		ptMap[hash] = append(ptMap[hash], pt)
@@ -58,7 +57,7 @@ func mergePts(pts []*point.Point) []*point.Point {
 	return res
 }
 
-func doGatherPoints(reg prometheus.Gatherer) ([]*point.Point, error) {
+func doGatherPoints(reg prometheus.Gatherer) ([]*Point, error) {
 	mfs, err := reg.Gather()
 	if err != nil {
 		return nil, err
@@ -67,7 +66,7 @@ func doGatherPoints(reg prometheus.Gatherer) ([]*point.Point, error) {
 	// All gathered data should have the same timestamp, we enforce it.
 	now := time.Now()
 
-	var pts []*point.Point
+	var pts []*Point
 	for _, mf := range mfs {
 		arr := strings.SplitN(*mf.Name, "_", 2)
 
@@ -75,17 +74,17 @@ func doGatherPoints(reg prometheus.Gatherer) ([]*point.Point, error) {
 		fieldName := arr[1]
 
 		for _, m := range mf.Metric {
-			var kvs point.KVs
+			var kvs KVs
 			for _, label := range m.GetLabel() {
-				kvs = append(kvs, point.NewKV(label.GetName(), label.GetValue(), point.WithKVTagSet(true)))
+				kvs = append(kvs, NewKV(label.GetName(), label.GetValue(), WithKVTagSet(true)))
 			}
 
 			switch *mf.Type {
 			case dto.MetricType_COUNTER:
-				kvs = append(kvs, point.NewKV(fieldName, m.GetCounter().GetValue()))
+				kvs = append(kvs, NewKV(fieldName, m.GetCounter().GetValue()))
 			case dto.MetricType_SUMMARY:
 				avg := uint64(m.GetSummary().GetSampleSum()) / m.GetSummary().GetSampleCount()
-				kvs = append(kvs, point.NewKV(fieldName, avg))
+				kvs = append(kvs, NewKV(fieldName, avg))
 
 			case dto.MetricType_GAUGE:
 				continue // TODO
@@ -103,8 +102,8 @@ func doGatherPoints(reg prometheus.Gatherer) ([]*point.Point, error) {
 				ts = time.Unix(0, int64(time.Millisecond)**m.TimestampMs)
 			}
 
-			opts := append(point.DefaultMetricOptions(), point.WithTime(ts))
-			pts = append(pts, point.NewPointV2(name, kvs, opts...))
+			opts := append(DefaultMetricOptions(), WithTime(ts))
+			pts = append(pts, NewPointV2(name, kvs, opts...))
 		}
 	}
 
@@ -112,7 +111,7 @@ func doGatherPoints(reg prometheus.Gatherer) ([]*point.Point, error) {
 }
 
 // GatherPoints gather all metrics in global registry, but convert these metrics
-// to point.Point.
-func GatherPoints() ([]*point.Point, error) {
+// to Point.
+func GatherPoints(reg prometheus.Gatherer) ([]*Point, error) {
 	return doGatherPoints(reg)
 }

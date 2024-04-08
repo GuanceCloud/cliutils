@@ -2,10 +2,13 @@ package point
 
 import (
 	"fmt"
+	"math"
 	sync "sync"
 	T "testing"
 	"time"
 
+	"github.com/GuanceCloud/cliutils"
+	"github.com/GuanceCloud/cliutils/metrics"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -313,5 +316,93 @@ func TestReset(t *T.T) {
 		pt.Reset()
 
 		assert.True(t, isEmptyPoint(pt))
+	})
+}
+
+func BenchmarkStringKV(b *T.B) {
+	var (
+		fpp fullPointPool
+
+		shortString = cliutils.CreateRandomString(32)
+		longString  = cliutils.CreateRandomString(1 << 10) // 1KB
+		hugeString  = cliutils.CreateRandomString(1 << 20) // 1MB
+		now         = time.Now()
+	)
+
+	SetPointPool(&fpp)
+	defer ClearPointPool()
+
+	b.Run("v3-pool-string-kv", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			var kvs KVs
+			kvs = kvs.Add("short-f1", shortString, false, false)
+			kvs = kvs.Add("long-f2", longString, false, false)
+			kvs = kvs.Add("huge-f3", hugeString, false, false)
+
+			kvs = kvs.Add("local-str-f1", "f1", false, false)
+			kvs = kvs.Add("local-str-f2", "f2", false, false)
+			kvs = kvs.Add("local-str-f3", "f3", false, false)
+
+			pt := NewPointV2("m1",
+				kvs,
+				WithTime(now),
+				WithStrField(true),
+				WithPrecheck(false),
+			)
+			fpp.Put(pt)
+		}
+	})
+
+	b.Run("v3-pool-non-string-kv", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			var kvs KVs
+			kvs = kvs.Add("f-i", 1024, false, false)
+			kvs = kvs.Add("f-b", false, false, false)
+			kvs = kvs.Add("f-f", 3.14, false, false)
+			kvs = kvs.Add("f-u", uint(42), false, false)
+			kvs = kvs.Add("f-max-int", int64(math.MaxInt64), false, false)
+			kvs = kvs.Add("f-max-uint", uint64(math.MaxUint64), false, false)
+
+			pt := NewPointV2("m1",
+				kvs,
+				WithTime(now),
+				WithPrecheck(false),
+			)
+			fpp.Put(pt)
+		}
+	})
+}
+
+func TestPointPoolMetrics(t *T.T) {
+	t.Run("v3-pool-metrics", func(t *T.T) {
+		pp := &fullPointPool{}
+		SetPointPool(pp)
+		defer ClearPointPool()
+
+		metrics.MustRegister(pp)
+
+		// total add 100 * 4 Field
+		for i := 0; i < 100; i++ {
+			func() {
+				var kvs KVs
+				kvs = kvs.Add(fmt.Sprintf("f%d", i), 123, false, false)
+				kvs = kvs.Add(fmt.Sprintf("f%d", i+1), 123, false, false)
+				kvs = kvs.Add(fmt.Sprintf("f%d", i+2), 123, false, false)
+				kvs = kvs.Add(fmt.Sprintf("f%d", i+3), 123, false, false)
+
+				pt := NewPointV2("some", kvs)
+				pp.Put(pt)
+			}()
+		}
+
+		assert.Equal(t, int64(396), pp.kvReused.Load())
+		assert.Equal(t, int64(4), pp.kvCreated.Load())
+
+		t.Logf("point pool: %s", pp)
+
+		mfs, err := metrics.Gather()
+		assert.NoError(t, err)
+
+		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 	})
 }
