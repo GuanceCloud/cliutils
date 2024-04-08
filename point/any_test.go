@@ -58,7 +58,6 @@ func TestAny(t *T.T) {
 	})
 
 	t.Run("with-nil", func(t *T.T) {
-
 		EnableMixedArrayField = true
 		defer func() {
 			EnableMixedArrayField = false

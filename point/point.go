@@ -335,7 +335,7 @@ func (p *Point) CopyField(kvs ...*Field) {
 	p.pt.Fields = old
 }
 
-// SetKVs set kvs as p's new KVs
+// SetKVs set kvs as p's new KVs.
 func (p *Point) SetKVs(kvs ...*Field) {
 	old := KVs(p.pt.Fields)
 

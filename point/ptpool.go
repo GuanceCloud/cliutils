@@ -19,7 +19,7 @@ type PointPool interface {
 
 	String() string
 
-	// For promethues metrics.
+	// For prometheus metrics.
 	p8s.Collector
 }
 
@@ -117,7 +117,7 @@ func NewPointPoolLevel2() PointPool {
 func (ppp *partialPointPool) Describe(ch chan<- *p8s.Desc) { p8s.DescribeByCollect(ppp, ch) }
 func (ppp *partialPointPool) Collect(ch chan<- p8s.Metric) { ch <- nil }
 
-func (pp *partialPointPool) String() string {
+func (ppp *partialPointPool) String() string {
 	return ""
 }
 
