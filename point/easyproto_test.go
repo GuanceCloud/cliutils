@@ -16,9 +16,6 @@ func BenchmarkEasyproto(b *T.B) {
 		pbpts.Arr = append(pbpts.Arr, pt.pt)
 	}
 
-	src, err := pbpts.Marshal()
-	assert.NoError(b, err)
-
 	b.ResetTimer()
 	b.Run("easyproto-encode", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
@@ -27,12 +24,15 @@ func BenchmarkEasyproto(b *T.B) {
 		}
 	})
 
+	b.ResetTimer()
 	b.Run("gogopb-encode", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			pbpts.Marshal()
 		}
 	})
 
+	src, err := pbpts.Marshal()
+	assert.NoError(b, err)
 	b.ResetTimer()
 	b.Run("easyproto-decode", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
@@ -50,7 +50,12 @@ func BenchmarkEasyproto(b *T.B) {
 	b.Run("easyproto-decode-under-point-pool", func(b *T.B) {
 		pp := &fullPointPool{}
 		SetPointPool(pp)
-		defer ClearPointPool()
+
+		b.Cleanup(func() {
+			b.Logf("ptpool: %s", pp.String())
+
+			ClearPointPool()
+		})
 
 		for i := 0; i < b.N; i++ {
 			pts, _ := unmarshalPoints(src)
@@ -59,8 +64,6 @@ func BenchmarkEasyproto(b *T.B) {
 				pp.Put(pt)
 			}
 		}
-
-		// b.Logf("point pool: %s", pp.String())
 	})
 
 	/*
