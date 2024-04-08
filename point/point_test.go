@@ -157,11 +157,11 @@ func TestGet(t *T.T) {
 	t.Run("get", func(t *T.T) {
 		var kvs KVs
 
-		EnableMixedArrayField = true
 		EnableDictField = true
+		EnableMixedArrayField = true
 		defer func() {
-			EnableMixedArrayField = false
 			EnableDictField = false
+			EnableMixedArrayField = false
 		}()
 
 		kvs = kvs.Add("si1", int8(1), false, true)

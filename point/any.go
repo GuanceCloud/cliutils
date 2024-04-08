@@ -303,11 +303,14 @@ func NewArray(ents ...any) (arr *Array, err error) {
 			arr.Arr = append(arr.Arr, &BasicTypes{X: &BasicTypes_D{x}})
 		case bool:
 			arr.Arr = append(arr.Arr, &BasicTypes{X: &BasicTypes_B{x}})
-
-		//	arr.Arr = append(arr.Arr, nil)
 		default:
-			return nil, fmt.Errorf("unknown element type %q(index: %d) within array",
-				reflect.TypeOf(v).String(), idx)
+			if x == nil {
+				// gogoproto any do not support nil value.
+				return nil, fmt.Errorf("got nil(index: %d) within array", idx)
+			} else {
+				return nil, fmt.Errorf("unknown element type %q(index: %d) within array",
+					reflect.TypeOf(v).String(), idx)
+			}
 		}
 	}
 

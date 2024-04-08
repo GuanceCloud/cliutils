@@ -8,7 +8,6 @@ package point
 import (
 	T "testing"
 
-	types "github.com/gogo/protobuf/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -59,7 +58,6 @@ func TestAny(t *T.T) {
 	})
 
 	t.Run("with-nil", func(t *T.T) {
-		var kvs KVs
 
 		EnableMixedArrayField = true
 		defer func() {
@@ -74,10 +72,15 @@ func TestAny(t *T.T) {
 		x, err := NewAny(arr)
 		assert.NoError(t, err)
 
+		var kvs KVs
+
 		kvs = kvs.Add("k1", x, false, false)
 		pt := NewPointV2("basic", kvs)
 
 		t.Logf("%s", pt.Pretty())
+
+		_, err = NewArray(1, 2.0, nil)
+		assert.Error(t, err)
 	})
 
 	t.Run("with-non-baisc-type", func(t *T.T) {
@@ -110,7 +113,7 @@ func TestAny(t *T.T) {
 		m = MustNewMap(map[string]any{"i1": 1, "i2": 2})
 		assert.Len(t, m.Map, 2)
 
-		x, err := types.MarshalAny(m)
+		x, err := NewAny(m)
 		assert.NoError(t, err)
 
 		assert.Equal(t, DictFieldType, x.TypeUrl)

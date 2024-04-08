@@ -308,7 +308,7 @@ func (p *Point) KVs() (arr KVs) {
 	return KVs(p.pt.Fields)
 }
 
-// AddKVs add kvs, if keys exist, do nothing.
+// AddKVs add(shallow-copy) kvs, if keys exist, do nothing.
 func (p *Point) AddKVs(kvs ...*Field) {
 	old := KVs(p.pt.Fields)
 	for _, kv := range kvs {
@@ -317,7 +317,25 @@ func (p *Point) AddKVs(kvs ...*Field) {
 	p.pt.Fields = old
 }
 
-// SetKVs set kvs as p's new KVs.
+// CopyTags deep-copy tag kvs, if keys exist, do nothing.
+func (p *Point) CopyTags(kvs ...*Field) {
+	old := KVs(p.pt.Fields)
+	for _, kv := range kvs {
+		old = old.AddTag(kv.Key, kv.GetS())
+	}
+	p.pt.Fields = old
+}
+
+// CopyField deep-copy field kvs, if keys exist, do nothing.
+func (p *Point) CopyField(kvs ...*Field) {
+	old := KVs(p.pt.Fields)
+	for _, kv := range kvs {
+		old = old.Add(kv.Key, kv.Raw(), false, false)
+	}
+	p.pt.Fields = old
+}
+
+// SetKVs set kvs as p's new KVs
 func (p *Point) SetKVs(kvs ...*Field) {
 	old := KVs(p.pt.Fields)
 

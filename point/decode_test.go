@@ -21,7 +21,7 @@ func TestLPFieldArray(t *T.T) {
 
 		dec := GetDecoder(WithDecEncoding(LineProtocol))
 		_, err := dec.Decode(lp)
-		assert.NoError(t, err)
+		assert.NoErrorf(t, err, "should got no error: %s", err)
 	})
 
 	t.Run(`encode-lp-array-field`, func(t *T.T) {
