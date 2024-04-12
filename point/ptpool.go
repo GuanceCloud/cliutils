@@ -161,15 +161,49 @@ func NewPointPoolLevel3() PointPool {
 
 func (fpp *fullPointPool) Describe(ch chan<- *p8s.Desc) { p8s.DescribeByCollect(fpp, ch) }
 func (fpp *fullPointPool) Collect(ch chan<- p8s.Metric) {
-	ch <- p8s.MustNewConstMetric(kvCreatedDesc, p8s.CounterValue, float64(fpp.kvCreated.Load()))
-	ch <- p8s.MustNewConstMetric(kvReusedDesc, p8s.CounterValue, float64(fpp.kvReused.Load()))
-	ch <- p8s.MustNewConstMetric(pointCreatedDesc, p8s.CounterValue, float64(fpp.ptCreated.Load()))
-	ch <- p8s.MustNewConstMetric(pointReusedDesc, p8s.CounterValue, float64(fpp.ptReused.Load()))
+	ch <- p8s.MustNewConstMetric(kvCreatedDesc,
+		p8s.CounterValue,
+		float64(fpp.kvCreated.Load()),
+		"pool",
+	)
 
-	ch <- p8s.MustNewConstMetric(kvGetDesc, p8s.CounterValue, float64(fpp.kvGetCount.Load()))
-	ch <- p8s.MustNewConstMetric(kvPutDesc, p8s.CounterValue, float64(fpp.kvPutCount.Load()))
-	ch <- p8s.MustNewConstMetric(pointGetDesc, p8s.CounterValue, float64(fpp.ptGetCount.Load()))
-	ch <- p8s.MustNewConstMetric(pointPutDesc, p8s.CounterValue, float64(fpp.ptPutCount.Load()))
+	ch <- p8s.MustNewConstMetric(kvReusedDesc,
+		p8s.CounterValue,
+		float64(fpp.kvReused.Load()),
+		"pool")
+
+	ch <- p8s.MustNewConstMetric(
+		pointCreatedDesc,
+		p8s.CounterValue,
+		float64(fpp.ptCreated.Load()),
+		"pool")
+
+	ch <- p8s.MustNewConstMetric(
+		pointReusedDesc,
+		p8s.CounterValue,
+		float64(fpp.ptReused.Load()),
+		"pool")
+
+	ch <- p8s.MustNewConstMetric(
+		kvGetDesc,
+		p8s.CounterValue,
+		float64(fpp.kvGetCount.Load()),
+		"pool")
+
+	ch <- p8s.MustNewConstMetric(kvPutDesc,
+		p8s.CounterValue,
+		float64(fpp.kvPutCount.Load()),
+		"pool")
+
+	ch <- p8s.MustNewConstMetric(pointGetDesc,
+		p8s.CounterValue,
+		float64(fpp.ptGetCount.Load()),
+		"pool")
+
+	ch <- p8s.MustNewConstMetric(pointPutDesc,
+		p8s.CounterValue,
+		float64(fpp.ptPutCount.Load()),
+		"pool")
 }
 
 func (fpp *fullPointPool) String() string {
@@ -425,52 +459,313 @@ func (fpp *fullPointPool) GetKV(k string, v any) *Field {
 	return kv
 }
 
+type reservedCapPool struct {
+	pool sync.Pool
+
+	newFn func() any
+	ch    chan any
+}
+
+func newReservedCapPool(capacity int64, newFn func() any) *reservedCapPool {
+	x := &reservedCapPool{
+		pool: sync.Pool{},
+		ch:   make(chan any, capacity),
+	}
+
+	x.pool.New = newFn
+	return x
+}
+
+func (p *reservedCapPool) get() any {
+	select {
+	case elem := <-p.ch:
+		return elem
+	default:
+		return p.pool.Get()
+	}
+}
+
+func (p *reservedCapPool) put(x any) {
+	select {
+	case p.ch <- x:
+		return
+	default:
+		p.pool.Put(x)
+	}
+}
+
+type ReservedCapPointPool struct {
+	capacity int64
+
+	poolGetCount, poolPutCount,
+	chanGetCount, chanPutCount atomic.Int64
+
+	ptpool, // pool for *Point
+	// other pools for various *Fields
+	fpool, // float
+	ipool, // int
+	upool, // uint
+	spool, // string
+	bpool, // bool
+	dpool, // []byte
+	apool *reservedCapPool // any
+}
+
+func NewReservedCapPointPool(capacity int64) PointPool {
+	p := &ReservedCapPointPool{
+		capacity: capacity,
+	}
+
+	p.ptpool = newReservedCapPool(capacity, func() any {
+		return emptyPoint()
+	})
+
+	p.fpool = newReservedCapPool(capacity, func() any {
+		return &Field{Val: &Field_F{}}
+	})
+
+	p.ipool = newReservedCapPool(capacity, func() any {
+		return &Field{Val: &Field_I{}}
+	})
+
+	p.upool = newReservedCapPool(capacity, func() any {
+		return &Field{Val: &Field_U{}}
+	})
+
+	p.spool = newReservedCapPool(capacity, func() any {
+		return &Field{Val: &Field_S{}}
+	})
+
+	p.bpool = newReservedCapPool(capacity, func() any {
+		return &Field{Val: &Field_B{}}
+	})
+
+	p.dpool = newReservedCapPool(capacity, func() any {
+		return &Field{Val: &Field_D{}}
+	})
+
+	p.apool = newReservedCapPool(capacity, func() any {
+		return &Field{Val: &Field_A{}}
+	})
+
+	return p
+}
+
+func (cpp *ReservedCapPointPool) Get() *Point {
+	return cpp.ptpool.get().(*Point)
+}
+
+func (cpp *ReservedCapPointPool) Put(p *Point) {
+	for _, f := range p.KVs() {
+		cpp.PutKV(f)
+	}
+
+	p.Reset()
+	cpp.ptpool.put(p)
+}
+
+func (cpp *ReservedCapPointPool) GetKV(k string, v any) *Field {
+	var (
+		kv  *Field
+		arr *types.Any
+		err error
+	)
+
+	switch x := v.(type) {
+	case int8:
+		kv = cpp.ipool.get().(*Field)
+		kv.Val.(*Field_I).I = int64(x)
+	case uint8:
+		kv = cpp.fpool.get().(*Field)
+		kv.Val.(*Field_U).U = uint64(x)
+	case int16:
+		kv = cpp.ipool.get().(*Field)
+		kv.Val.(*Field_I).I = int64(x)
+	case uint16:
+		kv = cpp.upool.get().(*Field)
+		kv.Val.(*Field_U).U = uint64(x)
+	case int32:
+		kv = cpp.ipool.get().(*Field)
+		kv.Val.(*Field_I).I = int64(x)
+	case uint32:
+		kv = cpp.upool.get().(*Field)
+		kv.Val.(*Field_U).U = uint64(x)
+	case int:
+		kv = cpp.ipool.get().(*Field)
+		kv.Val.(*Field_I).I = int64(x)
+	case uint:
+		kv = cpp.upool.get().(*Field)
+		kv.Val.(*Field_U).U = uint64(x)
+	case int64:
+		kv = cpp.ipool.get().(*Field)
+		kv.Val.(*Field_I).I = x
+	case uint64:
+		kv = cpp.upool.get().(*Field)
+		kv.Val.(*Field_U).U = x
+	case float64:
+		kv = cpp.fpool.get().(*Field)
+		kv.Val.(*Field_F).F = x
+	case float32:
+		kv = cpp.fpool.get().(*Field)
+		kv.Val.(*Field_F).F = float64(x)
+	case string:
+		kv = cpp.spool.get().(*Field)
+		kv.Val.(*Field_S).S = x
+	case []byte:
+		kv = cpp.dpool.get().(*Field)
+		kv.Val.(*Field_D).D = append(kv.Val.(*Field_D).D, x...)
+	case bool:
+		kv = cpp.bpool.get().(*Field)
+		kv.Val.(*Field_B).B = x
+
+	case *types.Any: // TODO
+		kv = cpp.apool.get().(*Field)
+		kv.Val.(*Field_A).A = x
+
+		// following are array types
+	case []int8:
+		kv = cpp.apool.get().(*Field)
+		arr, err = NewIntArray(x...)
+	case []int16:
+		kv = cpp.apool.get().(*Field)
+		arr, err = NewIntArray(x...)
+	case []int32:
+		kv = cpp.apool.get().(*Field)
+		arr, err = NewIntArray(x...)
+	case []int64:
+		kv = cpp.apool.get().(*Field)
+		arr, err = NewIntArray(x...)
+	case []uint16:
+		kv = cpp.apool.get().(*Field)
+		arr, err = NewUintArray(x...)
+	case []uint32:
+		kv = cpp.apool.get().(*Field)
+		arr, err = NewUintArray(x...)
+	case []uint64:
+		kv = cpp.apool.get().(*Field)
+		arr, err = NewUintArray(x...)
+
+	case []string:
+		kv = cpp.apool.get().(*Field)
+		arr, err = NewStringArray(x...)
+
+	case []bool:
+		kv = cpp.apool.get().(*Field)
+		arr, err = NewBoolArray(x...)
+
+	case [][]byte:
+		kv = cpp.apool.get().(*Field)
+		arr, err = NewBytesArray(x...)
+
+	default: // for nil or other types
+		return nil
+	}
+
+	// there are array types.
+	if arr != nil && err == nil {
+		kv.Val.(*Field_A).A = arr
+	}
+
+	if kv != nil {
+		kv.Key = k
+	}
+
+	return kv
+}
+
+func (cpp *ReservedCapPointPool) PutKV(f *Field) {
+	f = resetKV(clearKV(f))
+
+	switch f.Val.(type) {
+	case *Field_A:
+		cpp.apool.put(f)
+	case *Field_B:
+		cpp.bpool.put(f)
+	case *Field_D:
+		cpp.dpool.put(f)
+	case *Field_F:
+		cpp.fpool.put(f)
+	case *Field_I:
+		cpp.ipool.put(f)
+	case *Field_S:
+		cpp.spool.put(f)
+	case *Field_U:
+		cpp.upool.put(f)
+	}
+}
+
+func (cpp *ReservedCapPointPool) String() string {
+	// TODO
+	return ""
+}
+
+func (cpp *ReservedCapPointPool) Describe(ch chan<- *p8s.Desc) { p8s.DescribeByCollect(cpp, ch) }
+func (cpp *ReservedCapPointPool) Collect(ch chan<- p8s.Metric) {
+	ch <- p8s.MustNewConstMetric(kvCreatedDesc, p8s.CounterValue, float64(cpp.kvCreated.Load()))
+	ch <- p8s.MustNewConstMetric(kvReusedDesc, p8s.CounterValue, float64(cpp.kvReused.Load()))
+	ch <- p8s.MustNewConstMetric(pointCreatedDesc, p8s.CounterValue, float64(cpp.ptCreated.Load()))
+	ch <- p8s.MustNewConstMetric(pointReusedDesc, p8s.CounterValue, float64(cpp.ptReused.Load()))
+
+	ch <- p8s.MustNewConstMetric(kvGetDesc, p8s.CounterValue, float64(cpp.kvGetCount.Load()))
+	ch <- p8s.MustNewConstMetric(kvPutDesc, p8s.CounterValue, float64(cpp.kvPutCount.Load()))
+	ch <- p8s.MustNewConstMetric(pointGetDesc, p8s.CounterValue, float64(cpp.ptGetCount.Load()))
+	ch <- p8s.MustNewConstMetric(pointPutDesc, p8s.CounterValue, float64(cpp.ptPutCount.Load()))
+
+	ch <- p8s.MustNewConstMetric(poolReservedCapacity, p8s.CounterValue, float64(cpp.capacity))
+}
+
 var (
 	kvCreatedDesc = p8s.NewDesc(
 		"pointpool_kv_created_total",
 		"New created key-value instance",
-		nil, nil,
+		[]string{"from"}, nil,
 	)
 
 	kvReusedDesc = p8s.NewDesc(
 		"pointpool_kv_reused_total",
 		"Reused key-value instance count",
-		nil, nil,
+		[]string{"from"}, nil,
 	)
 
 	pointCreatedDesc = p8s.NewDesc(
 		"pointpool_point_created_total",
 		"New created point instance count",
-		nil, nil,
+		[]string{"from"}, nil,
 	)
 
 	pointReusedDesc = p8s.NewDesc(
 		"pointpool_point_reused_total",
 		"Reused point instance count",
-		nil, nil,
+		[]string{"from"}, nil,
 	)
 
 	pointGetDesc = p8s.NewDesc(
 		"pointpool_point_get_total",
 		"Get point count",
-		nil, nil,
+		[]string{"from"}, nil,
 	)
 
 	pointPutDesc = p8s.NewDesc(
 		"pointpool_point_put_total",
 		"Put point count",
-		nil, nil,
+		[]string{"from"}, nil,
 	)
 
 	kvGetDesc = p8s.NewDesc(
 		"pointpool_kv_get_total",
 		"Get key-value count",
-		nil, nil,
+		[]string{"from"}, nil,
 	)
 
 	kvPutDesc = p8s.NewDesc(
 		"pointpool_kv_put_total",
 		"Put key-value count",
+		[]string{"from"}, nil,
+	)
+
+	poolReservedCapacity = p8s.NewDesc(
+		"pointpool_reserved_capacity",
+		"Reserved capacity of the pool",
 		nil, nil,
 	)
 )

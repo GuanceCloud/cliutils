@@ -122,7 +122,7 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 		}
 
 	case Protobuf:
-		if d.easyproto {
+		if d.easyproto || defaultPTPool != nil { // force use easyproto when point pool enabled
 			pts, err = unmarshalPoints(data)
 			if err != nil {
 				return nil, err
@@ -134,23 +134,14 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 			}
 
 			for _, pbpt := range pbpts.Arr {
-				pt := &Point{
-					pt: pbpt,
-				}
-
-				pts = append(pts, pt)
+				pts = append(pts, FromPB(pbpt))
 			}
 		}
 
 		var chk *checker
 		if cfg.precheck {
 			chk = &checker{cfg: cfg}
-		}
-
-		for idx, pt := range pts {
-			pt.SetFlag(Ppb)
-
-			if cfg.precheck {
+			for idx, pt := range pts {
 				pts[idx] = chk.check(pt)
 			}
 		}

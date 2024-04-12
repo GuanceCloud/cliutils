@@ -52,7 +52,7 @@ func (p *Point) HasFlag(f uint) bool {
 // WrapPoint wrap lagacy line-protocol point into Point.
 func WrapPoint(pts []influxm.Point) (arr []*Point) {
 	for _, pt := range pts {
-		if x := FromLP(pt); x != nil {
+		if x := FromModelsLP(pt); x != nil {
 			arr = append(arr, x)
 		}
 	}
@@ -61,7 +61,7 @@ func WrapPoint(pts []influxm.Point) (arr []*Point) {
 
 // NewLPPoint create Point based on a lineproto point.
 func NewLPPoint(lp influxm.Point) *Point {
-	return FromLP(lp)
+	return FromModelsLP(lp)
 }
 
 func (p *Point) MustLPPoint() influxm.Point {
@@ -196,40 +196,13 @@ func FromPBJson(j []byte) (*Point, error) {
 }
 
 func FromJSONPoint(j *JSONPoint) *Point {
-	pt := &Point{
-		pt: &PBPoint{
-			Name:   j.Measurement,
-			Fields: NewKVs(j.Fields),
-			Time:   time.Unix(0, j.Time).UnixNano(),
-		},
-	}
+	kvs := NewKVs(j.Fields)
 
 	for k, v := range j.Tags {
-		pt.MustAddTag(k, v)
+		kvs.MustAddTag(k, v)
 	}
+	return NewPointV2(j.Measurement, kvs, WithTime(time.Unix(0, j.Time)))
 
-	return pt
-}
-
-func FromLP(lp influxm.Point) *Point {
-	lpfs, err := lp.Fields()
-	if err != nil { // invalid line-protocol point
-		return nil
-	}
-
-	pt := &Point{
-		pt: &PBPoint{
-			Name:   string(lp.Name()),
-			Fields: NewKVs(lpfs),
-			Time:   lp.Time().UnixNano(),
-		},
-	}
-
-	for _, tag := range lp.Tags() {
-		pt.MustAddTag(string(tag.Key), string(tag.Value))
-	}
-
-	return pt
 }
 
 func FromModelsLP(lp influxm.Point) *Point {
@@ -238,25 +211,25 @@ func FromModelsLP(lp influxm.Point) *Point {
 		return nil
 	}
 
-	pt := &Point{
-		pt: &PBPoint{
-			Name:   string(lp.Name()),
-			Fields: NewKVs(lpfs),
-			Time:   lp.Time().UnixNano(),
-		},
-	}
+	var kvs KVs
+	kvs = NewKVs(lpfs)
 
 	tags := lp.Tags()
 	for _, t := range tags {
-		pt.MustAddTag(string(t.Key), string(t.Value))
+		kvs = kvs.MustAddTag(string(t.Key), string(t.Value))
 	}
 
-	return pt
+	return NewPointV2(string(lp.Name()), kvs, WithTime(lp.Time()))
 }
 
 func FromPB(pb *PBPoint) *Point {
-	pt := &Point{
-		pt: pb,
+	pt := NewPointV2(pb.Name, pb.Fields, WithTime(time.Unix(0, pb.Time)))
+	if len(pb.Warns) > 0 {
+		pt.pt.Warns = pb.Warns
+	}
+
+	if len(pb.Debugs) > 0 {
+		pt.pt.Debugs = pb.Debugs
 	}
 
 	pt.SetFlag(Ppb)
