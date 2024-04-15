@@ -208,6 +208,18 @@ func BenchmarkRandWithPool(b *T.B) {
 			}
 		}
 	})
+
+	b.Run("with-reserved-pool", func(b *T.B) {
+		pp := NewReservedCapPointPool(128)
+		r := NewRander(WithRandPointPool(pp), WithFixedKeys(true), WithFixedTags(true), WithRandStringValues(false))
+
+		for i := 0; i < b.N; i++ {
+			pts := r.Rand(1000)
+			for _, pt := range pts {
+				pp.Put(pt)
+			}
+		}
+	})
 }
 
 func BenchmarkRandWithoutPool(b *T.B) {

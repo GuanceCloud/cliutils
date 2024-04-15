@@ -9,7 +9,9 @@ import (
 
 	"github.com/GuanceCloud/cliutils"
 	"github.com/GuanceCloud/cliutils/metrics"
+	gofakeit "github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var sampleLogs = []string{
@@ -104,25 +106,6 @@ var sampleLogs = []string{
 	`2022-10-27T16:12:42.050+0800	DEBUG	ddtrace	ddtrace/ddtrace_http.go:34	### received tracing data from path: /v0.4/traces`,
 }
 
-func BenchmarkPoolV0(b *T.B) {
-	now := time.Now()
-
-	b.Run("without-pool", func(b *T.B) {
-		for i := 0; i < b.N; i++ {
-			var kvs KVs
-
-			kvs = kvs.Add("f0", 123, false, true)
-			kvs = kvs.Add("f1", 3.14, false, true)
-			kvs = kvs.Add("f2", "hello", false, true)
-			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, true)
-			kvs = kvs.Add("f4", false, false, false)
-			kvs = kvs.Add("f5", -123, false, false)
-
-			NewPointV2("m1", kvs, WithTime(now), WithPrecheck(false))
-		}
-	})
-}
-
 func BenchmarkPoolV1(b *T.B) {
 	now := time.Now()
 	pp := NewPointPoolLevel1()
@@ -169,8 +152,56 @@ func BenchmarkPoolV2(b *T.B) {
 	})
 }
 
-func BenchmarkPoolV3(b *T.B) {
+func BenchmarkPoolV3AndReservedCapPool(b *T.B) {
 	now := time.Now()
+
+	b.Run("without-pool", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			var kvs KVs
+
+			kvs = kvs.Add("f0", 123, false, true)
+			kvs = kvs.Add("f1", 3.14, false, true)
+			kvs = kvs.Add("f2", "hello", false, true)
+			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, true)
+			kvs = kvs.Add("f4", false, false, false)
+			kvs = kvs.Add("f5", -123, false, false)
+
+			NewPointV2("m1", kvs, WithTime(now), WithPrecheck(false))
+		}
+	})
+
+	b.Run("reservedCapPool", func(b *T.B) {
+		pp := NewReservedCapPointPool(1000)
+		SetPointPool(pp)
+		defer func() {
+			SetPointPool(nil)
+		}()
+
+		b.Cleanup(func() {
+			metrics.Unregister(pp)
+		})
+
+		metrics.MustRegister(pp)
+
+		b.ResetTimer()
+		var kvs KVs
+		for i := 0; i < b.N; i++ {
+			kvs = kvs.Add("f0", 123, false, false)
+			kvs = kvs.Add("f1", 3.14, false, false)
+			kvs = kvs.Add("f2", "hello", false, false)
+			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, false)
+			kvs = kvs.Add("f4", false, false, false)
+			kvs = kvs.Add("f5", -123, false, false)
+
+			pt := NewPointV2("m1", kvs, WithPrecheck(false))
+			pp.Put(pt)
+		}
+
+		mfs, err := metrics.Gather()
+		assert.NoError(b, err)
+
+		b.Logf("\n%s", metrics.MetricFamily2Text(mfs))
+	})
 
 	b.Run("v3-pool", func(b *T.B) {
 		fpp := NewPointPoolLevel3()
@@ -376,6 +407,10 @@ func TestPointPoolMetrics(t *T.T) {
 
 		metrics.MustRegister(pp)
 
+		t.Cleanup(func() {
+			metrics.Unregister(pp)
+		})
+
 		// total add 100 * 4 Field
 		for i := 0; i < 100; i++ {
 			func() {
@@ -400,4 +435,204 @@ func TestPointPoolMetrics(t *T.T) {
 
 		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 	})
+
+	t.Run("reserved-pool-metrics", func(t *T.T) {
+		pp := NewReservedCapPointPool(100)
+		SetPointPool(pp)
+		defer ClearPointPool()
+
+		t.Cleanup(func() {
+			metrics.Unregister(pp)
+		})
+
+		metrics.MustRegister(pp)
+
+		// total add 100 * 4 Field
+		for i := 0; i < 100; i++ {
+			func() {
+				var kvs KVs
+				kvs = kvs.Add(fmt.Sprintf("f%d", i), 123, false, false)
+				kvs = kvs.Add(fmt.Sprintf("f%d", i+1), 123, false, false)
+				kvs = kvs.Add(fmt.Sprintf("f%d", i+2), 123, false, false)
+				kvs = kvs.Add(fmt.Sprintf("f%d", i+3), 123, false, false)
+
+				pt := NewPointV2("some", kvs)
+				pp.Put(pt)
+			}()
+		}
+
+		mfs, err := metrics.Gather()
+		assert.NoError(t, err)
+
+		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
+	})
+}
+
+func TestReservedCapPointPool(t *T.T) {
+	t.Run(`basic`, func(t *T.T) {
+
+		pp := NewReservedCapPointPool(100)
+		SetPointPool(pp)
+		defer ClearPointPool()
+
+		var kvs KVs
+		kvs = kvs.Add(fmt.Sprintf("f%d", 0), 123, false, false)
+		kvs = kvs.Add(fmt.Sprintf("f%d", +1), 123, false, false)
+		kvs = kvs.Add(fmt.Sprintf("f%d", +2), 123, false, false)
+		kvs = kvs.Add(fmt.Sprintf("f%d", +3), 123, false, false)
+
+		pt := NewPointV2("some", kvs)
+		t.Logf("pt: %s", pt.Pretty())
+
+		pp.Put(pt)
+
+		empty := pp.Get()
+		t.Logf("empty pt: %s", empty.Pretty())
+	})
+}
+
+func TestPoolKVResuable(t *T.T) {
+	type Foo struct {
+		Measurement string
+
+		TS int64
+
+		// tags
+		T1Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		T2Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		T3Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+
+		T1 string
+		T2 string
+		T3 string
+
+		SKey, S string `fake:"{regex:[a-zA-Z0-9]{128}}"`
+
+		I8Key  string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		I16Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		I32Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		I64Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		I64    int64
+		I8     int8
+		I16    int16
+		I32    int32
+
+		U8Key  string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		U16Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		U32Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		U64Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+
+		U8  uint8
+		U16 uint16
+		U32 uint32
+		U64 uint64
+
+		BKey   string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		DKey   string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		F64Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		F32Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		B      bool
+		D      []byte
+		F64    float64
+		F32    float32
+	}
+
+	cases := []struct {
+		name string
+		pp   PointPool
+	}{
+		{
+			name: "v3",
+			pp:   NewPointPoolLevel3(),
+		},
+
+		{
+			name: "reserve-cap-pool",
+			pp:   NewReservedCapPointPool(1024),
+		},
+
+		{
+			name: "reserve-0-cap-pool", // regression to v3
+			pp:   NewReservedCapPointPool(0),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *T.T) {
+
+			metrics.MustRegister(tc.pp)
+
+			SetPointPool(tc.pp)
+			t.Cleanup(func() {
+				ClearPointPool()
+				metrics.Unregister(tc.pp)
+			})
+
+			var f Foo
+			maxPT := (1 << 20)
+			for i := 0; i < maxPT; i++ {
+				assert.NoError(t, gofakeit.Struct(&f))
+				var kvs KVs
+				kvs = kvs.AddTag("T_"+f.T1Key, f.T1)
+				kvs = kvs.AddTag("T_"+f.T2Key, f.T2)
+				kvs = kvs.AddTag("T_"+f.T3Key, f.T3)
+
+				kvs = kvs.AddV2("S_"+f.SKey, f.S, true)
+
+				kvs = kvs.AddV2("I8_"+f.I8Key, f.I8, true)
+				kvs = kvs.AddV2("I16_"+f.I16Key, f.I16, true)
+				kvs = kvs.AddV2("I32_"+f.I32Key, f.I32, true)
+				kvs = kvs.AddV2("I64_"+f.I64Key, f.I64, true)
+
+				kvs = kvs.AddV2("U8_"+f.U8Key, f.U8, true)
+				kvs = kvs.AddV2("U16_"+f.U16Key, f.U16, true)
+				kvs = kvs.AddV2("U32_"+f.U32Key, f.U32, true)
+				kvs = kvs.AddV2("U64_"+f.U64Key, f.U64, true)
+
+				kvs = kvs.AddV2("F32_"+f.F32Key, f.F32, true)
+				kvs = kvs.AddV2("F64_"+f.F64Key, f.F64, true)
+
+				kvs = kvs.AddV2("B_"+f.BKey, f.B, true)
+				kvs = kvs.AddV2("D_"+f.DKey, f.D, true)
+
+				if f.TS < 0 {
+					f.TS = 0
+				}
+
+				pt := NewPointV2(f.Measurement, kvs, WithTimestamp(f.TS))
+
+				require.Equal(t, f.T1, pt.Get("T_"+f.T1Key))
+				require.Equal(t, f.T2, pt.Get("T_"+f.T2Key))
+				require.Equal(t, f.T3, pt.Get("T_"+f.T3Key))
+
+				require.Equal(t, f.S, pt.Get("S_"+f.SKey))
+
+				require.Equal(t, int64(f.I8), pt.Get("I8_"+f.I8Key))
+				require.Equalf(t, int64(f.I16), pt.Get("I16_"+f.I16Key), "got %s", pt.Pretty())
+				require.Equal(t, int64(f.I32), pt.Get("I32_"+f.I32Key))
+				require.Equal(t, f.I64, pt.Get("I64_"+f.I64Key))
+
+				require.Equal(t, uint64(f.U8), pt.Get("U8_"+f.U8Key))
+				require.Equal(t, uint64(f.U16), pt.Get("U16_"+f.U16Key))
+				require.Equal(t, uint64(f.U32), pt.Get("U32_"+f.U32Key))
+				require.Equal(t, f.U64, pt.Get("U64_"+f.U64Key))
+
+				require.Equal(t, f.B, pt.Get("B_"+f.BKey), "got %s", pt.Pretty())
+				require.Equal(t, f.D, pt.Get("D_"+f.DKey))
+				require.Equalf(t, float64(f.F32), pt.Get("F32_"+f.F32Key), "got %s", pt.Pretty())
+				require.Equal(t, f.F64, pt.Get("F64_"+f.F64Key))
+
+				if i == maxPT-1 {
+					t.Logf("point: %s", pt.Pretty())
+				}
+
+				tc.pp.Put(pt)
+			}
+
+			mfs, err := metrics.Gather()
+			assert.NoError(t, err)
+
+			t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
+		})
+	}
 }

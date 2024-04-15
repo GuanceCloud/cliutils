@@ -10,6 +10,86 @@ import (
 	p8s "github.com/prometheus/client_golang/prometheus"
 )
 
+var (
+	kvCreatedDesc = p8s.NewDesc(
+		"pointpool_kv_created_total",
+		"New created key-value instance",
+		[]string{"from"}, nil,
+	)
+
+	kvReusedDesc = p8s.NewDesc(
+		"pointpool_kv_reused_total",
+		"Reused key-value instance count",
+		[]string{"from"}, nil,
+	)
+
+	pointCreatedDesc = p8s.NewDesc(
+		"pointpool_point_created_total",
+		"New created point instance count",
+		[]string{"from"}, nil,
+	)
+
+	pointReusedDesc = p8s.NewDesc(
+		"pointpool_point_reused_total",
+		"Reused point instance count",
+		[]string{"from"}, nil,
+	)
+
+	pointGetDesc = p8s.NewDesc(
+		"pointpool_point_get_total",
+		"Get point count",
+		[]string{"from"}, nil,
+	)
+
+	pointPutDesc = p8s.NewDesc(
+		"pointpool_point_put_total",
+		"Put point count",
+		[]string{"from"}, nil,
+	)
+
+	kvGetDesc = p8s.NewDesc(
+		"pointpool_kv_get_total",
+		"Get key-value count",
+		[]string{"from"}, nil,
+	)
+
+	kvPutDesc = p8s.NewDesc(
+		"pointpool_kv_put_total",
+		"Put key-value count",
+		[]string{"from"}, nil,
+	)
+
+	reservedCapacityDesc = p8s.NewDesc(
+		"pointpool_reserved_capacity",
+		"Reserved capacity of the pool",
+		nil, nil,
+	)
+
+	chanGetDesc = p8s.NewDesc(
+		"pointpool_chan_get",
+		"Get count from reserved channel",
+		nil, nil,
+	)
+
+	chanPutDesc = p8s.NewDesc(
+		"pointpool_chan_put",
+		"Put count to reserved channel",
+		nil, nil,
+	)
+
+	poolGetDesc = p8s.NewDesc(
+		"pointpool_pool_get",
+		"Get count from reserved channel",
+		nil, nil,
+	)
+
+	poolPutDesc = p8s.NewDesc(
+		"pointpool_pool_put",
+		"Put count to reserved channel",
+		nil, nil,
+	)
+)
+
 type PointPool interface {
 	Get() *Point
 	Put(*Point)
@@ -464,6 +544,9 @@ type reservedCapPool struct {
 
 	newFn func() any
 	ch    chan any
+
+	poolGet, poolPut,
+	chanGet, chanPut atomic.Int64
 }
 
 func newReservedCapPool(capacity int64, newFn func() any) *reservedCapPool {
@@ -479,8 +562,10 @@ func newReservedCapPool(capacity int64, newFn func() any) *reservedCapPool {
 func (p *reservedCapPool) get() any {
 	select {
 	case elem := <-p.ch:
+		p.chanGet.Add(1)
 		return elem
 	default:
+		p.poolGet.Add(1)
 		return p.pool.Get()
 	}
 }
@@ -488,17 +573,16 @@ func (p *reservedCapPool) get() any {
 func (p *reservedCapPool) put(x any) {
 	select {
 	case p.ch <- x:
+		p.chanPut.Add(1)
 		return
 	default:
+		p.poolPut.Add(1)
 		p.pool.Put(x)
 	}
 }
 
 type ReservedCapPointPool struct {
 	capacity int64
-
-	poolGetCount, poolPutCount,
-	chanGetCount, chanPutCount atomic.Int64
 
 	ptpool, // pool for *Point
 	// other pools for various *Fields
@@ -576,7 +660,7 @@ func (cpp *ReservedCapPointPool) GetKV(k string, v any) *Field {
 		kv = cpp.ipool.get().(*Field)
 		kv.Val.(*Field_I).I = int64(x)
 	case uint8:
-		kv = cpp.fpool.get().(*Field)
+		kv = cpp.upool.get().(*Field)
 		kv.Val.(*Field_U).U = uint64(x)
 	case int16:
 		kv = cpp.ipool.get().(*Field)
@@ -699,73 +783,52 @@ func (cpp *ReservedCapPointPool) String() string {
 	return ""
 }
 
-func (cpp *ReservedCapPointPool) Describe(ch chan<- *p8s.Desc) { p8s.DescribeByCollect(cpp, ch) }
-func (cpp *ReservedCapPointPool) Collect(ch chan<- p8s.Metric) {
-	ch <- p8s.MustNewConstMetric(kvCreatedDesc, p8s.CounterValue, float64(cpp.kvCreated.Load()))
-	ch <- p8s.MustNewConstMetric(kvReusedDesc, p8s.CounterValue, float64(cpp.kvReused.Load()))
-	ch <- p8s.MustNewConstMetric(pointCreatedDesc, p8s.CounterValue, float64(cpp.ptCreated.Load()))
-	ch <- p8s.MustNewConstMetric(pointReusedDesc, p8s.CounterValue, float64(cpp.ptReused.Load()))
-
-	ch <- p8s.MustNewConstMetric(kvGetDesc, p8s.CounterValue, float64(cpp.kvGetCount.Load()))
-	ch <- p8s.MustNewConstMetric(kvPutDesc, p8s.CounterValue, float64(cpp.kvPutCount.Load()))
-	ch <- p8s.MustNewConstMetric(pointGetDesc, p8s.CounterValue, float64(cpp.ptGetCount.Load()))
-	ch <- p8s.MustNewConstMetric(pointPutDesc, p8s.CounterValue, float64(cpp.ptPutCount.Load()))
-
-	ch <- p8s.MustNewConstMetric(poolReservedCapacity, p8s.CounterValue, float64(cpp.capacity))
+func (cpp *ReservedCapPointPool) chanGet() int64 {
+	return cpp.apool.chanGet.Load() +
+		cpp.bpool.chanGet.Load() +
+		cpp.dpool.chanGet.Load() +
+		cpp.fpool.chanGet.Load() +
+		cpp.ipool.chanGet.Load() +
+		cpp.spool.chanGet.Load() +
+		cpp.upool.chanGet.Load()
 }
 
-var (
-	kvCreatedDesc = p8s.NewDesc(
-		"pointpool_kv_created_total",
-		"New created key-value instance",
-		[]string{"from"}, nil,
-	)
+func (cpp *ReservedCapPointPool) chanPut() int64 {
+	return cpp.apool.chanGet.Load() +
+		cpp.bpool.chanPut.Load() +
+		cpp.dpool.chanPut.Load() +
+		cpp.fpool.chanPut.Load() +
+		cpp.ipool.chanPut.Load() +
+		cpp.spool.chanPut.Load() +
+		cpp.upool.chanPut.Load()
+}
 
-	kvReusedDesc = p8s.NewDesc(
-		"pointpool_kv_reused_total",
-		"Reused key-value instance count",
-		[]string{"from"}, nil,
-	)
+func (cpp *ReservedCapPointPool) poolGet() int64 {
+	return cpp.apool.chanGet.Load() +
+		cpp.bpool.poolGet.Load() +
+		cpp.dpool.poolGet.Load() +
+		cpp.fpool.poolGet.Load() +
+		cpp.ipool.poolGet.Load() +
+		cpp.spool.poolGet.Load() +
+		cpp.upool.poolGet.Load()
+}
 
-	pointCreatedDesc = p8s.NewDesc(
-		"pointpool_point_created_total",
-		"New created point instance count",
-		[]string{"from"}, nil,
-	)
+func (cpp *ReservedCapPointPool) poolPut() int64 {
+	return cpp.apool.chanGet.Load() +
+		cpp.bpool.poolPut.Load() +
+		cpp.dpool.poolPut.Load() +
+		cpp.fpool.poolPut.Load() +
+		cpp.ipool.poolPut.Load() +
+		cpp.spool.poolPut.Load() +
+		cpp.upool.poolPut.Load()
+}
 
-	pointReusedDesc = p8s.NewDesc(
-		"pointpool_point_reused_total",
-		"Reused point instance count",
-		[]string{"from"}, nil,
-	)
+func (cpp *ReservedCapPointPool) Describe(ch chan<- *p8s.Desc) { p8s.DescribeByCollect(cpp, ch) }
+func (cpp *ReservedCapPointPool) Collect(ch chan<- p8s.Metric) {
+	ch <- p8s.MustNewConstMetric(chanGetDesc, p8s.CounterValue, float64(cpp.chanGet()))
+	ch <- p8s.MustNewConstMetric(chanPutDesc, p8s.CounterValue, float64(cpp.chanPut()))
+	ch <- p8s.MustNewConstMetric(poolGetDesc, p8s.CounterValue, float64(cpp.poolGet()))
+	ch <- p8s.MustNewConstMetric(poolPutDesc, p8s.CounterValue, float64(cpp.poolPut()))
 
-	pointGetDesc = p8s.NewDesc(
-		"pointpool_point_get_total",
-		"Get point count",
-		[]string{"from"}, nil,
-	)
-
-	pointPutDesc = p8s.NewDesc(
-		"pointpool_point_put_total",
-		"Put point count",
-		[]string{"from"}, nil,
-	)
-
-	kvGetDesc = p8s.NewDesc(
-		"pointpool_kv_get_total",
-		"Get key-value count",
-		[]string{"from"}, nil,
-	)
-
-	kvPutDesc = p8s.NewDesc(
-		"pointpool_kv_put_total",
-		"Put key-value count",
-		[]string{"from"}, nil,
-	)
-
-	poolReservedCapacity = p8s.NewDesc(
-		"pointpool_reserved_capacity",
-		"Reserved capacity of the pool",
-		nil, nil,
-	)
-)
+	ch <- p8s.MustNewConstMetric(reservedCapacityDesc, p8s.CounterValue, float64(cpp.capacity))
+}

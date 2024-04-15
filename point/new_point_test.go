@@ -793,6 +793,11 @@ func FuzzPLPBEquality(f *testing.F) {
 		measurement, tagk, tagv string,
 		i64 int64, u64 uint64, str string, b bool, f float64, d []byte, ts int64,
 	) {
+
+		if ts < 0 { // force ts > 0 to make 2 point's time are equal. under ts < 0, NewPoint will use time.Now()
+			ts = 0
+		}
+
 		lppt, err := NewPoint(measurement,
 			map[string]string{tagk: tagv},
 			map[string]interface{}{
@@ -801,9 +806,9 @@ func FuzzPLPBEquality(f *testing.F) {
 				"str": str,
 				"b":   b,
 				"f":   f,
-				"d":   d, // dropped under line-protocol
+				"d":   d,
 			},
-			WithTime(time.Unix(0, ts)),
+			WithTimestamp(ts),
 			WithDotInKey(true) /* random string may contains '.' */)
 
 		assert.NoError(t, err)
@@ -818,7 +823,7 @@ func FuzzPLPBEquality(f *testing.F) {
 				"f":   f,
 				"d":   d,
 			},
-			WithTime(time.Unix(0, ts)),
+			WithTimestamp(ts),
 			WithDotInKey(true), // random string may contains '.'
 			WithEncoding(Protobuf))
 
@@ -826,5 +831,14 @@ func FuzzPLPBEquality(f *testing.F) {
 
 		_ = pbpt
 		_ = lppt
+
+		ok, why := lppt.EqualWithReason(pbpt)
+		assert.Truef(t, ok, "why: %s, ts: %d", why, ts)
+	})
+}
+
+func TestTimeUnix(t *T.T) {
+	t.Run("-1", func(t *T.T) {
+		t.Logf("date: %s", time.Unix(0, -1000).UTC())
 	})
 }

@@ -87,11 +87,13 @@ func doNewPoint(name string, kvs KVs, c *cfg) *Point {
 		sort.Sort(KVs(pt.pt.Fields))
 	}
 
-	if !c.t.IsZero() {
+	if c.timestamp >= 0 {
 		pt.pt.Time = c.t.Round(0).UnixNano() // trim monotonic clock
+	} else {
+		pt.pt.Time = -1
 	}
 
-	if pt.pt.Time == 0 {
+	if pt.pt.Time == -1 {
 		pt.pt.Time = time.Now().Round(0).UnixNano() // trim monotonic clock
 	}
 

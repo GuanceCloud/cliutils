@@ -48,6 +48,8 @@ func PutCfg(c *cfg) {
 type cfg struct {
 	t time.Time
 
+	timestamp int64 // same as t
+
 	// Inject extra tags to the point
 	extraTags KVs
 
@@ -127,6 +129,7 @@ func (c *cfg) reset() {
 	c.precision = PrecNS
 	c.requiredKeys = nil
 	c.t = time.Time{}
+	c.timestamp = -1
 }
 
 func WithMaxKVComposeLen(n int) Option   { return func(c *cfg) { c.maxTagKeyValComposeLen = n } }
@@ -137,7 +140,15 @@ func WithStrField(on bool) Option        { return func(c *cfg) { c.enableStrFiel
 func WithDotInKey(on bool) Option        { return func(c *cfg) { c.enableDotInKey = on } }
 func WithPrecheck(on bool) Option        { return func(c *cfg) { c.precheck = on } }
 func WithKeySorted(on bool) Option       { return func(c *cfg) { c.keySorted = on } }
-func WithTime(t time.Time) Option        { return func(c *cfg) { c.t = t } }
+
+func WithTime(t time.Time) Option {
+	return func(c *cfg) {
+		c.t = t
+		c.timestamp = t.UnixNano()
+	}
+}
+
+func WithTimestamp(ts int64) Option { return func(c *cfg) { c.timestamp = ts } }
 
 func WithEncoding(enc Encoding) Option { return func(c *cfg) { c.enc = enc } }
 
