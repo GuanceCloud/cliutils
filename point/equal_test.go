@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestEqual(t *T.T) {
@@ -266,13 +265,6 @@ func TestEqual(t *T.T) {
 						"f4":           "abc",
 						"f5":           []byte("xyz"),
 						"f6":           uint64(1234567890),
-						"f7": func() *anypb.Any {
-							x, err := anypb.New(&AnyDemo{Demo: "this is a any field"})
-							if err != nil {
-								t.Errorf("anypb.New: %s", err)
-							}
-							return x
-						}(),
 					},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
@@ -290,13 +282,6 @@ func TestEqual(t *T.T) {
 						"f4":           "abc",
 						"f5":           []byte("xyz"),
 						"f6":           uint64(1234567890),
-						"f7": func() *anypb.Any {
-							x, err := anypb.New(&AnyDemo{Demo: "this is a any field"})
-							if err != nil {
-								t.Errorf("anypb.New: %s", err)
-							}
-							return x
-						}(),
 					},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)

@@ -77,6 +77,42 @@ func TestJSONPointMarshal(t *testing.T) {
 	}
 }
 
+func TestJSONPointMarhsal(t *testing.T) {
+	var kvs KVs
+
+	EnableMixedArrayField = true
+	defer func() {
+		EnableMixedArrayField = false
+	}()
+
+	kvs = kvs.AddV2("f1", 123, false)
+	kvs = kvs.AddV2("f2", uint(123), false)
+	kvs = kvs.AddV2("f3", "hello", false)
+	kvs = kvs.AddV2("f4", []byte("world"), false)
+	kvs = kvs.AddV2("f5", false, false)
+	kvs = kvs.AddV2("f6", 3.14, false, WithKVUnit("kb"), WithKVType(GAUGE))
+	kvs = kvs.AddV2("f7", []int{1, 2, 3, 4, 5}, false)
+	kvs = kvs.AddV2("f8", MustNewAnyArray(1.0, 2, uint(3), "hello", []byte("world"), false, 3.14), false)
+
+	kvs = kvs.AddV2("t1", "some-tag-value", false, WithKVTagSet(true))
+
+	pt := NewPointV2("json-point", kvs)
+
+	j, err := json.MarshalIndent(pt, "", "  ")
+	assert.NoError(t, err)
+
+	t.Logf("old json:\n%s", string(j))
+
+	pt.SetFlag(Ppb)
+
+	j, err = json.MarshalIndent(pt, "", "  ")
+	assert.NoError(t, err)
+
+	t.Logf("new json:\n%s", string(j))
+
+	t.Logf("line-protocol:\n%s", pt.LineProto())
+}
+
 func TestJSONPoint2Point(t *testing.T) {
 	cases := []struct {
 		name   string

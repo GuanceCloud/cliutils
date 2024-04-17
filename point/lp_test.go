@@ -14,6 +14,7 @@ import (
 
 	"github.com/GuanceCloud/cliutils"
 	"github.com/influxdata/influxdb1-client/models"
+	influxm "github.com/influxdata/influxdb1-client/models"
 	influxdb "github.com/influxdata/influxdb1-client/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -249,7 +250,7 @@ func TestNewLPPoint(t *testing.T) {
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
 			warns:  1,
 			opts: []Option{
-				WithDisabledKeys(NewKey(`f1`, KeyType_I)),
+				WithDisabledKeys(NewKey(`f1`, I)),
 				WithTime(time.Unix(0, 123)),
 			},
 			expect: "abc,t1=abc,t2=32 f2=32i,f3=32i 123",
@@ -574,7 +575,7 @@ func TestNewLPPoint(t *testing.T) {
 				}
 			}
 
-			assert.Equal(t, tc.warns, len(pt.warns), "got pt with warns: %s", pt.Pretty())
+			assert.Equal(t, tc.warns, len(pt.pt.Warns), "got pt with warns: %s", pt.Pretty())
 
 			x := pt.LineProto()
 			assert.Equal(t, tc.expect, x, "got pt %s", pt.Pretty())
@@ -647,7 +648,7 @@ func TestParsePoint(t *testing.T) {
 			data: []byte(`abc,t1=1,t2=2 f1=1i,f2=2,f3="abc" 123`),
 			opts: []Option{
 				WithTime(time.Unix(0, 123)),
-				WithDisabledKeys(NewKey(`f1`, KeyType_I)),
+				WithDisabledKeys(NewKey(`f1`, I)),
 			},
 
 			expect: []*influxdb.Point{
@@ -1173,4 +1174,78 @@ func TestParseLineProto(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAppendString(t *T.T) {
+	r := NewRander()
+	pts := r.Rand(3)
+
+	var lppts []influxm.Point
+	for _, pt := range pts {
+		lppt, err := pt.LPPoint()
+		assert.NoError(t, err)
+		lppts = append(lppts, lppt)
+	}
+
+	var ptbuf []byte
+	totalBuf := make([]byte, 0, 4<<20)
+
+	for _, pt := range lppts {
+		ptbuf = pt.AppendString(ptbuf)
+		totalBuf = append(totalBuf, ptbuf[:pt.StringSize()]...)
+		totalBuf = append(totalBuf, '\n')
+
+		ptbuf = ptbuf[:0]
+	}
+
+	t.Logf("total:\n%s", string(totalBuf))
+
+	dec := GetDecoder(WithDecEncoding(LineProtocol))
+	decPts, err := dec.Decode(totalBuf)
+	assert.NoError(t, err)
+
+	for i, pt := range decPts {
+		ok, why := pt.EqualWithReason(pts[i])
+		assert.Truef(t, ok, "reason: %s", why)
+
+		t.Logf("exp: %s\ngot %s", pts[i].Pretty(), pt.Pretty())
+	}
+}
+
+func BenchmarkLPString(b *T.B) {
+	r := NewRander()
+	pts := r.Rand(100)
+
+	var lppts []influxm.Point
+	for _, pt := range pts {
+		lppt, err := pt.LPPoint()
+		assert.NoError(b, err)
+		lppts = append(lppts, lppt)
+	}
+
+	var ptbuf []byte
+	totalBuf := make([]byte, 0, 8<<20)
+
+	b.ResetTimer()
+	b.Run("AppendString", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			for _, pt := range lppts {
+				ptbuf = pt.AppendString(ptbuf)
+				totalBuf = append(totalBuf, ptbuf[:pt.StringSize()]...)
+				totalBuf = append(totalBuf, '\n')
+
+				ptbuf = ptbuf[:0]
+			}
+		}
+	})
+
+	b.Run("String", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			for _, pt := range lppts {
+				ptstr := pt.String()
+				totalBuf = append(totalBuf, []byte(ptstr)...)
+				totalBuf = append(totalBuf, '\n')
+			}
+		}
+	})
 }
