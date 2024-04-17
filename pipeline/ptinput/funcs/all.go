@@ -78,6 +78,7 @@ var FuncsMap = map[string]runtime.FuncCall{
 	"parse_int":              ParseInt,
 	"format_int":             FormatInt,
 	"pt_name":                PtName,
+	"gjson":                  GJSON,
 	// disable
 	"json_all": JSONAll,
 }
@@ -143,6 +144,7 @@ var FuncsCheckMap = map[string]runtime.FuncCheck{
 	"parse_int":              ParseIntChecking,
 	"format_int":             FormatIntChecking,
 	"pt_name":                PtNameChecking,
+	"gjson":                  GJSONChecking,
 	// disable
 	"json_all": JSONAllChecking,
 }
