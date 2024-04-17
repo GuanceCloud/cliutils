@@ -6,7 +6,7 @@
 package point
 
 import (
-	"math"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -58,9 +58,28 @@ func (x KVs) Less(i, j int) bool {
 
 func (x KVs) Pretty() string {
 	var arr []string
-	for _, kv := range x {
-		arr = append(arr, kv.String())
+	for idx, kv := range x {
+		if kv == nil {
+			arr = append(arr, fmt.Sprintf("[%d] <nil>", idx))
+		} else {
+			arr = append(arr, fmt.Sprintf("[%d] %s", idx, kv.String()))
+		}
 	}
+
+	return strings.Join(arr, "\n")
+}
+
+func (x KVs) PrettySorted() string {
+	var arr []string
+	for _, kv := range x {
+		if kv == nil {
+			arr = append(arr, "<nil>")
+		} else {
+			arr = append(arr, kv.String())
+		}
+	}
+
+	sort.Strings(arr)
 
 	return strings.Join(arr, "\n")
 }
@@ -78,18 +97,15 @@ func (x KVs) InfluxFields() map[string]any {
 		case *Field_I:
 			res[kv.Key] = x.I
 		case *Field_U:
-			if x.U <= math.MaxInt64 {
-				res[kv.Key] = int64(x.U)
-			} // else: dropped, see lp_test.go/parse-uint
+			res[kv.Key] = x.U
 		case *Field_F:
 			res[kv.Key] = x.F
 		case *Field_B:
 			res[kv.Key] = x.B
 		case *Field_D:
-			res[kv.Key] = string(x.D)
+			res[kv.Key] = x.D
 		case *Field_S:
 			res[kv.Key] = x.S
-
 		case *Field_A:
 			if v, err := AnyRaw(kv.GetA()); err != nil {
 				// pass
@@ -394,6 +410,14 @@ func NewKV(k string, v any, opts ...KVOption) *Field {
 	var kv *Field
 
 	switch x := v.(type) {
+
+	case []any: // array from json are []any
+		if anyArr, err := NewAnyArray(x...); err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{anyArr}}
+		}
+
 	case int8:
 		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
 	case []int8:
@@ -406,7 +430,6 @@ func NewKV(k string, v any, opts ...KVOption) *Field {
 
 	case uint8:
 		kv = &Field{Key: k, Val: &Field_U{uint64(x)}}
-		// case []uint8 is []byte, skip it.
 
 	case int16:
 		kv = &Field{Key: k, Val: &Field_I{int64(x)}}
@@ -531,6 +554,13 @@ func NewKV(k string, v any, opts ...KVOption) *Field {
 
 	case []byte:
 		kv = &Field{Key: k, Val: &Field_D{x}}
+
+	case [][]byte:
+		if darr, err := NewBytesArray(x...); err != nil {
+			kv = &Field{Key: k, Val: nil}
+		} else {
+			kv = &Field{Key: k, Val: &Field_A{darr}}
+		}
 
 	case bool:
 		kv = &Field{Key: k, Val: &Field_B{x}}
