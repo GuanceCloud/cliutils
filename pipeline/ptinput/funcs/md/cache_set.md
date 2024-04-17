@@ -2,7 +2,7 @@
 
 函数原型：`fn cache_set(key: str, value: str, expiration: int) nil`
 
-函数说明：将键值对保存到cache中
+函数说明：将键值对保存到 cache 中
 
 参数：
 
