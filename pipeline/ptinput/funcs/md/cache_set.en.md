@@ -13,7 +13,7 @@ Function parameters:
 Example:
 
 ```python
-    a = cache_set("a", "123")
-	a = cache_get("a")
-	add_key(abc, a)
+a = cache_set("a", "123")
+a = cache_get("a")
+add_key(abc, a)
 ```
