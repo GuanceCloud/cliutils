@@ -66,26 +66,32 @@ var (
 	)
 
 	chanGetDesc = p8s.NewDesc(
-		"pointpool_chan_get",
+		"pointpool_chan_get_total",
 		"Get count from reserved channel",
 		nil, nil,
 	)
 
 	chanPutDesc = p8s.NewDesc(
-		"pointpool_chan_put",
+		"pointpool_chan_put_total",
 		"Put count to reserved channel",
 		nil, nil,
 	)
 
 	poolGetDesc = p8s.NewDesc(
-		"pointpool_pool_get",
+		"pointpool_pool_get_total",
 		"Get count from reserved channel",
 		nil, nil,
 	)
 
 	poolPutDesc = p8s.NewDesc(
-		"pointpool_pool_put",
+		"pointpool_pool_put_total",
 		"Put count to reserved channel",
+		nil, nil,
+	)
+
+	poolMallocDesc = p8s.NewDesc(
+		"pointpool_malloc_total",
+		"New object malloc from pool",
 		nil, nil,
 	)
 )
@@ -584,6 +590,8 @@ func (p *reservedCapPool) put(x any) {
 type ReservedCapPointPool struct {
 	capacity int64
 
+	malloc atomic.Int64
+
 	ptpool, // pool for *Point
 	// other pools for various *Fields
 	fpool, // float
@@ -601,34 +609,42 @@ func NewReservedCapPointPool(capacity int64) PointPool {
 	}
 
 	p.ptpool = newReservedCapPool(capacity, func() any {
+		p.malloc.Add(1)
 		return emptyPoint()
 	})
 
 	p.fpool = newReservedCapPool(capacity, func() any {
+		p.malloc.Add(1)
 		return &Field{Val: &Field_F{}}
 	})
 
 	p.ipool = newReservedCapPool(capacity, func() any {
+		p.malloc.Add(1)
 		return &Field{Val: &Field_I{}}
 	})
 
 	p.upool = newReservedCapPool(capacity, func() any {
+		p.malloc.Add(1)
 		return &Field{Val: &Field_U{}}
 	})
 
 	p.spool = newReservedCapPool(capacity, func() any {
+		p.malloc.Add(1)
 		return &Field{Val: &Field_S{}}
 	})
 
 	p.bpool = newReservedCapPool(capacity, func() any {
+		p.malloc.Add(1)
 		return &Field{Val: &Field_B{}}
 	})
 
 	p.dpool = newReservedCapPool(capacity, func() any {
+		p.malloc.Add(1)
 		return &Field{Val: &Field_D{}}
 	})
 
 	p.apool = newReservedCapPool(capacity, func() any {
+		p.malloc.Add(1)
 		return &Field{Val: &Field_A{}}
 	})
 
@@ -831,4 +847,5 @@ func (cpp *ReservedCapPointPool) Collect(ch chan<- p8s.Metric) {
 	ch <- p8s.MustNewConstMetric(poolPutDesc, p8s.CounterValue, float64(cpp.poolPut()))
 
 	ch <- p8s.MustNewConstMetric(reservedCapacityDesc, p8s.CounterValue, float64(cpp.capacity))
+	ch <- p8s.MustNewConstMetric(poolMallocDesc, p8s.CounterValue, float64(cpp.malloc.Load()))
 }

@@ -622,6 +622,8 @@ func TestPoolKVResuable(t *T.T) {
 				require.Equalf(t, float64(f.F32), pt.Get("F32_"+f.F32Key), "got %s", pt.Pretty())
 				require.Equal(t, f.F64, pt.Get("F64_"+f.F64Key))
 
+				require.Equal(t, f.TS, pt.Time().UnixNano(), "got %s", pt.Pretty())
+
 				if i == maxPT-1 {
 					t.Logf("point: %s", pt.Pretty())
 				}

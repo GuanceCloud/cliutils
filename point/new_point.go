@@ -88,12 +88,8 @@ func doNewPoint(name string, kvs KVs, c *cfg) *Point {
 	}
 
 	if c.timestamp >= 0 {
-		pt.pt.Time = c.t.Round(0).UnixNano() // trim monotonic clock
-	} else {
-		pt.pt.Time = -1
-	}
-
-	if pt.pt.Time == -1 {
+		pt.pt.Time = c.timestamp
+	} else { // not set, use current time
 		pt.pt.Time = time.Now().Round(0).UnixNano() // trim monotonic clock
 	}
 
