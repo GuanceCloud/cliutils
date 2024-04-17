@@ -2,7 +2,7 @@
 
 函数原型：`fn cache_get(key: str) nil|str`
 
-函数说明：从cache中获取key所对应的value
+函数说明：从 cache 中获取 key 所对应的 value
 
 参数：
 

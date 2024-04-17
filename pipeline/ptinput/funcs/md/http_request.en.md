@@ -12,7 +12,7 @@ Function parameters:
 
 Return type: map
 
-key 
+key contains status code (status_code) and result body (body)
 
 - `status_code`: status_code
 - `body`: response body
