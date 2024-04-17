@@ -6,14 +6,8 @@
 //nolint:gochecknoinits
 package point
 
-import "github.com/influxdata/influxdb1-client/models"
-
 func init() {
 	loadEnvs()
-
-	// Enable unsigned int for line-protocol, we do not use
-	// influxdb 1.x any more.
-	models.EnableUintSupport()
 
 	// add more...
 }

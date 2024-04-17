@@ -7,6 +7,7 @@ package point
 
 import (
 	"encoding/json"
+	"log"
 	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -63,6 +64,8 @@ func (p *Point) UnmarshalJSON(j []byte) error {
 	if err := protojson.Unmarshal(j, &x); err == nil {
 		pt = FromPB(&x)
 	} else {
+		log.Printf("pb json unmarshal failed: %s", err)
+
 		// try JSONPoint unmarshal
 		var y JSONPoint
 		if err := json.Unmarshal(j, &y); err == nil {

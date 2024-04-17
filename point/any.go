@@ -132,27 +132,6 @@ func NewAnyArray(a ...any) (*anypb.Any, error) {
 	return anypb.New(x)
 }
 
-// MustNewBytesArray wrapped []byte array into anypb.Any.
-func MustNewBytesArray(d ...[]byte) *anypb.Any {
-	if x, err := NewBytesArray(d...); err != nil {
-		panic(err)
-	} else {
-		return x
-	}
-}
-
-// NewBytesArray wrapped []byte array into anypb.Any.
-func NewBytesArray(d ...[]byte) (*anypb.Any, error) {
-	arr := &Array{
-		Arr: make([]*BasicTypes, 0, len(d)),
-	}
-
-	for _, v := range d {
-		arr.Arr = append(arr.Arr, &BasicTypes{X: &BasicTypes_D{v}})
-	}
-	return anypb.New(arr)
-}
-
 // MustNewIntArray wrapped signed int list into anypb.Any, and panic if any error.
 func MustNewIntArray[T int8 | int16 | int | int32 | int64](i ...T) *anypb.Any {
 	if x, err := NewIntArray(i...); err != nil {

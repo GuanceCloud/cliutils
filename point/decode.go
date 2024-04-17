@@ -80,29 +80,24 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 
 	switch d.enc {
 	case JSON:
-		var (
-			ts  = time.Now()
-			arr []*Point
-		)
-
+		var arr []JSONPoint
 		if err := json.Unmarshal(data, &arr); err != nil {
 			return nil, err
 		}
 
 		for _, x := range arr {
-			ptts := x.time.UnixNano()
-			if ptts > 0 { // check if precision attached
+			if x.Time > 0 { // check if precision attached
 				switch cfg.precision {
 				case US:
-					ptts *= int64(time.Microsecond)
+					x.Time *= int64(time.Microsecond)
 				case MS:
-					ptts *= int64(time.Millisecond)
+					x.Time *= int64(time.Millisecond)
 				case S:
-					ptts *= int64(time.Second)
+					x.Time *= int64(time.Second)
 				case M:
-					ptts *= int64(time.Minute)
+					x.Time *= int64(time.Minute)
 				case H:
-					ptts *= int64(time.Hour)
+					x.Time *= int64(time.Hour)
 
 				case NS:
 					// pass
@@ -112,13 +107,13 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 				default:
 					// pass
 				}
-
-				x.time = time.Unix(0, ptts)
-			} else {
-				x.time = ts
 			}
 
-			pts = append(pts, NewPointV2(x.name, x.kvs, append(opts, WithTime(x.time))...))
+			if pt, err := x.Point(opts...); err != nil {
+				return nil, err
+			} else {
+				pts = append(pts, pt)
+			}
 		}
 
 	case Protobuf:
@@ -127,6 +122,7 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 			return nil, err
 		}
 
+		chk := checker{cfg: cfg}
 		for _, pbpt := range pbpts.Arr {
 			pt := &Point{
 				name:   pbpt.Name,
@@ -137,6 +133,10 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 			}
 			pt.SetFlag(Ppb)
 
+			pt = chk.check(pt)
+			pt.warns = chk.warns
+			chk.reset()
+
 			pts = append(pts, pt)
 		}
 
@@ -146,36 +146,6 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 		if err != nil {
 			d.detailedError = err
 			return nil, simplifyLPError(err)
-		}
-	}
-
-	// check point and apply callbak on each point
-	if cfg.precheck || cfg.callback != nil {
-		var (
-			chk = &checker{cfg: cfg}
-			arr []*Point
-		)
-
-		for idx, _ := range pts {
-			if cfg.precheck {
-				pts[idx] = chk.check(pts[idx])
-				chk.reset()
-			}
-
-			if cfg.callback != nil {
-				newPoint, err := cfg.callback(pts[idx])
-				if err != nil {
-					return nil, err
-				}
-
-				if newPoint != nil {
-					arr = append(arr, newPoint)
-				}
-			}
-		}
-
-		if cfg.callback != nil {
-			pts = arr
 		}
 	}
 
