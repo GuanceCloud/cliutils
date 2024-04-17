@@ -42,10 +42,11 @@ type PlScript struct {
 
 	updateTS int64
 
+	tags  map[string]string
 	cache *plcache.Cache
 }
 
-func NewScripts(scripts map[string]string, scriptPath map[string]string, ns string, category point.Category,
+func NewScripts(scripts, scriptPath, scriptTags map[string]string, ns string, cat point.Category,
 	buks ...*plmap.AggBuckets,
 ) (map[string]*PlScript, map[string]error) {
 	var plbuks *plmap.AggBuckets
@@ -53,10 +54,10 @@ func NewScripts(scripts map[string]string, scriptPath map[string]string, ns stri
 		plbuks = buks[0]
 	}
 
-	switch category {
+	switch cat {
 	case point.Metric:
 	case point.MetricDeprecated:
-		category = point.Metric
+		cat = point.Metric
 	case point.Network:
 	case point.KeyEvent:
 	case point.Object:
@@ -69,7 +70,7 @@ func NewScripts(scripts map[string]string, scriptPath map[string]string, ns stri
 	case point.UnknownCategory, point.DynamicDWCategory:
 		retErr := map[string]error{}
 		for k := range scripts {
-			retErr[k] = fmt.Errorf("unsupported category: %s", category)
+			retErr[k] = fmt.Errorf("unsupported category: %s", cat)
 		}
 		return nil, retErr
 	}
@@ -84,15 +85,30 @@ func NewScripts(scripts map[string]string, scriptPath map[string]string, ns stri
 		}
 		cache, _ := plcache.NewCache(time.Second, 100)
 
+		sTags := map[string]string{
+			"category":  cat.String(),
+			"name":      name,
+			"namespace": ns,
+
+			"lang": "platypus",
+		}
+
+		for k, v := range scriptTags {
+			if _, ok := sTags[k]; !ok {
+				sTags[k] = v
+			}
+		}
+
 		retScipt[name] = &PlScript{
 			script:   scripts[name],
 			name:     name,
 			filePath: sPath,
 			ns:       ns,
-			category: category,
+			category: cat,
 			proc:     ng,
 			updateTS: time.Now().UnixNano(),
 			plBuks:   plbuks,
+			tags:     sTags,
 			cache:    cache,
 		}
 	}
@@ -124,7 +140,7 @@ func (script *PlScript) Run(plpt ptinput.PlInputPt, signal plruntime.Signal, opt
 
 	err := plengine.RunScriptWithRMapIn(script.proc, plpt, signal)
 	if err != nil {
-		stats.WriteScriptStats(script.category, script.ns, script.name, 1, 0, 1, int64(time.Since(startTime)), err)
+		stats.WriteMetric(script.tags, 1, 0, 1, time.Since(startTime))
 		return err
 	}
 
@@ -142,9 +158,9 @@ func (script *PlScript) Run(plpt ptinput.PlInputPt, signal plruntime.Signal, opt
 	}
 
 	if plpt.Dropped() {
-		stats.WriteScriptStats(script.category, script.ns, script.name, 1, 1, 0, int64(time.Since(startTime)), nil)
+		stats.WriteMetric(script.tags, 1, 1, 0, time.Since(startTime))
 	} else {
-		stats.WriteScriptStats(script.category, script.ns, script.name, 1, 0, 0, int64(time.Since(startTime)), nil)
+		stats.WriteMetric(script.tags, 1, 0, 0, time.Since(startTime))
 	}
 
 	plpt.KeyTime2Time()
