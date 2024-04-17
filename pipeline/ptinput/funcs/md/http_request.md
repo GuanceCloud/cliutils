@@ -10,6 +10,13 @@
 - `url`: 请求路径
 - `headers`: 附加的header，类型为map[string]string
 
+返回值类型：map
+
+key包含了状态码（status_code）和返回体（body）
+
+- `status_code`: 状态码
+- `body`: 返回体
+
 示例：
 
 ```python

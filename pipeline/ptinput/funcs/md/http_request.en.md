@@ -10,6 +10,13 @@ Function parameters:
 - `url`: Request path
 - `headers`: Additional header，the type is map[string]string
 
+Return type: map
+
+key 
+
+- `status_code`: status_code
+- `body`: response body
+
 Example:
 
 ```python
