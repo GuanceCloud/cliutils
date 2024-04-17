@@ -19,8 +19,8 @@ var (
 	KeyClass       = NewKey("class", KeyType_S)
 	KeyDate        = NewKey("date", KeyType_I)
 
-	KeyName   = NewKey("name", KeyType_S, defaultObjectName)
-	KeyStatus = NewKey("status", KeyType_S, defaultLoggingStatus)
+	KeyName   = NewKey("name", KeyType_D, []byte(defaultObjectName))
+	KeyStatus = NewKey("status", KeyType_D, []byte(defaultLoggingStatus))
 )
 
 var (

@@ -3,7 +3,6 @@ package models
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -135,7 +134,7 @@ type Point interface {
 	// the result, potentially reducing string allocations.
 	AppendString(buf []byte) []byte
 
-	// FieldIterator returns a FieldIterator that can be used to traverse the
+	// FieldIterator retuns a FieldIterator that can be used to traverse the
 	// fields of a point without constructing the in-memory map.
 	FieldIterator() FieldIterator
 }
@@ -176,10 +175,6 @@ const (
 
 	// UnsignedArray indicates the field's type is an array of unsigned integers.
 	UnsignedArray
-
-	// Binary indicates the field's type is an []byte.
-	Binary
-	BinaryArray
 )
 
 // FieldIterator provides a low-allocation interface to iterate through a point's fields.
@@ -202,9 +197,6 @@ type FieldIterator interface {
 	// UnsignedValue returns the unsigned value of the current field.
 	UnsignedValue() (uint64, error)
 
-	// BinaryValue returns the base64 encoded []byte value of the current field.
-	BinaryValue() ([]byte, error)
-
 	// BooleanValue returns the boolean value of the current field.
 	BooleanValue() (bool, error)
 
@@ -225,9 +217,6 @@ type FieldIterator interface {
 
 	// FloatArrayValue returns the float array value of the current field.
 	FloatArrayValue() ([]float64, error)
-
-	// BinaryArrayValue returns the binary array value of the current field.
-	BinaryArrayValue() ([][]byte, error)
 
 	// Reset resets the iterator to its initial state.
 	Reset()
@@ -272,28 +261,28 @@ type point struct {
 	it fieldIterator
 }
 
-// type assertions.
+// type assertions
 var (
 	_ Point         = (*point)(nil)
 	_ FieldIterator = (*point)(nil)
 )
 
 const (
-	// the number of characters for the largest possible int64 (9223372036854775807).
+	// the number of characters for the largest possible int64 (9223372036854775807)
 	maxInt64Digits = 19
 
-	// the number of characters for the smallest possible int64 (-9223372036854775808).
+	// the number of characters for the smallest possible int64 (-9223372036854775808)
 	minInt64Digits = 20
 
-	// the number of characters for the largest possible uint64 (18446744073709551615).
+	// the number of characters for the largest possible uint64 (18446744073709551615)
 	maxUint64Digits = 20
 
 	// the number of characters required for the largest float64 before a range check
-	// would occur during parsing.
+	// would occur during parsing
 	maxFloat64Digits = 25
 
 	// the number of characters required for smallest float64 before a range check occur
-	// would occur during parsing.
+	// would occur during parsing
 	minFloat64Digits = 27
 )
 
@@ -364,9 +353,9 @@ func ParseName(buf []byte) []byte {
 func ParsePointsWithPrecision(buf []byte, defaultTime time.Time, precision string) ([]Point, error) {
 	points := make([]Point, 0, bytes.Count(buf, []byte{'\n'})+1)
 	var (
-		prevPos, pos int
-		block        []byte
-		failed       []string
+		pos    int
+		block  []byte
+		failed []string
 	)
 	for pos < len(buf) {
 		pos, block = scanLine(buf, pos)
@@ -395,19 +384,17 @@ func ParsePointsWithPrecision(buf []byte, defaultTime time.Time, precision strin
 
 		pt, err := parsePoint(block[start:], defaultTime, precision)
 		if err != nil {
-			failed = append(failed, fmt.Sprintf("unable to parse '%s'(pos: %d): %v",
-				string(block[start:]), prevPos+1, err))
+			failed = append(failed, fmt.Sprintf("unable to parse '%s': %v", string(block[start:]), err))
 		} else {
 			points = append(points, pt)
 		}
 
-		prevPos = pos
 	}
 	if len(failed) > 0 {
-		failed = append(failed, fmt.Sprintf("with %d point parse ok, %d points failed", len(points), len(failed)))
 		return points, fmt.Errorf("%s", strings.Join(failed, "\n"))
 	}
 	return points, nil
+
 }
 
 func parsePoint(buf []byte, defaultTime time.Time, precision string) (Point, error) {
@@ -772,18 +759,15 @@ func less(buf []byte, indices []int, i, j int) bool {
 // scanFields scans buf, starting at i for the fields section of a point.  It returns
 // the ending position and the byte slice of the fields within buf.
 func scanFields(buf []byte, i int) (int, []byte, error) {
-	var (
-		start  = skipWhitespace(buf, i)
-		quoted = false
-
-		// tracks how many '=' we've seen
-		equals = 0
-
-		// tracks how many commas we've seen
-		commas = 0
-	)
-
+	start := skipWhitespace(buf, i)
 	i = start
+	quoted := false
+
+	// tracks how many '=' we've seen
+	equals := 0
+
+	// tracks how many commas we've seen
+	commas := 0
 
 	for {
 		// reached the end of buf?
@@ -802,20 +786,6 @@ func scanFields(buf []byte, i int) (int, []byte, error) {
 		// in the field key
 		if buf[i] == '"' && equals > commas {
 			quoted = !quoted
-
-			if !quoted && i+1 < len(buf) {
-				switch buf[i+1] {
-				case ',': // we have more field...
-				case ' ': // last field
-				case 'b': // base64-encode string
-					i++
-				case '"':
-					return i, buf[start:i], fmt.Errorf("unbalanced quotes")
-				default:
-					return i, buf[start:i], fmt.Errorf("invalid string, got tail char `%c'", buf[i+1])
-				}
-			}
-
 			i++
 			continue
 		}
@@ -1244,6 +1214,7 @@ func scanLine(buf []byte, i int) (int, []byte) {
 					break
 				}
 				continue
+
 			} else if !quoted && buf[i] == ']' {
 				i++
 				brackets--
@@ -1365,7 +1336,6 @@ func scanFieldValue(buf []byte, i int) (int, []byte) {
 		}
 		i++
 	}
-
 	return i, buf[start:i]
 }
 
@@ -1532,7 +1502,7 @@ func seriesKeySize(key, field []byte) int {
 	return len(key) + 4 + len(field)
 }
 
-// NewPointFromBytes returns a new Point from a marshaled Point.
+// NewPointFromBytes returns a new Point from a marshalled Point.
 func NewPointFromBytes(b []byte) (Point, error) {
 	p := &point{}
 	if err := p.UnmarshalBinary(b); err != nil {
@@ -1551,19 +1521,6 @@ func NewPointFromBytes(b []byte) (Point, error) {
 		switch iter.Type() {
 		case String, StringArray:
 			// Skip since this won't return an error
-
-		case Binary:
-			_, err := iter.BinaryValue()
-			if err != nil {
-				return nil, fmt.Errorf("unable to unmarshal binary field %s: %w", string(iter.FieldKey()), err)
-			}
-
-		case BinaryArray:
-			_, err := iter.BinaryArrayValue()
-			if err != nil {
-				return nil, fmt.Errorf("unable to unmarshal binary array field %s: %s", string(iter.FieldKey()), err)
-			}
-
 		case Float:
 			_, err := iter.FloatValue()
 			if err != nil {
@@ -1768,7 +1725,7 @@ func parseTags(buf []byte, dst Tags) Tags {
 		dst = dst[:n]
 	}
 
-	// Ensure existing behavior when point has no tags and nil slice passed in.
+	// Ensure existing behaviour when point has no tags and nil slice passed in.
 	if dst == nil {
 		dst = Tags{}
 	}
@@ -1990,7 +1947,6 @@ func (p *point) unmarshalBinary() (Fields, error) {
 				return nil, fmt.Errorf("unable to unmarshal field %s: %s", string(iter.FieldKey()), err)
 			}
 			fields[string(iter.FieldKey())] = v
-
 		case Integer:
 			v, err := iter.IntegerValue()
 			if err != nil {
@@ -2003,7 +1959,6 @@ func (p *point) unmarshalBinary() (Fields, error) {
 				return nil, fmt.Errorf("unable to unmarshal field %s: %s", string(iter.FieldKey()), err)
 			}
 			fields[string(iter.FieldKey())] = v
-
 		case Unsigned:
 			v, err := iter.UnsignedValue()
 			if err != nil {
@@ -2016,12 +1971,10 @@ func (p *point) unmarshalBinary() (Fields, error) {
 				return nil, fmt.Errorf("unable to unmarshal field %s: %s", string(iter.FieldKey()), err)
 			}
 			fields[string(iter.FieldKey())] = v
-
 		case String:
 			fields[string(iter.FieldKey())] = iter.StringValue()
 		case StringArray:
 			fields[string(iter.FieldKey())] = iter.StringArrayValue()
-
 		case Boolean:
 			v, err := iter.BooleanValue()
 			if err != nil {
@@ -2034,24 +1987,6 @@ func (p *point) unmarshalBinary() (Fields, error) {
 				return nil, fmt.Errorf("unable to unmarshal field %s: %s", string(iter.FieldKey()), err)
 			}
 			fields[string(iter.FieldKey())] = v
-
-		case Binary:
-			v, err := iter.BinaryValue()
-			if err != nil {
-				return nil, fmt.Errorf("unable to unmarshal binary field %s: %w", string(iter.FieldKey()), err)
-			}
-
-			fields[string(iter.FieldKey())] = v
-
-		case BinaryArray:
-			v, err := iter.BinaryArrayValue()
-			if err != nil {
-				return nil, fmt.Errorf("unable to unmarshal binary array field %s: %w", string(iter.FieldKey()), err)
-			}
-			fields[string(iter.FieldKey())] = v
-
-		case Empty:
-			// pass
 		}
 	}
 	return fields, nil
@@ -2405,7 +2340,7 @@ func DeepCopyTags(a Tags) Tags {
 // values.
 type Fields map[string]interface{}
 
-// FieldIterator returns a FieldIterator that can be used to traverse the
+// FieldIterator retuns a FieldIterator that can be used to traverse the
 // fields of a point without constructing the in-memory map.
 func (p *point) FieldIterator() FieldIterator {
 	p.Reset()
@@ -2447,7 +2382,6 @@ func detectValueType(s string) FieldType {
 		s == "f" || s == "F" || s == "False" || s == "FALSE" || s == "false" {
 		return Boolean
 	}
-
 	if len(s) > 0 && s[0] == '[' && s[len(s)-1] == ']' {
 		i := nextUnescapedChar(s[1:], ',')
 		if i == -1 {
@@ -2464,24 +2398,13 @@ func detectValueType(s string) FieldType {
 			return UnsignedArray
 		case Float:
 			return FloatArray
-		case Binary: // do not support
-			return BinaryArray
 		default:
 			return Empty
 		}
 	}
-
 	if len(s) > 0 && s[0] == '"' {
-		switch s[len(s)-1] {
-		case 'b':
-			return Binary
-		case '"':
-			return String
-		default:
-			return Empty
-		}
+		return String
 	}
-
 	switch s[len(s)-1] {
 	case 'i':
 		return Integer
@@ -2516,20 +2439,6 @@ func (p *point) IntegerValue() (int64, error) {
 	return n, nil
 }
 
-// BinaryValue returns base64 decoded []byte of the current field.
-func (p *point) BinaryValue() ([]byte, error) {
-	if len(p.it.valueBuf) <= 3 { // ""b
-		return nil, fmt.Errorf("invalid base64 string: %q", p.it.valueBuf)
-	}
-
-	s := string(p.it.valueBuf[1 : len(p.it.valueBuf)-2])
-	raw, err := base64.StdEncoding.DecodeString(s)
-	if err != nil {
-		return nil, fmt.Errorf("base64: %w, b64 string: %s", err, s)
-	}
-	return raw, nil
-}
-
 // UnsignedValue returns the unsigned value of the current field.
 func (p *point) UnsignedValue() (uint64, error) {
 	n, err := parseUintBytes(p.it.valueBuf[:len(p.it.valueBuf)-1], 10, 64)
@@ -2555,32 +2464,6 @@ func (p *point) FloatValue() (float64, error) {
 		return 0, fmt.Errorf("unable to parse floating point value %q: %v", p.it.valueBuf, err)
 	}
 	return f, nil
-}
-
-func (p *point) BinaryArrayValue() ([][]byte, error) {
-	s := toUnsafeString(p.it.valueBuf[1 : len(p.it.valueBuf)-1])
-	values := make([][]byte, 0, 16)
-
-	for i := 0; i < len(s); {
-		start := nextUnescapedChar(s[i:], '"')
-		if start == -1 {
-			break
-		}
-
-		end := nextUnescapedChar(s[i+start+1:], '"')
-		if end == -1 {
-			break
-		}
-
-		raw, err := base64.StdEncoding.DecodeString(s[i+start+1 : i+start+end+1])
-		if err != nil {
-			return nil, err
-		}
-		values = append(values, raw)
-		i = i + start + end + 3
-	}
-
-	return values, nil
 }
 
 func (p *point) StringArrayValue() []string {
@@ -2683,7 +2566,7 @@ func (p *point) Reset() {
 }
 
 // MarshalBinary encodes all the fields to their proper type and returns the binary
-// representation
+// represenation
 // NOTE: uint64 is specifically not supported due to potential overflow when we decode
 // again later to an int64
 // NOTE2: uint is accepted, and may be 64 bits, and is for some reason accepted...
@@ -2752,9 +2635,8 @@ func appendField(b []byte, k string, v interface{}) ([]byte, error) {
 		b = marshalStrings(b, v)
 	case []int8:
 		b = marshalInts(b, v)
-	case []uint8: // []byte
-
-		b = marshalBinary(b, v)
+	case []uint8:
+		b = marshalUints(b, v)
 	case []int16:
 		b = marshalInts(b, v)
 	case []uint16:
@@ -2850,17 +2732,6 @@ func marshalInts[T int8 | int16 | int32 | int64 | int](b []byte, v []T) []byte {
 	return b
 }
 
-func marshalBinary(b []byte, data []byte) []byte {
-	if data == nil {
-		return nil
-	}
-
-	b = append(b, '"')
-	b = append(b, base64.StdEncoding.EncodeToString(data)...)
-	b = append(b, `"b`...)
-	return b
-}
-
 func marshalUints[T uint8 | uint16 | uint32 | uint64 | uint](b []byte, v []T) []byte {
 	if len(v) == 0 {
 		return append(b, "[]"...)
@@ -2939,8 +2810,9 @@ func marshalAnys(b []byte, arr []any) []byte {
 			b = marshalString(b, v)
 			b = append(b, ',')
 		case []byte:
-			b = marshalBinary(b, v)
+			b = marshalString(b, string(v))
 			b = append(b, ',')
+		default: //pass
 		}
 	}
 

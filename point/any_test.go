@@ -239,21 +239,6 @@ func TestNewArray(t *T.T) {
 		t.Logf("any.Raw: %+#v", raw)
 	})
 
-	t.Run(`bytes array`, func(t *T.T) {
-		arr := []any{
-			[]byte("hello"), []byte("world"),
-		}
-
-		x, err := NewAnyArray(arr...)
-		assert.NoError(t, err)
-
-		raw, err := AnyRaw(x)
-		assert.NoError(t, err)
-
-		assert.Equal(t, []any{[]byte("hello"), []byte("world")}, raw)
-		t.Logf("any.Raw: %+#v", raw)
-	})
-
 	t.Run(`basic-mixed-type`, func(t *T.T) {
 		arr := []any{
 			"s1", 123, false,
