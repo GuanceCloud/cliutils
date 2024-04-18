@@ -35,6 +35,7 @@ const (
 	WarnTagDisabled   = "tag_disabled"
 
 	WarnSameTagFieldKey = "same_tag_field_key"
+	WarnKeyNameConflict = "key_name_conflict"
 	WarnDotInkey        = "dot_in_key"
 	WarnNROrTailEscape  = "found_new_line_or_tail_espace"
 	WarnFieldB64Encoded = "field_base64_encoded"

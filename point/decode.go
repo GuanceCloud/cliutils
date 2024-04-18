@@ -9,8 +9,6 @@ import (
 	"encoding/json"
 	sync "sync"
 	"time"
-
-	"google.golang.org/protobuf/proto"
 )
 
 var decPool sync.Pool
@@ -28,9 +26,15 @@ func WithDecFn(fn DecodeFn) DecoderOption {
 	return func(d *Decoder) { d.fn = fn }
 }
 
+func WithDecEasyproto(on bool) DecoderOption {
+	return func(d *Decoder) { d.easyproto = on }
+}
+
 type Decoder struct {
 	enc Encoding
 	fn  DecodeFn
+
+	easyproto bool
 
 	// For line-protocol parsing, keep original error.
 	detailedError error
@@ -66,6 +70,7 @@ func (d *Decoder) reset() {
 	d.enc = 0
 	d.fn = nil
 	d.detailedError = nil
+	d.easyproto = false
 }
 
 func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
@@ -90,54 +95,60 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 		}
 
 		for _, x := range arr {
-			ptts := x.time.UnixNano()
+			ptts := x.pt.Time
 			if ptts > 0 { // check if precision attached
 				switch cfg.precision {
-				case US:
+				case PrecUS:
 					ptts *= int64(time.Microsecond)
-				case MS:
+				case PrecMS:
 					ptts *= int64(time.Millisecond)
-				case S:
+				case PrecS:
 					ptts *= int64(time.Second)
-				case M:
+				case PrecM:
 					ptts *= int64(time.Minute)
-				case H:
+				case PrecH:
 					ptts *= int64(time.Hour)
 
-				case NS:
+				case PrecNS:
 					// pass
 
-				case W, D: // not used
+				case PrecW, PrecD: // not used
 
 				default:
 					// pass
 				}
-
-				x.time = time.Unix(0, ptts)
 			} else {
-				x.time = ts
+				ptts = ts.UnixNano()
 			}
 
-			pts = append(pts, NewPointV2(x.name, x.kvs, append(opts, WithTime(x.time))...))
+			x.pt.Time = ptts
+
+			pts = append(pts, x)
 		}
 
 	case Protobuf:
-		var pbpts PBPoints
-		if err = proto.Unmarshal(data, &pbpts); err != nil {
-			return nil, err
+		if d.easyproto || defaultPTPool != nil { // force use easyproto when point pool enabled
+			pts, err = unmarshalPoints(data)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			var pbpts PBPoints
+			if err = pbpts.Unmarshal(data); err != nil {
+				return nil, err
+			}
+
+			for _, pbpt := range pbpts.Arr {
+				pts = append(pts, FromPB(pbpt))
+			}
 		}
 
-		for _, pbpt := range pbpts.Arr {
-			pt := &Point{
-				name:   pbpt.Name,
-				kvs:    pbpt.Fields,
-				time:   time.Unix(0, pbpt.Time),
-				warns:  pbpt.Warns,
-				debugs: pbpt.Debugs,
+		var chk *checker
+		if cfg.precheck {
+			chk = &checker{cfg: cfg}
+			for idx, pt := range pts {
+				pts[idx] = chk.check(pt)
 			}
-			pt.SetFlag(Ppb)
-
-			pts = append(pts, pt)
 		}
 
 	case LineProtocol:
@@ -174,6 +185,8 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 			}
 		}
 
+		// Callback may drop some point from pts, so
+		// here we override it with newPoint arr.
 		if cfg.callback != nil {
 			pts = arr
 		}

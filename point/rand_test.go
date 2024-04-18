@@ -81,9 +81,14 @@ func TestPointRander(t *T.T) {
 		fs := pts[0].Fields()
 		require.True(t, len(fs) > 0)
 
-		require.True(t, fs.Has("message"), "fields: %s", fs.Pretty())
-		require.True(t, fs.Has("error_message"))
-		require.True(t, fs.Has("error_stack"))
+		ntext := 0
+		for _, f := range fs {
+			if strings.HasPrefix(f.Key, "long-text") {
+				ntext++
+			}
+		}
+
+		require.Equal(t, 4, ntext)
 
 		t.Logf("point: %s", pts[0].Pretty())
 	})
@@ -167,8 +172,8 @@ func TestWithFixKeys(t *T.T) {
 		pt2 := r.Rand(1)[0]
 
 		// NOTE: sort kvs to keep assert ok
-		sort.Sort(pt1.kvs)
-		sort.Sort(pt2.kvs)
+		sort.Sort(KVs(pt1.pt.Fields))
+		sort.Sort(KVs(pt2.pt.Fields))
 
 		pt1tags := pt1.Tags()
 		pt2tags := pt2.Tags()
@@ -185,8 +190,44 @@ func TestWithFixKeys(t *T.T) {
 				f.Key,
 				"%d not equal:\npt1: %s\n\npt2: %s",
 				idx,
-				pt1.kvs.Pretty(),
-				pt2.kvs.Pretty())
+				KVs(pt1.pt.Fields).Pretty(),
+				KVs(pt2.pt.Fields).Pretty())
+		}
+	})
+}
+
+func BenchmarkRandWithPool(b *T.B) {
+	b.Run("with-pool-v3", func(b *T.B) {
+		pp := NewReservedCapPointPool(1000)
+		r := NewRander(WithRandPointPool(pp), WithFixedKeys(true), WithFixedTags(true), WithRandStringValues(false))
+
+		for i := 0; i < b.N; i++ {
+			pts := r.Rand(1000)
+			for _, pt := range pts {
+				pp.Put(pt)
+			}
+		}
+	})
+
+	b.Run("with-reserved-pool", func(b *T.B) {
+		pp := NewReservedCapPointPool(128)
+		r := NewRander(WithRandPointPool(pp), WithFixedKeys(true), WithFixedTags(true), WithRandStringValues(false))
+
+		for i := 0; i < b.N; i++ {
+			pts := r.Rand(1000)
+			for _, pt := range pts {
+				pp.Put(pt)
+			}
+		}
+	})
+}
+
+func BenchmarkRandWithoutPool(b *T.B) {
+	b.Run("without-pool", func(b *T.B) {
+		r := NewRander(WithFixedKeys(true), WithFixedTags(true), WithRandStringValues(false))
+
+		for i := 0; i < b.N; i++ {
+			r.Rand(1000)
 		}
 	})
 }

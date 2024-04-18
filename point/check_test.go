@@ -85,6 +85,50 @@ func TestCheckMeasurement(t *testing.T) {
 	}
 }
 
+func TestCheckPoints(t *T.T) {
+	t.Run("string", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f1", 1.23, false, false)
+		kvs = kvs.Add("str", "hello", false, false)
+		kvs = kvs.Add("u64", uint64(math.MaxUint64), false, false)
+
+		pt := NewPointV2("m1", kvs, WithPrecheck(false))
+		pts := CheckPoints([]*Point{pt}, WithStrField(false))
+		assert.Len(t, pts, 1)
+		assert.Nil(t, pts[0].Get("str"))
+		assert.Equal(t, 1.23, pts[0].Get("f1"))
+	})
+
+	t.Run("u64", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f1", 1.23, false, false)
+		kvs = kvs.Add("str", "hello", false, false)
+		kvs = kvs.Add("u64", uint64(math.MaxUint64), false, false)
+
+		pt := NewPointV2("m1", kvs, WithPrecheck(false))
+		pts := CheckPoints([]*Point{pt}, WithU64Field(false))
+		assert.Len(t, pts, 1)
+		assert.Nil(t, pts[0].Get("u64"))
+		assert.Equal(t, "hello", pts[0].Get("str"))
+	})
+
+	t.Run("dot-in-key", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f.1", 1.23, false, false)
+		kvs = kvs.Add("u64", uint64(math.MaxUint64), false, false)
+
+		pt := NewPointV2("m1", kvs, WithPrecheck(false))
+
+		pts := CheckPoints([]*Point{pt}, WithDotInKey(false))
+		assert.Len(t, pts, 1)
+		assert.Equal(t, uint64(math.MaxUint64), pts[0].Get("u64"))
+		assert.Equal(t, 1.23, pts[0].Get("f_1"))
+		assert.Len(t, pts[0].Warns(), 1)
+
+		t.Logf("point: %s", pts[0].Pretty())
+	})
+}
+
 func TestCheckTags(t *T.T) {
 	cases := []struct {
 		name   string
@@ -164,6 +208,58 @@ func TestCheckTags(t *T.T) {
 			}
 		})
 	}
+
+	t.Run("key-updated-but-conflict", func(t *T.T) {
+		///////////////////////
+		// dot in tag key
+		var kvs KVs
+		kvs = kvs.AddV2("f.1", "some string", false, WithKVTagSet(true))
+		kvs = kvs.AddV2("f_1", 1.23, false)
+
+		pt := NewPointV2("m", kvs, WithDotInKey(false))
+
+		assert.Len(t, pt.pt.Fields, 1)
+		// drop tag
+		assert.Len(t, pt.pt.Fields, 1)
+		assert.Equal(t, 1.23, pt.Get(`f_1`).(float64))
+		t.Logf("pt: %s", pt.Pretty())
+
+		///////////////////////
+		// too long tag key
+		kvs = kvs[:0]
+		kvs = kvs.AddV2("f111", "some string", false, WithKVTagSet(true))
+		kvs = kvs.AddV2("f1", 1.23, false)
+		pt = NewPointV2("m", kvs, WithMaxTagKeyLen(2))
+
+		assert.Len(t, pt.pt.Fields, 1)
+		// drop tag
+		assert.Equal(t, 1.23, pt.Get(`f1`).(float64))
+		t.Logf("pt: %s", pt.Pretty())
+
+		///////////////////////
+		// too long field key
+		kvs = kvs[:0]
+		kvs = kvs.AddV2("f1", 1.23, false)
+		kvs = kvs.AddV2("f111", "some string", false)
+		pt = NewPointV2("m", kvs, WithMaxFieldKeyLen(2))
+
+		assert.Len(t, pt.pt.Fields, 1)
+		// drop field
+		assert.Equal(t, 1.23, pt.Get(`f1`).(float64))
+		t.Logf("pt: %s", pt.Pretty())
+
+		///////////////////////
+		// conflict on updated-key
+		kvs = kvs[:0]
+		kvs = kvs.AddV2("f.1", 1.23, false)            // f.1 => f_1
+		kvs = kvs.AddV2("f_111", "some string", false) // f_111 => f_1: conflict
+		pt = NewPointV2("m", kvs, WithMaxFieldKeyLen(3), WithDotInKey(false))
+
+		assert.Len(t, pt.pt.Fields, 1)
+		// drop field
+		assert.Equal(t, 1.23, pt.Get(`f_1`).(float64))
+		t.Logf("pt: %s", pt.Pretty())
+	})
 }
 
 func TestCheckFields(t *T.T) {
@@ -316,7 +412,7 @@ func TestCheckFields(t *T.T) {
 				"b": "12345",
 			},
 			warns: 1,
-			opts:  []Option{WithDisabledKeys(NewKey("a", KeyType_I))},
+			opts:  []Option{WithDisabledKeys(NewKey("a", I))},
 			expect: map[string]interface{}{
 				"b": "12345",
 			},
@@ -382,7 +478,7 @@ func TestCheckFields(t *T.T) {
 			}
 
 			kvs = c.checkKVs(kvs)
-			require.Equal(t, tc.warns, len(c.warns))
+			require.Equal(t, tc.warns, len(c.warns), "got pt %s", kvs.Pretty())
 
 			eopt := eqopt{}
 			if tc.expect != nil {
@@ -422,7 +518,7 @@ def`,
 func TestRequiredKV(t *T.T) {
 	t.Run(`add`, func(t *T.T) {
 		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123}),
-			WithRequiredKeys(NewKey(`rk`, KeyType_I, 1024)))
+			WithRequiredKeys(NewKey(`rk`, I, 1024)))
 		assert.Equal(t, int64(1024), pt.Get(`rk`))
 	})
 }
@@ -526,7 +622,7 @@ func BenchmarkCheck(b *T.B) {
 		pt, err := NewPoint(tc.m, tc.t, tc.f, tc.opts...)
 		assert.NoError(b, err)
 
-		b.Logf("pt with warns: %d", len(pt.warns))
+		b.Logf("pt with warns: %d", len(pt.pt.Warns))
 
 		cfg := GetCfg()
 		defer PutCfg(cfg)
@@ -536,10 +632,43 @@ func BenchmarkCheck(b *T.B) {
 		}
 		c := checker{cfg: cfg}
 
+		b.ResetTimer()
 		b.Run(tc.name, func(b *T.B) {
 			for i := 0; i < b.N; i++ {
 				c.check(pt)
 			}
 		})
 	}
+}
+
+func BenchmarkCheckPoints(b *T.B) {
+	b.Run("check-rand-pts", func(b *T.B) {
+		r := NewRander()
+		pts := r.Rand(1000)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			CheckPoints(pts)
+		}
+	})
+
+	b.Run("check-pts-without-str-field", func(b *T.B) {
+		r := NewRander()
+		pts := r.Rand(1000)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			CheckPoints(pts, WithStrField(false))
+		}
+	})
+
+	b.Run("check-pts-without-u64-field", func(b *T.B) {
+		r := NewRander()
+		pts := r.Rand(1000)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			CheckPoints(pts, WithU64Field(false))
+		}
+	})
 }

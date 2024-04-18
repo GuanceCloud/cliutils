@@ -34,6 +34,9 @@ github.com/Microsoft/go-winio/internal/fs
 github.com/Microsoft/go-winio/internal/socket
 github.com/Microsoft/go-winio/internal/stringbuffer
 github.com/Microsoft/go-winio/pkg/guid
+# github.com/VictoriaMetrics/easyproto v0.1.4
+## explicit; go 1.18
+github.com/VictoriaMetrics/easyproto
 # github.com/aliyun/aliyun-oss-go-sdk v2.1.2+incompatible
 ## explicit
 github.com/aliyun/aliyun-oss-go-sdk/oss
@@ -54,6 +57,10 @@ github.com/avast/retry-go
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
+# github.com/brianvoe/gofakeit/v6 v6.28.0
+## explicit; go 1.21
+github.com/brianvoe/gofakeit/v6
+github.com/brianvoe/gofakeit/v6/data
 # github.com/bytedance/sonic v1.8.0
 ## explicit; go 1.15
 github.com/bytedance/sonic
@@ -143,6 +150,12 @@ github.com/goccy/go-json/internal/encoder/vm_color_indent
 github.com/goccy/go-json/internal/encoder/vm_indent
 github.com/goccy/go-json/internal/errors
 github.com/goccy/go-json/internal/runtime
+# github.com/gogo/protobuf v1.3.2
+## explicit; go 1.15
+github.com/gogo/protobuf/jsonpb
+github.com/gogo/protobuf/proto
+github.com/gogo/protobuf/sortkeys
+github.com/gogo/protobuf/types
 # github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 ## explicit
 github.com/golang/groupcache/lru
@@ -417,14 +430,12 @@ golang.org/x/xerrors
 golang.org/x/xerrors/internal
 # google.golang.org/protobuf v1.31.0
 ## explicit; go 1.11
-google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
 google.golang.org/protobuf/internal/descfmt
 google.golang.org/protobuf/internal/descopts
 google.golang.org/protobuf/internal/detrand
 google.golang.org/protobuf/internal/encoding/defval
-google.golang.org/protobuf/internal/encoding/json
 google.golang.org/protobuf/internal/encoding/messageset
 google.golang.org/protobuf/internal/encoding/tag
 google.golang.org/protobuf/internal/encoding/text

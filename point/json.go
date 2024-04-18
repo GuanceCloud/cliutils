@@ -6,10 +6,12 @@
 package point
 
 import (
+	bytes "bytes"
 	"encoding/json"
+	"log"
 	"time"
 
-	"google.golang.org/protobuf/encoding/protojson"
+	protojson "github.com/gogo/protobuf/jsonpb"
 )
 
 type JSONPoint struct {
@@ -37,19 +39,20 @@ func (jp *JSONPoint) Point(opts ...Option) (*Point, error) {
 // MarshalJSON to protobuf json.
 func (p *Point) MarshalJSON() ([]byte, error) {
 	if p.HasFlag(Ppb) {
+		m := &protojson.Marshaler{}
 		pb := p.PBPoint()
-		if x, err := protojson.Marshal(pb); err != nil {
+		buf := bytes.Buffer{}
+		if err := m.Marshal(&buf, pb); err != nil {
 			return nil, err
-		} else {
-			return x, nil
 		}
+		return buf.Bytes(), nil
 	}
 
 	return json.Marshal(&JSONPoint{
 		Measurement: p.Name(),
 		Tags:        p.MapTags(),
 		Fields:      p.InfluxFields(),
-		Time:        p.time.UnixNano(),
+		Time:        p.pt.Time,
 		// NOTE: warns & debugs skipped.
 	})
 }
@@ -59,14 +62,19 @@ func (p *Point) UnmarshalJSON(j []byte) error {
 	var x PBPoint
 	var pt *Point
 
+	m := &protojson.Unmarshaler{}
+	buf := bytes.NewBuffer(j)
+
 	// try pb unmarshal.
-	if err := protojson.Unmarshal(j, &x); err == nil {
+	if err := m.Unmarshal(buf, &x); err == nil {
 		pt = FromPB(&x)
 	} else {
 		// try JSONPoint unmarshal
 		var y JSONPoint
 		if err := json.Unmarshal(j, &y); err == nil {
 			pt = FromJSONPoint(&y)
+
+			log.Printf("pt: %s", pt.Pretty())
 		} else {
 			return err
 		}

@@ -6,14 +6,17 @@ require (
 	github.com/DataDog/datadog-agent/pkg/obfuscate v0.47.1
 	github.com/GuanceCloud/grok v1.1.3
 	github.com/GuanceCloud/platypus v0.2.9
+	github.com/VictoriaMetrics/easyproto v0.1.4
 	github.com/aliyun/aliyun-oss-go-sdk v2.1.2+incompatible
 	github.com/antchfx/xmlquery v1.3.18
 	github.com/araddon/dateparse v0.0.0-20201001162425-8aadafed4dc4
 	github.com/avast/retry-go v3.0.0+incompatible
+	github.com/brianvoe/gofakeit/v6 v6.28.0
 	github.com/didip/tollbooth/v6 v6.1.2
 	github.com/gin-gonic/gin v1.9.0
 	github.com/go-ping/ping v1.1.0
 	github.com/gobwas/ws v1.1.0
+	github.com/gogo/protobuf v1.3.2
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-retryablehttp v0.7.4
 	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c

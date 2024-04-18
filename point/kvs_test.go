@@ -11,8 +11,183 @@ import (
 	T "testing"
 
 	"github.com/stretchr/testify/assert"
-	anypb "google.golang.org/protobuf/types/known/anypb"
 )
+
+func TestTrim(t *T.T) {
+	t.Run("trim-field", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f0", 1.23, false, false)
+		kvs = kvs.AddTag("t1", "v1")
+		kvs = kvs.Add("f1", -123, false, false)
+		kvs = kvs.Add("f2", uint64(123), false, false)
+		kvs = kvs.Add("f3", "hello", false, false)
+		kvs = kvs.Add("f4", []byte("world"), false, false)
+		kvs = kvs.Add("f5", false, false, false)
+
+		kvs = kvs.TrimFields(1)
+
+		assert.Lenf(t, kvs, 2, "go kvs: %s", kvs.Pretty())
+		assert.NotNil(t, kvs.Get("f0"))
+		assert.NotNil(t, kvs.Get("t1"))
+	})
+
+	t.Run("point-pool-kv-reuse", func(t *T.T) {
+		pp := NewReservedCapPointPool(1000)
+		SetPointPool(pp)
+		defer ClearPointPool()
+
+		i := 0
+		var kvs KVs
+
+		kvs = kvs.Add("f0", 1.23, false, false)
+		kvs = kvs.AddTag("t1", "v1")
+
+		for {
+			kvs = kvs.TrimFields(0)
+
+			assert.Lenf(t, kvs, 1, "go kvs: %s", kvs.Pretty())
+
+			kvs = kvs.Add("f-1", 123, false, false)
+
+			if pp.(*ReservedCapPointPool).chanGet() > 0 {
+				t.Logf("[%d] %s", i, pp)
+				break
+			}
+			i++
+		}
+	})
+
+	t.Run("trim-field-under-point-pool", func(t *T.T) {
+		pp := NewReservedCapPointPool(1000)
+		SetPointPool(pp)
+		defer ClearPointPool()
+
+		for loop := 0; loop < 2; loop++ {
+			var kvs KVs
+			kvs = kvs.Add("f0", 1.23, false, false)
+			kvs = kvs.AddTag("t1", "v1")
+			kvs = kvs.Add("f1", -123, false, false)
+			kvs = kvs.Add("f2", uint64(123), false, false)
+			kvs = kvs.Add("f3", "hello", false, false)
+			kvs = kvs.Add("f4", []byte("world"), false, false)
+			kvs = kvs.Add("f5", false, false, false)
+
+			kvs = kvs.TrimFields(2)
+
+			assert.Lenf(t, kvs, 3 /* 2 fields  + 1 tag */, "go kvs: %s", kvs.Pretty())
+			assert.NotNil(t, kvs.Get("f0"))
+			assert.NotNil(t, kvs.Get("f1"))
+			assert.NotNil(t, kvs.Get("t1"))
+
+			kvs = kvs.Add("f-2", 123, false, false)
+			kvs = kvs.Add("f-3", 123, false, false)
+			kvs = kvs.Add("f-4", 123, false, false)
+			_ = kvs.Add("f-5", 123, false, false)
+		}
+
+		// XXX: why set loop to 1, the kvReused == 0?
+		assert.True(t, pp.(*ReservedCapPointPool).chanGet() > 0)
+
+		t.Logf("point-pool: %s", pp)
+	})
+
+	t.Run("trim-tag", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f0", 1.23, false, false)
+		kvs = kvs.AddTag("t1", "v1")
+		kvs = kvs.AddTag("t2", "v1")
+		kvs = kvs.AddTag("t3", "v1")
+		kvs = kvs.Add("f1", -123, false, false)
+
+		kvs = kvs.TrimTags(1)
+
+		assert.Lenf(t, kvs, 3, "go kvs: %s", kvs.Pretty())
+		assert.NotNil(t, kvs.Get("t1"))
+	})
+
+	t.Run("trim-tag-under-point-pool", func(t *T.T) {
+		pp := NewReservedCapPointPool(2)
+		SetPointPool(pp)
+		defer ClearPointPool()
+
+		for loop := 0; loop < 2; loop++ {
+			var kvs KVs
+
+			kvs = kvs.Add("f0", 1.23, false, false)
+			kvs = kvs.AddTag("t1", "v1")
+			kvs = kvs.AddTag("t2", "v1")
+			kvs = kvs.Add("f1", -123, false, false)
+
+			kvs = kvs.TrimTags(1)
+
+			assert.Lenf(t, kvs, 3 /* 2 fields  + 1 tag */, "go kvs: %s", kvs.Pretty())
+
+			assert.NotNil(t, kvs.Get("f0"))
+			assert.NotNil(t, kvs.Get("f1"))
+			assert.NotNil(t, kvs.Get("f1"))
+
+			kvs = kvs.Add("f-2", 123, false, false)
+			kvs = kvs.Add("f-3", 123, false, false)
+			kvs = kvs.Add("f-4", 123, false, false)
+			_ = kvs.Add("f-5", 123, false, false)
+		}
+
+		// XXX: why set loop to 1, the kvReused == 0?
+		assert.True(t, pp.(*ReservedCapPointPool).chanGet() > 0)
+
+		t.Logf("point-pool: %s", pp.(*ReservedCapPointPool).String())
+	})
+}
+
+func BenchmarkKVsTrim(b *T.B) {
+	b.Run("trim", func(b *T.B) {
+		pp := NewReservedCapPointPool(1000)
+		SetPointPool(pp)
+		defer func() {
+			ClearPointPool()
+			b.Logf("point pool: %s", pp)
+		}()
+
+		for i := 0; i < b.N; i++ {
+			var kvs KVs
+			kvs = kvs.Add("f0", 1.23, false, false)
+			kvs = kvs.AddTag("t1", "v1")
+			kvs = kvs.Add("f1", -123, false, false)
+			kvs = kvs.Add("f2", uint64(123), false, false)
+
+			kvs = kvs.TrimFields(1)
+
+			kvs = kvs.Add("f-2", 123, false, false)
+			kvs = kvs.Add("f-3", 123, false, false)
+			kvs = kvs.Add("f-4", 123, false, false)
+			_ = kvs.Add("f-5", 123, false, false)
+		}
+	})
+
+	b.Run("del", func(b *T.B) {
+		pp := NewReservedCapPointPool(1000)
+		SetPointPool(pp)
+		defer func() {
+			ClearPointPool()
+			b.Logf("point pool: %s", pp)
+		}()
+
+		for i := 0; i < b.N; i++ {
+			var kvs KVs
+			kvs = kvs.Add("f0", 1.23, false, false)
+			kvs = kvs.AddTag("t1", "v1")
+			kvs = kvs.Add("f1", -123, false, false)
+			kvs = kvs.Add("f2", uint64(123), false, false)
+
+			kvs = kvs.Del("f2")
+
+			kvs = kvs.Add("f-2", 123, false, false)
+			kvs = kvs.Add("f-3", 123, false, false)
+			kvs = kvs.Add("f-4", 123, false, false)
+			_ = kvs.Add("f-5", 123, false, false)
+		}
+	})
+}
 
 func TestKVsAdd(t *T.T) {
 	t.Run("basic", func(t *T.T) {
@@ -23,6 +198,37 @@ func TestKVsAdd(t *T.T) {
 
 		kvs = kvs.Add("f1", 123, false, false)
 		assert.Len(t, kvs, 1)
+	})
+
+	t.Run("add-v2", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.AddV2("f1", 123, false, WithKVUnit("dollar"), WithKVType(GAUGE))
+		kvs = kvs.AddV2("cap", 123, false, WithKVUnit("bytes"), WithKVType(COUNT))
+
+		t.Logf("kvs: %s", kvs.Pretty())
+	})
+}
+
+func TestKVsReset(t *T.T) {
+	t.Run("reset", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f0", 1.23, false, false)
+		kvs = kvs.Add("f1", -123, false, false)
+		kvs = kvs.Add("f2", uint64(123), false, false)
+		kvs = kvs.Add("f3", "hello", false, false)
+		kvs = kvs.Add("f4", []byte("world"), false, false)
+		kvs = kvs.Add("f5", false, false, false)
+
+		kvs.ResetFull()
+
+		assert.Equal(t, "", kvs[0].Key)
+		assert.Equal(t, 0.0, kvs[0].Raw().(float64))
+
+		assert.Equal(t, int64(0), kvs[1].Raw().(int64))
+		assert.Equal(t, uint64(0), kvs[2].Raw().(uint64))
+		assert.Equal(t, "", kvs[3].Raw().(string))
+		assert.Len(t, kvs[4].Raw().([]byte), 0)
+		assert.False(t, kvs[5].Raw().(bool))
 	})
 }
 
@@ -78,13 +284,8 @@ func TestNewKVs(t *T.T) {
 			"f5": []byte(`world`),
 			"f6": false,
 			"f7": true,
-			"f8": func() *anypb.Any {
-				x, _ := anypb.New(&AnyDemo{Demo: "haha"})
-				return x
-			}(),
-			"f9": struct{}{},
 		})
-		assert.Equal(t, 9, len(kvs))
+		assert.Equal(t, 7, len(kvs))
 
 		assert.Equal(t, int64(123), kvs.Get(`f1`).GetI())
 		assert.Equal(t, uint64(123), kvs.Get(`f2`).GetU())
@@ -93,14 +294,6 @@ func TestNewKVs(t *T.T) {
 		assert.Equal(t, []byte(`world`), kvs.Get(`f5`).GetD())
 		assert.Equal(t, false, kvs.Get(`f6`).GetB())
 		assert.Equal(t, true, kvs.Get(`f7`).GetB())
-
-		x := kvs.Get(`f8`).GetA()
-		assert.NotNil(t, x)
-		t.Logf("any: %s", x)
-		t.Logf("any.type: %q", x.TypeUrl)
-		t.Logf("any.value: %q", x.Value)
-
-		assert.Nil(t, kvs.Get(`f9`).Val)
 
 		t.Logf("kvs:\n%s", kvs.Pretty())
 	})
@@ -113,8 +306,8 @@ func TestNewKVs(t *T.T) {
 		kvs = kvs.MustAddKV(NewKV(`t3`, []byte("v2"), WithKVTagSet(true)))
 
 		kvs = kvs.MustAddKV(NewKV(`f1`, "foo"))
-		kvs = kvs.MustAddKV(NewKV(`f2`, 123, WithKVUnit("MB"), WithKVType(MetricType_COUNT)))
-		kvs = kvs.MustAddKV(NewKV(`f3`, 3.14, WithKVUnit("some"), WithKVType(MetricType_GAUGE)))
+		kvs = kvs.MustAddKV(NewKV(`f2`, 123, WithKVUnit("MB"), WithKVType(COUNT)))
+		kvs = kvs.MustAddKV(NewKV(`f3`, 3.14, WithKVUnit("some"), WithKVType(GAUGE)))
 
 		assert.Equal(t, 6, len(kvs))
 
@@ -140,8 +333,71 @@ func TestNewKVs(t *T.T) {
 		kvs = kvs.MustAddKV(NewKV(`f3`, 3.14))
 		assert.False(t, sort.IsSorted(kvs))
 
+		t.Logf("kvs:\n%s", kvs.Pretty())
+
 		sort.Sort(kvs)
 		assert.True(t, sort.IsSorted(kvs))
+		assert.Len(t, kvs, 4)
+	})
+
+	t.Run(`test-del3`, func(t *T.T) {
+		pp := NewReservedCapPointPool(1000)
+
+		SetPointPool(pp)
+		defer ClearPointPool()
+
+		var kvs KVs
+
+		defer func() {
+			for _, kv := range kvs {
+				pp.PutKV(kv)
+			}
+		}()
+
+		kvs = kvs.Add(`f1`, false, false, false)
+		kvs = kvs.Add(`f2`, 123, false, false)
+		kvs = kvs.Add(`f3`, 123, false, false)
+
+		t.Logf("kvs:\n%s", kvs.Pretty())
+		kvs = kvs.Del(`f1`)
+		t.Logf("kvs:\n%s", kvs.Pretty())
+
+		t.Logf("pt pool: %s", pp)
+	})
+
+	t.Run(`test-del-on-pt-pool`, func(t *T.T) {
+		pp := NewReservedCapPointPool(1000)
+
+		SetPointPool(pp)
+		defer ClearPointPool()
+
+		var kvs KVs
+
+		defer func() {
+			for _, kv := range kvs {
+				pp.PutKV(kv)
+			}
+		}()
+
+		kvs = kvs.Add(`f1`, false, false, false)
+		kvs = kvs.Add(`f2`, 123, false, false)
+		kvs = kvs.Add(`f3`, 123, false, false)
+
+		t.Logf("kvs:\n%s", kvs.Pretty())
+		kvs = kvs.Del(`f1`)
+		t.Logf("kvs:\n%s", kvs.Pretty())
+
+		t.Logf("pt pool: %s", pp)
+	})
+
+	t.Run(`test-update-on-kvs`, func(t *T.T) {
+		pt := NewPointV2("ptname", nil)
+
+		pt.pt.Fields = KVs(pt.pt.Fields).Add("f1", 1.23, false, false)
+
+		t.Logf("point: %s", pt.Pretty())
+
+		assert.NotNil(t, pt.Get("f1"))
 	})
 
 	t.Run("array-int-value", func(t *T.T) {
@@ -175,5 +431,106 @@ func TestNewKVs(t *T.T) {
 			"f_arr": [][]byte{[]byte("hello"), []byte("world")},
 		})
 		t.Logf("kvs: %s", kvs.Pretty())
+	})
+}
+
+func TestKVsDel(t *T.T) {
+	t.Run("del", func(t *T.T) {
+		var kvs KVs
+
+		kvs = kvs.Add(`f1`, false, false, false)
+		kvs = kvs.Add(`f2`, 123, false, false)
+		kvs = kvs.Add(`f3`, 123, false, false)
+
+		kvs = kvs.Del(`f1`)
+		assert.Len(t, kvs, 2)
+		kvs = kvs.Del(`f3`)
+		assert.Len(t, kvs, 1)
+		assert.NotNil(t, kvs.Get(`f2`))
+	})
+
+	t.Run(`del-on-point-pool`, func(t *T.T) {
+		var kvs KVs
+
+		pp := NewReservedCapPointPool(1000)
+		SetPointPool(pp)
+		defer func() {
+			ClearPointPool()
+		}()
+
+		kvs = kvs.Add(`f1`, false, false, false)
+		kvs = kvs.Add(`f2`, 123, false, false)
+		kvs = kvs.Add(`f3`, 123, false, false)
+
+		kvs = kvs.Del(`f1`)
+		assert.Len(t, kvs, 2)
+		kvs = kvs.Del(`f3`)
+
+		assert.Len(t, kvs, 1)
+		assert.NotNil(t, kvs.Get(`f2`))
+
+		_ = kvs.Add(`f-x`, 123, false, false)
+
+		assert.True(t, pp.(*ReservedCapPointPool).poolGet() > 0)
+		assert.True(t, pp.(*ReservedCapPointPool).poolPut() == 0) // chan is 1000, not put to pool
+
+		assert.True(t, pp.(*ReservedCapPointPool).chanGet() > 0)
+		assert.True(t, pp.(*ReservedCapPointPool).chanPut() > 0)
+
+		t.Logf("point pool: %s", pp.(*ReservedCapPointPool).String())
+	})
+}
+
+func BenchmarkKVsDel(b *T.B) {
+	addTestKVs := func(kvs KVs) KVs {
+		kvs = kvs.Add(`f1`, false, false, false)
+		kvs = kvs.Add(`f2`, 123, false, false)
+		kvs = kvs.Add(`f3`, "some string", false, false)
+		kvs = kvs.Add(`f4`, []byte("hello world"), false, false)
+		kvs = kvs.Add(`f5`, 3.14, false, false)
+		kvs = kvs.Add(`f6`, uint(8), false, false)
+
+		return kvs
+	}
+
+	b.Run("del-on-slice-Delete", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			var kvs KVs
+			kvs = addTestKVs(kvs)
+			_ = kvs.Del(`f1`)
+		}
+	})
+
+	b.Run("del-on-slice-Delete-with-point-pool", func(b *T.B) {
+		pp := NewReservedCapPointPool(1000)
+		SetPointPool(pp)
+		defer func() {
+			b.Logf("point pool: %s", pp.(*ReservedCapPointPool).String())
+			ClearPointPool()
+		}()
+
+		for i := 0; i < b.N; i++ {
+			var kvs KVs
+			kvs = addTestKVs(kvs)
+			_ = kvs.Del(`f1`)
+		}
+	})
+
+	b.Run("del-on-new-slice", func(b *T.B) {
+		del := func(kvs KVs, k string) KVs {
+			var keep KVs // new slice
+			for _, f := range kvs {
+				if f.Key != k {
+					keep = append(keep, f)
+				}
+			}
+			return keep
+		}
+
+		for i := 0; i < b.N; i++ {
+			var kvs KVs
+			kvs = addTestKVs(kvs)
+			_ = del(kvs, `f1`)
+		}
 	})
 }
