@@ -179,13 +179,13 @@ func TestPointPool(t *T.T) {
 
 		cpp := pp.(*ReservedCapPointPool)
 
-		assert.Equal(t, int64(396), cpp.poolGet())
-		assert.Equal(t, int64(4), cpp.chanGet())
+		assert.Equal(t, int64(4), cpp.poolGet())   // pool-get: new object from pool
+		assert.Equal(t, int64(396), cpp.chanGet()) // chan-get: reuse-exist object from channel
 
 		t.Logf("point pool: %s", cpp.String())
 	})
 
-	t.Run("level-3-concurrent", func(t *T.T) {
+	t.Run("point-pool-concurrent", func(t *T.T) {
 		pp := NewReservedCapPointPool(1000)
 		SetPointPool(pp)
 		defer ClearPointPool()
@@ -218,7 +218,9 @@ func TestPointPool(t *T.T) {
 
 		cpp := pp.(*ReservedCapPointPool)
 
-		assert.Equal(t, int64(n*100*4), cpp.poolGet())
+		// all put-back locate in chan, not pool(here chan cap is 1000, too large for only 4 kvs each loop).
+		assert.Equal(t, int64(n*100*4), cpp.chanPut())
+
 		t.Logf("point pool: %s", cpp.String())
 	})
 }

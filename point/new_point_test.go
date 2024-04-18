@@ -153,7 +153,7 @@ func TestNewPoint(t *T.T) {
 				"u64-large": uint64(math.MaxInt64 + 1), // skipped in expect string
 				"u8":        uint8(1),
 			},
-			expect: `valid-fields []byte="abc",[]uint8="abc",b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1i,u16=1i,u32=1i,u64=1i,u8=1i 123`,
+			expect: `valid-fields []byte="YWJj"b,[]uint8="YWJj"b,b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1u,u16=1u,u32=1u,u64=1u,u64-large=9223372036854775808u,u8=1u 123`,
 		},
 
 		{

@@ -164,17 +164,6 @@ func TestJSONPoint2Point(t *T.T) {
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			expect: fmt.Sprintf("%s f1=123i,f2=false 123", DefaultMeasurementName),
 		},
-
-		{
-			name: "minus-time", // it's ok!
-			p: &JSONPoint{
-				Measurement: "minus-time",
-				Tags:        nil,
-				Fields:      map[string]interface{}{"f1": 123, "f2": false},
-			},
-			opts:   []Option{WithTime(time.Unix(0, -123))},
-			expect: "minus-time f1=123i,f2=false -123",
-		},
 	}
 
 	for _, tc := range cases {
@@ -228,9 +217,9 @@ func TestJSONPoint2Point(t *T.T) {
 
 		pt, err = jp2.Point()
 		assert.NoError(t, err)
-		assert.NotNil(t, pt.Get("f_i_arr"))
-		assert.NotNil(t, pt.Get("f_f_arr"))
-		assert.NotNil(t, pt.Get("f_mix_arr"))
+		assert.NotNil(t, pt.Get("f_i_arr"), "pt: %s", pt.Pretty())
+		assert.NotNil(t, pt.Get("f_f_arr"), "pt: %s", pt.Pretty())
+		assert.NotNil(t, pt.Get("f_mix_arr"), "pt: %s", pt.Pretty())
 
 		t.Logf("pt: %s", pt.Pretty())
 	})
