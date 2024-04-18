@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestJSONPointMarshal(t *testing.T) {
+func TestJSONPointMarshal(t *T.T) {
 	cases := []struct {
 		name   string
 		p      *Point
@@ -59,7 +59,7 @@ func TestJSONPointMarshal(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *T.T) {
 			j, err := json.Marshal(tc.p)
 			assert.NoError(t, err, "marshal %s to json failed: %s, json: %v", tc.p.Pretty(), err, j)
 
@@ -125,7 +125,7 @@ func TestJSONPointMarhsal(t *testing.T) {
 	t.Logf("line-protocol:\n%s", pt.LineProto())
 }
 
-func TestJSONPoint2Point(t *testing.T) {
+func TestJSONPoint2Point(t *T.T) {
 	cases := []struct {
 		name   string
 		p      *JSONPoint
@@ -178,7 +178,7 @@ func TestJSONPoint2Point(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *T.T) {
 			pt, err := tc.p.Point(tc.opts...)
 			if tc.fail {
 				assert.Error(t, err)
@@ -233,5 +233,58 @@ func TestJSONPoint2Point(t *testing.T) {
 		assert.NotNil(t, pt.Get("f_mix_arr"))
 
 		t.Logf("pt: %s", pt.Pretty())
+	})
+}
+
+func TestFromJSONPoint(t *T.T) {
+	t.Run(`basic`, func(t *T.T) {
+		jp := JSONPoint{
+			Measurement: "m",
+			Tags: map[string]string{
+				"t1": "v1",
+				"t2": "v2",
+			},
+			Fields: map[string]any{
+				"f1": 1,
+				"f2": 3.14,
+			},
+			Time: 123,
+		}
+
+		pt := FromJSONPoint(&jp)
+		assert.Equal(t, "m", pt.Name())
+		assert.Equal(t, "v1", pt.Get("t1"))
+		assert.Equal(t, "v2", pt.Get("t2"))
+		assert.Equal(t, int64(1), pt.Get("f1"))
+		assert.Equal(t, 3.14, pt.Get("f2"))
+		assert.Equal(t, int64(123), pt.Time().UnixNano())
+	})
+
+	t.Run(`from-raw-json`, func(t *T.T) {
+		j := `
+{
+	"measurement": "m",
+	"tags": {
+		"t1": "v1",
+		"t2": "v2"
+	},
+	"fields": {
+		"f1": 1,
+		"f2": 3.14
+	},
+
+	"time": 123
+}
+`
+
+		var pt Point
+		assert.NoError(t, json.Unmarshal([]byte(j), &pt))
+
+		assert.Equal(t, "m", pt.Name())
+		assert.Equal(t, "v1", pt.Get("t1"))
+		assert.Equal(t, "v2", pt.Get("t2"))
+		assert.Equal(t, 1.0, pt.Get("f1")) // NOTE: here 1 in json unmarshaled as float
+		assert.Equal(t, 3.14, pt.Get("f2"))
+		assert.Equal(t, int64(123), pt.Time().UnixNano())
 	})
 }

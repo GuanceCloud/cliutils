@@ -201,6 +201,7 @@ func FromJSONPoint(j *JSONPoint) *Point {
 	for k, v := range j.Tags {
 		kvs = kvs.MustAddTag(k, v)
 	}
+
 	return NewPointV2(j.Measurement, kvs, WithTime(time.Unix(0, j.Time)))
 }
 
