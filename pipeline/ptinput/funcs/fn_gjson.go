@@ -27,7 +27,7 @@ func GJSONChecking(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlErr
 	}
 
 	switch funcExpr.Param[1].NodeType { //nolint:exhaustive
-	case ast.TypeAttrExpr, ast.TypeIdentifier, ast.TypeIndexExpr:
+	case ast.TypeIdentifier, ast.TypeStringLiteral:
 		var err error
 		if err != nil {
 			return runtime.NewRunError(ctx, err.Error(), funcExpr.Param[1].StartPos())
@@ -39,7 +39,7 @@ func GJSONChecking(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlErr
 
 	if funcExpr.Param[2] != nil {
 		switch funcExpr.Param[2].NodeType { //nolint:exhaustive
-		case ast.TypeAttrExpr, ast.TypeIdentifier, ast.TypeStringLiteral:
+		case ast.TypeIdentifier, ast.TypeStringLiteral:
 		default:
 			return runtime.NewRunError(ctx, fmt.Sprintf("expect AttrExpr or Identifier, got %s",
 				funcExpr.Param[2].NodeType), funcExpr.Param[2].StartPos())
@@ -50,31 +50,33 @@ func GJSONChecking(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlErr
 }
 
 func GJSON(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
-	var jpath *ast.Node
-
 	srcKey, err := getKeyName(funcExpr.Param[0])
 	if err != nil {
 		return runtime.NewRunError(ctx, err.Error(), funcExpr.Param[0].StartPos())
 	}
 
-	switch funcExpr.Param[1].NodeType {
-	case ast.TypeAttrExpr, ast.TypeIdentifier, ast.TypeIndexExpr:
-		jpath = funcExpr.Param[1]
-	default:
-		return runtime.NewRunError(ctx, fmt.Sprintf("expect AttrExpr or Identifier, got %s",
-			funcExpr.Param[1].NodeType), funcExpr.Param[1].StartPos())
+	jpath, dtype, errP := runtime.RunStmt(ctx, funcExpr.Param[1])
+	if errP != nil {
+		return errP
+	}
+	if dtype != ast.String {
+		return runtime.NewRunError(ctx, "param data type expect string",
+			funcExpr.Param[1].StartPos())
 	}
 
-	targetKey, _ := getKeyName(jpath)
+	targetKey := jpath.(string)
 
 	if funcExpr.Param[2] != nil {
-		switch funcExpr.Param[2].NodeType { //nolint:exhaustive
-		case ast.TypeAttrExpr, ast.TypeIdentifier, ast.TypeStringLiteral:
-			targetKey, _ = getKeyName(funcExpr.Param[2])
-		default:
-			return runtime.NewRunError(ctx, fmt.Sprintf("expect AttrExpr or Identifier, got %s",
-				funcExpr.Param[2].NodeType), funcExpr.Param[2].StartPos())
+		tk, dtype, errP := runtime.RunStmt(ctx, funcExpr.Param[2])
+		if errP != nil {
+			return errP
 		}
+		if dtype != ast.String {
+			return runtime.NewRunError(ctx, "param data type expect string",
+				funcExpr.Param[2].StartPos())
+		}
+
+		targetKey = tk.(string)
 	}
 
 	cont, err := ctx.GetKeyConv2Str(srcKey)
@@ -83,22 +85,18 @@ func GJSON(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
 		return nil
 	}
 
-	fmt.Println(jpath)
-	res := gjson.Get(cont, jpath.String())
+	res := gjson.Get(cont, jpath.(string))
 	rType := res.Type
 
-	fmt.Println(res)
-
-	var dtype ast.DType
 	var v any
 	switch rType {
-	case 2:
+	case gjson.Number:
 		v = res.Float()
 		dtype = ast.Float
-	case 1, 4:
+	case gjson.True, gjson.False:
 		v = res.Bool()
 		dtype = ast.Bool
-	case 3, 5:
+	case gjson.String, gjson.JSON:
 		v = res.String()
 		dtype = ast.String
 	default:

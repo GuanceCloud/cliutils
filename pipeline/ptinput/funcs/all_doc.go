@@ -77,6 +77,7 @@ var PipelineFunctionDocs = map[string]*PLDoc{
 	"parse_int()":              &parseIntMarkdown,
 	"format_int()":             &formatIntMarkdown,
 	"pt_name()":                &ptNameMarkdown,
+	"gjson()":                  &gjsonMarkdown,
 }
 
 var PipelineFunctionDocsEN = map[string]*PLDoc{
@@ -138,6 +139,7 @@ var PipelineFunctionDocsEN = map[string]*PLDoc{
 	"parse_int()":              &parseIntMarkdownEN,
 	"format_int()":             &formatIntMarkdownEN,
 	"pt_name()":                &ptNameMarkdownEN,
+	"gjson()":                  &gjsonMarkdownEN,
 }
 
 // embed docs.
@@ -316,6 +318,9 @@ var (
 
 	//go:embed md/pt_name.md
 	docPtName string
+
+	//go:embed md/gjson.md
+	docGJSON string
 )
 
 const (
@@ -693,6 +698,13 @@ var (
 
 	ptNameMarkdown = PLDoc{
 		Doc: docPtName,
+		FnCategory: map[string][]string{
+			langTagZhCN: {cOther},
+		},
+	}
+
+	gjsonMarkdown = PLDoc{
+		Doc: docGJSON,
 		FnCategory: map[string][]string{
 			langTagZhCN: {cOther},
 		},

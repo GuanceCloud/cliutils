@@ -29,7 +29,7 @@ func TestGJSON(t *testing.T) {
 				  {"first": "Jane", "last": "Murphy", "age": 47, "nets": ["ig", "tw"]}
 				]
 			  }`,
-			script:   `gjson(_, age)`,
+			script:   `gjson(_, "age")`,
 			expected: float64(37),
 			key:      "age",
 		},
@@ -45,7 +45,7 @@ func TestGJSON(t *testing.T) {
 				  {"first": "Jane", "last": "Murphy", "age": 47, "nets": ["ig", "tw"]}
 				]
 			  }`,
-			script:   `gjson(_, children)`,
+			script:   `gjson(_, "children")`,
 			expected: `["Sara","Alex","Jack"]`,
 			key:      "children",
 		},
@@ -61,7 +61,7 @@ func TestGJSON(t *testing.T) {
 				  {"first": "Jane", "last": "Murphy", "age": 47, "nets": ["ig", "tw"]}
 				]
 			  }`,
-			script:   `gjson(_, name)`,
+			script:   `gjson(_, "name")`,
 			expected: `{"first": "Tom", "last": "Anderson"}`,
 			key:      "name",
 		},
@@ -77,27 +77,45 @@ func TestGJSON(t *testing.T) {
 				  {"first": "Jane", "last": "Murphy", "age": 47, "nets": ["ig", "tw"]}
 				]
 			  }`,
-			script: `gjson(_, name)
-			gjson(name, first)`,
+			script: `gjson(_, "name")
+			gjson(name, "first")`,
 			expected: `Tom`,
 			key:      "first",
 		},
-		// {
-		// 	in: `{
-		// 	  "name": {"first": "Tom", "last": "Anderson"},
-		// 	  "age":37,
-		// 	  "children": ["Sara","Alex","Jack"],
-		// 	  "fav.movie": "Deer Hunter",
-		// 	  "friends": [
-		// 	    {"first": "Dale", "last": "Murphy", "age": 44, "nets": ["ig", "fb", "tw"]},
-		// 	    {"first": "Roger", "last": "Craig", "age": 68, "nets": ["fb", "tw"]},
-		// 	    {"first": "Jane", "last": "Murphy", "age": 47, "nets": ["ig", "tw"]}
-		// 	  ]
-		// 	}`,
-		// 	script:   `gjson(_, friends.1.first, f_first)`,
-		// 	expected: "Roger",
-		// 	key:      "f_first",
-		// },
+		{
+			in: `{
+			  "name": {"first": "Tom", "last": "Anderson"},
+			  "age":37,
+			  "children": ["Sara","Alex","Jack"],
+			  "fav.movie": "Deer Hunter",
+			  "friends": [
+			    {"first": "Dale", "last": "Murphy", "age": 44, "nets": ["ig", "fb", "tw"]},
+			    {"first": "Roger", "last": "Craig", "age": 68, "nets": ["fb", "tw"]},
+			    {"first": "Jane", "last": "Murphy", "age": 47, "nets": ["ig", "tw"]}
+			  ]
+			}`,
+			script: `gjson(_, "friends")
+			gjson(friends, "1.first", "f_first")`,
+			expected: "Roger",
+			key:      "f_first",
+		},
+		{
+			in: `{
+			  "name": {"first": "Tom", "last": "Anderson"},
+			  "age":37,
+			  "children": ["Sara","Alex","Jack"],
+			  "fav.movie": "Deer Hunter",
+			  "friends": [
+			    {"first": "Dale", "last": "Murphy", "age": 44, "nets": ["ig", "fb", "tw"]},
+			    {"first": "Roger", "last": "Craig", "age": 68, "nets": ["fb", "tw"]},
+			    {"first": "Jane", "last": "Murphy", "age": 47, "nets": ["ig", "tw"]}
+			  ]
+			}`,
+			script: `gjson(_, "friends", "friends")
+			gjson(friends, "1.nets.1", "f_nets")`,
+			expected: "tw",
+			key:      "f_nets",
+		},
 	}
 	for idx, tc := range Cases {
 		t.Run(tc.name, func(t *testing.T) {

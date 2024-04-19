@@ -185,6 +185,9 @@ var (
 
 	//go:embed md/pt_name.en.md
 	docPtNameEN string
+
+	//go:embed md/gjson.en.md
+	docGJSONEN string
 )
 
 const (
@@ -565,6 +568,13 @@ var (
 
 	ptNameMarkdownEN = PLDoc{
 		Doc: docPtNameEN,
+		FnCategory: map[string][]string{
+			langTagEnUS: {eOther},
+		},
+	}
+
+	gjsonMarkdownEN = PLDoc{
+		Doc: docGJSONEN,
 		FnCategory: map[string][]string{
 			langTagEnUS: {eOther},
 		},
