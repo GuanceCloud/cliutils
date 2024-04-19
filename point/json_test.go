@@ -217,9 +217,9 @@ func TestJSONPoint2Point(t *T.T) {
 
 		pt, err = jp2.Point()
 		assert.NoError(t, err)
-		assert.NotNil(t, pt.Get("f_i_arr"), "pt: %s", pt.Pretty())
-		assert.NotNil(t, pt.Get("f_f_arr"), "pt: %s", pt.Pretty())
-		assert.NotNil(t, pt.Get("f_mix_arr"), "pt: %s", pt.Pretty())
+		assert.NotNilf(t, pt.Get("f_i_arr"), "pt: %s", pt.Pretty())
+		assert.NotNilf(t, pt.Get("f_f_arr"), "pt: %s", pt.Pretty())
+		assert.NotNilf(t, pt.Get("f_mix_arr"), "pt: %s", pt.Pretty())
 
 		t.Logf("pt: %s", pt.Pretty())
 	})

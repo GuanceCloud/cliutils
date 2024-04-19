@@ -199,7 +199,7 @@ func TestCheckTags(t *T.T) {
 			c := checker{cfg: cfg}
 			kvs := c.checkKVs(NewTags(tc.t))
 
-			assert.Equal(t, tc.warns, len(c.warns), "got warns: %v", c.warns)
+			assert.Equal(t, tc.warns, len(c.warns), "got warns: %v, kvs: %s", c.warns, kvs.Pretty())
 
 			eopt := eqopt{}
 			if tc.expect != nil {
@@ -218,7 +218,7 @@ func TestCheckTags(t *T.T) {
 
 		pt := NewPointV2("m", kvs, WithDotInKey(false))
 
-		assert.Len(t, pt.pt.Fields, 1)
+		assert.Lenf(t, pt.pt.Fields, 1, "pt: %s", pt.Pretty())
 		// drop tag
 		assert.Len(t, pt.pt.Fields, 1)
 		assert.Equal(t, 1.23, pt.Get(`f_1`).(float64))
@@ -621,8 +621,6 @@ func BenchmarkCheck(b *T.B) {
 	for _, tc := range cases {
 		pt, err := NewPoint(tc.m, tc.t, tc.f, tc.opts...)
 		assert.NoError(b, err)
-
-		b.Logf("pt with warns: %d", len(pt.pt.Warns))
 
 		cfg := GetCfg()
 		defer PutCfg(cfg)
