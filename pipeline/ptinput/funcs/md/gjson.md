@@ -16,6 +16,9 @@ gjson(_, "x.y", "abc")
 
 # 已提取出的某个 `key`，对其再提取一次 `x.y`，提取后字段名为 `x.y`
 gjson(key, "x.y") 
+
+# 提取数组，`key` 和 `abc` 均为数组类型
+gjson(key, "1.abc.2")
 ```
 
 示例一：

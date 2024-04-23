@@ -15,7 +15,10 @@ Function parameters:
 gjson(_, "x.y", "abc")
 
 # Extract the x.y field from a previously extracted key, and name the extracted field as x.y.
-gjson(key, "x.y") 
+gjson(key, "x.y")
+
+# Extract arrays, where `key` and `abc` are arrays.
+gjson(key, "1.abc.2")
 ```
 
 Example 1:
