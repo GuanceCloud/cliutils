@@ -116,6 +116,16 @@ func TestGJSON(t *testing.T) {
 			expected: "tw",
 			key:      "f_nets",
 		},
+		{
+			in: `[
+				{"first": "Dale", "last": "Murphy", "age": 44, "nets": ["ig", "fb", "tw"]},
+				{"first": "Roger", "last": "Craig", "age": 68, "nets": ["fb", "tw"]},
+				{"first": "Jane", "last": "Murphy", "age": 47, "nets": ["ig", "tw"]}
+				]`,
+			script:   `gjson(_, "0.nets.2", "f_nets")`,
+			expected: "tw",
+			key:      "f_nets",
+		},
 	}
 	for idx, tc := range Cases {
 		t.Run(tc.name, func(t *testing.T) {
