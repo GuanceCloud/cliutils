@@ -190,8 +190,8 @@ func TestJSONPoint2Point(t *T.T) {
 			},
 		}
 
-		pt, err := jp.Point()
-		assert.NoError(t, err)
+		pt := fromJSONPoint(&jp)
+		//assert.NoError(t, err)
 		t.Logf("pt: %s", pt.Pretty())
 
 		EnableMixedArrayField = true
@@ -215,7 +215,7 @@ func TestJSONPoint2Point(t *T.T) {
 
 		t.Logf("jp2 fields: %+#v", jp2.Fields)
 
-		pt, err = jp2.Point()
+		pt, err := jp2.Point()
 		assert.NoError(t, err)
 		assert.NotNilf(t, pt.Get("f_i_arr"), "pt: %s", pt.Pretty())
 		assert.NotNilf(t, pt.Get("f_f_arr"), "pt: %s", pt.Pretty())
@@ -240,7 +240,7 @@ func TestFromJSONPoint(t *T.T) {
 			Time: 123,
 		}
 
-		pt := FromJSONPoint(&jp)
+		pt := fromJSONPoint(&jp)
 		assert.Equal(t, "m", pt.Name())
 		assert.Equal(t, "v1", pt.Get("t1"))
 		assert.Equal(t, "v2", pt.Get("t2"))

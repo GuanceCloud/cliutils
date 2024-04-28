@@ -245,6 +245,14 @@ func newVal(v any) isField_Val {
 	case []byte:
 		return &Field_D{x}
 
+	case [][]byte:
+		bytesArr, err := NewBytesArray(x...)
+		if err != nil {
+			return nil
+		} else {
+			return &Field_A{bytesArr}
+		}
+
 	case bool:
 		return &Field_B{x}
 
