@@ -144,7 +144,8 @@ func (p *Point) Reset() {
 
 func emptyPoint() *Point {
 	return &Point{
-		pt: &PBPoint{},
+		pt:  &PBPoint{},
+		cfg: getCfg(),
 	}
 }
 

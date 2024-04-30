@@ -10,9 +10,7 @@ import (
 )
 
 func NewPointV2(name string, kvs KVs, opts ...Option) *Point {
-	c := getCfg(opts...)
-
-	return doNewPoint(name, kvs, c)
+	return doNewPoint(name, kvs, opts...)
 }
 
 // NewPoint returns a new Point given name(measurement), tags, fields and optional options.
@@ -33,12 +31,10 @@ func NewPoint(name string, tags map[string]string, fields map[string]any, opts .
 		kvs = kvs.MustAddTag(k, v) // force add these tags
 	}
 
-	c := getCfg(opts...)
-
-	return doNewPoint(name, kvs, c), nil
+	return doNewPoint(name, kvs, opts...), nil
 }
 
-func doNewPoint(name string, kvs KVs, c *cfg) *Point {
+func doNewPoint(name string, kvs KVs, opts ...Option) *Point {
 	var pt *Point
 
 	if defaultPTPool != nil {
@@ -53,31 +49,31 @@ func doNewPoint(name string, kvs KVs, c *cfg) *Point {
 		pt.pt.Fields = kvs
 	}
 
-	pt.cfg = c
+	applyCfgOptions(pt.cfg, opts...)
 
 	// add extra tags
-	if len(c.extraTags) > 0 {
-		for _, kv := range c.extraTags {
+	if len(pt.cfg.extraTags) > 0 {
+		for _, kv := range pt.cfg.extraTags {
 			pt.AddTag(kv.Key, kv.GetS()) // NOTE: do-not-override exist keys
 		}
 	}
 
-	if c.enc == Protobuf {
+	if pt.cfg.enc == Protobuf {
 		pt.SetFlag(Ppb)
 	}
 
-	if c.keySorted {
+	if pt.cfg.keySorted {
 		kvs := KVs(pt.pt.Fields)
 		sort.Sort(kvs)
 		pt.pt.Fields = kvs
 	}
 
-	if c.precheck {
+	if pt.cfg.precheck {
 		pt = pt.cfg.check(pt)
 	}
 
 	// sort again: during check, kv maybe update
-	if c.keySorted {
+	if pt.cfg.keySorted {
 		sort.Sort(KVs(pt.pt.Fields))
 	}
 
