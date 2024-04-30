@@ -7,12 +7,10 @@ package point
 
 import (
 	"sort"
-	"time"
 )
 
 func NewPointV2(name string, kvs KVs, opts ...Option) *Point {
-	c := GetCfg(opts...)
-	defer PutCfg(c)
+	c := getCfg(opts...)
 
 	return doNewPoint(name, kvs, c)
 }
@@ -35,8 +33,7 @@ func NewPoint(name string, tags map[string]string, fields map[string]any, opts .
 		kvs = kvs.MustAddTag(k, v) // force add these tags
 	}
 
-	c := GetCfg(opts...)
-	defer PutCfg(c)
+	c := getCfg(opts...)
 
 	return doNewPoint(name, kvs, c), nil
 }
@@ -51,13 +48,12 @@ func doNewPoint(name string, kvs KVs, c *cfg) *Point {
 		pt.pt.Fields = kvs
 		pt.SetFlag(Ppooled)
 	} else {
-		pt = &Point{
-			pt: &PBPoint{
-				Name:   name,
-				Fields: kvs,
-			},
-		}
+		pt = emptyPoint()
+		pt.pt.Name = name
+		pt.pt.Fields = kvs
 	}
+
+	pt.cfg = c
 
 	// add extra tags
 	if len(c.extraTags) > 0 {
@@ -77,20 +73,12 @@ func doNewPoint(name string, kvs KVs, c *cfg) *Point {
 	}
 
 	if c.precheck {
-		chk := checker{cfg: c}
-		pt = chk.check(pt)
-		pt.SetFlag(Pcheck)
+		pt = pt.cfg.check(pt)
 	}
 
 	// sort again: during check, kv maybe update
 	if c.keySorted {
 		sort.Sort(KVs(pt.pt.Fields))
-	}
-
-	if c.timestamp >= 0 {
-		pt.pt.Time = c.timestamp
-	} else { // not set, use current time
-		pt.pt.Time = time.Now().Round(0).UnixNano() // trim monotonic clock
 	}
 
 	return pt

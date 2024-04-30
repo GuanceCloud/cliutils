@@ -1002,14 +1002,7 @@ line`}, time.Unix(0, 123)),
 		}
 
 		t.Run(tc.name, func(t *testing.T) {
-			c := GetCfg()
-			defer PutCfg(c)
-
-			for _, opt := range tc.opts {
-				opt(c)
-			}
-
-			pts, err := parseLPPoints(tc.data, c)
+			pts, err := parseLPPoints(tc.data, tc.opts...)
 			if tc.fail {
 				if len(pts) > 0 {
 					assert.Error(t, err, "got point[0]: %s", pts[0].Pretty())

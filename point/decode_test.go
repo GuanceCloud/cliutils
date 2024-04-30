@@ -168,14 +168,25 @@ func TestDecode(t *T.T) {
 		},
 
 		{
-			name: "decode-json-with-precision-x",
+			name: "decode-json-with-precision-w",
 			data: []byte(`[ { "measurement": "abc",  "tags": {"t1": "val1"}, "fields": {"f1": 123, "f2": 3.14}, "time":123} ]`),
 			expectLP: []string{
-				`abc,t1=val1 f1=123,f2=3.14 123`,
+				fmt.Sprintf(`abc,t1=val1 f1=123,f2=3.14 %d`, 123*7*24*time.Hour),
 			},
 
 			opts:    []DecoderOption{WithDecEncoding(JSON)},
 			ptsOpts: []Option{WithPrecision(PrecW)},
+		},
+
+		{
+			name: "decode-json-with-precision-d",
+			data: []byte(`[ { "measurement": "abc",  "tags": {"t1": "val1"}, "fields": {"f1": 123, "f2": 3.14}, "time":123} ]`),
+			expectLP: []string{
+				fmt.Sprintf(`abc,t1=val1 f1=123,f2=3.14 %d`, 123*24*time.Hour),
+			},
+
+			opts:    []DecoderOption{WithDecEncoding(JSON)},
+			ptsOpts: []Option{WithPrecision(PrecD)},
 		},
 
 		{

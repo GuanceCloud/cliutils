@@ -7,10 +7,18 @@ package point
 
 import "time"
 
-func (p *Point) SetName(name string) {
-	p.pt.Name = name
+func (p *Point) SetName(name string) *Point {
+	bufName := p.bufStr(name)
+	p.pt.Name = bufName
+	return p
 }
 
-func (p *Point) SetTime(t time.Time) {
+func (p *Point) SetTime(t time.Time) *Point {
 	p.pt.Time = t.UnixNano()
+	return p
+}
+
+func (p *Point) SetTimestamp(nanoTimestamp int64) *Point {
+	p.pt.Time = nanoTimestamp
+	return p
 }

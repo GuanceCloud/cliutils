@@ -130,6 +130,14 @@ func (p *Point) clear() {
 }
 
 func (p *Point) Reset() {
+	if cap(p.buf) > (1 << 12) { // larger than 4KB
+		p.buf = nil
+		p.bufShrinked++ // do not reset the field
+	}
+
+	p.cfg.reset()
+
+	p.buf = p.buf[:0]
 	p.flags = 0
 	p.clear()
 }
@@ -656,6 +664,8 @@ func (cpp *ReservedCapPointPool) Get() *Point {
 }
 
 func (cpp *ReservedCapPointPool) Put(p *Point) {
+	pointSize.Observe(float64(p.Size()))
+
 	for _, f := range p.KVs() {
 		cpp.PutKV(f)
 	}
@@ -845,7 +855,6 @@ func (cpp *ReservedCapPointPool) Collect(ch chan<- p8s.Metric) {
 	ch <- p8s.MustNewConstMetric(chanPutDesc, p8s.CounterValue, float64(cpp.chanPut()))
 	ch <- p8s.MustNewConstMetric(poolGetDesc, p8s.CounterValue, float64(cpp.poolGet()))
 	ch <- p8s.MustNewConstMetric(poolPutDesc, p8s.CounterValue, float64(cpp.poolPut()))
-
 	ch <- p8s.MustNewConstMetric(reservedCapacityDesc, p8s.CounterValue, float64(cpp.capacity))
 	ch <- p8s.MustNewConstMetric(poolMallocDesc, p8s.CounterValue, float64(cpp.malloc.Load()))
 }
