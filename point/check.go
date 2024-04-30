@@ -10,69 +10,103 @@ import (
 	"math"
 	"reflect"
 	"strings"
+	"time"
 )
 
-type checker struct {
-	*cfg
-	warns []*Warn
-}
-
-func (c *checker) reset() {
+func (c *cfg) check(pt *Point) *Point {
+	// reset warns: make the point can check multiple times and the warns(if any)
+	// not duplicated.
 	c.warns = c.warns[:0]
-}
 
-func (c *checker) check(pt *Point) *Point {
 	pt.pt.Name = c.checkMeasurement(pt.pt.Name)
 	pt.pt.Fields = c.checkKVs(pt.pt.Fields)
+	c.checkTime(pt)
+
 	pt.pt.Warns = append(pt.pt.Warns, c.warns...)
 
-	// Add more checkings...
+	pt.SetFlag(Pcheck)
+
 	return pt
 }
 
-func (c *checker) addWarn(t, msg string) {
+func (c *cfg) addWarn(t, msg string) {
 	c.warns = append(c.warns, &Warn{
 		Type: t, Msg: msg,
 	})
 }
 
-func (c *checker) checkMeasurement(m string) string {
+func (c *cfg) checkTime(pt *Point) {
+	x := pt.pt.Time
+
+	if c.timestamp != -1 && x == 0 { // apply time in cfg
+		x = c.timestamp
+	}
+
+	if x < 0 && !c.enableNagativeTimestamp { // Set to current time.
+		c.addWarn(WarnNagativeTimestamp, fmt.Sprintf("got nagative timestamp %d, reset to current time", x))
+		x = time.Now().Round(0).UnixNano() // trim monotonic clock
+	}
+
+	switch c.precision {
+	case PrecUS:
+		x *= int64(time.Microsecond)
+	case PrecMS:
+		x *= int64(time.Millisecond)
+	case PrecS:
+		x *= int64(time.Second)
+	case PrecM:
+		x *= int64(time.Minute)
+	case PrecH:
+		x *= int64(time.Hour)
+	case PrecNS: // pass
+	case PrecD:
+		x *= (24 * int64(time.Hour))
+	case PrecW:
+		x *= (7 * 24 * int64(time.Hour))
+	default:
+		// pass
+	}
+
+	pt.pt.Time = x
+}
+
+func (c *cfg) checkMeasurement(m string) string {
 	if len(m) == 0 {
 		c.addWarn(WarnInvalidMeasurement,
 			fmt.Sprintf("empty measurement, use %s", DefaultMeasurementName))
 		m = DefaultMeasurementName
 	}
 
-	if c.cfg.maxMeasurementLen > 0 && len(m) > c.cfg.maxMeasurementLen {
+	if c.maxMeasurementLen > 0 && len(m) > c.maxMeasurementLen {
 		c.addWarn(WarnInvalidMeasurement,
 			fmt.Sprintf("exceed max measurement length(%d), got length %d, trimmed",
-				c.cfg.maxMeasurementLen, len(m)))
-		return m[:c.cfg.maxMeasurementLen]
+				c.maxMeasurementLen, len(m)))
+		return m[:c.maxMeasurementLen]
 	} else {
 		return m
 	}
 }
 
-func (c *checker) checkKVs(kvs KVs) KVs {
+func (c *cfg) checkKVs(kvs KVs) KVs {
 	tcnt := kvs.TagCount()
 	fcnt := kvs.FieldCount()
 
 	// delete extra fields
-	if c.cfg.maxFields > 0 && fcnt > c.cfg.maxFields {
+	if c.maxFields > 0 && fcnt > c.maxFields {
 		c.addWarn(WarnMaxFields,
 			fmt.Sprintf("exceed max field count(%d), got %d fields, extra fields deleted",
-				c.cfg.maxFields, fcnt))
+				c.maxFields, fcnt))
 
-		kvs = kvs.TrimFields(c.cfg.maxFields)
+		kvs = kvs.TrimFields(c.maxFields)
 	}
 
 	// delete extra tags
-	if c.cfg.maxTags > 0 && tcnt > c.cfg.maxTags {
+	if c.maxTags > 0 && tcnt > c.maxTags {
 		c.addWarn(WarnMaxFields,
 			fmt.Sprintf("exceed max tag count(%d), got %d tags, extra tags deleted",
-				c.cfg.maxTags, tcnt))
+				c.maxTags, tcnt))
 
-		kvs = kvs.TrimTags(c.cfg.maxTags)
+		kvs = kvs.TrimTags(c.maxTags)
 	}
 
 	// check each kv valid
@@ -113,7 +147,7 @@ func adjustKV(x string) string {
 	return x
 }
 
-func (c *checker) checkKV(f *Field, kvs KVs) (*Field, bool) {
+func (c *cfg) checkKV(f *Field, kvs KVs) (*Field, bool) {
 	if f.IsTag {
 		return c.checkTag(f, kvs)
 	} else {
@@ -121,7 +155,7 @@ func (c *checker) checkKV(f *Field, kvs KVs) (*Field, bool) {
 	}
 }
 
-func (c *checker) keyConflict(key string, kvs KVs) bool {
+func (c *cfg) keyConflict(key string, kvs KVs) bool {
 	if kvs.Get(key) != nil { // key exist
 		c.addWarn(WarnKeyNameConflict,
 			fmt.Sprintf("same key after rename(%q), kv dropped", key))
@@ -133,13 +167,13 @@ func (c *checker) keyConflict(key string, kvs KVs) bool {
 
 // checkTag try to auto modify the f. If we need to drop
 // f, we return false.
-func (c *checker) checkTag(f *Field, kvs KVs) (*Field, bool) {
-	if c.cfg.maxTagKeyLen > 0 && len(f.Key) > c.cfg.maxTagKeyLen {
+func (c *cfg) checkTag(f *Field, kvs KVs) (*Field, bool) {
+	if c.maxTagKeyLen > 0 && len(f.Key) > c.maxTagKeyLen {
 		c.addWarn(WarnMaxTagKeyLen,
 			fmt.Sprintf("exceed max tag key length(%d), got %d, key truncated",
-				c.cfg.maxTagKeyLen, len(f.Key)))
+				c.maxTagKeyLen, len(f.Key)))
 
-		newKey := f.Key[:c.cfg.maxTagKeyLen]
+		newKey := f.Key[:c.maxTagKeyLen]
 		if c.keyConflict(newKey, kvs) {
 			return f, false
 		} else {
@@ -149,12 +183,12 @@ func (c *checker) checkTag(f *Field, kvs KVs) (*Field, bool) {
 
 	x := f.Val.(*Field_S)
 
-	if c.cfg.maxTagValLen > 0 && len(x.S) > c.cfg.maxTagValLen {
+	if c.maxTagValLen > 0 && len(x.S) > c.maxTagValLen {
 		c.addWarn(WarnMaxTagValueLen,
 			fmt.Sprintf("exceed max tag value length(%d), got %d, value truncated",
-				c.cfg.maxTagValLen, len(x.S)))
+				c.maxTagValLen, len(x.S)))
 
-		x.S = x.S[:c.cfg.maxTagValLen]
+		x.S = x.S[:c.maxTagValLen]
 		f.Val = x
 	}
 
@@ -179,7 +213,7 @@ func (c *checker) checkTag(f *Field, kvs KVs) (*Field, bool) {
 	}
 
 	// replace `.' with `_' in tag keys
-	if strings.Contains(f.Key, ".") && !c.cfg.enableDotInKey {
+	if strings.Contains(f.Key, ".") && !c.enableDotInKey {
 		c.addWarn(WarnInvalidTagKey, fmt.Sprintf("invalid tag key `%s': found `.'", f.Key))
 
 		newKey := strings.ReplaceAll(f.Key, ".", "_")
@@ -200,14 +234,14 @@ func (c *checker) checkTag(f *Field, kvs KVs) (*Field, bool) {
 
 // checkField try to auto modify the f. If we need to drop
 // f, we return false.
-func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
+func (c *cfg) checkField(f *Field, kvs KVs) (*Field, bool) {
 	// trim key
-	if c.cfg.maxFieldKeyLen > 0 && len(f.Key) > c.cfg.maxFieldKeyLen {
+	if c.maxFieldKeyLen > 0 && len(f.Key) > c.maxFieldKeyLen {
 		c.addWarn(WarnMaxFieldKeyLen,
 			fmt.Sprintf("exceed max field key length(%d), got %d, key truncated to %s",
-				c.cfg.maxFieldKeyLen, len(f.Key), f.Key))
+				c.maxFieldKeyLen, len(f.Key), f.Key))
 
-		newKey := f.Key[:c.cfg.maxFieldKeyLen]
+		newKey := f.Key[:c.maxFieldKeyLen]
 
 		if c.keyConflict(newKey, kvs) {
 			return f, false
@@ -216,7 +250,7 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 		}
 	}
 
-	if strings.Contains(f.Key, ".") && !c.cfg.enableDotInKey {
+	if strings.Contains(f.Key, ".") && !c.enableDotInKey {
 		c.addWarn(WarnDotInkey,
 			fmt.Sprintf("invalid field key `%s': found `.'", f.Key))
 
@@ -236,7 +270,7 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 
 	switch x := f.Val.(type) {
 	case *Field_U:
-		if !c.cfg.enableU64Field {
+		if !c.enableU64Field {
 			if x.U > uint64(math.MaxInt64) {
 				c.addWarn(WarnMaxFieldValueInt,
 					fmt.Sprintf("too large int field: key=%s, value=%d(> %d)", f.Key, x.U, uint64(math.MaxInt64)))
@@ -263,35 +297,35 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 
 	case *Field_D: // same as []uint8
 
-		if !c.cfg.enableStrField {
+		if !c.enableStrField {
 			c.addWarn(WarnInvalidFieldValueType,
 				fmt.Sprintf("field(%s) dropped with string value, when [DisableStringField] enabled", f.Key))
 			return f, false
 		}
 
-		if c.cfg.maxFieldValLen > 0 && len(x.D) > c.cfg.maxFieldValLen {
+		if c.maxFieldValLen > 0 && len(x.D) > c.maxFieldValLen {
 			c.addWarn(WarnMaxFieldValueLen,
 				fmt.Sprintf("field (%s) exceed max field value length(%d), got %d, value truncated",
-					f.Key, c.cfg.maxFieldValLen, len(x.D)))
+					f.Key, c.maxFieldValLen, len(x.D)))
 
-			x.D = x.D[:c.cfg.maxFieldValLen]
+			x.D = x.D[:c.maxFieldValLen]
 			f.Val = x
 		}
 
 	case *Field_S: // same as Field_D
 
-		if !c.cfg.enableStrField {
+		if !c.enableStrField {
 			c.addWarn(WarnInvalidFieldValueType,
 				fmt.Sprintf("field(%s) dropped with string value, when [DisableStringField] enabled", f.Key))
 			return f, false
 		}
 
-		if c.cfg.maxFieldValLen > 0 && len(x.S) > c.cfg.maxFieldValLen {
+		if c.maxFieldValLen > 0 && len(x.S) > c.maxFieldValLen {
 			c.addWarn(WarnMaxFieldValueLen,
 				fmt.Sprintf("field (%s) exceed max field value length(%d), got %d, value truncated",
-					f.Key, c.cfg.maxFieldValLen, len(x.S)))
+					f.Key, c.maxFieldValLen, len(x.S)))
 
-			x.S = x.S[:c.cfg.maxFieldValLen]
+			x.S = x.S[:c.maxFieldValLen]
 			f.Val = x
 		}
 
@@ -317,16 +351,16 @@ func trimSuffixAll(s, sfx string) string {
 	return x
 }
 
-func (c *checker) keyDisabled(k string) bool {
+func (c *cfg) keyDisabled(k string) bool {
 	if k == "" {
 		return true
 	}
 
-	if c.cfg.disabledKeys == nil {
+	if c.disabledKeys == nil {
 		return false
 	}
 
-	for _, item := range c.cfg.disabledKeys {
+	for _, item := range c.disabledKeys {
 		if k == item.key {
 			return true
 		}
@@ -335,12 +369,12 @@ func (c *checker) keyDisabled(k string) bool {
 	return false
 }
 
-func (c *checker) keyMiss(kvs KVs) KVs {
-	if c.cfg.requiredKeys == nil {
+func (c *cfg) keyMiss(kvs KVs) KVs {
+	if c.requiredKeys == nil {
 		return kvs
 	}
 
-	for _, rk := range c.cfg.requiredKeys {
+	for _, rk := range c.requiredKeys {
 		if !kvs.Has(rk.Key()) {
 			if def := rk.Default(); def != nil {
 				kvs = kvs.MustAddKV(NewKV(rk.Key(), def))
@@ -356,11 +390,6 @@ func (c *checker) keyMiss(kvs KVs) KVs {
 
 // CheckPoints used to check pts on various opts.
 func CheckPoints(pts []*Point, opts ...Option) (arr []*Point) {
-	c := GetCfg(opts...)
-	defer PutCfg(c)
-
-	chk := checker{cfg: c}
-
 	arr = pts[:0]
 
 	for _, pt := range pts {
@@ -368,11 +397,17 @@ func CheckPoints(pts []*Point, opts ...Option) (arr []*Point) {
 			continue
 		}
 
-		pt = chk.check(pt)
-		pt.SetFlag(Pcheck)
-		pt.pt.Warns = chk.warns
+		for _, opt := range opts {
+			if opt == nil {
+				continue
+			}
+
+			opt(pt.cfg)
+		}
+
+		pt = pt.cfg.check(pt)
+
 		arr = append(arr, pt)
-		chk.reset()
 	}
 
 	return arr

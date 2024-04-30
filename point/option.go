@@ -6,7 +6,6 @@
 package point
 
 import (
-	sync "sync"
 	"time"
 )
 
@@ -22,27 +21,17 @@ const (
 
 type Option func(*cfg)
 
-var cfgPool sync.Pool
-
-func GetCfg(opts ...Option) *cfg {
-	v := cfgPool.Get()
-	if v == nil {
-		v = newCfg()
-	}
-
-	x := v.(*cfg)
+func applyCfgOptions(c *cfg, opts ...Option) *cfg {
 	for _, opt := range opts {
 		if opt != nil {
-			opt(x)
+			opt(c)
 		}
 	}
-
-	return x
+	return c
 }
 
-func PutCfg(c *cfg) {
-	c.reset()
-	cfgPool.Put(c)
+func getCfg(opts ...Option) *cfg {
+	return applyCfgOptions(newCfg(), opts...)
 }
 
 type cfg struct {
@@ -62,6 +51,7 @@ type cfg struct {
 
 	keySorted bool
 
+	enableNagativeTimestamp,
 	enableDotInKey, // enable dot(.) in tag/field key name
 	enableStrField, // enable string field value
 	// For uint64 field, if value < maxint64，convert to int64, or dropped if value > maxint64
@@ -83,6 +73,8 @@ type cfg struct {
 
 	disabledKeys,
 	requiredKeys []*Key
+
+	warns []*Warn
 }
 
 func newCfg() *cfg {
@@ -110,11 +102,16 @@ func newCfg() *cfg {
 }
 
 func (c *cfg) reset() {
+	if c == nil {
+		return
+	}
+
 	c.callback = nil
 	c.disabledKeys = nil
 	c.enableDotInKey = true
 	c.enableStrField = true
 	c.enableU64Field = true
+	c.enableNagativeTimestamp = false
 	c.enc = DefaultEncoding
 	c.extraTags = nil
 	c.maxFieldKeyLen = defaultKeyLen
@@ -130,16 +127,18 @@ func (c *cfg) reset() {
 	c.requiredKeys = nil
 	c.t = time.Time{}
 	c.timestamp = -1
+	c.warns = c.warns[:0]
 }
 
-func WithMaxKVComposeLen(n int) Option   { return func(c *cfg) { c.maxTagKeyValComposeLen = n } }
-func WithMaxMeasurementLen(n int) Option { return func(c *cfg) { c.maxMeasurementLen = n } }
-func WithCallback(fn Callback) Option    { return func(c *cfg) { c.callback = fn } }
-func WithU64Field(on bool) Option        { return func(c *cfg) { c.enableU64Field = on } }
-func WithStrField(on bool) Option        { return func(c *cfg) { c.enableStrField = on } }
-func WithDotInKey(on bool) Option        { return func(c *cfg) { c.enableDotInKey = on } }
-func WithPrecheck(on bool) Option        { return func(c *cfg) { c.precheck = on } }
-func WithKeySorted(on bool) Option       { return func(c *cfg) { c.keySorted = on } }
+func WithMaxKVComposeLen(n int) Option     { return func(c *cfg) { c.maxTagKeyValComposeLen = n } }
+func WithMaxMeasurementLen(n int) Option   { return func(c *cfg) { c.maxMeasurementLen = n } }
+func WithCallback(fn Callback) Option      { return func(c *cfg) { c.callback = fn } }
+func WithU64Field(on bool) Option          { return func(c *cfg) { c.enableU64Field = on } }
+func WithStrField(on bool) Option          { return func(c *cfg) { c.enableStrField = on } }
+func WithDotInKey(on bool) Option          { return func(c *cfg) { c.enableDotInKey = on } }
+func WithPrecheck(on bool) Option          { return func(c *cfg) { c.precheck = on } }
+func WithNagativeTimestamp(on bool) Option { return func(c *cfg) { c.enableNagativeTimestamp = on } }
+func WithKeySorted(on bool) Option         { return func(c *cfg) { c.keySorted = on } }
 
 func WithTime(t time.Time) Option {
 	return func(c *cfg) {

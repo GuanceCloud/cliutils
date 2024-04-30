@@ -154,20 +154,22 @@ func TestJSONPoint2Point(t *T.T) {
 		},
 
 		{
-			name: "minus-time", // it's ok!
+			name: "nagative-time", // it's ok!
 			p: &JSONPoint{
-				Measurement: "minus-time",
+				Measurement: "nagative-time",
 				Tags:        nil,
 				Fields:      map[string]interface{}{"f1": 123, "f2": false},
 			},
-			opts:   []Option{WithTime(time.Unix(0, -123))},
-			expect: "minus-time f1=123i,f2=false -123",
+			opts:   []Option{WithTimestamp(-123), WithNagativeTimestamp(true)},
+			expect: "nagative-time f1=123i,f2=false -123",
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
+
 			pt, err := tc.p.Point(tc.opts...)
+
 			if tc.fail {
 				assert.Error(t, err)
 				t.Logf("expect err: %s", err)
@@ -176,7 +178,7 @@ func TestJSONPoint2Point(t *T.T) {
 				assert.NoError(t, err)
 			}
 
-			assert.Equal(t, tc.expect, pt.LineProto())
+			assert.Equalf(t, tc.expect, pt.LineProto(), "cfg: %+#v, pt: %s", pt.cfg, pt.Pretty())
 		})
 	}
 }

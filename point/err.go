@@ -28,6 +28,7 @@ const (
 	WarnInvalidTagKey         = "invalid_tag_key"
 	WarnInvalidTagValue       = "invalid_tag_value"
 	WarnInvalidMeasurement    = "invalid_measurement"
+	WarnNagativeTimestamp     = "nagative_timestamp"
 	WarnInvalidFieldValueType = "invalid_field_value_type"
 	WarnAddRequiredKV         = "add_required_kv"
 

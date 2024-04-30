@@ -30,7 +30,12 @@ type Callback func(*Point) (*Point, error)
 
 type Point struct {
 	flags uint64
-	pt    *PBPoint
+
+	buf         []byte
+	bufShrinked int
+
+	cfg *cfg
+	pt  *PBPoint
 }
 
 // ClearFlag clear specific bit.
@@ -144,6 +149,9 @@ func (p *Point) Pretty() string {
 	for _, d := range p.pt.Debugs {
 		arr = append(arr, fmt.Sprintf("[D] %s", d.Info))
 	}
+
+	arr = append(arr, "-----------")
+	arr = append(arr, fmt.Sprintf("Buf len/cap: %d/%d", len(p.buf), cap(p.buf)))
 
 	return strings.Join(arr, "\n")
 }

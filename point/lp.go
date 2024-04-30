@@ -84,15 +84,12 @@ func simplifyLPError(err error) error {
 }
 
 // parseLPPoints parse line-protocol payload to Point.
-func parseLPPoints(data []byte, c *cfg) ([]*Point, error) {
+func parseLPPoints(data []byte, opts ...Option) ([]*Point, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("empty data")
 	}
 
-	if c == nil {
-		c = GetCfg()
-		defer PutCfg(c)
-	}
+	c := getCfg(opts...)
 
 	ptTime := c.t
 	if c.t.IsZero() {
@@ -105,7 +102,6 @@ func parseLPPoints(data []byte, c *cfg) ([]*Point, error) {
 	}
 
 	res := []*Point{}
-	chk := checker{cfg: c}
 
 	for _, x := range lppts {
 		if x == nil {
@@ -142,9 +138,7 @@ func parseLPPoints(data []byte, c *cfg) ([]*Point, error) {
 			}
 		}
 
-		pt = chk.check(pt)
-		pt.pt.Warns = chk.warns
-		chk.reset()
+		pt = c.check(pt)
 
 		// re-sort again: check may update pt.pt.Fields
 		if c.keySorted {

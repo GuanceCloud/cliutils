@@ -72,14 +72,9 @@ func TestCheckMeasurement(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
-			cfg := GetCfg()
-			defer PutCfg(cfg)
-			for _, opt := range tc.opts {
-				opt(cfg)
-			}
+			cfg := getCfg(tc.opts...)
 
-			c := checker{cfg: cfg}
-			m := c.checkMeasurement(tc.measurement)
+			m := cfg.checkMeasurement(tc.measurement)
 			assert.Equal(t, tc.expect, m)
 		})
 	}
@@ -189,17 +184,11 @@ func TestCheckTags(t *T.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
-			cfg := GetCfg()
-			defer PutCfg(cfg)
+			cfg := getCfg(tc.opts...)
 
-			for _, opt := range tc.opts {
-				opt(cfg)
-			}
+			kvs := cfg.checkKVs(NewTags(tc.t))
 
-			c := checker{cfg: cfg}
-			kvs := c.checkKVs(NewTags(tc.t))
-
-			assert.Equal(t, tc.warns, len(c.warns), "got warns: %v", c.warns)
+			assert.Equal(t, tc.warns, len(cfg.warns), "got warns: %v", cfg.warns)
 
 			if tc.expect != nil {
 				eq, r := kvsEq(tc.expect, kvs)
@@ -457,16 +446,7 @@ func TestCheckFields(t *T.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
-			cfg := GetCfg()
-			defer PutCfg(cfg)
-
-			for _, opt := range tc.opts {
-				opt(cfg)
-			}
-
-			t.Logf("cfg: %+#v", cfg)
-
-			c := checker{cfg: cfg}
+			cfg := getCfg(tc.opts...)
 
 			kvs := NewKVs(tc.f)
 			expect := NewKVs(tc.expect)
@@ -476,8 +456,8 @@ func TestCheckFields(t *T.T) {
 				sort.Sort(expect)
 			}
 
-			kvs = c.checkKVs(kvs)
-			require.Equal(t, tc.warns, len(c.warns))
+			kvs = cfg.checkKVs(kvs)
+			require.Equal(t, tc.warns, len(cfg.warns))
 
 			if tc.expect != nil {
 				eq, _ := kvsEq(expect, kvs)
@@ -616,24 +596,16 @@ func BenchmarkCheck(b *T.B) {
 		},
 	}
 
-	for _, tc := range cases {
-		pt, err := NewPoint(tc.m, tc.t, tc.f, tc.opts...)
+	for _, bc := range cases {
+		pt, err := NewPoint(bc.m, bc.t, bc.f, bc.opts...)
 		assert.NoError(b, err)
 
 		b.Logf("pt with warns: %d", len(pt.pt.Warns))
 
-		cfg := GetCfg()
-		defer PutCfg(cfg)
-
-		for _, opt := range tc.opts {
-			opt(cfg)
-		}
-		c := checker{cfg: cfg}
-
 		b.ResetTimer()
-		b.Run(tc.name, func(b *T.B) {
+		b.Run(bc.name, func(b *T.B) {
 			for i := 0; i < b.N; i++ {
-				c.check(pt)
+				pt.cfg.check(pt)
 			}
 		})
 	}

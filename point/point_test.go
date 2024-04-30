@@ -113,16 +113,14 @@ func BenchmarkFromModelsLP(b *T.B) {
 		assert.NoError(b, err)
 		assert.Len(b, lppts, 1)
 
-		c := GetCfg()
-		chk := checker{cfg: c}
+		c := getCfg()
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			pt := FromModelsLP(lppts[0])
 
-			pt = chk.check(pt)
-			pt.pt.Warns = chk.warns
-			chk.reset()
+			pt = c.check(pt)
+			c.reset()
 
 			// re-sort again: check may update pt.kvs
 			if c.keySorted {
@@ -274,7 +272,7 @@ func TestFlags(t *T.T) {
 	})
 
 	t.Run("test-flag-set-clear", func(t *T.T) {
-		pt := &Point{}
+		pt := emptyPoint()
 		pt.SetFlag(Psent)
 
 		assert.True(t, pt.HasFlag(Psent))
@@ -695,14 +693,7 @@ func TestPointPB(t *T.T) {
 		sort.Sort(kvs)
 		expect.pt.Fields = kvs
 
-		cfg := GetCfg()
-		defer PutCfg(cfg)
-		chk := checker{cfg: cfg}
-		expect = chk.check(expect)
-		expect.SetFlag(Pcheck)
-		expect.pt.Warns = chk.warns
-
-		assert.Equal(t, expect.Pretty(), pt.Pretty(), "got\n%s\nexpect\n%s", expect.Pretty(), pt.Pretty())
+		assert.Equal(t, expect.Pretty(), pt.Pretty(), "got\n%s\nexpect\n%s", pt.Pretty(), expect.Pretty())
 
 		t.Logf("pt: %s", pt.Pretty())
 	})
