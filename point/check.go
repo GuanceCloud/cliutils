@@ -257,8 +257,12 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 
 	case *Field_F:
 		if math.IsInf(x.F, 1) {
-			x.F = float64(math.MaxUint64)
+			c.addWarn(WarnInfConvertToMaxValue,
+				fmt.Sprintf("+inf value from %q convert to max-uint64", f.Key))
+			x.F = math.MaxUint64
 		} else if math.IsInf(x.F, -1) {
+			c.addWarn(WarnInfConvertToMaxValue,
+				fmt.Sprintf("+inf value from %q convert to min-int64", f.Key))
 			x.F = math.MinInt64
 		}
 

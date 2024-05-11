@@ -703,7 +703,6 @@ func TestEncodePayloadSize(t *T.T) {
 }
 
 func TestEncodeInfField(t *T.T) {
-
 	var kvs KVs
 	kvs = kvs.AddV2("f1", math.Inf(1), true)
 	kvs = kvs.AddV2("f2", math.Inf(-1), true)

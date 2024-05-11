@@ -22,6 +22,7 @@ const (
 	WarnMaxFieldKeyLen        = "exceed_max_field_key_len"
 	WarnMaxFieldValueLen      = "exceed_max_field_value_len"
 	WarnMaxFieldValueInt      = "exceed_max_field_value_int"
+	WarnInfConvertToMaxValue  = "convert_inf_to_max_value"
 	WarnInvalidUTF8String     = "invalid_utf8_string"
 	WarnMaxTagKeyValueCompose = "exceed_max_tag_key_value_compose"
 

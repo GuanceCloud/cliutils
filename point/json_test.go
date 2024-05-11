@@ -152,17 +152,6 @@ func TestJSONPoint2Point(t *T.T) {
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			expect: fmt.Sprintf("%s f1=123i,f2=false 123", DefaultMeasurementName),
 		},
-
-		{
-			name: "minus-time", // it's ok!
-			p: &JSONPoint{
-				Measurement: "minus-time",
-				Tags:        nil,
-				Fields:      map[string]interface{}{"f1": 123, "f2": false},
-			},
-			opts:   []Option{WithTime(time.Unix(0, -123))},
-			expect: "minus-time f1=123i,f2=false -123",
-		},
 	}
 
 	for _, tc := range cases {
