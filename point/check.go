@@ -255,7 +255,14 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 			}
 		}
 
-	case *Field_F, *Field_B, *Field_I, *Field_A:
+	case *Field_F:
+		if math.IsInf(x.F, 1) {
+			x.F = float64(math.MaxUint64)
+		} else if math.IsInf(x.F, -1) {
+			x.F = math.MinInt64
+		}
+
+	case *Field_B, *Field_I, *Field_A:
 		// pass: they are ok
 
 	case nil:

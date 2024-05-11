@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"math"
 	T "testing"
 	"time"
 
@@ -699,4 +700,77 @@ func TestEncodePayloadSize(t *T.T) {
 
 	t.Logf("pbsize: %d, lpsize: %d, gz pb: %d, gz lp: %d",
 		len(pbPayload), len(lpPayload), gzSize(pbPayload), gzSize(lpPayload))
+}
+
+func TestEncodeInfField(t *T.T) {
+
+	var kvs KVs
+	kvs = kvs.AddV2("f1", math.Inf(1), true)
+	kvs = kvs.AddV2("f2", math.Inf(-1), true)
+	kvs = kvs.AddV2("f3", 123, true)
+
+	pt := NewPointV2("some", kvs)
+
+	t.Logf("point: %s", pt.Pretty())
+
+	t.Run("inf-lineproto", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(LineProtocol))
+		defer PutEncoder(enc)
+
+		enc.EncodeV2([]*Point{pt})
+
+		buf := make([]byte, 1<<20)
+
+		for {
+			if res, ok := enc.Next(buf); ok {
+				t.Logf("res: %s", string(res))
+			} else {
+				break
+			}
+		}
+
+		assert.NoError(t, enc.LastErr())
+	})
+
+	t.Run("inf-protobuf", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		defer PutEncoder(enc)
+
+		enc.EncodeV2([]*Point{pt})
+
+		buf := make([]byte, 1<<20)
+
+		for {
+			if res, ok := enc.Next(buf); ok {
+				dec := GetDecoder(WithDecEncoding(Protobuf))
+				defer PutDecoder(dec)
+
+				pts, err := dec.Decode(res)
+				assert.NoError(t, err)
+
+				t.Logf("decode point: %s", pts[0].Pretty())
+
+				assert.Equal(t, uint64(math.MaxUint64), uint64(pts[0].Get("f1").(float64)))
+				assert.Equal(t, int64(math.MinInt64), int64(pts[0].Get("f2").(float64)))
+				assert.Equal(t, int64(123), pts[0].Get("f3"))
+
+			} else {
+				break
+			}
+		}
+
+		assert.NoError(t, enc.LastErr())
+	})
+
+	t.Run("inf-pbjson", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(JSON))
+		defer PutEncoder(enc)
+
+		pt.SetFlag(Ppb)
+
+		arr, err := enc.Encode([]*Point{pt})
+		assert.NoError(t, err)
+
+		t.Logf("res: %s", string(arr[0]))
+	})
 }
