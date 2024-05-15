@@ -46,7 +46,7 @@ func PtWindow(ctx *runtime.Context, funcExpr *ast.CallExpr) *errchain.PlError {
 
 	var tags []string
 	if funcExpr.Param[2] != nil {
-		streamTags, _, errP := runtime.RunStmt(ctx, funcExpr.Param[2])
+		streamTags, vtype, errP := runtime.RunStmt(ctx, funcExpr.Param[2])
 		if errP != nil {
 			return errP
 		}

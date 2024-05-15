@@ -44,6 +44,108 @@ func TestPtWindow(t *testing.T) {
 			},
 			outkey: "message",
 		},
+		{
+			name: "test_pt_window",
+			pl: `point_window(3,3)
+			if _ == "4" {
+				window_hit()
+			}
+			if _ != "6" {
+				drop()
+			}
+			`,
+			in: []string{
+				"1", "2", "3", "4", "5", "6", "7",
+			},
+			commTags: []string{"host", "filepath"},
+			tagsVal: [][]string{
+				{"a", "b"}, {"a", "b"},
+				{"a", "b"}, {"a", "b"},
+				{"a", "b"}, {"a", "b"},
+				{"a", "b"},
+			},
+			expected: []string{
+				"1", "2", "3", "4", "5",
+			},
+			outkey: "message",
+		},
+		{
+			name: "test_pt_window",
+			pl: `point_window(3,3, ["host", "filepath"])
+			if _ == "4" {
+				window_hit()
+			}
+			if _ != "3" {
+				drop()
+			}
+			`,
+			in: []string{
+				"1", "2", "3", "4", "5", "6", "7",
+			},
+			commTags: []string{"host", "filepath"},
+			tagsVal: [][]string{
+				{"a", "b"}, {"a", "b"},
+				{"a", "b"}, {"a", "b"},
+				{"a", "b"}, {"a", "b"},
+				{"a", "b"},
+			},
+			expected: []string{
+				"1", "2", "4", "5", "6",
+			},
+			outkey: "message",
+		},
+		{
+			name: "test_pt_window",
+			pl: `point_window(3,3)
+			if _ == "4" {
+				window_hit()
+			}
+			if _ != "6" {
+				drop()
+			}
+			if _ == "7" {
+				window_hit()
+			}
+			`,
+			in: []string{
+				"1", "2", "3", "4", "5", "6", "7",
+			},
+			commTags: []string{"host", "filepath"},
+			tagsVal: [][]string{
+				{"a", "b"}, {"a", "b"},
+				{"a", "b"}, {"a", "b"},
+				{"a", "b"}, {"a", "b"},
+				{"a", "b"},
+			},
+			expected: []string{
+				"1", "2", "3", "4", "5", "7",
+			},
+			outkey: "message",
+		},
+
+		{
+			name: "test_pt_window1",
+			pl: `point_window(3,3)
+			drop()
+			if _ == "4" {
+				window_hit()
+			}
+			`,
+			in: []string{
+				"0", "1", "2", "3", "4", "5", "6",
+			},
+			commTags: []string{"host", "filepath"},
+			tagsVal: [][]string{
+				{"a", "b"}, {"a", "b"},
+				{"a", "b"}, {"a", "b"},
+				{"a", "b"}, {"a", "b"},
+				{"a", "b"},
+			},
+			expected: []string{
+				"3", "1", "2", "4", "5", "6",
+			},
+			outkey: "message",
+		},
 	}
 
 	for _, c := range cases {
