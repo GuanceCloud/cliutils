@@ -13,6 +13,7 @@ import (
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/ipdb"
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/plcache"
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/plmap"
+	"github.com/GuanceCloud/cliutils/pipeline/ptinput/ptwindow"
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/refertable"
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/utils"
 	"github.com/GuanceCloud/cliutils/point"
@@ -45,6 +46,11 @@ type PlInputPt interface {
 
 	GetAggBuckets() *plmap.AggBuckets
 	SetAggBuckets(*plmap.AggBuckets)
+
+	SetPtWinPool(w *ptwindow.WindowPool)
+	PtWinRegister(before, after int, k, v []string)
+	PtWinHit()
+	CallbackPtWinMove() (result []*point.Point)
 
 	AppendSubPoint(PlInputPt)
 	GetSubPoint() []PlInputPt
@@ -115,6 +121,10 @@ type PlPoint struct {
 	refTable   refertable.PlReferTables
 
 	subPlpt []PlInputPt
+
+	ptWindowPool       *ptwindow.WindowPool
+	ptWindowRegistered bool
+	winKeyVal          [2][]string
 
 	category point.Category
 	drop     bool
@@ -292,6 +302,39 @@ func (pt *PlPoint) SetPlReferTables(refTable refertable.PlReferTables) {
 
 func (pt *PlPoint) GetPlReferTables() refertable.PlReferTables {
 	return pt.refTable
+}
+
+func (pt *PlPoint) SetPtWinPool(w *ptwindow.WindowPool) {
+	pt.ptWindowPool = w
+}
+
+func (pt *PlPoint) PtWinRegister(before, after int, k, v []string) {
+	if pt.ptWindowPool != nil && !pt.ptWindowRegistered {
+		pt.ptWindowRegistered = true
+		pt.ptWindowPool.Register(before, after, k, v)
+		pt.winKeyVal = [2][]string{k, v}
+	}
+}
+
+func (pt *PlPoint) PtWinHit() {
+	if pt.ptWindowPool != nil && pt.ptWindowRegistered {
+		if v, ok := pt.ptWindowPool.Get(pt.winKeyVal[0], pt.winKeyVal[1]); ok {
+			v.Hit()
+		}
+	}
+}
+
+func (pt *PlPoint) CallbackPtWinMove() (result []*point.Point) {
+	if pt.ptWindowPool != nil && pt.ptWindowRegistered {
+		if v, ok := pt.ptWindowPool.Get(pt.winKeyVal[0], pt.winKeyVal[1]); ok {
+			if pt.Dropped() {
+				result = v.Move(pt.Point())
+			} else {
+				result = v.Move(nil)
+			}
+		}
+	}
+	return
 }
 
 func (pt *PlPoint) SetIPDB(db ipdb.IPdb) {
