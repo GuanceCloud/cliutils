@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput"
+	"github.com/GuanceCloud/cliutils/pipeline/ptinput/ptwindow"
 	"github.com/GuanceCloud/cliutils/point"
 	"github.com/stretchr/testify/assert"
 )
@@ -47,6 +48,7 @@ func TestPtWindow(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			ptPool := ptwindow.NewManager()
 			runner, err := NewTestingRunner(c.pl)
 			assert.NoError(t, err)
 			r := []string{}
@@ -57,14 +59,17 @@ func TestPtWindow(t *testing.T) {
 				}
 				pt := ptinput.NewPlPoint(
 					point.Logging, "test", tags, map[string]any{"message": x}, time.Now())
-
+				pt.SetPtWinPool(ptPool)
 				errR := runScript(runner, pt)
 				if errR != nil {
 					t.Fatal(errR)
 				}
 
-				v, _, _ := pt.Get("message")
-				r = append(r, v.(string))
+				pts := pt.CallbackPtWinMove()
+				for _, pt := range pts {
+					val := pt.Get("message")
+					r = append(r, val.(string))
+				}
 			}
 
 			assert.Equal(t, c.expected, r)
