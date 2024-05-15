@@ -23,7 +23,7 @@ type testCase struct {
 func TestPtWindow(t *testing.T) {
 	cases := []testCase{
 		{
-			name: "test_pt_window",
+			name: "1",
 			pl: `point_window(3,3)
 			drop()
 			if _ == "4" {
@@ -45,8 +45,9 @@ func TestPtWindow(t *testing.T) {
 			outkey: "message",
 		},
 		{
-			name: "test_pt_window",
+			name: "2",
 			pl: `point_window(3,3)
+			point_window(2,2)
 			if _ == "4" {
 				window_hit()
 			}
@@ -55,14 +56,14 @@ func TestPtWindow(t *testing.T) {
 			}
 			`,
 			in: []string{
-				"1", "2", "3", "4", "5", "6", "7",
+				"1", "2", "3", "xx", "4", "5", "6", "7",
 			},
 			commTags: []string{"host", "filepath"},
 			tagsVal: [][]string{
 				{"a", "b"}, {"a", "b"},
+				{"a", "b"}, {"a", "xx"},
 				{"a", "b"}, {"a", "b"},
 				{"a", "b"}, {"a", "b"},
-				{"a", "b"},
 			},
 			expected: []string{
 				"1", "2", "3", "4", "5",
@@ -70,7 +71,7 @@ func TestPtWindow(t *testing.T) {
 			outkey: "message",
 		},
 		{
-			name: "test_pt_window",
+			name: "3",
 			pl: `point_window(3,3, ["host", "filepath"])
 			if _ == "4" {
 				window_hit()
@@ -95,7 +96,7 @@ func TestPtWindow(t *testing.T) {
 			outkey: "message",
 		},
 		{
-			name: "test_pt_window",
+			name: "4",
 			pl: `point_window(3,3)
 			if _ == "4" {
 				window_hit()
@@ -122,9 +123,8 @@ func TestPtWindow(t *testing.T) {
 			},
 			outkey: "message",
 		},
-
 		{
-			name: "test_pt_window1",
+			name: "5",
 			pl: `point_window(3,3)
 			drop()
 			if _ == "4" {
