@@ -38,6 +38,7 @@ func (w *PtRing) Clean() []*point.Point {
 	for i := 0; i < len(w.ring); i++ {
 		if w.ring[i] != nil {
 			r = append(r, w.ring[i])
+			w.ring[i] = nil
 		}
 	}
 	return r
