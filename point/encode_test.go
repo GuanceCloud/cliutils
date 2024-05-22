@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"math"
 	"strings"
 	T "testing"
 	"time"
@@ -740,6 +741,33 @@ func TestV2Encode(t *T.T) {
 				break
 			}
 		}
+		PutEncoder(enc)
+	})
+
+	t.Run("encode-uint-line-protocol", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.AddV2("uint", uint64(42), true)
+		kvs = kvs.AddV2("max-uint", uint64(math.MaxUint64), true)
+
+		pt := NewPointV2("some", kvs, WithTimestamp(123))
+
+		t.Logf("point: %s", pt.Pretty())
+
+		enc := GetEncoder(WithEncEncoding(LineProtocol))
+		enc.EncodeV2([]*Point{pt})
+		buf := make([]byte, 1<<10)
+
+		for {
+			lp, ok := enc.Next(buf)
+			if !ok {
+				break
+			}
+
+			assert.Equal(t, "some max-uint=18446744073709551615u,uint=42u 123\n", string(lp))
+
+			t.Logf("buf: %s", string(lp))
+		}
+
 		PutEncoder(enc)
 	})
 }
