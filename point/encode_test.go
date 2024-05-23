@@ -500,7 +500,7 @@ func TestV2Encode(t *T.T) {
 		var (
 			decodePts []*Point
 			round     int
-			buf       = make([]byte, 1<<20) // KB
+			buf       = make([]byte, 0, 1<<20) // KB
 		)
 
 		for {

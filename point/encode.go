@@ -317,14 +317,14 @@ func (e *Encoder) doEncodeProtobuf(buf []byte) ([]byte, bool) {
 
 		// e.pbpts size larger than buf, we must trim some of points
 		// until size fit ok or MarshalTo will panic.
-		if curSize >= len(buf) {
+		if curSize >= cap(buf) {
 			if len(e.pbpts.Arr) <= 1 { // nothing to trim
 				e.lastErr = errTooSmallBuffer
 				return nil, false
 			}
 
 			for {
-				if pbptsSize = e.pbpts.Size(); pbptsSize > len(buf) {
+				if pbptsSize = e.pbpts.Size(); pbptsSize > cap(buf) {
 					e.pbpts.Arr = e.pbpts.Arr[:len(e.pbpts.Arr)-trimmed]
 					e.lastPtsIdx -= trimmed
 					trimmed *= 2
