@@ -466,16 +466,7 @@ func (p *Point) LPSize() int {
 
 // PBSize get point protobuf size.
 func (p *Point) PBSize() int {
-	pbpt := p.PBPoint()
-
-	m := protojson.Marshaler{}
-	buf := bytes.Buffer{}
-
-	if err := m.Marshal(&buf, pbpt); err != nil {
-		return 0
-	}
-
-	return buf.Len()
+	return p.pt.Size()
 }
 
 func b64(x []byte) string {
