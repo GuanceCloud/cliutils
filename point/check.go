@@ -45,8 +45,8 @@ func (c *checker) checkMeasurement(m string) string {
 
 	if c.cfg.maxMeasurementLen > 0 && len(m) > c.cfg.maxMeasurementLen {
 		c.addWarn(WarnInvalidMeasurement,
-			fmt.Sprintf("exceed max measurement length(%d), got length %d, trimmed",
-				c.cfg.maxMeasurementLen, len(m)))
+			fmt.Sprintf("%s: exceed max measurement length(%d), got length %d, trimmed",
+				m, c.cfg.maxMeasurementLen, len(m)))
 		return m[:c.cfg.maxMeasurementLen]
 	} else {
 		return m
@@ -151,8 +151,8 @@ func (c *checker) checkTag(f *Field, kvs KVs) (*Field, bool) {
 
 	if c.cfg.maxTagValLen > 0 && len(x.S) > c.cfg.maxTagValLen {
 		c.addWarn(WarnMaxTagValueLen,
-			fmt.Sprintf("exceed max tag value length(%d), got %d, value truncated",
-				c.cfg.maxTagValLen, len(x.S)))
+			fmt.Sprintf("%s: exceed max tag value length(%d), got %d, value truncated",
+				x, c.cfg.maxTagValLen, len(x.S)))
 
 		x.S = x.S[:c.cfg.maxTagValLen]
 		f.Val = x
@@ -160,7 +160,7 @@ func (c *checker) checkTag(f *Field, kvs KVs) (*Field, bool) {
 
 	// check tag key '\', '\n'
 	if strings.HasSuffix(f.Key, `\`) || strings.Contains(f.Key, "\n") {
-		c.addWarn(WarnInvalidTagKey, fmt.Sprintf("invalid tag key `%s'", f.Key))
+		c.addWarn(WarnInvalidTagKey, fmt.Sprintf("%s: invalid tag key `%s'", f, f.Key))
 
 		newKey := adjustKV(f.Key)
 		if c.keyConflict(newKey, kvs) {
@@ -172,7 +172,7 @@ func (c *checker) checkTag(f *Field, kvs KVs) (*Field, bool) {
 
 	// check tag value: '\', '\n'
 	if strings.HasSuffix(f.GetS(), `\`) || strings.Contains(f.GetS(), "\n") {
-		c.addWarn(WarnInvalidTagValue, fmt.Sprintf("invalid tag value %q", f.GetS()))
+		c.addWarn(WarnInvalidTagValue, fmt.Sprintf("%s: invalid tag value %q", f, f.GetS()))
 
 		x.S = adjustKV(x.S)
 		f.Val = x
@@ -180,7 +180,7 @@ func (c *checker) checkTag(f *Field, kvs KVs) (*Field, bool) {
 
 	// replace `.' with `_' in tag keys
 	if strings.Contains(f.Key, ".") && !c.cfg.enableDotInKey {
-		c.addWarn(WarnInvalidTagKey, fmt.Sprintf("invalid tag key `%s': found `.'", f.Key))
+		c.addWarn(WarnInvalidTagKey, fmt.Sprintf("%s: invalid tag key `%s': found `.'", f, f.Key))
 
 		newKey := strings.ReplaceAll(f.Key, ".", "_")
 		if c.keyConflict(newKey, kvs) {
@@ -191,7 +191,7 @@ func (c *checker) checkTag(f *Field, kvs KVs) (*Field, bool) {
 	}
 
 	if c.keyDisabled(f.Key) {
-		c.addWarn(WarnTagDisabled, fmt.Sprintf("tag key `%s' disabled", f.Key))
+		c.addWarn(WarnTagDisabled, fmt.Sprintf("%s: tag key `%s' disabled", f, f.Key))
 		return f, false
 	}
 
@@ -204,8 +204,8 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 	// trim key
 	if c.cfg.maxFieldKeyLen > 0 && len(f.Key) > c.cfg.maxFieldKeyLen {
 		c.addWarn(WarnMaxFieldKeyLen,
-			fmt.Sprintf("exceed max field key length(%d), got %d, key truncated to %s",
-				c.cfg.maxFieldKeyLen, len(f.Key), f.Key))
+			fmt.Sprintf("%s: exceed max field key length(%d), got %d, key truncated to %s",
+				f, c.cfg.maxFieldKeyLen, len(f.Key), f.Key))
 
 		newKey := f.Key[:c.cfg.maxFieldKeyLen]
 
@@ -218,7 +218,7 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 
 	if strings.Contains(f.Key, ".") && !c.cfg.enableDotInKey {
 		c.addWarn(WarnDotInkey,
-			fmt.Sprintf("invalid field key `%s': found `.'", f.Key))
+			fmt.Sprintf("%s: invalid field key `%s': found `.'", f, f.Key))
 
 		newKey := strings.ReplaceAll(f.Key, ".", "_")
 		if c.keyConflict(newKey, kvs) {
@@ -230,7 +230,7 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 
 	if c.keyDisabled(f.Key) {
 		c.addWarn(WarnFieldDisabled,
-			fmt.Sprintf("field key `%s' disabled, value: %v", f.Key, f.Raw()))
+			fmt.Sprintf("%s: field key `%s' disabled, value: %v", f, f.Key, f.Raw()))
 		return nil, false
 	}
 
@@ -239,7 +239,8 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 		if !c.cfg.enableU64Field {
 			if x.U > uint64(math.MaxInt64) {
 				c.addWarn(WarnMaxFieldValueInt,
-					fmt.Sprintf("too large int field: key=%s, value=%d(> %d)", f.Key, x.U, uint64(math.MaxInt64)))
+					fmt.Sprintf("%s: too large int field: key=%s, value=%d(> %d)",
+						f, f.Key, x.U, uint64(math.MaxInt64)))
 				return f, false
 			} else {
 				// Force convert uint64 to int64: to disable line proto like
@@ -265,14 +266,14 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 
 		if !c.cfg.enableStrField {
 			c.addWarn(WarnInvalidFieldValueType,
-				fmt.Sprintf("field(%s) dropped with string value, when [DisableStringField] enabled", f.Key))
+				fmt.Sprintf("%s: field(%s) dropped with string value, when [DisableStringField] enabled", f, f.Key))
 			return f, false
 		}
 
 		if c.cfg.maxFieldValLen > 0 && len(x.D) > c.cfg.maxFieldValLen {
 			c.addWarn(WarnMaxFieldValueLen,
-				fmt.Sprintf("field (%s) exceed max field value length(%d), got %d, value truncated",
-					f.Key, c.cfg.maxFieldValLen, len(x.D)))
+				fmt.Sprintf("%s: field (%s) exceed max field value length(%d), got %d, value truncated",
+					f, f.Key, c.cfg.maxFieldValLen, len(x.D)))
 
 			x.D = x.D[:c.cfg.maxFieldValLen]
 			f.Val = x
@@ -282,14 +283,14 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 
 		if !c.cfg.enableStrField {
 			c.addWarn(WarnInvalidFieldValueType,
-				fmt.Sprintf("field(%s) dropped with string value, when [DisableStringField] enabled", f.Key))
+				fmt.Sprintf("%s: field(%s) dropped with string value, when [DisableStringField] enabled", f, f.Key))
 			return f, false
 		}
 
 		if c.cfg.maxFieldValLen > 0 && len(x.S) > c.cfg.maxFieldValLen {
 			c.addWarn(WarnMaxFieldValueLen,
-				fmt.Sprintf("field (%s) exceed max field value length(%d), got %d, value truncated",
-					f.Key, c.cfg.maxFieldValLen, len(x.S)))
+				fmt.Sprintf("%s: field (%s) exceed max field value length(%d), got %d, value truncated",
+					f, f.Key, c.cfg.maxFieldValLen, len(x.S)))
 
 			x.S = x.S[:c.cfg.maxFieldValLen]
 			f.Val = x
@@ -297,8 +298,7 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 
 	default:
 		c.addWarn(WarnInvalidFieldValueType,
-			fmt.Sprintf("invalid field (%s), value: %s, type: %s",
-				f.Key, f.Val, reflect.TypeOf(f.Val)))
+			fmt.Sprintf("%s: invalid field (%s), value: %s, type: %s", f, f.Key, f.Val, reflect.TypeOf(f.Val)))
 		return f, false
 	}
 

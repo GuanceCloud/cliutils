@@ -491,15 +491,61 @@ func TestReservedCapPointPool(t *T.T) {
 	})
 }
 
-func TestPoolKVResuable(t *T.T) {
-	type Foo struct {
+type Foo struct {
+	Measurement string
+
+	TS int64
+
+	// tags
+	T1Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+	T2Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+	T3Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+
+	T1 string
+	T2 string
+	T3 string
+
+	SKey, S string `fake:"{regex:[a-zA-Z0-9]{128}}"`
+
+	I8Key  string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+	I16Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+	I32Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+	I64Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+	I64    int64
+	I8     int8
+	I16    int16
+	I32    int32
+
+	U8Key  string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+	U16Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+	U32Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+	U64Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+
+	U8  uint8
+	U16 uint16
+	U32 uint32
+	U64 uint64
+
+	BKey   string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+	DKey   string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+	F64Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+	F32Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+	B      bool
+	D      []byte
+	F64    float64
+	F32    float32
+}
+
+func TestPoolKVResuableConcurrently(t *T.T) {
+
+	type foo struct {
 		Measurement string
 
 		TS int64
 
 		// tags
-		T1Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
-		T2Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		T1Key string `fake:"{regex:[a-zA-Z0-9_]{16}}"`
+		T2Key string `fake:"{regex:[a-zA-Z0-9_]{32}}"`
 		T3Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
 
 		T1 string
@@ -508,18 +554,18 @@ func TestPoolKVResuable(t *T.T) {
 
 		SKey, S string `fake:"{regex:[a-zA-Z0-9]{128}}"`
 
-		I8Key  string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
-		I16Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
-		I32Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		I8Key  string `fake:"{regex:[a-zA-Z0-9_]{8}}"`
+		I16Key string `fake:"{regex:[a-zA-Z0-9_]{16}}"`
+		I32Key string `fake:"{regex:[a-zA-Z0-9_]{32}}"`
 		I64Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
 		I64    int64
 		I8     int8
 		I16    int16
 		I32    int32
 
-		U8Key  string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
-		U16Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
-		U32Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		U8Key  string `fake:"{regex:[a-zA-Z0-9_]{8}}"`
+		U16Key string `fake:"{regex:[a-zA-Z0-9_]{16}}"`
+		U32Key string `fake:"{regex:[a-zA-Z0-9_]{32}}"`
 		U64Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
 
 		U8  uint8
@@ -527,9 +573,9 @@ func TestPoolKVResuable(t *T.T) {
 		U32 uint32
 		U64 uint64
 
-		BKey   string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
-		DKey   string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
-		F64Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
+		BKey   string `fake:"{regex:[a-zA-Z0-9_]{8}}"`
+		DKey   string `fake:"{regex:[a-zA-Z0-9_]{16}}"`
+		F64Key string `fake:"{regex:[a-zA-Z0-9_]{32}}"`
 		F32Key string `fake:"{regex:[a-zA-Z0-9_]{64}}"`
 		B      bool
 		D      []byte
@@ -537,6 +583,154 @@ func TestPoolKVResuable(t *T.T) {
 		F32    float32
 	}
 
+	fn := func() *Point {
+		var f foo
+		assert.NoError(t, gofakeit.Struct(&f))
+		var kvs KVs
+		kvs = kvs.AddTag("T_"+f.T1Key, f.T1)
+		kvs = kvs.AddTag("T_"+f.T2Key, f.T2)
+		kvs = kvs.AddTag("T_"+f.T3Key, f.T3)
+
+		kvs = kvs.AddV2("S_"+f.SKey, f.S, true)
+
+		kvs = kvs.AddV2("I8_"+f.I8Key, f.I8, true)
+		kvs = kvs.AddV2("I16_"+f.I16Key, f.I16, true)
+		kvs = kvs.AddV2("I32_"+f.I32Key, f.I32, true)
+		kvs = kvs.AddV2("I64_"+f.I64Key, f.I64, true)
+
+		kvs = kvs.AddV2("U8_"+f.U8Key, f.U8, true)
+		kvs = kvs.AddV2("U16_"+f.U16Key, f.U16, true)
+		kvs = kvs.AddV2("U32_"+f.U32Key, f.U32, true)
+		kvs = kvs.AddV2("U64_"+f.U64Key, f.U64, true)
+
+		kvs = kvs.AddV2("F32_"+f.F32Key, f.F32, true)
+		kvs = kvs.AddV2("F64_"+f.F64Key, f.F64, true)
+
+		kvs = kvs.AddV2("B_"+f.BKey, f.B, true)
+		kvs = kvs.AddV2("D_"+f.DKey, f.D, true)
+
+		if f.TS < 0 {
+			f.TS = 0
+		}
+
+		pt := NewPointV2(f.Measurement, kvs, WithTimestamp(f.TS))
+
+		require.Equal(t, f.T1, pt.Get("T_"+f.T1Key))
+		require.Equal(t, f.T2, pt.Get("T_"+f.T2Key))
+		require.Equal(t, f.T3, pt.Get("T_"+f.T3Key))
+
+		require.Equal(t, f.S, pt.Get("S_"+f.SKey))
+
+		require.Equal(t, int64(f.I8), pt.Get("I8_"+f.I8Key))
+		require.Equalf(t, int64(f.I16), pt.Get("I16_"+f.I16Key), "got %s", pt.Pretty())
+		require.Equal(t, int64(f.I32), pt.Get("I32_"+f.I32Key))
+		require.Equal(t, f.I64, pt.Get("I64_"+f.I64Key))
+
+		require.Equal(t, uint64(f.U8), pt.Get("U8_"+f.U8Key))
+		require.Equal(t, uint64(f.U16), pt.Get("U16_"+f.U16Key))
+		require.Equal(t, uint64(f.U32), pt.Get("U32_"+f.U32Key))
+		require.Equal(t, f.U64, pt.Get("U64_"+f.U64Key))
+
+		require.Equal(t, f.B, pt.Get("B_"+f.BKey), "got %s", pt.Pretty())
+		require.Equal(t, f.D, pt.Get("D_"+f.DKey))
+		require.Equalf(t, float64(f.F32), pt.Get("F32_"+f.F32Key), "got %s", pt.Pretty())
+		require.Equal(t, f.F64, pt.Get("F64_"+f.F64Key))
+
+		require.Equal(t, f.TS, pt.Time().UnixNano(), "got %s", pt.Pretty())
+
+		return pt
+	}
+
+	pp := NewReservedCapPointPool(1 << 14) // 16kb
+	SetPointPool(pp)
+
+	metrics.MustRegister(pp)
+
+	t.Cleanup(func() {
+		ClearPointPool()
+		metrics.Unregister(pp)
+	})
+
+	nworkers := 32
+	npts := (1 << 30)
+
+	wg := sync.WaitGroup{}
+	wg.Add(nworkers)
+	ch := make(chan int)
+	chExit := make(chan any)
+	batchSize := npts / nworkers
+
+	for i := 0; i < nworkers; i++ {
+		go func(idx int) {
+			defer wg.Done()
+
+			subBatch := (nworkers + (batchSize % (i + 1)))
+
+			pts := make([]*Point, 0, subBatch)
+			encBuffer := make([]byte, 1<<14)
+
+			for {
+				select {
+				case <-ch: // new point comming
+					pts = append(pts, fn())
+
+					if len(pts) == subBatch {
+						// try encoding these points
+						func() {
+							enc := GetEncoder(WithEncEncoding(Protobuf))
+
+							defer PutEncoder(enc)
+							enc.EncodeV2(pts)
+							parts := 0
+
+							for {
+								enc.pbpts.Size()
+								if x, ok := enc.Next(encBuffer); !ok {
+									if enc.LastErr() != nil {
+										t.Errorf("encode error: %s", enc.LastErr())
+									} else {
+										assert.Equal(t, enc.pbpts.Size(), len(x))
+										break
+									}
+								} else {
+									parts++
+								}
+							}
+						}()
+
+						for _, pt := range pts {
+							pp.Put(pt)
+						}
+						pts = pts[:0] //clear slice
+					}
+
+				case <-chExit:
+					return
+				}
+			}
+		}(i)
+	}
+
+	// send jobs
+	for i := 0; i < npts; i++ {
+		ch <- i
+		if i%(npts/nworkers) == 0 {
+			t.Logf("job %d done", i)
+		}
+	}
+
+	// signal exit and wait
+	close(chExit)
+	wg.Wait()
+
+	// show p8s metrics
+	mfs, err := metrics.Gather()
+	assert.NoError(t, err)
+
+	t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
+}
+
+func TestPoolKVResuable(t *T.T) {
 	cases := []struct {
 		name string
 		pp   PointPool
