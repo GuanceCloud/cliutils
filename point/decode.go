@@ -73,6 +73,18 @@ func (d *Decoder) reset() {
 	d.easyproto = false
 }
 
+func detectTimestampPrecision(ts int64) int64 {
+	if ts/1e9 < 10 { // sec
+		return ts * int64(time.Second)
+	} else if ts/1e12 < 10 { // milli-sec
+		return ts * int64(time.Millisecond)
+	} else if ts/1e15 < 10 { // micro-sec
+		return ts * int64(time.Microsecond)
+	} else { // nano-sec
+		return ts
+	}
+}
+
 func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 	var (
 		pts []*Point
@@ -91,29 +103,6 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 		}
 
 		for _, x := range arr {
-			if x.Time > 0 { // check if precision attached
-				switch cfg.precision {
-				case PrecUS:
-					x.Time *= int64(time.Microsecond)
-				case PrecMS:
-					x.Time *= int64(time.Millisecond)
-				case PrecS:
-					x.Time *= int64(time.Second)
-				case PrecM:
-					x.Time *= int64(time.Minute)
-				case PrecH:
-					x.Time *= int64(time.Hour)
-
-				case PrecNS:
-					// pass
-
-				case PrecW, PrecD: // not used
-
-				default:
-					// pass
-				}
-			}
-
 			if pt, err := x.Point(opts...); err != nil {
 				return nil, err
 			} else {
@@ -152,6 +141,32 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 		if err != nil {
 			d.detailedError = err
 			return nil, simplifyLPError(err)
+		}
+	}
+
+	// adjust timestamp precision.
+	for _, pt := range pts {
+		switch cfg.precision {
+		case PrecDyn:
+			pt.pt.Time = detectTimestampPrecision(pt.pt.Time)
+		case PrecUS:
+			pt.pt.Time *= int64(time.Microsecond)
+		case PrecMS:
+			pt.pt.Time *= int64(time.Millisecond)
+		case PrecS:
+			pt.pt.Time *= int64(time.Second)
+		case PrecM:
+			pt.pt.Time *= int64(time.Minute)
+		case PrecH:
+			pt.pt.Time *= int64(time.Hour)
+
+		case PrecNS:
+			// pass
+
+		case PrecW, PrecD: // not used
+
+		default:
+			// pass
 		}
 	}
 
