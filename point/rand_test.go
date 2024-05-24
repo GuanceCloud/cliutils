@@ -198,7 +198,7 @@ func TestWithFixKeys(t *T.T) {
 
 func BenchmarkRandWithPool(b *T.B) {
 	b.Run("with-pool-v3", func(b *T.B) {
-		pp := NewPointPoolLevel3()
+		pp := NewReservedCapPointPool(1000)
 		r := NewRander(WithRandPointPool(pp), WithFixedKeys(true), WithFixedTags(true), WithRandStringValues(false))
 
 		for i := 0; i < b.N; i++ {

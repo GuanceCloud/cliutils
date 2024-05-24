@@ -46,6 +46,8 @@ func (p Precision) String() string {
 		return "d"
 	case PrecW:
 		return "w"
+	case PrecDyn:
+		return "dyn"
 	default:
 		return "unknown"
 	}
@@ -65,6 +67,8 @@ func PrecStr(s string) Precision {
 		return PrecM
 	case "h":
 		return PrecH
+	case "dyn":
+		return PrecDyn
 	default:
 		return PrecNS
 	}
@@ -102,7 +106,8 @@ func parseLPPoints(data []byte, c *cfg) ([]*Point, error) {
 
 	lppts, err := models.ParsePointsWithPrecision(data, ptTime, c.precision.String())
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrInvalidLineProtocol, err)
+		return nil, fmt.Errorf("%w: %s. Origin data: %q",
+			ErrInvalidLineProtocol, err, data)
 	}
 
 	res := []*Point{}
@@ -130,17 +135,6 @@ func parseLPPoints(data []byte, c *cfg) ([]*Point, error) {
 			kvs := KVs(pt.pt.Fields)
 			sort.Sort(kvs)
 			pt.pt.Fields = kvs
-		}
-
-		if c.callback != nil {
-			newPoint, err := c.callback(pt)
-			if err != nil {
-				return nil, err
-			}
-
-			if newPoint == nil {
-				return nil, fmt.Errorf("no point")
-			}
 		}
 
 		pt = chk.check(pt)

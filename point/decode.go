@@ -97,17 +97,8 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 
 	switch d.enc {
 	case JSON:
-		var arr []JSONPoint
-		if err := json.Unmarshal(data, &arr); err != nil {
+		if err := json.Unmarshal(data, &pts); err != nil {
 			return nil, err
-		}
-
-		for _, x := range arr {
-			if pt, err := x.Point(opts...); err != nil {
-				return nil, err
-			} else {
-				pts = append(pts, pt)
-			}
 		}
 
 	case Protobuf:
@@ -167,6 +158,38 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 
 		default:
 			// pass
+		}
+	}
+
+	// check point and apply callbak on each point
+	if cfg.precheck || cfg.callback != nil {
+		var (
+			chk = &checker{cfg: cfg}
+			arr []*Point
+		)
+
+		for idx, _ := range pts {
+			if cfg.precheck {
+				pts[idx] = chk.check(pts[idx])
+				chk.reset()
+			}
+
+			if cfg.callback != nil {
+				newPoint, err := cfg.callback(pts[idx])
+				if err != nil {
+					return nil, err
+				}
+
+				if newPoint != nil {
+					arr = append(arr, newPoint)
+				}
+			}
+		}
+
+		// Callback may drop some point from pts, so
+		// here we override it with newPoint arr.
+		if cfg.callback != nil {
+			pts = arr
 		}
 	}
 

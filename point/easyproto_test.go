@@ -48,12 +48,11 @@ func BenchmarkEasyproto(b *T.B) {
 	})
 
 	b.Run("easyproto-decode-under-point-pool", func(b *T.B) {
-		pp := &fullPointPool{}
+		pp := NewReservedCapPointPool(100)
 		SetPointPool(pp)
 
 		b.Cleanup(func() {
-			b.Logf("ptpool: %s", pp.String())
-
+			b.Logf("ptpool: %s", pp.(*ReservedCapPointPool).String())
 			ClearPointPool()
 		})
 

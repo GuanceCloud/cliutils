@@ -32,7 +32,7 @@ func TestTrim(t *T.T) {
 	})
 
 	t.Run("point-pool-kv-reuse", func(t *T.T) {
-		pp := &fullPointPool{}
+		pp := NewReservedCapPointPool(1000)
 		SetPointPool(pp)
 		defer ClearPointPool()
 
@@ -49,10 +49,7 @@ func TestTrim(t *T.T) {
 
 			kvs = kvs.Add("f-1", 123, false, false)
 
-			// kvs = kvs.Add("f-5", 123, false, false)
-
-			// kvs = kvs.Add("f-8", 123, false, false)
-			if pp.kvReused.Load() > 0 {
+			if pp.(*ReservedCapPointPool).chanGet() > 0 {
 				t.Logf("[%d] %s", i, pp)
 				break
 			}
@@ -61,7 +58,7 @@ func TestTrim(t *T.T) {
 	})
 
 	t.Run("trim-field-under-point-pool", func(t *T.T) {
-		pp := &fullPointPool{}
+		pp := NewReservedCapPointPool(1000)
 		SetPointPool(pp)
 		defer ClearPointPool()
 
@@ -89,7 +86,7 @@ func TestTrim(t *T.T) {
 		}
 
 		// XXX: why set loop to 1, the kvReused == 0?
-		assert.True(t, pp.kvReused.Load() > 0)
+		assert.True(t, pp.(*ReservedCapPointPool).chanGet() > 0)
 
 		t.Logf("point-pool: %s", pp)
 	})
@@ -109,7 +106,7 @@ func TestTrim(t *T.T) {
 	})
 
 	t.Run("trim-tag-under-point-pool", func(t *T.T) {
-		pp := &fullPointPool{}
+		pp := NewReservedCapPointPool(2)
 		SetPointPool(pp)
 		defer ClearPointPool()
 
@@ -136,15 +133,15 @@ func TestTrim(t *T.T) {
 		}
 
 		// XXX: why set loop to 1, the kvReused == 0?
-		assert.True(t, pp.kvReused.Load() > 0)
+		assert.True(t, pp.(*ReservedCapPointPool).chanGet() > 0)
 
-		t.Logf("point-pool: %s", pp)
+		t.Logf("point-pool: %s", pp.(*ReservedCapPointPool).String())
 	})
 }
 
 func BenchmarkKVsTrim(b *T.B) {
 	b.Run("trim", func(b *T.B) {
-		pp := NewPointPoolLevel3()
+		pp := NewReservedCapPointPool(1000)
 		SetPointPool(pp)
 		defer func() {
 			ClearPointPool()
@@ -168,7 +165,7 @@ func BenchmarkKVsTrim(b *T.B) {
 	})
 
 	b.Run("del", func(b *T.B) {
-		pp := NewPointPoolLevel3()
+		pp := NewReservedCapPointPool(1000)
 		SetPointPool(pp)
 		defer func() {
 			ClearPointPool()
@@ -235,7 +232,7 @@ func TestKVsReset(t *T.T) {
 	})
 }
 
-func TestKVs(t *T.T) {
+func TestNewKVs(t *T.T) {
 	t.Run("add-tag", func(t *T.T) {
 		kvs := NewKVs(map[string]any{"f1": 123})
 
@@ -344,7 +341,7 @@ func TestKVs(t *T.T) {
 	})
 
 	t.Run(`test-del3`, func(t *T.T) {
-		pp := NewPointPoolLevel3()
+		pp := NewReservedCapPointPool(1000)
 
 		SetPointPool(pp)
 		defer ClearPointPool()
@@ -369,7 +366,7 @@ func TestKVs(t *T.T) {
 	})
 
 	t.Run(`test-del-on-pt-pool`, func(t *T.T) {
-		pp := NewPointPoolLevel3()
+		pp := NewReservedCapPointPool(1000)
 
 		SetPointPool(pp)
 		defer ClearPointPool()
@@ -402,6 +399,39 @@ func TestKVs(t *T.T) {
 
 		assert.NotNil(t, pt.Get("f1"))
 	})
+
+	t.Run("array-int-value", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f_arr", MustNewAnyArray(1, 2, 3), false, false)
+		assert.Equal(t, []any{int64(1), int64(2), int64(3)}, kvs.Get("f_arr").Raw())
+		t.Logf("kvs: %s", kvs.Pretty())
+	})
+
+	t.Run("array-bytes-value", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f_arr", MustNewAnyArray([]byte("hello"), []byte("world")), false, false)
+		assert.Equal(t, []any{[]byte("hello"), []byte("world")}, kvs.Get("f_arr").Raw())
+		t.Logf("kvs: %s", kvs.Pretty())
+
+		pt := NewPointV2("some", kvs)
+
+		t.Logf("pt pretty: %s", pt.Pretty())
+		t.Logf("pt lineproto: %s", pt.LineProto())
+	})
+
+	t.Run("array-float-value", func(t *T.T) {
+		kvs := NewKVs(map[string]any{
+			"f_arr": []float64{1.0, 2.0},
+		})
+		t.Logf("kvs: %s", kvs.Pretty())
+	})
+
+	t.Run("array-bytes-value", func(t *T.T) {
+		kvs := NewKVs(map[string]any{
+			"f_arr": [][]byte{[]byte("hello"), []byte("world")},
+		})
+		t.Logf("kvs: %s", kvs.Pretty())
+	})
 }
 
 func TestKVsDel(t *T.T) {
@@ -422,7 +452,7 @@ func TestKVsDel(t *T.T) {
 	t.Run(`del-on-point-pool`, func(t *T.T) {
 		var kvs KVs
 
-		pp := &fullPointPool{}
+		pp := NewReservedCapPointPool(1000)
 		SetPointPool(pp)
 		defer func() {
 			ClearPointPool()
@@ -441,10 +471,13 @@ func TestKVsDel(t *T.T) {
 
 		_ = kvs.Add(`f-x`, 123, false, false)
 
-		assert.True(t, pp.kvReused.Load() > 0) // key f-x reused
-		assert.True(t, pp.kvCreated.Load() > 0)
+		assert.True(t, pp.(*ReservedCapPointPool).poolGet() > 0)
+		assert.True(t, pp.(*ReservedCapPointPool).poolPut() == 0) // chan is 1000, not put to pool
 
-		t.Logf("point pool: %s", pp.String())
+		assert.True(t, pp.(*ReservedCapPointPool).chanGet() > 0)
+		assert.True(t, pp.(*ReservedCapPointPool).chanPut() > 0)
+
+		t.Logf("point pool: %s", pp.(*ReservedCapPointPool).String())
 	})
 }
 
@@ -469,10 +502,10 @@ func BenchmarkKVsDel(b *T.B) {
 	})
 
 	b.Run("del-on-slice-Delete-with-point-pool", func(b *T.B) {
-		pp := NewPointPoolLevel3()
+		pp := NewReservedCapPointPool(1000)
 		SetPointPool(pp)
 		defer func() {
-			b.Logf("point pool: %s", pp)
+			b.Logf("point pool: %s", pp.(*ReservedCapPointPool).String())
 			ClearPointPool()
 		}()
 
