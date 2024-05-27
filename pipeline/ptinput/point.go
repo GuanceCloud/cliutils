@@ -122,14 +122,14 @@ type PlPoint struct {
 
 	subPlpt []PlInputPt
 
-	ptWindowPool       *ptwindow.WindowPool
-	ptWindowRegistered bool
-	winKeyVal          [2][]string
-
-	category point.Category
-	drop     bool
-
 	cache *plcache.Cache
+
+	ptWindowPool       *ptwindow.WindowPool
+	winKeyVal          [2][]string
+	ptWindowRegistered bool
+
+	drop     bool
+	category point.Category
 }
 
 func NewPlPoint(category point.Category, name string,

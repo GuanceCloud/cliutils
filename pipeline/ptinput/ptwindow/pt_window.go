@@ -1,3 +1,4 @@
+// Package ptwindow impl pt context window
 package ptwindow
 
 import (
@@ -106,10 +107,8 @@ func (w *PtWindow) Move(pt *point.Point) []*point.Point {
 			rst = append(rst, pt)
 		}
 		return rst
-	} else {
-		if w.ringBefore != nil && !w.disableInsert {
-			w.ringBefore.put(pt)
-		}
+	} else if w.ringBefore != nil && !w.disableInsert {
+		w.ringBefore.put(pt)
 	}
 
 	return nil
