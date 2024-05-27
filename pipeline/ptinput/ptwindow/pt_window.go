@@ -7,6 +7,16 @@ import (
 	"github.com/GuanceCloud/cliutils/point"
 )
 
+func PutbackPoints(pts ...*point.Point) {
+	if ptPool := point.GetPointPool(); ptPool != nil {
+		for _, pt := range pts {
+			if pt.HasFlag(point.Ppooled) {
+				ptPool.Put(pt)
+			}
+		}
+	}
+}
+
 type PtRing struct {
 	ring []*point.Point
 	pos  int
@@ -16,10 +26,14 @@ type PtRing struct {
 	elemLimit int
 }
 
-func (w *PtRing) Put(pt *point.Point) {
+func (w *PtRing) put(pt *point.Point) {
 	if w.pos >= len(w.ring) {
 		w.pos = 0
 	}
+	if w.ring[w.pos] != nil {
+		PutbackPoints(pt)
+	}
+
 	w.ring[w.pos] = pt
 	if pt != nil {
 		w.notNil++
@@ -27,7 +41,7 @@ func (w *PtRing) Put(pt *point.Point) {
 	w.pos++
 }
 
-func (w *PtRing) Clean() []*point.Point {
+func (w *PtRing) clean() []*point.Point {
 	if w.notNil == 0 {
 		return nil
 	}
@@ -63,7 +77,17 @@ type PtWindow struct {
 	before int
 	after  int
 
+	disableInsert bool
 	sync.Mutex
+}
+
+func (w *PtWindow) deprecated() {
+	w.Lock()
+	defer w.Unlock()
+	w.disableInsert = true
+
+	pts := w.ringBefore.clean()
+	PutbackPoints(pts...)
 }
 
 func (w *PtWindow) Move(pt *point.Point) []*point.Point {
@@ -74,7 +98,7 @@ func (w *PtWindow) Move(pt *point.Point) []*point.Point {
 		w.hit--
 		var rst []*point.Point
 		if w.ringBefore != nil {
-			if v := w.ringBefore.Clean(); len(v) > 0 {
+			if v := w.ringBefore.clean(); len(v) > 0 {
 				rst = append(rst, v...)
 			}
 		}
@@ -83,8 +107,8 @@ func (w *PtWindow) Move(pt *point.Point) []*point.Point {
 		}
 		return rst
 	} else {
-		if w.ringBefore != nil {
-			w.ringBefore.Put(pt)
+		if w.ringBefore != nil && !w.disableInsert {
+			w.ringBefore.put(pt)
 		}
 	}
 

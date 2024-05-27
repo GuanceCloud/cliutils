@@ -115,6 +115,10 @@ func SetPointPool(pp PointPool) {
 	defaultPTPool = pp
 }
 
+func GetPointPool() PointPool {
+	return defaultPTPool
+}
+
 func ClearPointPool() {
 	defaultPTPool = nil
 }
