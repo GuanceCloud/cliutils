@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLPFieldArray(t *T.T) {
@@ -337,6 +338,42 @@ func TestDecode(t *T.T) {
 			}
 		})
 	}
+
+	t.Run("decode-pb-json", func(t *T.T) {
+		j := `[
+{"name":"abc","fields":[{"key":"f1","i":"123"},{"key":"f2","b":false},{"key":"t1","s":"tv1","is_tag":true},{"key":"t2","s":"tv2","is_tag":true}],"time":"123"}
+]`
+		dec := GetDecoder(WithDecEncoding(JSON))
+		defer PutDecoder(dec)
+		pts, err := dec.Decode([]byte(j), DefaultLoggingOptions()...)
+		require.NoError(t, err)
+
+		for _, pt := range pts {
+			assert.Equal(t, "unknown", pt.Get("status").(string))
+
+			t.Logf("pt: %s", pt.Pretty())
+		}
+	})
+
+	t.Run("decode-bytes-array", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f_d_arr", MustNewAnyArray([]byte("hello"), []byte("world")), false, false)
+		pt := NewPointV2("m1", kvs)
+		enc := GetEncoder(WithEncEncoding(LineProtocol))
+		defer PutEncoder(enc)
+		arr, err := enc.Encode([]*Point{pt})
+		assert.NoError(t, err)
+
+		t.Logf("lp: %s", arr[0])
+
+		dec := GetDecoder(WithDecEncoding(LineProtocol))
+		defer PutDecoder(dec)
+		pts, err := dec.Decode(arr[0])
+		assert.NoError(t, err)
+		for _, pt := range pts {
+			t.Logf("pt: %s", pt.Pretty())
+		}
+	})
 
 	t.Run("decode-with-check", func(t *T.T) {
 		var kvs KVs

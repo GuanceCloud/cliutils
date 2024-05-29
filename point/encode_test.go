@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"strings"
 	T "testing"
 	"time"
 
@@ -267,7 +268,108 @@ func TestEncodeEqualty(t *T.T) {
 			}
 		})
 	}
+}
 
+func TestEscapeEncode(t *T.T) {
+	t.Run("escaped-lineproto", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f1=2=3=", 3.14, false, false)
+		kvs = kvs.Add("f2\tnr", 2, false, false)
+		kvs = kvs.Add("f3,", "some-string\nanother-line", false, false)
+		kvs = kvs.Add("f4,", false, false, false)
+		//kvs = kvs.Add("f_nil", nil, false, false)
+		kvs = kvs.Add("f\nnext-line,", []byte("hello"), false, false)
+		kvs = kvs.Add(`f\other`, []byte("hello"), false, false)
+		kvs = kvs.Add("tag=1", "value", true, false)
+		kvs = kvs.Add("tag 2", "value", true, false)
+		kvs = kvs.Add("tag\t3", "value", true, false)
+
+		kvs = kvs.Add("tag=1", "value=1", true, false)
+		kvs = kvs.Add("tag 2", "value 2", true, false)
+		kvs = kvs.Add("tag\t3", "value \t3", true, false)
+		kvs = kvs.Add("tag4", "value \n3", true, false)
+		kvs = kvs.Add("tag5", `value \`, true, false)         // tag-value got tail \
+		kvs = kvs.Add("tag\nnext-line", `value`, true, false) // tag key get \n
+
+		pt := NewPointV2("some,=abc\"", kvs)
+
+		lp := pt.LineProto()
+		t.Logf("line-protocol: %s", lp)
+		t.Logf("pretty: %s", pt.Pretty())
+
+		dec := GetDecoder(WithDecEncoding(LineProtocol))
+		defer PutDecoder(dec)
+		pts, err := dec.Decode([]byte(lp))
+		assert.NoError(t, err)
+		eq, why := pts[0].EqualWithReason(pt)
+		assert.Truef(t, eq, "not equal: %s", why)
+	})
+}
+
+func TestPBEncode(t *T.T) {
+	t.Run(`invalid-utf8-string-field`, func(t *T.T) {
+		var kvs KVs
+		invalidUTF8 := "a\xffb\xC0\xAFc\xff"
+
+		t.Logf("invalidUTF8: %s", invalidUTF8) // the printed invalid-utf8 seems equal to `abc'
+
+		kvs = kvs.Add("invalid-utf8", invalidUTF8, false, false)
+
+		pt := NewPointV2("p1", kvs)
+
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		defer PutEncoder(enc)
+		arr, err := enc.Encode([]*Point{pt})
+		require.NoError(t, err)
+		assert.Len(t, arr, 1)
+
+		require.Lenf(t, pt.pt.Warns, 0, "point: %s", pt.Pretty())
+
+		// but the real value get from point is "a\xffb\xC0\xAFc\xff"
+		assert.Equal(t, invalidUTF8, pt.Get("invalid-utf8"), "abc")
+
+		t.Logf("pt: %s", pt.Pretty())
+	})
+
+	t.Run(`invalid-utf8-string-field`, func(t *T.T) {
+		var kvs KVs
+
+		invalidUTF8Str := "a\xffb\xC0\xAFc\xff"
+
+		validUTF8Str := strings.ToValidUTF8(invalidUTF8Str, "0X")
+		kvs = kvs.Add("invalid-utf8", validUTF8Str, false, false)
+
+		pt := NewPointV2("p1", kvs)
+
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		defer PutEncoder(enc)
+		arr, err := enc.Encode([]*Point{pt})
+		require.NoError(t, err)
+		assert.Len(t, arr, 1)
+		t.Logf("pt: %s", pt.Pretty())
+	})
+
+	t.Run(`invalid-utf8-[]byte-field`, func(t *T.T) {
+		var kvs KVs
+
+		invalidUTF8Bytes := []byte("a\xffb\xC0\xAFc\xff")
+
+		kvs = kvs.Add("invalid-utf8", invalidUTF8Bytes, false, false)
+
+		pt := NewPointV2("p1", kvs)
+
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		defer PutEncoder(enc)
+		arr, err := enc.Encode([]*Point{pt})
+		require.NoError(t, err)
+		assert.Len(t, arr, 1)
+
+		require.Equal(t, invalidUTF8Bytes, pt.Get("invalid-utf8"))
+		t.Logf("pt: %s", pt.Pretty())
+	})
+}
+
+func TestEncodeWithBytesLimit(t *T.T) {
 	t.Run(`bytes-limite`, func(t *T.T) {
 		r := NewRander(WithFixedTags(true), WithRandText(3))
 		pts := r.Rand(1000)
@@ -558,7 +660,8 @@ func TestV2Encode(t *T.T) {
 		assert.NoError(t, enc.LastErr())
 
 		for i, pt := range decodePts {
-			assert.Equal(t, randPts[i].Pretty(), pt.Pretty())
+			ok, why := randPts[i].EqualWithReason(pt)
+			require.Truef(t, ok, "reason: %s", why)
 		}
 	})
 

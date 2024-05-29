@@ -106,53 +106,7 @@ var sampleLogs = []string{
 	`2022-10-27T16:12:42.050+0800	DEBUG	ddtrace	ddtrace/ddtrace_http.go:34	### received tracing data from path: /v0.4/traces`,
 }
 
-func BenchmarkPoolV1(b *T.B) {
-	now := time.Now()
-	pp := NewPointPoolLevel1()
-
-	b.Run("v1-pool", func(b *T.B) {
-		for i := 0; i < b.N; i++ {
-			pt := pp.Get()
-
-			pt.SetName("m1")
-			pt.SetTime(now)
-			pt.Add("f0", 123)
-			pt.Add("f1", 3.14)
-			pt.Add("f2", "hello")
-			pt.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"))
-			pt.Add("f4", false)
-			pt.Add("f5", -123)
-
-			pp.Put(pt)
-		}
-	})
-}
-
-func BenchmarkPoolV2(b *T.B) {
-	now := time.Now()
-
-	var ppp partialPointPool
-
-	b.Run("v2-pool", func(b *T.B) {
-		for i := 0; i < b.N; i++ {
-			pt := ppp.Get()
-
-			pt.SetName("m1")
-			pt.SetTime(now)
-
-			pt.AddKVs(ppp.GetKV("f0", 123),
-				ppp.GetKV("f1", 3.14),
-				ppp.GetKV("f2", "hello"),
-				ppp.GetKV("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text")),
-				ppp.GetKV("f4", false),
-				ppp.GetKV("f5", -123))
-
-			ppp.Put(pt)
-		}
-	})
-}
-
-func BenchmarkPoolV3AndReservedCapPool(b *T.B) {
+func BenchmarkReservedCapPool(b *T.B) {
 	now := time.Now()
 
 	b.Run("without-pool", func(b *T.B) {
@@ -202,78 +156,11 @@ func BenchmarkPoolV3AndReservedCapPool(b *T.B) {
 
 		b.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 	})
-
-	b.Run("v3-pool", func(b *T.B) {
-		fpp := NewPointPoolLevel3()
-
-		defer func() {
-			SetPointPool(nil)
-		}()
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			pt := fpp.Get()
-
-			pt.SetName("m1")
-			pt.SetTime(now)
-
-			pt.AddKVs(
-				fpp.GetKV("f0", 123),
-				fpp.GetKV("f1", 3.14),
-				fpp.GetKV("f2", "hello"),
-				fpp.GetKV("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text")),
-				fpp.GetKV("f4", false),
-				fpp.GetKV("f5", -123))
-
-			fpp.Put(pt)
-		}
-	})
-
-	b.Run("v3-new-point", func(b *T.B) {
-		fpp := NewPointPoolLevel3()
-		SetPointPool(fpp)
-		defer func() {
-			SetPointPool(nil)
-		}()
-
-		b.ResetTimer()
-		var kvs KVs
-		for i := 0; i < b.N; i++ {
-			kvs = kvs.Add("f0", 123, false, false)
-			kvs = kvs.Add("f1", 3.14, false, false)
-			kvs = kvs.Add("f2", "hello", false, false)
-			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, false)
-			kvs = kvs.Add("f4", false, false, false)
-			kvs = kvs.Add("f5", -123, false, false)
-
-			pt := NewPointV2("m1", kvs, WithPrecheck(false))
-			fpp.Put(pt)
-		}
-	})
 }
 
 func TestPointPool(t *T.T) {
-	t.Run("level-1", func(t *T.T) {
-		pp := NewPointPoolLevel1()
-
-		pt := pp.Get()
-		pt.SetName("m1")
-		pt.AddKVs(pp.GetKV("f0", 123),
-			pp.GetKV("f1", 3.14),
-			pp.GetKV("f2", "hello"),
-			pp.GetKV("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text")),
-			pp.GetKV("f4", false),
-			pp.GetKV("f5", -123))
-		pp.Put(pt)
-
-		pt = pp.Get()
-		assert.True(t, isEmptyPoint(pt))
-
-		assert.True(t, cap(pt.pt.Fields) > 0) // reuse field array
-	})
-
-	t.Run("level3-put-kv", func(t *T.T) {
-		pp := &fullPointPool{}
+	t.Run("reserve-cap-pool-put-kv", func(t *T.T) {
+		pp := NewReservedCapPointPool(1000)
 		SetPointPool(pp)
 		defer ClearPointPool()
 
@@ -290,14 +177,16 @@ func TestPointPool(t *T.T) {
 			}
 		}
 
-		assert.Equal(t, int64(396), pp.kvReused.Load())
-		assert.Equal(t, int64(4), pp.kvCreated.Load())
+		cpp := pp.(*ReservedCapPointPool)
 
-		t.Logf("point pool: %s", pp)
+		assert.Equal(t, int64(4), cpp.poolGet())   // pool-get: new object from pool
+		assert.Equal(t, int64(396), cpp.chanGet()) // chan-get: reuse-exist object from channel
+
+		t.Logf("point pool: %s", cpp.String())
 	})
 
-	t.Run("level-3-concurrent", func(t *T.T) {
-		pp := &fullPointPool{}
+	t.Run("point-pool-concurrent", func(t *T.T) {
+		pp := NewReservedCapPointPool(1000)
 		SetPointPool(pp)
 		defer ClearPointPool()
 
@@ -327,8 +216,12 @@ func TestPointPool(t *T.T) {
 
 		wg.Wait()
 
-		assert.Equal(t, int64(n*100*4), pp.kvReused.Load()+pp.kvCreated.Load())
-		t.Logf("point pool: %s", pp)
+		cpp := pp.(*ReservedCapPointPool)
+
+		// all put-back locate in chan, not pool(here chan cap is 1000, too large for only 4 kvs each loop).
+		assert.Equal(t, int64(n*100*4), cpp.chanPut())
+
+		t.Logf("point pool: %s", cpp.String())
 	})
 }
 
@@ -347,7 +240,7 @@ func TestReset(t *T.T) {
 
 func BenchmarkStringKV(b *T.B) {
 	var (
-		fpp fullPointPool
+		pp = NewReservedCapPointPool(1000)
 
 		shortString = cliutils.CreateRandomString(32)
 		longString  = cliutils.CreateRandomString(1 << 10) // 1KB
@@ -355,10 +248,10 @@ func BenchmarkStringKV(b *T.B) {
 		now         = time.Now()
 	)
 
-	SetPointPool(&fpp)
+	SetPointPool(pp)
 	defer ClearPointPool()
 
-	b.Run("v3-pool-string-kv", func(b *T.B) {
+	b.Run("string-kv", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
 			kvs = kvs.Add("short-f1", shortString, false, false)
@@ -375,11 +268,11 @@ func BenchmarkStringKV(b *T.B) {
 				WithStrField(true),
 				WithPrecheck(false),
 			)
-			fpp.Put(pt)
+			pp.Put(pt)
 		}
 	})
 
-	b.Run("v3-pool-non-string-kv", func(b *T.B) {
+	b.Run("non-string-kv", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
 			kvs = kvs.Add("f-i", 1024, false, false)
@@ -394,48 +287,12 @@ func BenchmarkStringKV(b *T.B) {
 				WithTime(now),
 				WithPrecheck(false),
 			)
-			fpp.Put(pt)
+			pp.Put(pt)
 		}
 	})
 }
 
 func TestPointPoolMetrics(t *T.T) {
-	t.Run("v3-pool-metrics", func(t *T.T) {
-		pp := &fullPointPool{}
-		SetPointPool(pp)
-		defer ClearPointPool()
-
-		metrics.MustRegister(pp)
-
-		t.Cleanup(func() {
-			metrics.Unregister(pp)
-		})
-
-		// total add 100 * 4 Field
-		for i := 0; i < 100; i++ {
-			func() {
-				var kvs KVs
-				kvs = kvs.Add(fmt.Sprintf("f%d", i), 123, false, false)
-				kvs = kvs.Add(fmt.Sprintf("f%d", i+1), 123, false, false)
-				kvs = kvs.Add(fmt.Sprintf("f%d", i+2), 123, false, false)
-				kvs = kvs.Add(fmt.Sprintf("f%d", i+3), 123, false, false)
-
-				pt := NewPointV2("some", kvs)
-				pp.Put(pt)
-			}()
-		}
-
-		assert.Equal(t, int64(396), pp.kvReused.Load())
-		assert.Equal(t, int64(4), pp.kvCreated.Load())
-
-		t.Logf("point pool: %s", pp)
-
-		mfs, err := metrics.Gather()
-		assert.NoError(t, err)
-
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
-	})
-
 	t.Run("reserved-pool-metrics", func(t *T.T) {
 		pp := NewReservedCapPointPool(100)
 		SetPointPool(pp)
@@ -541,11 +398,6 @@ func TestPoolKVResuable(t *T.T) {
 		name string
 		pp   PointPool
 	}{
-		{
-			name: "v3",
-			pp:   NewPointPoolLevel3(),
-		},
-
 		{
 			name: "reserve-cap-pool",
 			pp:   NewReservedCapPointPool(1024),

@@ -8,6 +8,7 @@ package point
 import (
 	"encoding/json"
 	"fmt"
+	"testing"
 	T "testing"
 	"time"
 
@@ -77,7 +78,18 @@ func TestJSONPointMarshal(t *T.T) {
 	}
 }
 
-func TestJSONPointMarhsal(t *T.T) {
+func TestJSONUnmarshal(t *T.T) {
+	t.Run(`unmarshal-point-array`, func(t *T.T) {
+		j := `[
+{"name":"abc","fields":[{"key":"f1","i":"123"},{"key":"f2","b":false},{"key":"t1","s":"tv1","is_tag":true},{"key":"t2","s":"tv2","is_tag":true}],"time":"123"}
+]`
+		pts := make([]*Point, 0)
+		require.NoError(t, json.Unmarshal([]byte(j), &pts))
+		t.Logf("pt: %s", pts[0].Pretty())
+	})
+}
+
+func TestJSONPointMarhsal(t *testing.T) {
 	var kvs KVs
 
 	EnableMixedArrayField = true
@@ -152,17 +164,6 @@ func TestJSONPoint2Point(t *T.T) {
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			expect: fmt.Sprintf("%s f1=123i,f2=false 123", DefaultMeasurementName),
 		},
-
-		{
-			name: "minus-time", // it's ok!
-			p: &JSONPoint{
-				Measurement: "minus-time",
-				Tags:        nil,
-				Fields:      map[string]interface{}{"f1": 123, "f2": false},
-			},
-			opts:   []Option{WithTime(time.Unix(0, -123))},
-			expect: "minus-time f1=123i,f2=false -123",
-		},
 	}
 
 	for _, tc := range cases {
@@ -179,6 +180,49 @@ func TestJSONPoint2Point(t *T.T) {
 			assert.Equal(t, tc.expect, pt.LineProto())
 		})
 	}
+
+	t.Run("array-field", func(t *T.T) {
+		jp := JSONPoint{
+			Measurement: "some",
+			Fields: map[string]any{
+				"f_i_arr": []int{1, 2, 3},
+				"f_d_arr": [][]byte{[]byte("hello"), []byte("world")},
+			},
+		}
+
+		pt := fromJSONPoint(&jp)
+		//assert.NoError(t, err)
+		t.Logf("pt: %s", pt.Pretty())
+
+		EnableMixedArrayField = true
+		defer func() {
+			EnableMixedArrayField = false
+		}()
+
+		j := `{
+	"measurement": "some",
+	"fields": {
+		"f_i_arr": [1,2,3],
+		"f_f_arr": [1.0,2.0,3.14],
+		"f_mix_arr": [1.0, "string", false, 3]
+	}
+}`
+		// NOTE: simple json do not support:
+		//  - signed/unsigned int
+		//  - []byte
+		var jp2 JSONPoint
+		assert.NoError(t, json.Unmarshal([]byte(j), &jp2))
+
+		t.Logf("jp2 fields: %+#v", jp2.Fields)
+
+		pt, err := jp2.Point()
+		assert.NoError(t, err)
+		assert.NotNilf(t, pt.Get("f_i_arr"), "pt: %s", pt.Pretty())
+		assert.NotNilf(t, pt.Get("f_f_arr"), "pt: %s", pt.Pretty())
+		assert.NotNilf(t, pt.Get("f_mix_arr"), "pt: %s", pt.Pretty())
+
+		t.Logf("pt: %s", pt.Pretty())
+	})
 }
 
 func TestFromJSONPoint(t *T.T) {
@@ -196,7 +240,7 @@ func TestFromJSONPoint(t *T.T) {
 			Time: 123,
 		}
 
-		pt := FromJSONPoint(&jp)
+		pt := fromJSONPoint(&jp)
 		assert.Equal(t, "m", pt.Name())
 		assert.Equal(t, "v1", pt.Get("t1"))
 		assert.Equal(t, "v2", pt.Get("t2"))

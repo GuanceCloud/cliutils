@@ -85,24 +85,29 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 
 	switch d.enc {
 	case JSON:
-		var arr []JSONPoint
+		var (
+			ts  = time.Now()
+			arr []*Point
+		)
+
 		if err := json.Unmarshal(data, &arr); err != nil {
 			return nil, err
 		}
 
 		for _, x := range arr {
-			if x.Time > 0 { // check if precision attached
+			ptts := x.pt.Time
+			if ptts > 0 { // check if precision attached
 				switch cfg.precision {
 				case PrecUS:
-					x.Time *= int64(time.Microsecond)
+					ptts *= int64(time.Microsecond)
 				case PrecMS:
-					x.Time *= int64(time.Millisecond)
+					ptts *= int64(time.Millisecond)
 				case PrecS:
-					x.Time *= int64(time.Second)
+					ptts *= int64(time.Second)
 				case PrecM:
-					x.Time *= int64(time.Minute)
+					ptts *= int64(time.Minute)
 				case PrecH:
-					x.Time *= int64(time.Hour)
+					ptts *= int64(time.Hour)
 
 				case PrecNS:
 					// pass
@@ -112,13 +117,13 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 				default:
 					// pass
 				}
+			} else {
+				ptts = ts.UnixNano()
 			}
 
-			if pt, err := x.Point(opts...); err != nil {
-				return nil, err
-			} else {
-				pts = append(pts, pt)
-			}
+			x.pt.Time = ptts
+
+			pts = append(pts, x)
 		}
 
 	case Protobuf:
@@ -152,6 +157,38 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 		if err != nil {
 			d.detailedError = err
 			return nil, simplifyLPError(err)
+		}
+	}
+
+	// check point and apply callbak on each point
+	if cfg.precheck || cfg.callback != nil {
+		var (
+			chk = &checker{cfg: cfg}
+			arr []*Point
+		)
+
+		for idx, _ := range pts {
+			if cfg.precheck {
+				pts[idx] = chk.check(pts[idx])
+				chk.reset()
+			}
+
+			if cfg.callback != nil {
+				newPoint, err := cfg.callback(pts[idx])
+				if err != nil {
+					return nil, err
+				}
+
+				if newPoint != nil {
+					arr = append(arr, newPoint)
+				}
+			}
+		}
+
+		// Callback may drop some point from pts, so
+		// here we override it with newPoint arr.
+		if cfg.callback != nil {
+			pts = arr
 		}
 	}
 
