@@ -17,14 +17,15 @@ import (
 type Precision int
 
 const (
-	PrecNS Precision = iota // nano-second
-	PrecUS                  // micro-second
-	PrecMS                  // milli-second
-	PrecS                   // second
-	PrecM                   // minute
-	PrecH                   // hour
-	PrecD                   // day
-	PrecW                   // week
+	PrecNS  Precision = iota // nano-second
+	PrecUS                   // micro-second
+	PrecMS                   // milli-second
+	PrecS                    // second
+	PrecM                    // minute
+	PrecH                    // hour
+	PrecD                    // day
+	PrecW                    // week
+	PrecDyn                  // dynamic precision
 )
 
 func (p Precision) String() string {
