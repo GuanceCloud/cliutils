@@ -405,7 +405,7 @@ func TestDecode(t *T.T) {
 				assert.NoError(t, err)
 			}
 
-			assert.Equal(t, len(pts), len(tc.expectLP))
+			assert.Equal(t, len(tc.expectLP), len(pts))
 			for idx := range pts {
 				assert.Equal(t, tc.expectLP[idx], pts[idx].LineProto())
 

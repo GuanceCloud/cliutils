@@ -97,21 +97,8 @@ func (d *Decoder) Decode(data []byte, opts ...Option) ([]*Point, error) {
 
 	switch d.enc {
 	case JSON:
-		var (
-			ts  = time.Now()
-			arr []*Point
-		)
-
-		if err := json.Unmarshal(data, &arr); err != nil {
+		if err := json.Unmarshal(data, &pts); err != nil {
 			return nil, err
-		}
-
-		for _, x := range arr {
-			if pt, err := x.Point(opts...); err != nil {
-				return nil, err
-			} else {
-				pts = append(pts, pt)
-			}
 		}
 
 	case Protobuf:
