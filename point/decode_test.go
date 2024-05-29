@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLPFieldArray(t *T.T) {
@@ -85,6 +86,85 @@ func TestTimeRound(t *T.T) {
 
 		assert.Equal(t, pt.Pretty(), pts[0].Pretty())
 	})
+}
+
+func TestDynamicPrecision(t *T.T) {
+	pts := []*Point{
+		func() *Point {
+			var kvs KVs
+			kvs = kvs.AddV2("f1", 123, true)
+			return NewPointV2("p1", kvs, WithTimestamp(1716536956))
+		}(),
+
+		func() *Point {
+			var kvs KVs
+			kvs = kvs.AddV2("f1", 123, true)
+			return NewPointV2("p1", kvs, WithTimestamp(1716536956000))
+		}(),
+
+		func() *Point {
+			var kvs KVs
+			kvs = kvs.AddV2("f1", 123, true)
+			return NewPointV2("p1", kvs, WithTimestamp(1716536956000000))
+		}(),
+
+		func() *Point {
+			var kvs KVs
+			kvs = kvs.AddV2("f1", 123, true)
+			return NewPointV2("p1", kvs, WithTimestamp(1716536956000000000))
+		}(),
+	}
+
+	cases := []struct {
+		name string
+		e    Encoding
+	}{
+		{
+			"line-protocol",
+			LineProtocol,
+		},
+
+		//{
+		//	"json",
+		//	JSON,
+		//},
+
+		//{
+		//	"pbjson",
+		//	PBJSON,
+		//},
+
+		{
+			"pb",
+			Protobuf,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *T.T) {
+			enc := GetEncoder(WithEncEncoding(tc.e))
+			defer PutEncoder(enc)
+
+			enc.EncodeV2(pts)
+			buf := make([]byte, 1<<20) // large buffer
+			var (
+				encBuf []byte
+				ok     bool
+			)
+
+			encBuf, ok = enc.Next(buf) // encode once we should get all the buffer
+			assert.True(t, ok, "enc last error: %s", enc.LastErr())
+
+			dec := GetDecoder(WithDecEncoding(tc.e))
+			defer PutDecoder(dec)
+
+			newPts, err := dec.Decode(encBuf, WithPrecision(PrecDyn))
+			assert.NoError(t, err)
+			for _, pt := range newPts {
+				assert.Equal(t, int64(1716536956000000000), pt.pt.Time)
+			}
+		})
+	}
 }
 
 func TestDecode(t *T.T) {
@@ -337,6 +417,42 @@ func TestDecode(t *T.T) {
 			}
 		})
 	}
+
+	t.Run("decode-pb-json", func(t *T.T) {
+		j := `[
+{"name":"abc","fields":[{"key":"f1","i":"123"},{"key":"f2","b":false},{"key":"t1","s":"tv1","is_tag":true},{"key":"t2","s":"tv2","is_tag":true}],"time":"123"}
+]`
+		dec := GetDecoder(WithDecEncoding(JSON))
+		defer PutDecoder(dec)
+		pts, err := dec.Decode([]byte(j), DefaultLoggingOptions()...)
+		require.NoError(t, err)
+
+		for _, pt := range pts {
+			assert.Equal(t, "unknown", pt.Get("status").(string))
+
+			t.Logf("pt: %s", pt.Pretty())
+		}
+	})
+
+	t.Run("decode-bytes-array", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.Add("f_d_arr", MustNewAnyArray([]byte("hello"), []byte("world")), false, false)
+		pt := NewPointV2("m1", kvs)
+		enc := GetEncoder(WithEncEncoding(LineProtocol))
+		defer PutEncoder(enc)
+		arr, err := enc.Encode([]*Point{pt})
+		assert.NoError(t, err)
+
+		t.Logf("lp: %s", arr[0])
+
+		dec := GetDecoder(WithDecEncoding(LineProtocol))
+		defer PutDecoder(dec)
+		pts, err := dec.Decode(arr[0])
+		assert.NoError(t, err)
+		for _, pt := range pts {
+			t.Logf("pt: %s", pt.Pretty())
+		}
+	})
 
 	t.Run("decode-with-check", func(t *T.T) {
 		var kvs KVs

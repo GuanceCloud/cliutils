@@ -75,7 +75,7 @@ func TestV2NewPoint(t *T.T) {
 				"u8":        uint8(1),
 			}), WithTime(time.Unix(0, 123)))
 
-		assert.Equal(t, `abc []byte="abc",[]uint8="abc",b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1i,u16=1i,u32=1i,u64=1i,u8=1i 123`,
+		assert.Equal(t, `abc []byte="YWJj"b,[]uint8="YWJj"b,b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1u,u16=1u,u32=1u,u64=1u,u64-large=9223372036854775808u,u8=1u 123`,
 			pt.LineProto())
 	})
 
@@ -102,7 +102,7 @@ func TestV2NewPoint(t *T.T) {
 			"u8":        uint8(1),
 		}
 		pt := NewPointV2(`abc`, NewKVs(kvs), WithTime(time.Unix(0, 123)), WithEncoding(Protobuf))
-		expect := `abc []byte="abc",[]uint8="abc",b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1i,u16=1i,u32=1i,u64=1i,u8=1i 123`
+		expect := `abc []byte="YWJj"b,[]uint8="YWJj"b,b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1u,u16=1u,u32=1u,u64=1u,u64-large=9223372036854775808u,u8=1u 123`
 		assert.Equal(t, expect, pt.LineProto())
 	})
 
@@ -153,7 +153,7 @@ func TestNewPoint(t *T.T) {
 				"u64-large": uint64(math.MaxInt64 + 1), // skipped in expect string
 				"u8":        uint8(1),
 			},
-			expect: `valid-fields []byte="abc",[]uint8="abc",b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1i,u16=1i,u32=1i,u64=1i,u8=1i 123`,
+			expect: `valid-fields []byte="YWJj"b,[]uint8="YWJj"b,b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1u,u16=1u,u32=1u,u64=1u,u64-large=9223372036854775808u,u8=1u 123`,
 		},
 
 		{
@@ -182,7 +182,7 @@ func TestNewPoint(t *T.T) {
 				"u64-large": uint64(math.MaxInt64 + 1), // skipped in expect string
 				"u8":        uint8(1),
 			},
-			expect: `valid-fields []byte="abc",[]uint8="abc",b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1i,u16=1i,u32=1i,u64=1i,u8=1i 123`,
+			expect: `valid-fields []byte="YWJj"b,[]uint8="YWJj"b,b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1u,u16=1u,u32=1u,u64=1u,u64-large=9223372036854775808u,u8=1u 123`,
 		},
 
 		{
@@ -210,7 +210,7 @@ func TestNewPoint(t *T.T) {
 				"u64-large": uint64(math.MaxInt64 + 1), // skipped in expect string
 				"u8":        uint8(1),
 			},
-			expect: `valid-fields []byte="abc",[]uint8="abc",b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1i,u16=1i,u32=1i,u64=1i,u8=1i 123`,
+			expect: `valid-fields []byte="YWJj"b,[]uint8="YWJj"b,b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1u,u16=1u,u32=1u,u64=1u,u64-large=9223372036854775808u,u8=1u 123`,
 		},
 
 		{
@@ -460,7 +460,7 @@ func TestNewPoint(t *T.T) {
 			)
 
 			if tc.withPool {
-				pp := NewPointPoolLevel3()
+				pp := NewReservedCapPointPool(100)
 				SetPointPool(pp)
 				defer func() {
 					ClearPointPool()
@@ -676,7 +676,7 @@ func BenchmarkV2NewPoint(b *T.B) {
 	})
 
 	b.Run("with-point-pool-level3", func(b *T.B) {
-		pp := NewPointPoolLevel3()
+		pp := NewReservedCapPointPool(100)
 		SetPointPool(pp)
 
 		defer func() {
