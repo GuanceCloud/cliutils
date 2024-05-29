@@ -2464,7 +2464,7 @@ func detectValueType(s string) FieldType {
 			return UnsignedArray
 		case Float:
 			return FloatArray
-		case Binary: // do not support
+		case Binary:
 			return BinaryArray
 		default:
 			return Empty
