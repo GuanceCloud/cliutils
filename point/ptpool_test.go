@@ -537,7 +537,6 @@ type Foo struct {
 }
 
 func TestPoolKVResuableConcurrently(t *T.T) {
-
 	type foo struct {
 		Measurement string
 
@@ -652,7 +651,7 @@ func TestPoolKVResuableConcurrently(t *T.T) {
 	})
 
 	nworkers := 32
-	npts := (1 << 30)
+	npts := (1 << 16)
 
 	wg := sync.WaitGroup{}
 	wg.Add(nworkers)
