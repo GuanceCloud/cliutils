@@ -95,14 +95,16 @@ func TestEasyproto(t *T.T) {
 		kvs = kvs.AddV2("tag-1", "value-1", true, WithKVTagSet(true))
 
 		pts := []*Point{
-			NewPointV2("p1", kvs),
+			NewPointV2("p1", kvs, WithTimestamp(123)),
 		}
 
 		var dst []byte
 
+		// marshalled with easyproto
 		dst = marshalPoints(pts, dst)
 
-		dec := GetDecoder(WithDecEncoding(Protobuf))
+		// unmarshal with gogo-proto
+		dec := GetDecoder(WithDecEncoding(Protobuf), WithDecEasyproto(false))
 		defer PutDecoder(dec)
 
 		pts2, err := dec.Decode(dst)
@@ -125,7 +127,7 @@ func TestEasyproto(t *T.T) {
 		kvs = kvs.AddV2("tag-1", "value-1", false, WithKVTagSet(true))
 
 		pts := []*Point{
-			NewPointV2("p1", kvs),
+			NewPointV2("p1", kvs, WithTimestamp(123)),
 		}
 		t.Logf("pt: %s", pts[0].Pretty())
 

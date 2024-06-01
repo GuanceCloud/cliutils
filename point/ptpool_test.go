@@ -348,6 +348,109 @@ func TestReservedCapPointPool(t *T.T) {
 	})
 }
 
+func TestPoolEscape(t *T.T) {
+
+	t.Run("escape", func(t *T.T) {
+		// setup point pool
+		pp := NewReservedCapPointPool(32)
+		SetPointPool(pp)
+		metrics.MustRegister(pp)
+
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+
+		dec := GetDecoder(WithDecEncoding(Protobuf), WithDecEasyproto(false))
+
+		r := NewRander()
+		pts := r.Rand(100)
+
+		t.Cleanup(func() {
+			PutEncoder(enc)
+			PutDecoder(dec)
+			for _, pt := range pts {
+				pp.Put(pt)
+			}
+
+			ClearPointPool()
+			metrics.Unregister(pp)
+		})
+
+		enc.EncodeV2(pts)
+		encBuf := make([]byte, 1<<20)
+		for {
+			if buf, ok := enc.Next(encBuf); ok {
+				decPts, err := dec.Decode(buf)
+				assert.NoError(t, err)
+
+				for _, pt := range decPts {
+					require.False(t, pt.HasFlag(Ppooled))
+					pp.Put(pt)
+				}
+			} else {
+				break
+			}
+		}
+
+		mfs, err := metrics.Gather()
+		assert.NoError(t, err)
+
+		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
+
+		mf := metrics.GetMetric(mfs, "pointpool_escaped", 0)
+		assert.Equal(t, 100.0, mf.GetCounter().GetValue()) // decoded 100 points(not easyproto) not from point pool
+
+	})
+
+	t.Run("no-escape", func(t *T.T) {
+		// setup point pool
+		pp := NewReservedCapPointPool(32)
+		SetPointPool(pp)
+		metrics.MustRegister(pp)
+
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+
+		dec := GetDecoder(WithDecEncoding(Protobuf), WithDecEasyproto(true))
+
+		r := NewRander()
+		pts := r.Rand(100)
+
+		t.Cleanup(func() {
+			PutEncoder(enc)
+			PutDecoder(dec)
+			for _, pt := range pts {
+				pp.Put(pt)
+			}
+
+			ClearPointPool()
+			metrics.Unregister(pp)
+		})
+
+		enc.EncodeV2(pts)
+		encBuf := make([]byte, 1<<20)
+		for {
+			if buf, ok := enc.Next(encBuf); ok {
+				decPts, err := dec.Decode(buf)
+				assert.NoError(t, err)
+
+				for _, pt := range decPts {
+					pp.Put(pt)
+				}
+			} else {
+				break
+			}
+		}
+
+		mfs, err := metrics.Gather()
+		assert.NoError(t, err)
+
+		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
+
+		mf := metrics.GetMetric(mfs, "pointpool_escaped", 0)
+		assert.Equal(t, 0.0, mf.GetCounter().GetValue()) // decoded 100 points(not easyproto) not from point pool
+
+	})
+
+}
+
 func TestPoolKVResuable(t *T.T) {
 	type Foo struct {
 		Measurement string

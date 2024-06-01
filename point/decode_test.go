@@ -506,7 +506,7 @@ func BenchmarkDecode(b *T.B) {
 	r := NewRander(WithFixedTags(true), WithRandText(3))
 	pts := r.Rand(1000)
 
-	b.Run("bench-decode-lp", func(b *T.B) {
+	b.Run("decode-lp", func(b *T.B) {
 		enc := GetEncoder()
 		defer PutEncoder(enc)
 
@@ -521,7 +521,7 @@ func BenchmarkDecode(b *T.B) {
 		}
 	})
 
-	b.Run("bench-decode-pb", func(b *T.B) {
+	b.Run("decode-pb", func(b *T.B) {
 		enc := GetEncoder(WithEncEncoding(Protobuf))
 		defer PutEncoder(enc)
 
@@ -536,7 +536,52 @@ func BenchmarkDecode(b *T.B) {
 		}
 	})
 
-	b.Run("bench-decode-json", func(b *T.B) {
+	b.Run("decode-pb-no-check", func(b *T.B) {
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		defer PutEncoder(enc)
+
+		data, _ := enc.Encode(pts)
+
+		d := GetDecoder(WithDecEncoding(Protobuf))
+		defer PutDecoder(d)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			d.Decode(data[0], WithPrecheck(false))
+		}
+	})
+
+	b.Run("decode-pb-with-easyproto", func(b *T.B) {
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		defer PutEncoder(enc)
+
+		data, _ := enc.Encode(pts)
+
+		d := GetDecoder(WithDecEncoding(Protobuf), WithDecEasyproto(true))
+		defer PutDecoder(d)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			d.Decode(data[0])
+		}
+	})
+
+	b.Run("decode-pb-with-easyproto-no-check", func(b *T.B) {
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+		defer PutEncoder(enc)
+
+		data, _ := enc.Encode(pts)
+
+		d := GetDecoder(WithDecEncoding(Protobuf), WithDecEasyproto(true))
+		defer PutDecoder(d)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			d.Decode(data[0], WithPrecheck(false))
+		}
+	})
+
+	b.Run("decode-json", func(b *T.B) {
 		enc := GetEncoder(WithEncEncoding(JSON))
 		defer PutEncoder(enc)
 
@@ -548,6 +593,40 @@ func BenchmarkDecode(b *T.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			d.Decode(data[0])
+		}
+	})
+
+	b.Run("decode-json-no-check", func(b *T.B) {
+		enc := GetEncoder(WithEncEncoding(JSON))
+		defer PutEncoder(enc)
+
+		data, _ := enc.Encode(pts)
+
+		d := GetDecoder(WithDecEncoding(JSON))
+		defer PutDecoder(d)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			d.Decode(data[0], WithPrecheck(false))
+		}
+	})
+
+	b.Run("decode-pbjson-no-check", func(b *T.B) {
+		enc := GetEncoder(WithEncEncoding(JSON))
+		defer PutEncoder(enc)
+
+		for _, pt := range pts {
+			pt.SetFlag(Ppb)
+		}
+
+		data, _ := enc.Encode(pts)
+
+		d := GetDecoder(WithDecEncoding(JSON))
+		defer PutDecoder(d)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			d.Decode(data[0], WithPrecheck(false))
 		}
 	})
 }
