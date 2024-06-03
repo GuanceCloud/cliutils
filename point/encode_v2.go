@@ -29,52 +29,38 @@ func (e *Encoder) Next(buf []byte) ([]byte, bool) {
 }
 
 func (e *Encoder) doEncodeProtobuf(buf []byte) ([]byte, bool) {
-	var (
-		curSize,
-		pbptsSize int
-		trimmed = 1
-	)
+	var curSize int
+
+	// clear points before current package
+	if len(e.pbpts.Arr) > 0 {
+		e.pbpts.Arr = e.pbpts.Arr[:0]
+	}
 
 	for _, pt := range e.pts[e.lastPtsIdx:] {
 		if pt == nil {
 			continue
 		}
 
-		curSize += pt.Size()
+		curSize += pt.PBArraySize()
 
-		// e.pbpts size larger than buf, we must trim some of points
-		// until size fit ok or MarshalTo will panic.
 		if curSize >= len(buf) {
-			if len(e.pbpts.Arr) <= 1 { // nothing to trim
+			// no point added, means current point(not added) is a
+			// huge point that can't fit into buf.
+			if len(e.pbpts.Arr) == 0 {
 				e.lastErr = errTooSmallBuffer
 				return nil, false
 			}
 
-			for {
-				if pbptsSize = e.pbpts.Size(); pbptsSize > len(buf) {
-					e.pbpts.Arr = e.pbpts.Arr[:len(e.pbpts.Arr)-trimmed]
-					e.lastPtsIdx -= trimmed
-					trimmed *= 2
-				} else {
-					goto __doEncode
-				}
-			}
+			break // break current package, the remaining points will encoded in next package
 		} else {
 			e.pbpts.Arr = append(e.pbpts.Arr, pt.pt)
 			e.lastPtsIdx++
 		}
 	}
 
-__doEncode:
-	e.trimmed = trimmed
-
-	if len(e.pbpts.Arr) == 0 {
+	if len(e.pbpts.Arr) == 0 { // no points available, it's done
 		return nil, false
 	}
-
-	defer func() {
-		e.pbpts.Arr = e.pbpts.Arr[:0]
-	}()
 
 	if n, err := e.pbpts.MarshalTo(buf); err != nil {
 		e.lastErr = err

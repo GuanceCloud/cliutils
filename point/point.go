@@ -444,7 +444,7 @@ func (p *Point) Size() int {
 	return n
 }
 
-// LPSize get point line-protocol size.
+// LPSize get point size in line-protocol.
 func (p *Point) LPSize() int {
 	lppt, err := p.LPPoint()
 	if err != nil {
@@ -456,16 +456,15 @@ func (p *Point) LPSize() int {
 
 // PBSize get point protobuf size.
 func (p *Point) PBSize() int {
-	pbpt := p.PBPoint()
+	return p.pt.Size()
+}
 
-	m := protojson.Marshaler{}
-	buf := bytes.Buffer{}
+// PBArraySize get protobuf size when points encoded as array.
+func (p *Point) PBArraySize() int {
+	l := p.PBSize()
 
-	if err := m.Marshal(&buf, pbpt); err != nil {
-		return 0
-	}
-
-	return buf.Len()
+	// For sovPoint(), see PBPoints.Size()
+	return (1 + l + sovPoint(uint64(l)))
 }
 
 func b64(x []byte) string {
