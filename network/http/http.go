@@ -7,6 +7,7 @@
 package http
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 )
@@ -15,7 +16,7 @@ import (
 func ReadBody(req *http.Request) ([]byte, error) {
 	buf, err := io.ReadAll(req.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("io ReadAll in ReadBody: %w", err)
 	}
 
 	// as HTTP server, we do not need to close body
