@@ -218,9 +218,10 @@ grok(_, "%{IPORHOST:client_ip} %{NOTSPACE:http_ident} %{NOTSPACE:http_auth} \\[%
 	data := `127.0.0.1 - - [21/Jul/2021:14:14:38 +0800] "GET /?1 HTTP/1.1" 200 2178 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36"`
 	// data := `fe80:d::127.0.0.1 - - [21/Jul/2021:14:14:38 +0800] "GET /?1 HTTP/1.1" 200 2178 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36"`
 
+	pt := ptinput.NewPlPoint(
+		point.Logging, "test", nil, map[string]any{"message": data}, time.Now())
+	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		pt := ptinput.NewPlPoint(
-			point.Logging, "test", nil, map[string]any{"message": data}, time.Now())
 		errR := runScript(runner, pt)
 
 		if errR != nil {
