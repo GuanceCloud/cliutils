@@ -20,22 +20,38 @@ func TestBuildBody(t *testing.T) {
 		val    any
 		result string
 	}{
-		{val: float64(123.1),
-			result: "123.1"},
-		{val: int64(123),
-			result: "123"},
-		{val: true,
-			result: "true"},
-		{val: false,
-			result: "false"},
-		{val: "abc",
-			result: "abc"},
-		{val: []any{1, 2, 3},
-			result: "[1,2,3]"},
-		{val: map[string]any{"a": 1, "b": 2},
-			result: `{"a":1,"b":2}`},
-		{val: nil,
-			result: ""},
+		{
+			val:    float64(123.1),
+			result: "123.1",
+		},
+		{
+			val:    int64(123),
+			result: "123",
+		},
+		{
+			val:    true,
+			result: "true",
+		},
+		{
+			val:    false,
+			result: "false",
+		},
+		{
+			val:    "abc",
+			result: "abc",
+		},
+		{
+			val:    []any{1, 2, 3},
+			result: "[1,2,3]",
+		},
+		{
+			val:    map[string]any{"a": 1, "b": 2},
+			result: `{"a":1,"b":2}`,
+		},
+		{
+			val:    nil,
+			result: "",
+		},
 	}
 
 	for i, c := range cases {

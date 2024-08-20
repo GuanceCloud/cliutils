@@ -327,7 +327,6 @@ func TestPointPoolMetrics(t *T.T) {
 
 func TestReservedCapPointPool(t *T.T) {
 	t.Run(`basic`, func(t *T.T) {
-
 		pp := NewReservedCapPointPool(100)
 		SetPointPool(pp)
 		defer ClearPointPool()
@@ -349,7 +348,6 @@ func TestReservedCapPointPool(t *T.T) {
 }
 
 func TestPoolEscape(t *T.T) {
-
 	t.Run("escape", func(t *T.T) {
 		// setup point pool
 		pp := NewReservedCapPointPool(32)
@@ -397,7 +395,6 @@ func TestPoolEscape(t *T.T) {
 
 		mf := metrics.GetMetric(mfs, "pointpool_escaped", 0)
 		assert.Equal(t, 100.0, mf.GetCounter().GetValue()) // decoded 100 points(not easyproto) not from point pool
-
 	})
 
 	t.Run("no-escape", func(t *T.T) {
@@ -446,9 +443,7 @@ func TestPoolEscape(t *T.T) {
 
 		mf := metrics.GetMetric(mfs, "pointpool_escaped", 0)
 		assert.Equal(t, 0.0, mf.GetCounter().GetValue()) // decoded 100 points(not easyproto) not from point pool
-
 	})
-
 }
 
 func TestPoolKVResuable(t *T.T) {
@@ -514,7 +509,6 @@ func TestPoolKVResuable(t *T.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *T.T) {
-
 			metrics.MustRegister(tc.pp)
 
 			SetPointPool(tc.pp)
