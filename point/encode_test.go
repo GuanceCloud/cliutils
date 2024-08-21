@@ -280,7 +280,7 @@ func TestEscapeEncode(t *T.T) {
 		kvs = kvs.Add("f4,", false, false, false)
 
 		kvs = kvs.Add("f\nnext-line,", []byte("hello"), false, false)
-		kvs = kvs.Add(`f\othere`, []byte("hello"), false, false)
+		kvs = kvs.Add(`f\other`, []byte("hello"), false, false)
 		kvs = kvs.Add("tag=1", "value", true, false)
 		kvs = kvs.Add("tag 2", "value", true, false)
 		kvs = kvs.Add("tag\t3", "value", true, false)
