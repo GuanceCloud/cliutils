@@ -278,7 +278,7 @@ func TestEscapeEncode(t *T.T) {
 		kvs = kvs.Add("f2\tnr", 2, false, false)
 		kvs = kvs.Add("f3,", "some-string\nanother-line", false, false)
 		kvs = kvs.Add("f4,", false, false, false)
-		//kvs = kvs.Add("f_nil", nil, false, false)
+
 		kvs = kvs.Add("f\nnext-line,", []byte("hello"), false, false)
 		kvs = kvs.Add(`f\other`, []byte("hello"), false, false)
 		kvs = kvs.Add("tag=1", "value", true, false)
@@ -855,7 +855,6 @@ func TestEncodeInfField(t *T.T) {
 				assert.Equal(t, uint64(math.MaxUint64), uint64(pts[0].Get("f1").(float64)))
 				assert.Equal(t, int64(math.MinInt64), int64(pts[0].Get("f2").(float64)))
 				assert.Equal(t, int64(123), pts[0].Get("f3"))
-
 			} else {
 				break
 			}

@@ -100,7 +100,7 @@ func TestEasyproto(t *T.T) {
 
 		var dst []byte
 
-		// marshalled with easyproto
+		// marshaled with easyproto
 		dst = marshalPoints(pts, dst)
 
 		// unmarshal with gogo-proto

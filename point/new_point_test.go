@@ -793,7 +793,6 @@ func FuzzPLPBEquality(f *testing.F) {
 		measurement, tagk, tagv string,
 		i64 int64, u64 uint64, str string, b bool, f float64, d []byte, ts int64,
 	) {
-
 		if ts < 0 { // force ts > 0 to make 2 point's time are equal. under ts < 0, NewPoint will use time.Now()
 			ts = 0
 		}

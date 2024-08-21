@@ -34,6 +34,6 @@ func NewTestingRunner2(scripts map[string]string) (map[string]*runtime.Script, m
 	return engine.ParseScript(scripts, FuncsMap, FuncsCheckMap)
 }
 
-func runScript(proc *runtime.Script, pt ptinput.PlInputPt) *errchain.PlError {
-	return engine.RunScriptWithRMapIn(proc, pt, nil)
+func runScript(proc *runtime.Script, pt ptinput.PlInputPt, fn ...runtime.TaskFn) *errchain.PlError {
+	return proc.Run(pt, nil, fn...)
 }

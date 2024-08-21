@@ -191,7 +191,7 @@ func TestJSONPoint2Point(t *T.T) {
 		}
 
 		pt := fromJSONPoint(&jp)
-		//assert.NoError(t, err)
+
 		t.Logf("pt: %s", pt.Pretty())
 
 		EnableMixedArrayField = true

@@ -127,12 +127,12 @@ func TestDynamicPrecision(t *T.T) {
 		//{
 		//	"json",
 		//	JSON,
-		//},
+		// },
 
 		//{
 		//	"pbjson",
 		//	PBJSON,
-		//},
+		// },
 
 		{
 			"pb",

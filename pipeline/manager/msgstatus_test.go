@@ -72,7 +72,7 @@ func TestStatus(t *testing.T) {
 		}
 		pt := ptinput.NewPlPoint(point.Logging, "", nil, outp.Fields, time.Now())
 		ProcLoggingStatus(pt, false, nil)
-		assert.Equal(t, "unknown", pt.Fields()[FieldStatus])
+		assert.Equal(t, "x", pt.Fields()[FieldStatus])
 		assert.Equal(t, "1234567891011", pt.Fields()[FieldMessage])
 	}
 
@@ -89,7 +89,7 @@ func TestStatus(t *testing.T) {
 		pt := ptinput.NewPlPoint(point.Logging, "", outp.Tags, outp.Fields, time.Now())
 		ProcLoggingStatus(pt, false, nil)
 		assert.Equal(t, map[string]interface{}{
-			FieldStatus:  "unknown",
+			FieldStatus:  "x",
 			FieldMessage: "1234567891011",
 		}, pt.Fields())
 		assert.Equal(t, map[string]string{

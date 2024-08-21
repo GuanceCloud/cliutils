@@ -12,7 +12,6 @@ import (
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/funcs"
 	"github.com/GuanceCloud/cliutils/point"
 	"github.com/GuanceCloud/platypus/pkg/engine"
-	"github.com/GuanceCloud/platypus/pkg/engine/runtime"
 	"github.com/influxdata/influxdb1-client/models"
 	"github.com/stretchr/testify/assert"
 
@@ -216,7 +215,7 @@ func BenchmarkScript(b *testing.B) {
 		}
 		for i := 0; i < b.N; i++ {
 			p := ptinput.WrapPoint(point.Logging, pt)
-			if err := runtime.RunScriptWithRMapIn(sp, p, nil); err != nil {
+			if err := sp.Run(p, nil); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -236,7 +235,7 @@ func BenchmarkScript(b *testing.B) {
 		}
 		for i := 0; i < b.N; i++ {
 			p := ptinput.WrapPoint(point.Logging, pt)
-			if err := runtime.RunScriptWithRMapIn(sp, p, nil); err != nil {
+			if err := sp.Run(p, nil); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -257,7 +256,7 @@ func BenchmarkScript(b *testing.B) {
 		}
 		for i := 0; i < b.N; i++ {
 			p := ptinput.WrapPoint(point.Logging, pt)
-			if err := runtime.RunScriptWithRMapIn(sp, p, nil); err != nil {
+			if err := sp.Run(p, nil); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -277,7 +276,7 @@ func BenchmarkScript(b *testing.B) {
 		}
 		for i := 0; i < b.N; i++ {
 			p := ptinput.WrapPoint(point.Logging, pt)
-			if err := runtime.RunScriptWithRMapIn(sp, p, nil); err != nil {
+			if err := sp.Run(p, nil); err != nil {
 				b.Fatal(err)
 			}
 		}
