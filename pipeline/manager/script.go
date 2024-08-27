@@ -70,6 +70,7 @@ func NewScripts(scripts, scriptPath, scriptTags map[string]string, ns string, ca
 	case point.Security:
 	case point.Logging:
 	case point.Profiling:
+	case point.DialTesting:
 	case point.UnknownCategory, point.DynamicDWCategory:
 		retErr := map[string]error{}
 		for k := range scripts {
