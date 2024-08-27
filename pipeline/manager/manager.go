@@ -144,6 +144,7 @@ func CategoryDirName() map[point.Category]string {
 		point.RUM:          "rum",
 		point.Security:     "security",
 		point.Profiling:    "profiling",
+		point.DialTesting:  "dialtesting",
 	}
 }
 
