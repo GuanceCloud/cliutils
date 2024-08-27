@@ -12,6 +12,7 @@ import (
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput"
 	"github.com/GuanceCloud/cliutils/point"
 	tu "github.com/GuanceCloud/cliutils/testutil"
+	"github.com/GuanceCloud/platypus/pkg/ast"
 )
 
 func TestXML(t *testing.T) {
@@ -117,8 +118,8 @@ func TestXML(t *testing.T) {
 				t.Fatal(errR)
 			}
 
-			r, isTag, ok := pt.GetWithIsTag(tc.key)
-			if !ok && !isTag && tc.fail {
+			r, dtype, err := pt.Get(tc.key)
+			if err != nil && dtype != ast.String && tc.fail {
 				t.Logf("[%d] failed as expected", idx)
 				return
 			}

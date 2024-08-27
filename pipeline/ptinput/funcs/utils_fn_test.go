@@ -24,7 +24,7 @@ import (
 func TestNewFn(t *testing.T) {
 	t.Run("new_check_p", func(t *testing.T) {
 		err := panicWrap(func() {
-			NewFunc("check_p", nil, nil, [2]*PLDoc{&PLDoc{}, &PLDoc{}}, nil)
+			NewFunc("check_p", nil, nil, [2]*PLDoc{{}, {}}, nil)
 		})
 		assert.NoError(t, err)
 	})

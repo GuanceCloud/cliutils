@@ -168,7 +168,7 @@ if invalid_status_code != nil {
 				t.Fatal(errR)
 			}
 
-			v, _, _ := pt.GetWithIsTag("add_new_key")
+			v, _, _ := pt.Get("add_new_key")
 			tu.Equals(t, tc.expect, v)
 			t.Logf("[%d] PASS", idx)
 		})

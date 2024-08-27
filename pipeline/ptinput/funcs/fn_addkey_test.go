@@ -117,9 +117,8 @@ add_key(add_new_key, "shanghai")
 			errR := runScript(runner, pt)
 
 			if errR == nil {
-				v, isTag, ok := pt.GetWithIsTag("add_new_key")
-				assert.Equal(t, true, ok)
-				assert.Equal(t, false, isTag)
+				v, _, e := pt.Get("add_new_key")
+				assert.NoError(t, e)
 				assert.Equal(t, tc.expect, v)
 				t.Logf("[%d] PASS", idx)
 			} else {

@@ -19,24 +19,24 @@ func TestPt(t *testing.T) {
 		t.Fatal("err == nil")
 	}
 
-	if _, _, ok := pt.GetWithIsTag("a"); ok {
+	if _, _, e := pt.Get("a"); e == nil {
 		t.Fatal("ok")
 	}
 
-	if err := pt.Set("a", 1, ast.Int); err != nil {
-		t.Fatal(err)
+	if ok := pt.Set("a", 1, ast.Int); !ok {
+		t.Fatal(ok)
 	}
 
-	if err := pt.Set("a1", []any{1}, ast.List); err != nil {
-		t.Fatal(err)
+	if ok := pt.Set("a1", []any{1}, ast.List); !ok {
+		t.Fatal(ok)
 	}
 
-	if err := pt.Set("xx2", []any{1}, ast.List); err != nil {
-		t.Fatal(err)
+	if ok := pt.Set("xx2", []any{1}, ast.List); !ok {
+		t.Fatal(ok)
 	}
 
-	if err := pt.Set("xx2", 1.2, ast.Float); err != nil {
-		t.Fatal(err)
+	if ok := pt.Set("xx2", 1.2, ast.Float); !ok {
+		t.Fatal(ok)
 	}
 
 	if _, _, err := pt.Get("xx2"); err != nil {
@@ -47,12 +47,12 @@ func TestPt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := pt.SetTag("a", 1., ast.Float); err != nil {
-		t.Fatal(err)
+	if ok := pt.SetTag("a", 1., ast.Float); !ok {
+		t.Fatal(ok)
 	}
 
-	if err := pt.Set("a", 1, ast.Int); err != nil {
-		t.Fatal(err)
+	if ok := pt.Set("a", 1, ast.Int); !ok {
+		t.Fatal(ok)
 	}
 
 	if _, ok := pt.Fields()["a"]; ok {
@@ -93,16 +93,12 @@ func TestPt(t *testing.T) {
 		t.Fatal("b not in tags")
 	}
 
-	if _, istag, ok := pt.GetWithIsTag("b"); !ok || !istag {
+	if _, dtyp, e := pt.Get("b"); e != nil || dtyp != ast.String {
 		t.Fatal("not tag")
 	}
 
-	if err := pt.Set("b", []any{}, ast.List); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, istag, ok := pt.GetWithIsTag("a1"); !ok || istag {
-		t.Fatal("is tag")
+	if ok := pt.Set("b", []any{}, ast.List); !ok {
+		t.Fatal(ok)
 	}
 
 	if _, ok := pt.Fields()["xxb"]; !ok {

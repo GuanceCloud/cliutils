@@ -173,8 +173,8 @@ func TestQueryReferTable(t *testing.T) {
 			}
 
 			for idxK, key := range tc.key {
-				v, _, ok := pt.GetWithIsTag(key)
-				if !ok {
+				v, _, err := pt.Get(key)
+				if err != nil {
 					if len(tc.expected) != 0 {
 						t.Logf("key: %s, value exp: %v  act: nil",
 							key, tc.expected[idxK])

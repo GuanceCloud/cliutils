@@ -114,10 +114,9 @@ func TestDelete(t *testing.T) {
 				t.Fatal(*errR)
 			}
 
-			v, isTag, ok := pt.GetWithIsTag(tc.outkey)
+			v, _, e := pt.Get(tc.outkey)
 
-			assert.Equal(t, true, ok)
-			assert.Equal(t, false, isTag)
+			assert.NoError(t, e)
 			assert.Equal(t, tc.expected, v)
 			t.Logf("[%d] PASS", idx)
 		})

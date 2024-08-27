@@ -11,6 +11,7 @@ import (
 
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput"
 	"github.com/GuanceCloud/cliutils/point"
+	"github.com/GuanceCloud/platypus/pkg/ast"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -105,9 +106,9 @@ func TestSetTag(t *testing.T) {
 				t.Fatal(errR.Error())
 			}
 
-			v, isTag, ok := pt.GetWithIsTag(tc.outtag)
-			assert.Equal(t, true, ok)
-			assert.Equal(t, true, isTag)
+			v, dtype, e := pt.Get(tc.outtag)
+			assert.NoError(t, e)
+			assert.Equal(t, ast.String, dtype)
 			assert.Equal(t, tc.expect, v)
 			t.Logf("[%d] PASS", idx)
 		})

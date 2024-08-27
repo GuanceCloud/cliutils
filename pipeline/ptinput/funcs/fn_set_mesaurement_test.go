@@ -73,8 +73,8 @@ func TestSetMeasurement(t *testing.T) {
 				t.Fatal(errR.Error())
 			}
 
-			_, _, ok := pt.GetWithIsTag(tc.out)
-			assert.Equal(t, tc.del, !ok)
+			_, _, e := pt.Get(tc.out)
+			assert.Equal(t, tc.del, e != nil)
 			assert.Equal(t, tc.expect, pt.GetPtName())
 			t.Logf("[%d] PASS", idx)
 		})
