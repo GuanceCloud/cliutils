@@ -172,13 +172,9 @@ func binEval(op ItemType, lhs, rhs interface{}) bool {
 			}
 
 		case *NilLiteral:
-			log.Debugf("lv: %+#v", lv)
 			return lv.String() == Nil
 
 		default: // NOTE: interface{} EQ/NEQ, see: https://stackoverflow.com/a/34246225/342348
-
-			log.Debugf("lv type: %s, rhs: %s", lv, rhs)
-
 			switch rv := rhs.(type) {
 			case *Regex:
 				ok, err := regexp.MatchString(rv.Regex, lhs.(string))
@@ -200,7 +196,6 @@ func binEval(op ItemType, lhs, rhs interface{}) bool {
 		return !rhs.(*Regex).Re.MatchString(lhs.(string))
 
 	case NEQ:
-		log.Debugf("lhs: %s, rhs: %s", lhs, rhs)
 		_, lok := lhs.(*NilLiteral)
 		_, rok := rhs.(*NilLiteral)
 		if lok && rok {
@@ -399,7 +394,6 @@ func (e *BinaryExpr) singleEval(data KVs) bool {
 				return true
 			}
 		} else { // not exist in data
-			log.Debugf("op %s on %s %s", e.Op, lit, nilVal)
 			return binEval(e.Op, lit, nilVal)
 		}
 	default:
