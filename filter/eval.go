@@ -144,7 +144,12 @@ func toInt64(i interface{}) int64 {
 }
 
 func binEval(op ItemType, lhs, rhs interface{}) bool {
-	if _, ok := rhs.(*Regex); !ok {
+	if _, ok := rhs.(*Regex); ok {
+		if _, isStr := lhs.(string); !isStr {
+			log.Warnf("non-string(type %s) can not match with regexp", reflect.TypeOf(lhs))
+			return false
+		}
+	} else { // rhs are all literals
 		tl := reflect.TypeOf(lhs).String()
 		tr := reflect.TypeOf(rhs).String()
 		switch op {
@@ -172,11 +177,17 @@ func binEval(op ItemType, lhs, rhs interface{}) bool {
 			}
 
 		case *NilLiteral:
+			if _, ok := rhs.(*NilLiteral); !ok { // nil compared to non-nil always false
+				log.Warnf("rhs %v not nil", rhs)
+				return false
+			}
+
 			return lv.String() == Nil
 
 		default: // NOTE: interface{} EQ/NEQ, see: https://stackoverflow.com/a/34246225/342348
 			switch rv := rhs.(type) {
 			case *Regex:
+				log.Debugf("lhs: %v, rhs: %v", lhs, rhs)
 				ok, err := regexp.MatchString(rv.Regex, lhs.(string))
 				if err != nil {
 					log.Error(err)

@@ -173,6 +173,11 @@ func TestExprConditions(t *testing.T) {
 		},
 
 		{
+			in:   " {a = b}", // a,b both nil, but b is not literal or regex
+			pass: false,
+		},
+
+		{
 			in:   "{ true = true }", // boolean literal
 			pass: true,
 		},
@@ -189,6 +194,40 @@ func TestExprConditions(t *testing.T) {
 		{
 			in:   "{ 'abc' = 'ABC' }",
 			pass: false,
+		},
+
+		{
+			in:   "{ re('ABC') = nil }", // regexp can not be lhs
+			pass: false,
+		},
+
+		{
+			in:   "{ nil = re('ABC') }",
+			pass: false,
+		},
+
+		{
+			in:     "{ abc = re(`nginx_*`)}", // abc is nil
+			fields: map[string]interface{}{"host": "abcdef"},
+			pass:   false,
+		},
+
+		{
+			in:     "{ false = re(`nginx_*`)}",
+			fields: map[string]interface{}{"host": "abcdef"},
+			pass:   false,
+		},
+
+		{
+			in:     "{ 123 = re(`nginx_*`)}",
+			fields: map[string]interface{}{"host": "abcdef"},
+			pass:   false,
+		},
+
+		{
+			in:     "{ 3.14 = re(`nginx_*`)}",
+			fields: map[string]interface{}{"host": "abcdef"},
+			pass:   false,
 		},
 	}
 
