@@ -229,6 +229,19 @@ func TestExprConditions(t *testing.T) {
 			fields: map[string]interface{}{"host": "abcdef"},
 			pass:   false,
 		},
+
+		// bool in list
+		{
+			in:     "{ xyz in [ false, true, 123,'abc' ] }",
+			fields: map[string]any{"xyz": false},
+			pass:   true,
+		},
+
+		{
+			in:     "{ abc in [ false ] }",
+			fields: map[string]any{"xyz": false},
+			pass:   false,
+		},
 	}
 
 	for _, tc := range cases {

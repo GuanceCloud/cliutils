@@ -330,6 +330,8 @@ func (e *BinaryExpr) singleEval(data KVs) bool {
 				arr = append(arr, x)
 			case *NilLiteral:
 				arr = append(arr, x)
+			case *BoolLiteral:
+				arr = append(arr, x.Val)
 			default:
 				log.Warnf("unsupported node list with type `%s'", reflect.TypeOf(elem).String())
 			}
