@@ -170,15 +170,19 @@ func binEval(op ItemType, lhs, rhs interface{}) bool {
 				return almostEqual(lv, f)
 			}
 
+		case *NilLiteral:
+			return lv.String() == Nil
+
 		default: // NOTE: interface{} EQ/NEQ, see: https://stackoverflow.com/a/34246225/342348
-			switch reg := rhs.(type) {
+			switch rv := rhs.(type) {
 			case *Regex:
-				ok, err := regexp.MatchString(reg.Regex, lhs.(string))
+				ok, err := regexp.MatchString(rv.Regex, lhs.(string))
 				if err != nil {
 					log.Error(err)
 				}
 
 				return ok
+
 			default:
 				return lhs == rhs
 			}
@@ -306,6 +310,8 @@ func (e *BinaryExpr) singleEval(data KVs) bool {
 				}
 			case *Regex:
 				arr = append(arr, x)
+			case *NilLiteral:
+				arr = append(arr, x)
 			default:
 				log.Warnf("unsupported node list with type `%s'", reflect.TypeOf(elem).String())
 			}
@@ -314,7 +320,11 @@ func (e *BinaryExpr) singleEval(data KVs) bool {
 	case *Regex:
 		lit = rhs
 
+	case *NilLiteral:
+		lit = rhs
+
 	default:
+
 		log.Errorf("invalid RHS, got type `%s'", reflect.TypeOf(e.RHS).String())
 		return false
 	}
@@ -346,6 +356,8 @@ func (e *BinaryExpr) singleEval(data KVs) bool {
 					if binEval(EQ, v, item) {
 						return true
 					}
+				} else {
+					return binEval(EQ, item, nilVal)
 				}
 			}
 			return false
@@ -354,6 +366,10 @@ func (e *BinaryExpr) singleEval(data KVs) bool {
 			for _, item := range arr {
 				if v, ok := data.Get(name); ok {
 					if binEval(EQ, v, item) {
+						return false
+					}
+				} else {
+					if binEval(EQ, nilVal, item) {
 						return false
 					}
 				}
@@ -367,6 +383,8 @@ func (e *BinaryExpr) singleEval(data KVs) bool {
 				if binEval(e.Op, v, lit) {
 					return true
 				}
+			} else { // not exist in data
+				return binEval(EQ, lit, nilVal)
 			}
 		}
 
@@ -375,3 +393,7 @@ func (e *BinaryExpr) singleEval(data KVs) bool {
 	}
 	return false
 }
+
+var (
+	nilVal = &NilLiteral{}
+)

@@ -77,8 +77,10 @@ var (
 		"filter":     FILTER,
 		"identifier": IDENTIFIER,
 
-		"in":    IN,
-		"notin": NOT_IN,
+		"in": IN,
+
+		"notin":  NOT_IN, // deprecated
+		"not_in": NOT_IN, // same as notin
 
 		"limit":   LIMIT,
 		"link":    LINK,
