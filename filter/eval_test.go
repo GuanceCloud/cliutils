@@ -8,7 +8,7 @@ package filter
 import (
 	"testing"
 
-	tu "github.com/GuanceCloud/cliutils/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestExprConditions(t *testing.T) {
@@ -116,13 +116,139 @@ func TestExprConditions(t *testing.T) {
 		// 	fields: map[string]interface{}{"host": "123abc"},
 		// 	pass:   false,
 		// },
+
+		{
+			in:     "{ abc = NULL && abc = null && abc = NIL && abc = nil }",
+			fields: map[string]any{"xyz": int64(123)},
+			pass:   true,
+		},
+
+		{
+			in:     "{ abc in [ NULL, 123, 'hello'] }",
+			fields: map[string]any{"xyz": int64(123)},
+			pass:   true,
+		},
+
+		{
+			in:     "{ abc notin [ NULL, 123, 'hello'] }",
+			fields: map[string]any{"xyz": int64(123)},
+			pass:   false,
+		},
+
+		{
+			in:     "{ abc not_in [ 123, 'hello'] }",
+			fields: map[string]any{"xyz": int64(123)},
+			pass:   true,
+		},
+
+		{
+			in:     "{ xyz != NULL and abc = nil }",
+			fields: map[string]any{"xyz": int64(123)},
+			pass:   true,
+		},
+
+		{
+			in:     "{ xyz in [ null, 123 ] and abc = nil }",
+			fields: map[string]any{"xyz": int64(123)},
+			pass:   true,
+		},
+
+		{
+			in:   "{ xyz = nil }",
+			pass: true,
+		},
+		{
+			in:   "{ xyz != nil }",
+			pass: false,
+		},
+
+		{
+			in:   "{ nil = nil }", // nil literal
+			pass: true,
+		},
+
+		{
+			in:   "{ 1 = 1 }", // int literal
+			pass: true,
+		},
+
+		{
+			in:   " {a = b}", // a,b both nil, but b is not literal or regex
+			pass: false,
+		},
+
+		{
+			in:   "{ true = true }", // boolean literal
+			pass: true,
+		},
+
+		{
+			in:   "{ 'hello' = 'hello'}", // string literal
+			pass: true,
+		},
+
+		{
+			in:   "{ 1.0 = 1.0 }", // float literal
+			pass: true,
+		},
+		{
+			in:   "{ 'abc' = 'ABC' }",
+			pass: false,
+		},
+
+		{
+			in:   "{ re('ABC') = nil }", // regexp can not be lhs
+			pass: false,
+		},
+
+		{
+			in:   "{ nil = re('ABC') }",
+			pass: false,
+		},
+
+		{
+			in:     "{ abc = re(`nginx_*`)}", // abc is nil
+			fields: map[string]interface{}{"host": "abcdef"},
+			pass:   false,
+		},
+
+		{
+			in:     "{ false = re(`nginx_*`)}",
+			fields: map[string]interface{}{"host": "abcdef"},
+			pass:   false,
+		},
+
+		{
+			in:     "{ 123 = re(`nginx_*`)}",
+			fields: map[string]interface{}{"host": "abcdef"},
+			pass:   false,
+		},
+
+		{
+			in:     "{ 3.14 = re(`nginx_*`)}",
+			fields: map[string]interface{}{"host": "abcdef"},
+			pass:   false,
+		},
+
+		// bool in list
+		{
+			in:     "{ xyz in [ false, true, 123,'abc' ] }",
+			fields: map[string]any{"xyz": false},
+			pass:   true,
+		},
+
+		{
+			in:     "{ abc in [ false ] }",
+			fields: map[string]any{"xyz": false},
+			pass:   false,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.in, func(t *testing.T) {
 			conditions, _ := GetConds(tc.in)
 
-			tu.Equals(t, tc.pass, conditions.Eval(newtf(tc.tags, tc.fields)) >= 0)
+			assert.Equalf(t, tc.pass, conditions.Eval(newtf(tc.tags, tc.fields)) >= 0, "conditions: %s", conditions)
 
 			t.Logf("[ok] %s => %v, source: %s, tags: %+#v, fields: %+#v", tc.in, tc.pass, tc.source, tc.tags, tc.fields)
 		})
@@ -253,7 +379,7 @@ func TestConditions(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.in.String(), func(t *testing.T) {
-			tu.Equals(t, tc.pass, tc.in.Eval(newtf(tc.tags, tc.fields)) >= 0)
+			assert.Equal(t, tc.pass, tc.in.Eval(newtf(tc.tags, tc.fields)) >= 0)
 			t.Logf("[ok] %s => %v,  tags: %+#v, fields: %+#v", tc.in, tc.pass, tc.tags, tc.fields)
 		})
 	}
@@ -345,7 +471,7 @@ func TestBinEval(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tu.Equals(t, tc.pass, binEval(tc.op, tc.lhs, tc.rhs))
+		assert.Equal(t, tc.pass, binEval(tc.op, tc.lhs, tc.rhs))
 		t.Logf("[ok] %v %s %v => %v", tc.lhs, tc.op, tc.rhs, tc.pass)
 	}
 }
@@ -419,7 +545,7 @@ func TestEval(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.cond.String(), func(t *testing.T) {
 			t.Logf("[ok] %s => %v", tc.cond, tc.pass)
-			tu.Equals(t, tc.pass, tc.cond.Eval(newtf(tc.tags, tc.fields)))
+			assert.Equal(t, tc.pass, tc.cond.Eval(newtf(tc.tags, tc.fields)))
 		})
 	}
 }
