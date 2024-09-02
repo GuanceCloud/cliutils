@@ -152,6 +152,15 @@ func TestExprConditions(t *testing.T) {
 			fields: map[string]any{"xyz": int64(123)},
 			pass:   true,
 		},
+
+		{
+			in:   "{ xyz = nil }",
+			pass: true,
+		},
+		{
+			in:   "{ xyz != nil }",
+			pass: false,
+		},
 	}
 
 	for _, tc := range cases {

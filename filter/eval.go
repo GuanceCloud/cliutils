@@ -172,9 +172,13 @@ func binEval(op ItemType, lhs, rhs interface{}) bool {
 			}
 
 		case *NilLiteral:
+			log.Debugf("lv: %+#v", lv)
 			return lv.String() == Nil
 
 		default: // NOTE: interface{} EQ/NEQ, see: https://stackoverflow.com/a/34246225/342348
+
+			log.Debugf("lv type: %s, rhs: %s", lv, rhs)
+
 			switch rv := rhs.(type) {
 			case *Regex:
 				ok, err := regexp.MatchString(rv.Regex, lhs.(string))
@@ -196,6 +200,13 @@ func binEval(op ItemType, lhs, rhs interface{}) bool {
 		return !rhs.(*Regex).Re.MatchString(lhs.(string))
 
 	case NEQ:
+		log.Debugf("lhs: %s, rhs: %s", lhs, rhs)
+		_, lok := lhs.(*NilLiteral)
+		_, rok := rhs.(*NilLiteral)
+		if lok && rok {
+			return false
+		}
+
 		return lhs != rhs
 
 	case GTE, GT, LT, LTE: // rhs/lhs should be number or string
@@ -331,67 +342,70 @@ func (e *BinaryExpr) singleEval(data KVs) bool {
 	}
 
 	// first: fetch left-handle-symbol and OP on right-handle-symbol
-	switch lhs := e.LHS.(type) {
-	case *Identifier:
-		name := lhs.Name
+	lhs, ok := e.LHS.(*Identifier)
+	if !ok {
+		log.Errorf("unknown LHS type, expect Identifier, got `%s'", reflect.TypeOf(e.LHS).String())
+		return false
+	}
 
-		switch e.Op {
-		case MATCH, NOT_MATCH:
-			for _, item := range e.RHS.(NodeList) {
-				if v, ok := data.Get(name); ok {
-					switch x := v.(type) {
-					case string:
-						if binEval(e.Op, x, item) {
-							return true
-						}
-					default:
-						continue
-					}
-				}
-			}
-			return false
+	name := lhs.Name
 
-		case IN:
-			for _, item := range arr {
-				if v, ok := data.Get(name); ok {
-					if binEval(EQ, v, item) {
+	switch e.Op {
+	case MATCH, NOT_MATCH:
+		for _, item := range e.RHS.(NodeList) {
+			if v, ok := data.Get(name); ok {
+				switch x := v.(type) {
+				case string:
+					if binEval(e.Op, x, item) {
 						return true
 					}
-				} else {
-					return binEval(EQ, item, nilVal)
+				default:
+					continue
 				}
 			}
-			return false
+		}
+		return false
 
-		case NOT_IN:
-			for _, item := range arr {
-				if v, ok := data.Get(name); ok {
-					if binEval(EQ, v, item) {
-						return false
-					}
-				} else {
-					if binEval(EQ, nilVal, item) {
-						return false
-					}
-				}
-			}
-
-			return true
-
-		case GTE, GT, LT, LTE, NEQ, EQ:
-
+	case IN:
+		for _, item := range arr {
 			if v, ok := data.Get(name); ok {
-				if binEval(e.Op, v, lit) {
+				if binEval(EQ, v, item) {
 					return true
 				}
-			} else { // not exist in data
-				return binEval(EQ, lit, nilVal)
+			} else {
+				return binEval(EQ, item, nilVal)
+			}
+		}
+		return false
+
+	case NOT_IN:
+		for _, item := range arr {
+			if v, ok := data.Get(name); ok {
+				if binEval(EQ, v, item) {
+					return false
+				}
+			} else {
+				if binEval(EQ, item, nilVal) {
+					return false
+				}
 			}
 		}
 
+		return true
+
+	case GTE, GT, LT, LTE, NEQ, EQ:
+		if v, ok := data.Get(name); ok {
+			if binEval(e.Op, v, lit) {
+				return true
+			}
+		} else { // not exist in data
+			log.Debugf("op %s on %s %s", e.Op, lit, nilVal)
+			return binEval(e.Op, lit, nilVal)
+		}
 	default:
-		log.Errorf("unknown LHS type, expect Identifier, got `%s'", reflect.TypeOf(e.LHS).String())
+		log.Warnf("unsupported operation %s on single-eval expr", e.Op)
 	}
+
 	return false
 }
 
