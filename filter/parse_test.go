@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	tu "github.com/GuanceCloud/cliutils/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParse(t *testing.T) {
@@ -307,12 +307,12 @@ func TestParse(t *testing.T) {
 			}
 
 			if tc.fail {
-				tu.Assert(t, len(p.errs) > 0, "")
+				assert.True(t, len(p.errs) > 0)
 				return
 			}
 
 			if len(p.errs) > 0 {
-				tu.Equals(t, nil, p.errs[0])
+				assert.Nil(t, p.errs[0])
 				return
 			}
 
@@ -327,7 +327,7 @@ func TestParse(t *testing.T) {
 				x := exp.String()
 				y := v.String()
 
-				tu.Equals(t, x, y)
+				assert.Equal(t, x, y)
 				t.Logf("[ok] in: %s, exp: %s", x, y)
 			default:
 				t.Fatalf("should not been here: %s", reflect.TypeOf(p.parseResult).String())
