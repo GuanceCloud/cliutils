@@ -119,25 +119,37 @@ func TestExprConditions(t *testing.T) {
 
 		{
 			in:     "{ abc = NULL && abc = null && abc = NIL && abc = nil }",
-			fields: map[string]any{"xyz": 123},
+			fields: map[string]any{"xyz": int64(123)},
 			pass:   true,
 		},
 
 		{
 			in:     "{ abc in [ NULL, 123, 'hello'] }",
-			fields: map[string]any{"xyz": 123},
+			fields: map[string]any{"xyz": int64(123)},
 			pass:   true,
 		},
 
 		{
 			in:     "{ abc notin [ NULL, 123, 'hello'] }",
-			fields: map[string]any{"xyz": 123},
+			fields: map[string]any{"xyz": int64(123)},
 			pass:   false,
 		},
 
 		{
-			in:     "{ abc notin [ 123, 'hello'] }",
-			fields: map[string]any{"xyz": 123},
+			in:     "{ abc not_in [ 123, 'hello'] }",
+			fields: map[string]any{"xyz": int64(123)},
+			pass:   true,
+		},
+
+		{
+			in:     "{ xyz != NULL and abc = nil }",
+			fields: map[string]any{"xyz": int64(123)},
+			pass:   true,
+		},
+
+		{
+			in:     "{ xyz in [ null, 123 ] and abc = nil }",
+			fields: map[string]any{"xyz": int64(123)},
 			pass:   true,
 		},
 	}

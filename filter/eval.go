@@ -149,7 +149,8 @@ func binEval(op ItemType, lhs, rhs interface{}) bool {
 		tr := reflect.TypeOf(rhs).String()
 		switch op {
 		case GTE, GT, LT, LTE, EQ, NEQ: // type conflict detecting on comparison expr
-			if tl != tr {
+			if _, ok := rhs.(*NilLiteral); !ok && // any type can compare to nil/null
+				tl != tr {
 				log.Warnf("type conflict %+#v(%s) <> %+#v(%s)", lhs, reflect.TypeOf(lhs), rhs, reflect.TypeOf(rhs))
 				return false
 			}
