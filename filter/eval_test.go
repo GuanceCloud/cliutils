@@ -161,6 +161,35 @@ func TestExprConditions(t *testing.T) {
 			in:   "{ xyz != nil }",
 			pass: false,
 		},
+
+		{
+			in:   "{ nil = nil }", // nil literal
+			pass: true,
+		},
+
+		{
+			in:   "{ 1 = 1 }", // int literal
+			pass: true,
+		},
+
+		{
+			in:   "{ true = true }", // boolean literal
+			pass: true,
+		},
+
+		{
+			in:   "{ 'hello' = 'hello'}", // string literal
+			pass: true,
+		},
+
+		{
+			in:   "{ 1.0 = 1.0 }", // float literal
+			pass: true,
+		},
+		{
+			in:   "{ 'abc' = 'ABC' }",
+			pass: false,
+		},
 	}
 
 	for _, tc := range cases {

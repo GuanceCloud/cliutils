@@ -330,15 +330,37 @@ func (e *BinaryExpr) singleEval(data KVs) bool {
 	case *NilLiteral:
 		lit = rhs
 
+	case *BoolLiteral:
+		lit = rhs.Val
+
 	default:
 
 		log.Errorf("invalid RHS, got type `%s'", reflect.TypeOf(e.RHS).String())
 		return false
 	}
 
-	// first: fetch left-handle-symbol and OP on right-handle-symbol
-	lhs, ok := e.LHS.(*Identifier)
-	if !ok {
+	var lhs *Identifier
+	switch left := e.LHS.(type) { // Left part can be string/bool/number/nil literal and identifier
+	case *NilLiteral:
+		return binEval(e.Op, nilVal, lit)
+
+	case *NumberLiteral:
+		if left.IsInt {
+			return binEval(e.Op, left.Int, lit)
+		} else {
+			return binEval(e.Op, left.Float, lit)
+		}
+
+	case *BoolLiteral:
+		return binEval(e.Op, left.Val, lit)
+
+	case *StringLiteral:
+		return binEval(e.Op, left.Val, lit)
+
+	case *Identifier:
+		lhs = left // we get detailed lhs value later...
+
+	default:
 		log.Errorf("unknown LHS type, expect Identifier, got `%s'", reflect.TypeOf(e.LHS).String())
 		return false
 	}
