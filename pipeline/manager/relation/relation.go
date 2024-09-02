@@ -87,80 +87,27 @@ func (relation *ScriptRelation) UpdateRelation(updateAt int64, rel map[string]ma
 	}
 }
 
-func (relation *ScriptRelation) Query(category point.Category, source string) (string, bool) {
+func (relation *ScriptRelation) CatRelation(cat point.Category, source string) (string, bool) {
 	relation.rwMutex.RLock()
 	defer relation.rwMutex.RUnlock()
 
-	if v, ok := relation.relation[category]; ok {
+	if v, ok := relation.relation[cat]; ok {
 		if name, ok := v[source]; ok {
 			return name, true
 		}
 	}
 
+	return "", false
+}
+
+func (relation *ScriptRelation) CatDefault(cat point.Category) (string, bool) {
+	relation.rwMutex.RLock()
+	defer relation.rwMutex.RUnlock()
+
 	// defaultPl
-	if v, ok := relation.defaultScript[category]; ok {
+	if v, ok := relation.defaultScript[cat]; ok {
 		return v, true
 	}
 
 	return "", false
 }
-
-func ScriptName(relation *ScriptRelation, cat point.Category, pt *point.Point, scriptMap map[string]string) (string, bool) {
-	if pt == nil {
-		return "", false
-	}
-
-	var scriptName string
-
-	// built-in rules last
-	switch cat { //nolint:exhaustive
-	case point.RUM:
-		scriptName = _rumSName(pt)
-	case point.Security:
-		scriptName = _securitySName(pt)
-	case point.Tracing, point.Profiling:
-		scriptName = _apmSName(pt)
-	default:
-		scriptName = _defaultCatSName(pt)
-	}
-
-	if scriptName == "" {
-		return "", false
-	}
-
-	// configuration first
-	if sName, ok := scriptMap[scriptName]; ok {
-		switch sName {
-		case "-":
-			return "", false
-		case "":
-		default:
-			return sName, true
-		}
-	}
-
-	if relation != nil {
-		// remote relation sencond
-		if sName, ok := relation.Query(cat, scriptName); ok {
-			return sName, true
-		}
-	}
-
-	return scriptName + ".p", true
-}
-
-// func QueryRemoteRelation(category point.Category, source string) (string, bool) {
-// 	return remoteRelation.query(category, source)
-// }
-
-// func RelationRemoteUpdateAt() int64 {
-// 	return remoteRelation.UpdateAt()
-// }
-
-// func UpdateRemoteDefaultPl(defaultPl map[string]string) {
-// 	remoteRelation.UpdateDefaultPl(defaultPl)
-// }
-
-// func UpdateRemoteRelation(updateAt int64, rel map[string]map[string]string) {
-// 	remoteRelation.UpdateRelation(updateAt, rel)
-// }

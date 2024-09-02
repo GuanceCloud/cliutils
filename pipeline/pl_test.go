@@ -289,7 +289,7 @@ func BenchmarkScript(b *testing.B) {
 		})...)
 		pt := point.NewPointV2("test", kvs, point.DefaultLoggingOptions()...)
 
-		s, _ := manager.NewScripts(map[string]string{"s": sGrok2}, nil, nil, "", point.Logging)
+		s, _ := manager.NewScripts(map[string]string{"s": sGrok2}, nil, "", point.Logging)
 
 		sp := s["s"]
 		if sp == nil {

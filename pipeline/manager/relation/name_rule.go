@@ -39,3 +39,55 @@ func _apmSName(pt *point.Point) string {
 func _defaultCatSName(pt *point.Point) string {
 	return pt.Name()
 }
+
+func ScriptName(relation *ScriptRelation, cat point.Category, pt *point.Point, scriptMap map[string]string) (string, bool) {
+	if pt == nil {
+		return "", false
+	}
+
+	var scriptName string
+
+	// built-in rules last
+	switch cat { //nolint:exhaustive
+	case point.RUM:
+		scriptName = _rumSName(pt)
+	case point.Security:
+		scriptName = _securitySName(pt)
+	case point.Tracing, point.Profiling:
+		scriptName = _apmSName(pt)
+	default:
+		scriptName = _defaultCatSName(pt)
+	}
+
+	if scriptName == "" {
+		return "", false
+	}
+
+	// remote relation first
+	if relation != nil {
+		if sName, ok := relation.CatRelation(cat, scriptName); ok {
+			return sName, true
+		}
+	}
+
+	// config rules second
+	if sName, ok := scriptMap[scriptName]; ok {
+		switch sName {
+		case "-":
+			return "", false
+		case "":
+		default:
+			return sName, true
+		}
+	}
+
+	// category default script third
+	if relation != nil {
+		if sName, ok := relation.CatDefault(cat); ok {
+			return sName, true
+		}
+	}
+
+	// built-in rule last
+	return scriptName + ".p", true
+}
