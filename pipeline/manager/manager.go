@@ -10,14 +10,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/GuanceCloud/cliutils/pipeline/manager/relation"
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/plmap"
 	"github.com/GuanceCloud/cliutils/point"
 )
 
 type Manager struct {
 	storeMap map[point.Category]*ScriptStore
-	relation *relation.ScriptRelation
+	relation *ScriptRelation
 }
 
 type ManagerCfg struct {
@@ -35,7 +34,7 @@ func NewManagerCfg(upFn plmap.UploadFunc, gTags [][2]string) ManagerCfg {
 func NewManager(cfg ManagerCfg) *Manager {
 	center := &Manager{
 		storeMap: map[point.Category]*ScriptStore{},
-		relation: relation.NewPipelineRelation(),
+		relation: NewPipelineRelation(),
 	}
 	for _, cat := range point.AllCategories() {
 		center.storeMap[cat] = NewScriptStore(cat, cfg)
@@ -53,13 +52,33 @@ func (m *Manager) whichStore(category point.Category) (*ScriptStore, bool) {
 	return nil, false
 }
 
-func (m *Manager) GetScriptRelation() *relation.ScriptRelation {
+func (m *Manager) UpdateDefaultScript(mp map[point.Category]string) {
+	for _, cat := range point.AllCategories() {
+		if store, ok := m.whichStore(cat); ok {
+			if v, ok := mp[cat]; ok && v != "" {
+				store.SetDefaultScript(v)
+			} else {
+				store.SetDefaultScript("")
+			}
+		}
+	}
+}
+
+func (m *Manager) GetScriptRelation() *ScriptRelation {
 	return m.relation
 }
 
-func (m *Manager) QueryScript(category point.Category, name string) (*PlScript, bool) {
+func (m *Manager) QueryScript(category point.Category, name string,
+	DisableDefaultP ...struct{}) (*PlScript, bool) {
+
 	if v, ok := m.whichStore(category); ok {
-		return v.IndexGet(name)
+		if ss, ok := v.IndexGet(name); ok {
+			return ss, ok
+		}
+
+		if len(DisableDefaultP) == 0 {
+			return v.IndexDefault()
+		}
 	}
 	return nil, false
 }

@@ -63,6 +63,8 @@ type ScriptStore struct {
 
 	storage scriptStorage
 
+	defultScript string
+
 	index     map[string]*PlScript
 	indexLock sync.RWMutex
 
@@ -90,10 +92,32 @@ func NewScriptStore(category point.Category, cfg ManagerCfg) *ScriptStore {
 	}
 }
 
+func (store *ScriptStore) SetDefaultScript(name string) {
+	store.indexLock.Lock()
+	defer store.indexLock.Unlock()
+	store.defultScript = name
+}
+
+func (store *ScriptStore) GetDefaultScript() string {
+	store.indexLock.RLock()
+	defer store.indexLock.RUnlock()
+	return store.defultScript
+}
+
 func (store *ScriptStore) IndexGet(name string) (*PlScript, bool) {
 	store.indexLock.RLock()
 	defer store.indexLock.RUnlock()
 	if v, ok := store.index[name]; ok {
+		return v, ok
+	}
+	return nil, false
+}
+
+func (store *ScriptStore) IndexDefault() (*PlScript, bool) {
+	store.indexLock.RLock()
+	defer store.indexLock.RUnlock()
+
+	if v, ok := store.index[store.defultScript]; ok {
 		return v, ok
 	}
 	return nil, false

@@ -3,7 +3,8 @@
 // This product includes software developed at Guance Cloud (https://www.guance.com/).
 // Copyright 2021-present Guance, Inc.
 
-package relation
+// Package manager for managing pipeline scripts
+package manager
 
 import (
 	"github.com/GuanceCloud/cliutils/point"
@@ -65,7 +66,7 @@ func ScriptName(relation *ScriptRelation, cat point.Category, pt *point.Point, s
 
 	// remote relation first
 	if relation != nil {
-		if sName, ok := relation.CatRelation(cat, scriptName); ok {
+		if sName, ok := relation.Query(cat, scriptName); ok {
 			return sName, true
 		}
 	}
@@ -77,13 +78,6 @@ func ScriptName(relation *ScriptRelation, cat point.Category, pt *point.Point, s
 			return "", false
 		case "":
 		default:
-			return sName, true
-		}
-	}
-
-	// category default script third
-	if relation != nil {
-		if sName, ok := relation.CatDefault(cat); ok {
 			return sName, true
 		}
 	}
