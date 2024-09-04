@@ -8,7 +8,6 @@ package pipeline
 import (
 	"testing"
 
-	"github.com/GuanceCloud/cliutils/pipeline/manager/relation"
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/funcs"
 	"github.com/GuanceCloud/cliutils/point"
 	"github.com/GuanceCloud/platypus/pkg/engine"
@@ -41,40 +40,40 @@ func TestSCriptName(t *testing.T) {
 	pt := point.NewPointV2("m_name",
 		kvs, point.DefaultLoggingOptions()...)
 
-	name, ok := relation.ScriptName(nil, point.Tracing, pt, nil)
+	name, ok := manager.ScriptName(nil, point.Tracing, pt, nil)
 	assert.Equal(t, true, ok)
 	assert.Equal(t, "svc_name.p", name)
 
-	name, ok = relation.ScriptName(nil, point.Tracing, pt, map[string]string{"c": "d"})
+	name, ok = manager.ScriptName(nil, point.Tracing, pt, map[string]string{"c": "d"})
 	assert.Equal(t, true, ok)
 	assert.Equal(t, "svc_name.p", name)
 
-	_, ok = relation.ScriptName(nil, point.Tracing, pt, map[string]string{"svc_name": "-"})
+	_, ok = manager.ScriptName(nil, point.Tracing, pt, map[string]string{"svc_name": "-"})
 	assert.Equal(t, false, ok)
 
-	name, ok = relation.ScriptName(nil, point.Profiling, pt, map[string]string{"svc_name": "def.p"})
+	name, ok = manager.ScriptName(nil, point.Profiling, pt, map[string]string{"svc_name": "def.p"})
 	assert.Equal(t, true, ok)
 	assert.Equal(t, "def.p", name)
 
 	pt = point.NewPointV2("m_name",
 		point.NewKVs(map[string]interface{}{"message@json": "a"}),
 		point.CommonLoggingOptions()...)
-	_, ok = relation.ScriptName(nil, point.Tracing, pt,
+	_, ok = manager.ScriptName(nil, point.Tracing, pt,
 		map[string]string{"m_name": "def.p"})
 	assert.Equal(t, false, ok)
 
-	name, ok = relation.ScriptName(nil, point.Metric, pt, map[string]string{"abc": "def.p"})
+	name, ok = manager.ScriptName(nil, point.Metric, pt, map[string]string{"abc": "def.p"})
 	assert.Equal(t, true, ok)
 	assert.Equal(t, "m_name.p", name)
 
-	name, ok = relation.ScriptName(nil, point.Metric, pt, map[string]string{"m_name": "def.p"})
+	name, ok = manager.ScriptName(nil, point.Metric, pt, map[string]string{"m_name": "def.p"})
 	assert.Equal(t, true, ok)
 	assert.Equal(t, "def.p", name)
 
-	_, ok = relation.ScriptName(nil, point.Metric, pt, map[string]string{"m_name": "-"})
+	_, ok = manager.ScriptName(nil, point.Metric, pt, map[string]string{"m_name": "-"})
 	assert.Equal(t, false, ok)
 
-	_, ok = relation.ScriptName(nil, point.Metric, pt, map[string]string{"m_name": "-"})
+	_, ok = manager.ScriptName(nil, point.Metric, pt, map[string]string{"m_name": "-"})
 	assert.Equal(t, false, ok)
 
 	pts, err := models.ParsePoints(scheckTestPointData)
@@ -87,7 +86,7 @@ func TestSCriptName(t *testing.T) {
 	f, _ := ptSc.Fields()
 	kvs = append(kvs, point.NewKVs(f)...)
 	pt = point.NewPointV2(string(ptSc.Name()), kvs, point.CommonLoggingOptions()...)
-	name, ok = relation.ScriptName(nil, point.Security, pt, nil)
+	name, ok = manager.ScriptName(nil, point.Security, pt, nil)
 	assert.Equal(t, true, ok)
 	assert.Equal(t, "system.p", name)
 
@@ -101,7 +100,7 @@ func TestSCriptName(t *testing.T) {
 	kvs = append(kvs, point.NewKVs(f)...)
 	pt = point.NewPointV2(string(ptSc.Name()), kvs, point.CommonLoggingOptions()...)
 
-	_, ok = relation.ScriptName(nil, point.Security, pt, nil)
+	_, ok = manager.ScriptName(nil, point.Security, pt, nil)
 	assert.Equal(t, false, ok)
 
 	pts, err = models.ParsePoints(rumTestPointData)
@@ -114,7 +113,7 @@ func TestSCriptName(t *testing.T) {
 	kvs = append(kvs, point.NewKVs(f)...)
 	pt = point.NewPointV2(string(ptSc.Name()), kvs, point.CommonLoggingOptions()...)
 
-	name, ok = relation.ScriptName(nil, point.RUM, pt, nil)
+	name, ok = manager.ScriptName(nil, point.RUM, pt, nil)
 	assert.Equal(t, true, ok)
 	assert.Equal(t, "appid01_error.p", name)
 
@@ -127,7 +126,7 @@ func TestSCriptName(t *testing.T) {
 	f, _ = ptSc.Fields()
 	kvs = append(kvs, point.NewKVs(f)...)
 	pt = point.NewPointV2(string(ptSc.Name()), kvs, point.CommonLoggingOptions()...)
-	_, ok = relation.ScriptName(nil, point.RUM, pt, nil)
+	_, ok = manager.ScriptName(nil, point.RUM, pt, nil)
 	assert.Equal(t, false, ok)
 }
 
@@ -289,7 +288,7 @@ func BenchmarkScript(b *testing.B) {
 		})...)
 		pt := point.NewPointV2("test", kvs, point.DefaultLoggingOptions()...)
 
-		s, _ := manager.NewScripts(map[string]string{"s": sGrok2}, nil, nil, "", point.Logging)
+		s, _ := manager.NewScripts(map[string]string{"s": sGrok2}, nil, "", point.Logging)
 
 		sp := s["s"]
 		if sp == nil {

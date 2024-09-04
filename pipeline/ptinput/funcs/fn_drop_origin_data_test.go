@@ -50,7 +50,7 @@ func TestDropOriginData(t *testing.T) {
 				t.Fatal(errR)
 			}
 
-			if v, _, ok := pt.GetWithIsTag(tc.key); ok {
+			if v, _, e := pt.Get(tc.key); e == nil {
 				t.Errorf("[%d] failed: key `%s` value `%v`", idx, tc.key, v)
 			} else {
 				t.Logf("[%d] PASS", idx)

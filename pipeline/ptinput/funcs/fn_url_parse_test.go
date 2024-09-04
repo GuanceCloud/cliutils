@@ -12,6 +12,7 @@ import (
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput"
 	"github.com/GuanceCloud/cliutils/point"
 	tu "github.com/GuanceCloud/cliutils/testutil"
+	"github.com/GuanceCloud/platypus/pkg/ast"
 )
 
 func TestURLParse(t *testing.T) {
@@ -133,12 +134,12 @@ m = url_parse(url, 2)
 				t.Fatal(errR)
 			}
 
-			if v, istag, ok := pt.GetWithIsTag(tc.outKey); !ok {
+			if v, istag, err := pt.Get(tc.outKey); err != nil {
 				if !tc.fail {
 					t.Errorf("[%d]key %s, error: %s", idx, tc.outKey, err)
 				}
 			} else {
-				if istag {
+				if istag != ast.String {
 					t.Errorf("key %s should be a field", tc.outKey)
 				} else {
 					tu.Equals(t, tc.expected, v)

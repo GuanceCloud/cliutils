@@ -23,7 +23,7 @@ func whichStore(c *Manager, cat point.Category) *ScriptStore {
 }
 
 func TestScriptLoadFunc(t *testing.T) {
-	center := NewManager(ManagerCfg{})
+	m := NewManager(ManagerCfg{})
 	case1 := map[point.Category]map[string]string{
 		point.Logging: {
 			"abcd": "if true {}",
@@ -34,74 +34,75 @@ func TestScriptLoadFunc(t *testing.T) {
 		},
 	}
 
-	LoadScripts(center, DefaultScriptNS, nil, nil, nil)
-	LoadScripts(center, GitRepoScriptNS, nil, nil, nil)
-	LoadScripts(center, RemoteScriptNS, nil, nil, nil)
+	m.LoadScripts(NSDefault, nil, nil)
+	m.LoadScripts(NSGitRepo, nil, nil)
+	m.LoadScripts(NSRemote, nil, nil)
 
-	LoadScripts(center, DefaultScriptNS, case1, nil, nil)
+	m.LoadScripts(NSDefault, case1, nil)
 	for category, v := range case1 {
 		for name := range v {
-			if y, ok := center.QueryScript(category, name); !ok {
+			if y, ok := m.QueryScript(category, name); !ok {
 				t.Error(category, " ", name, y)
-				if y, ok := center.QueryScript(category, name); !ok {
+				if y, ok := m.QueryScript(category, name); !ok {
 					t.Error(y)
 				}
 			}
 		}
 	}
 
-	LoadScripts(center, DefaultScriptNS, nil, nil, nil)
-	LoadScripts(center, GitRepoScriptNS, nil, nil, nil)
-	LoadScripts(center, RemoteScriptNS, nil, nil, nil)
+	m.LoadScripts(NSDefault, nil, nil)
+	m.LoadScripts(NSGitRepo, nil, nil)
+	m.LoadScripts(NSRemote, nil, nil)
 	for k, v := range case1 {
-		LoadScript(center, k, DefaultScriptNS, v, nil, nil)
+		m.LoadScriptWithCat(k, NSDefault, v, nil)
 	}
 	for category, v := range case1 {
 		for name := range v {
-			if _, ok := center.QueryScript(category, name); !ok {
+			if _, ok := m.QueryScript(category, name); !ok {
 				t.Error(category, " ", name)
 			}
 		}
 	}
 
-	LoadScripts(center, DefaultScriptNS, nil, nil, nil)
-	LoadScripts(center, GitRepoScriptNS, nil, nil, nil)
-	LoadScripts(center, RemoteScriptNS, nil, nil, nil)
+	m.LoadScripts(NSDefault, nil, nil)
+	m.LoadScripts(NSGitRepo, nil, nil)
+	m.LoadScripts(NSRemote, nil, nil)
 	for category, v := range case1 {
 		for name := range v {
-			if _, ok := center.QueryScript(category, name); ok {
+			if _, ok := m.QueryScript(category, name); ok {
 				t.Error(category, " ", name)
 			}
 		}
 	}
 
-	LoadScripts(center, DefaultScriptNS, nil, nil, nil)
-	LoadScripts(center, GitRepoScriptNS, nil, nil, nil)
-	LoadScripts(center, RemoteScriptNS, nil, nil, nil)
+	m.LoadScripts(NSDefault, nil, nil)
+	m.LoadScripts(NSGitRepo, nil, nil)
+	m.LoadScripts(NSRemote, nil, nil)
 
 	for k, v := range case1 {
-		LoadScript(center, k, "DefaultScriptNS", v, nil, nil)
-		whichStore(center, k).UpdateScriptsWithNS(RemoteScriptNS, v, nil, nil)
+		m.LoadScriptWithCat(k, "DefaultScriptNS", v, nil)
+		whichStore(m, k).UpdateScriptsWithNS(NSRemote, v, nil)
 	}
 	for category, v := range case1 {
 		for name := range v {
-			if s, ok := center.QueryScript(category, name); !ok || s.NS() != RemoteScriptNS {
+			if s, ok := m.QueryScript(category, name); !ok || s.NS() != NSRemote {
 				t.Error(category, " ", name)
 			}
 		}
 	}
 
-	LoadScripts(center, DefaultScriptNS, nil, nil, nil)
-	LoadScripts(center, GitRepoScriptNS, nil, nil, nil)
-	LoadScripts(center, RemoteScriptNS, nil, nil, nil)
+	m.LoadScripts(NSDefault, nil, nil)
+	m.LoadScripts(NSGitRepo, nil, nil)
+	m.LoadScripts(NSRemote, nil, nil)
 
 	_ = os.WriteFile("/tmp/nginx-time123.p", []byte(`
 		json(_, time)
 		set_tag(bb, "aa0")
 		default_time(time)
 		`), os.FileMode(0o755))
-	whichStore(center, point.Logging).LoadDotPScript2Store(
-		DefaultScriptNS, "", nil, []string{"/tmp/nginx-time.p123"})
+	ss, _ := ReadScripts("/tmp")
+	whichStore(m, point.Logging).UpdateScriptsWithNS(
+		NSDefault, ss, nil)
 	_ = os.Remove("/tmp/nginx-time123.p")
 }
 
@@ -194,68 +195,67 @@ func TestPlScriptStore(t *testing.T) {
 
 	store.indexUpdate(nil)
 
-	err := store.UpdateScriptsWithNS(DefaultScriptNS, map[string]string{
+	err := store.UpdateScriptsWithNS(NSDefault, map[string]string{
 		"abc.p": "default_time(time) ;set_tag(a, \"1\")",
-	}, nil, nil)
+	}, nil)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = store.UpdateScriptsWithNS(DefaultScriptNS, map[string]string{
+	err = store.UpdateScriptsWithNS(NSDefault, map[string]string{
 		"abc.p": "default_time(time)",
-	}, nil, nil)
+	}, nil)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = store.UpdateScriptsWithNS(DefaultScriptNS, map[string]string{
+	err = store.UpdateScriptsWithNS(NSDefault, map[string]string{
 		"abc.p": "default_time(time); set_tag(a, 1)",
-	}, nil, nil)
+	}, nil)
 	if err == nil {
 		t.Error("should not be nil")
 	}
 
-	err = store.UpdateScriptsWithNS(DefaultScriptNS, map[string]string{
+	err = store.UpdateScriptsWithNS(NSDefault, map[string]string{
 		"abc.p": "default_time(time)",
-	}, nil, nil)
+	}, nil)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = store.UpdateScriptsWithNS(GitRepoScriptNS, map[string]string{
+	err = store.UpdateScriptsWithNS(NSGitRepo, map[string]string{
 		"abc.p": "default_time(time)",
-	}, nil, nil)
-
+	}, nil)
 	if err != nil {
 		t.Error(err)
 	}
 
 	assert.Equal(t, store.Count(), 2)
 
-	err = store.UpdateScriptsWithNS(ConfdScriptNS, map[string]string{
+	err = store.UpdateScriptsWithNS(NSConfd, map[string]string{
 		"abc.p": "default_time(time)",
-	}, nil, nil)
+	}, nil)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = store.UpdateScriptsWithNS(RemoteScriptNS, map[string]string{
+	err = store.UpdateScriptsWithNS(NSRemote, map[string]string{
 		"abc.p": "default_time(time)",
-	}, nil, nil)
+	}, nil)
 	if err != nil {
 		t.Error(err)
 	}
 
-	for i, ns := range plScriptNSSearchOrder {
-		store.UpdateScriptsWithNS(ns, nil, nil, nil)
-		if i < len(plScriptNSSearchOrder)-1 {
+	for i, ns := range nsSearchOrder {
+		store.UpdateScriptsWithNS(ns, nil, nil)
+		if i < len(nsSearchOrder)-1 {
 			sInfo, ok := store.IndexGet("abc.p")
 			if !ok {
 				t.Error(fmt.Errorf("!ok"))
 				return
 			}
-			if sInfo.ns != plScriptNSSearchOrder[i+1] {
-				t.Error(sInfo.ns, plScriptNSSearchOrder[i+1])
+			if sInfo.ns != nsSearchOrder[i+1] {
+				t.Error(sInfo.ns, nsSearchOrder[i+1])
 			}
 		} else {
 			_, ok := store.IndexGet("abc.p")
@@ -295,7 +295,7 @@ func TestPlDirStruct(t *testing.T) {
 		default_time(time)
 		`), os.FileMode(0o755))
 	}
-	act := SearchPlFilePathFromPlStructPath(bPath)
+	act := SearchWorkspaceScripts(bPath)
 
 	assert.Equal(t, expt, act)
 }

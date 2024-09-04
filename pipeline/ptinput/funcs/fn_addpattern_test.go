@@ -170,9 +170,8 @@ func TestAddPattern(t *testing.T) {
 			if errR != nil {
 				t.Fatal(errR)
 			}
-			v, isTag, ok := pt.GetWithIsTag(tc.outkey)
-			assert.Equal(t, true, ok)
-			assert.Equal(t, false, isTag)
+			v, _, e := pt.Get(tc.outkey)
+			assert.NoError(t, e)
 			if assert.Equal(t, tc.expect, v) {
 				t.Logf("[%d] PASS", idx)
 			}

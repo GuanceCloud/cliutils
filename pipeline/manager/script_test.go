@@ -17,14 +17,13 @@ import (
 func TestScript(t *testing.T) {
 	ret, retErr := NewScripts(map[string]string{
 		"abc.p": "if true {}",
-	}, nil, nil, GitRepoScriptNS, point.Logging)
+	}, nil, NSGitRepo, point.Logging)
 
 	if len(retErr) > 0 {
 		t.Fatal(retErr)
 	}
 
 	s := ret["abc.p"]
-	t.Log(s.FilePath())
 
 	if ng := s.Engine(); ng == nil {
 		t.Fatalf("no engine")
@@ -38,7 +37,7 @@ func TestScript(t *testing.T) {
 	assert.Equal(t, 0, len(plpt.Tags()))
 	assert.Equal(t, "abc.p", s.Name())
 	assert.Equal(t, point.Logging, s.Category())
-	assert.Equal(t, s.NS(), GitRepoScriptNS)
+	assert.Equal(t, s.NS(), NSGitRepo)
 
 	//nolint:dogsled
 	plpt = ptinput.NewPlPoint(point.Logging, "ng", nil, nil, time.Now())
@@ -67,13 +66,12 @@ func TestScript(t *testing.T) {
 
 func TestDrop(t *testing.T) {
 	ret, retErr := NewScripts(map[string]string{"abc.p": "add_key(a, \"a\"); add_key(status, \"debug\"); drop(); add_key(b, \"b\")"},
-		nil, nil, GitRepoScriptNS, point.Logging)
+		nil, NSGitRepo, point.Logging)
 	if len(retErr) > 0 {
 		t.Fatal(retErr)
 	}
 
 	s := ret["abc.p"]
-	t.Log(s.FilePath())
 
 	plpt := ptinput.NewPlPoint(point.Logging, "ng", nil, nil, time.Now())
 	if err := s.Run(plpt, nil, nil); err != nil {

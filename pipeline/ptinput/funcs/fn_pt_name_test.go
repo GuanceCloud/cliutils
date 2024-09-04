@@ -113,8 +113,8 @@ func TestPtName(t *testing.T) {
 				t.Fatal(errR.Error())
 			}
 
-			_, _, ok := pt.GetWithIsTag(tc.out)
-			assert.True(t, ok)
+			_, _, e := pt.Get(tc.out)
+			assert.NoError(t, e)
 			assert.Equal(t, tc.expect, pt.GetPtName())
 			t.Logf("[%d] PASS", idx)
 		})

@@ -11,7 +11,6 @@ import (
 
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput"
 	"github.com/GuanceCloud/cliutils/point"
-	tu "github.com/GuanceCloud/cliutils/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -140,8 +139,8 @@ func TestJSON(t *testing.T) {
 			if err != nil && tc.fail {
 				return
 			} else if err != nil || tc.fail {
-				tu.Equals(t, nil, err)
-				tu.Equals(t, tc.fail, err != nil)
+				assert.Equal(t, nil, err)
+				assert.Equal(t, tc.fail, err != nil)
 			}
 
 			pt := ptinput.NewPlPoint(
@@ -151,8 +150,8 @@ func TestJSON(t *testing.T) {
 				t.Fatal(errR.Error())
 			}
 
-			r, _, ok := pt.GetWithIsTag(tc.key)
-			tu.Equals(t, true, ok)
+			r, _, e := pt.Get(tc.key)
+			assert.NoError(t, e)
 			if tc.key == "[2].age" {
 				t.Log(1)
 			}

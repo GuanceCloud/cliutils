@@ -98,9 +98,8 @@ func TestRename(t *testing.T) {
 				t.Fatal(errR.Error())
 			}
 
-			v, isTag, ok := pt.GetWithIsTag(tc.outkey)
-			assert.Equal(t, false, isTag)
-			assert.Equal(t, true, ok)
+			v, _, e := pt.Get(tc.outkey)
+			assert.NoError(t, e)
 			assert.Equal(t, tc.expected, v)
 			t.Logf("[%d] PASS", idx)
 		})

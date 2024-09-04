@@ -141,9 +141,8 @@ func TestGeoIpFunc(t *testing.T) {
 		}
 
 		for k, v := range tc.expected {
-			r, isTag, ok := pt.GetWithIsTag(k)
-			assert.Equal(t, true, ok, "!ok")
-			assert.Equal(t, false, isTag)
+			r, _, e := pt.Get(k)
+			assert.NoError(t, e)
 			assert.Equal(t, v, r, "`%s` != `%s`, key: `%s`", r, v, k)
 		}
 	}

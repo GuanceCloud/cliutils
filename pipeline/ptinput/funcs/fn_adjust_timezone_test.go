@@ -76,7 +76,7 @@ func TestAdjustTimezone(t *testing.T) {
 				pt.KeyTime2Time()
 				var v interface{}
 				if tc.outkey != "time" {
-					v, _, _ = pt.GetWithIsTag(tc.outkey)
+					v, _, _ = pt.Get(tc.outkey)
 				} else {
 					v = pt.PtTime()
 				}
@@ -95,7 +95,7 @@ func TestAdjustTimezone(t *testing.T) {
 				pt.KeyTime2Time()
 				var v interface{}
 				if tc.outkey != "time" {
-					v, _, _ = pt.GetWithIsTag(tc.outkey)
+					v, _, _ = pt.Get(tc.outkey)
 				} else {
 					v = pt.PtTime()
 				}

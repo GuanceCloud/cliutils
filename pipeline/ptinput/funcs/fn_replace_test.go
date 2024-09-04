@@ -106,7 +106,7 @@ func TestReplace(t *testing.T) {
 				t.Fatal(errR.Error())
 			}
 
-			if v, _, ok := pt.GetWithIsTag(tc.outKey); !ok {
+			if v, _, e := pt.Get(tc.outKey); e != nil {
 				if !tc.fail {
 					t.Errorf("[%d]expect error: %s", idx, errR.Error())
 				}

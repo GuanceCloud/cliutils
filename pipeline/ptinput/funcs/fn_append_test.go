@@ -96,10 +96,9 @@ func TestAppend(t *testing.T) {
 			if errR != nil {
 				t.Fatal(*errR)
 			}
-			v, isTag, ok := pt.GetWithIsTag(tc.outkey)
-			assert.Equal(t, true, ok)
+			v, _, err := pt.Get(tc.outkey)
+			assert.NoError(t, err)
 			assert.Equal(t, tc.expected, v)
-			assert.Equal(t, false, isTag)
 			t.Logf("[%d] PASS", idx)
 		})
 	}
