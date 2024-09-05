@@ -1,0 +1,17 @@
+# ============= PPROF PARSER CONFIG =============
+server:
+    addr: 0.0.0.0
+    port: 9634
+
+log:
+    path: /usr/local/pprofparser
+    file: main.log
+    level: info
+
+gin:
+    log: /usr/local/pprofparser/gin.log
+    error_log: /usr/local/pprofparser/gin_error.log
+
+storage:
+    disk:
+        profile_dir: '/data/profile'
