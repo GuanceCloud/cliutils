@@ -17,6 +17,7 @@ require (
 	github.com/go-ping/ping v1.1.0
 	github.com/gobwas/ws v1.1.0
 	github.com/gogo/protobuf v1.3.2
+	github.com/google/pprof v0.0.0-20230705174524-200ffdc848b8
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-retryablehttp v0.7.4
 	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c
@@ -25,6 +26,7 @@ require (
 	github.com/itchyny/timefmt-go v0.1.5
 	github.com/mssola/user_agent v0.6.0
 	github.com/oschwald/geoip2-golang v1.9.0
+	github.com/pierrec/lz4/v4 v4.1.18
 	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.44.0
