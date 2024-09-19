@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package parsing
 
 import (
@@ -57,18 +62,18 @@ func summary(filename string) (map[events.Type]*EventSummary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open profile file [%s] fail: %w", filename, err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	sampleSummary := &EventSummary{
 		SummaryValueType: &SummaryValueType{
-			Type: events.CpuSamples,
+			Type: events.CPUSamples,
 			Unit: quantity.CountUnit,
 		},
 		Value: 0,
 	}
 
 	spySummaries := map[events.Type]*EventSummary{
-		events.CpuSamples: sampleSummary,
+		events.CPUSamples: sampleSummary,
 	}
 
 	scanner := bufio.NewScanner(f)
@@ -144,7 +149,7 @@ func (p *Collapse) ResolveFlameGraph(_ events.Type) (*pprof.Frame, AggregatorSel
 	if err != nil {
 		return nil, nil, fmt.Errorf("open py-spy profile file fail: %w", err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	scanner := bufio.NewScanner(f)
 
@@ -305,7 +310,7 @@ func ParseRawFlameGraph(filename string) (*pprof.Frame, AggregatorSelectSlice, e
 	if err != nil {
 		return nil, nil, fmt.Errorf("open py-spy profile file fail: %w", err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	scanner := bufio.NewScanner(f)
 
