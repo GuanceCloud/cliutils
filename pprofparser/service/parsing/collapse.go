@@ -3,7 +3,6 @@ package parsing
 import (
 	"bufio"
 	"fmt"
-	"github.com/GuanceCloud/cliutils/pprofparser/domain/tracing"
 	"os"
 	"regexp"
 	"strconv"
@@ -13,6 +12,7 @@ import (
 	"github.com/GuanceCloud/cliutils/pprofparser/domain/parameter"
 	"github.com/GuanceCloud/cliutils/pprofparser/domain/pprof"
 	"github.com/GuanceCloud/cliutils/pprofparser/domain/quantity"
+	"github.com/GuanceCloud/cliutils/pprofparser/domain/tracing"
 	"github.com/GuanceCloud/cliutils/pprofparser/service/storage"
 	"github.com/GuanceCloud/cliutils/pprofparser/tools/filepathtoolkit"
 	"github.com/GuanceCloud/cliutils/pprofparser/tools/logtoolkit"
