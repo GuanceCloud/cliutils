@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package parsing
 
 import (
@@ -13,10 +18,10 @@ func TestGetPySpySummary(t *testing.T) {
 	}
 
 	for k, v := range summaries {
-		println(k)
-		println(v.Type)
-		println(v.Unit.Kind, v.Unit.Name, v.Unit.Base)
-		println(v.Value)
+		t.Log(k)
+		t.Log(v.Type)
+		t.Log(v.Unit.Kind, v.Unit.Name, v.Unit.Base)
+		t.Log(v.Value)
 	}
 
 }
