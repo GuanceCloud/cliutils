@@ -7,6 +7,10 @@ package diskcache
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
+	"io"
+	"os"
 	"time"
 )
 
@@ -21,7 +25,10 @@ func (c *DiskCache) Put(data []byte) error {
 
 	defer func() {
 		putVec.WithLabelValues(c.path).Inc()
+
 		putBytesVec.WithLabelValues(c.path).Add(float64(len(data)))
+		putBytesV2Vec.WithLabelValues(c.path).Observe(float64(len(data)))
+
 		putLatencyVec.WithLabelValues(c.path).Observe(float64(time.Since(start) / time.Microsecond))
 		sizeVec.WithLabelValues(c.path).Set(float64(c.size))
 	}()
@@ -61,6 +68,84 @@ func (c *DiskCache) Put(data []byte) error {
 	if c.curBatchSize >= c.batchSize {
 		if err := c.rotate(); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *DiskCache) putPart(part []byte) error {
+	if _, err := c.wfd.Write(part); err != nil {
+		return err
+	}
+
+	if !c.noSync {
+		if err := c.wfd.Sync(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// StreamPut read from r for bytes and write to storage.
+func (c *DiskCache) StreamPut(r io.Reader, size int) error {
+	var (
+		n           = 0
+		total       = 0
+		err         error
+		startOffset int64
+		start       = time.Now()
+		round       = 0
+	)
+
+	c.wlock.Lock()
+	defer c.wlock.Unlock()
+
+	if c.capacity > 0 && c.size+int64(size) > c.capacity {
+		return ErrCacheFull
+	}
+
+	if startOffset, err = c.wfd.Seek(0, os.SEEK_CUR); err != nil {
+		return fmt.Errorf("Seek(0, SEEK_CUR): %w", err)
+	}
+
+	defer func() {
+		if total > 0 && err != nil { // fallback to origin postion
+			if _, serr := c.wfd.Seek(startOffset, os.SEEK_SET); serr != nil {
+				// TODO:
+			}
+		}
+
+		putBytesV2Vec.WithLabelValues(c.path).Observe(float64(size))
+		putLatencyVec.WithLabelValues(c.path).Observe(float64(time.Since(start) / time.Microsecond))
+		sizeVec.WithLabelValues(c.path).Set(float64(c.size))
+		streamPutVec.WithLabelValues(c.path).Observe(float64(round))
+	}()
+
+	binary.LittleEndian.PutUint32(c.batchHeader, uint32(size))
+	if _, err := c.wfd.Write(c.batchHeader); err != nil {
+		return err
+	}
+
+	for {
+		n, err = r.Read(c.streamBuf)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			} else {
+				return err
+			}
+		}
+
+		if n == 0 {
+			break
+		}
+
+		if err = c.putPart(c.streamBuf); err != nil {
+			return err
+		} else {
+			total += n
+			round++
 		}
 	}
 

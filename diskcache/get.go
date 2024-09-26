@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"time"
 )
 
@@ -60,7 +61,8 @@ func (c *DiskCache) Get(fn Fn) error {
 
 	defer func() {
 		if uint32(nbytes) != EOFHint {
-			getBytesVec.WithLabelValues(c.path).Add(float64(nbytes))
+			getBytesVec.WithLabelValues(c.path).Add(float64(nbytes)) // deprecated
+			getBytesV2Vec.WithLabelValues(c.path).Observe(float64(nbytes))
 
 			// get on EOF not counted as a real Get
 			getVec.WithLabelValues(c.path).Inc()
@@ -120,6 +122,7 @@ retry:
 	if n, err = c.rfd.Read(databuf); err != nil {
 		return err
 	} else if n != nbytes {
+		log.Printf("bad read size: %d != %d", n, nbytes)
 		return ErrUnexpectedReadSize
 	}
 

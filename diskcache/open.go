@@ -48,6 +48,10 @@ func defaultInstance() *DiskCache {
 	return &DiskCache{
 		noSync: false,
 
+		//streamBuf:   bytes.NewBuffer(make([]byte, 4*1024)),
+		streamBuf:   make([]byte, 4*1024),
+		batchHeader: make([]byte, dataHeaderLen),
+
 		batchSize:   20 * 1024 * 1024,
 		maxDataSize: 0, // not set
 

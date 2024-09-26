@@ -7,6 +7,7 @@ package diskcache
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	T "testing"
@@ -321,6 +322,42 @@ func TestPutOnCapacityReached(t *T.T) {
 		require.NotNil(t, m, "got metrics:\n%s", metrics.MetricFamily2Text(mfs))
 
 		assert.True(t, m.GetCounter().GetValue() > 0.0)
+
+		t.Cleanup(func() {
+			assert.NoError(t, c.Close())
+			ResetMetrics()
+		})
+	})
+}
+
+func TestStreamPut(t *T.T) {
+	t.Run("basic", func(t *T.T) {
+		reg := prometheus.NewRegistry()
+		register(reg)
+
+		raw := "0123456789"
+		r := strings.NewReader(raw)
+
+		var (
+			p = t.TempDir()
+		)
+
+		t.Logf("path: %s", p)
+
+		c, err := Open(WithPath(p), WithStreamSize(2))
+		assert.NoError(t, err)
+
+		assert.NoError(t, c.StreamPut(r, len(raw)))
+		assert.NoError(t, c.Rotate())
+
+		assert.NoError(t, c.Get(func(data []byte) error {
+			assert.Equal(t, []byte(raw), data)
+			return nil
+		}))
+
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 		t.Cleanup(func() {
 			assert.NoError(t, c.Close())

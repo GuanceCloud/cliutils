@@ -42,6 +42,9 @@ var (
 	// Get on no data cache.
 	ErrEOF = errors.New("EOF")
 
+	// Diskcache full, no data can be write now
+	ErrCacheFull = errors.New("cache full")
+
 	// Invalid cache filename.
 	ErrInvalidDataFileName       = errors.New("invalid datafile name")
 	ErrInvalidDataFileNameSuffix = errors.New("invalid datafile name suffix")
@@ -85,6 +88,10 @@ type DiskCache struct {
 	batchSize, // current batch size(static)
 	capacity int64 // capacity of the diskcache
 	maxDataSize int32 // max data size of single Put()
+
+	batchHeader []byte
+	//streamBuf   *bytes.Buffer
+	streamBuf []byte
 
 	// File permission, default 0750/0640
 	dirPerms,
