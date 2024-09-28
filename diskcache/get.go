@@ -6,6 +6,7 @@
 package diskcache
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -49,6 +50,15 @@ func (c *DiskCache) skipBadFile() error {
 // Get is safe to call concurrently with other operations and will
 // block until all other operations finish.
 func (c *DiskCache) Get(fn Fn) error {
+	return c.doGet(nil, fn)
+}
+
+// BufGet fetch new data from disk cache, and read into buf
+func (c *DiskCache) BufGet(buf *bytes.Buffer, fn Fn) error {
+	return c.doGet(buf, fn)
+}
+
+func (c *DiskCache) doGet(buf *bytes.Buffer, fn Fn) error {
 	var (
 		n, nbytes int
 		err       error
@@ -94,11 +104,8 @@ retry:
 		return ErrEOF
 	}
 
-	hdr := make([]byte, dataHeaderLen)
-	if n, err = c.rfd.Read(hdr); err != nil || n != dataHeaderLen {
-		//
+	if n, err = c.rfd.Read(c.batchHeader); err != nil || n != dataHeaderLen {
 		// On bad datafile, just ignore and delete the file.
-		//
 		if err = c.skipBadFile(); err != nil {
 			return err
 		}
@@ -107,7 +114,7 @@ retry:
 	}
 
 	// how many bytes of current data?
-	nbytes = int(binary.LittleEndian.Uint32(hdr[0:]))
+	nbytes = int(binary.LittleEndian.Uint32(c.batchHeader))
 
 	if uint32(nbytes) == EOFHint { // EOF
 		if err := c.switchNextFile(); err != nil {
@@ -117,11 +124,13 @@ retry:
 		goto retry // read next new file to save another Get() calling.
 	}
 
-	databuf := make([]byte, nbytes)
+	if buf == nil {
+		buf = bytes.NewBuffer(make([]byte, 0, nbytes))
+	}
 
-	if n, err = c.rfd.Read(databuf); err != nil {
+	if n, err := io.CopyN(buf, c.rfd, int64(nbytes)); err != nil {
 		return err
-	} else if n != nbytes {
+	} else if n != int64(nbytes) {
 		log.Printf("bad read size: %d != %d", n, nbytes)
 		return ErrUnexpectedReadSize
 	}
@@ -130,7 +139,7 @@ retry:
 		goto __updatePos
 	}
 
-	if err = fn(databuf); err != nil {
+	if err = fn(buf.Bytes()); err != nil {
 		// seek back
 		if !c.noFallbackOnError {
 			if _, serr := c.rfd.Seek(-int64(dataHeaderLen+nbytes), io.SeekCurrent); serr != nil {

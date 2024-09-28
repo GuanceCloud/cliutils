@@ -6,6 +6,7 @@
 package diskcache
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -19,48 +20,97 @@ import (
 )
 
 func TestGetPut(t *T.T) {
-	testDir := t.TempDir()
+	t.Run(`buf-get`, func(t *T.T) {
+		testDir := t.TempDir()
+		err := os.MkdirAll(testDir, 0o755)
+		assert.NoError(t, err)
 
-	err := os.MkdirAll(testDir, 0o755)
-	assert.NoError(t, err)
+		dq, err := Open(WithPath(testDir), WithCapacity(1<<30))
+		assert.NoError(t, err)
 
-	dq, err := Open(WithPath(testDir), WithCapacity(1<<30))
-	assert.NoError(t, err)
+		raw := []byte("hello message-1")
+		assert.NoError(t, dq.Put(raw))
 
-	assert.NoError(t, dq.Put([]byte("hello message-1")))
+		buf := bytes.NewBuffer(nil)
 
-	for {
-		if err := dq.Get(func(msg []byte) error {
-			t.Logf("get message: %q\n", string(msg))
-			return nil
-		}); err != nil {
-			t.Log(time.Now().Format(time.RFC3339Nano), " fail to get message: ", err)
-			time.Sleep(time.Second * 1)
-		} else {
-			break
+		for {
+			if err := dq.BufGet(buf, nil); err != nil {
+				t.Log(time.Now().Format(time.RFC3339Nano),
+					" fail to get message: ", err)
+				time.Sleep(time.Second * 1)
+			} else {
+				assert.Equal(t, raw, buf.Bytes())
+				break
+			}
 		}
-	}
 
-	assert.NoError(t, dq.Put([]byte("hello message-2")))
+		raw2 := []byte("hello message-2")
+		assert.NoError(t, dq.Put(raw2))
 
-	ok := false
+		ok := false
+		buf.Reset()
 
-	for i := 0; i < 10; i++ {
-		if err := dq.Get(func(msg []byte) error {
-			t.Logf("get message: %q\n", string(msg))
-			ok = true
-			return nil
-		}); err != nil {
-			t.Log(time.Now().Format(time.RFC3339Nano), " fail to get message: ", err)
-			time.Sleep(time.Second * 1)
-		} else {
-			break
+		for i := 0; i < 10; i++ {
+			if err := dq.BufGet(buf, func(msg []byte) error {
+				t.Logf("get message: %q\n", string(msg))
+				ok = true
+				return nil
+			}); err != nil {
+				t.Log(time.Now().Format(time.RFC3339Nano), " fail to get message: ", err)
+				time.Sleep(time.Second * 1)
+			} else {
+				break
+			}
 		}
-	}
 
-	assert.True(t, ok, "expected consume 1 message in 10 seconds, but got no message")
+		assert.True(t, ok, "expected consume 1 message in 10 seconds, but got no message")
 
-	assert.NoError(t, dq.Close())
+		assert.NoError(t, dq.Close())
+	})
+
+	t.Run(`basic`, func(t *T.T) {
+		testDir := t.TempDir()
+		err := os.MkdirAll(testDir, 0o755)
+		assert.NoError(t, err)
+
+		dq, err := Open(WithPath(testDir), WithCapacity(1<<30))
+		assert.NoError(t, err)
+
+		assert.NoError(t, dq.Put([]byte("hello message-1")))
+
+		for {
+			if err := dq.Get(func(msg []byte) error {
+				t.Logf("get message: %q\n", string(msg))
+				return nil
+			}); err != nil {
+				t.Log(time.Now().Format(time.RFC3339Nano), " fail to get message: ", err)
+				time.Sleep(time.Second * 1)
+			} else {
+				break
+			}
+		}
+
+		assert.NoError(t, dq.Put([]byte("hello message-2")))
+
+		ok := false
+
+		for i := 0; i < 10; i++ {
+			if err := dq.Get(func(msg []byte) error {
+				t.Logf("get message: %q\n", string(msg))
+				ok = true
+				return nil
+			}); err != nil {
+				t.Log(time.Now().Format(time.RFC3339Nano), " fail to get message: ", err)
+				time.Sleep(time.Second * 1)
+			} else {
+				break
+			}
+		}
+
+		assert.True(t, ok, "expected consume 1 message in 10 seconds, but got no message")
+
+		assert.NoError(t, dq.Close())
+	})
 }
 
 func TestDropInvalidDataFile(t *T.T) {
@@ -83,16 +133,19 @@ func TestDropInvalidDataFile(t *T.T) {
 
 		assert.Len(t, c.dataFiles, 10)
 
+		round := 0
 		for {
 			err := c.Get(func(get []byte) error {
 				// switch to 2nd file
-				assert.Equal(t, data, get)
+				assert.Equalf(t, data, get, "at round %d, get %d bytes",
+					round, len(get))
 				return nil
 			})
 			if err != nil {
 				require.ErrorIs(t, err, ErrEOF)
 				break
 			}
+			round++
 		}
 
 		reg := prometheus.NewRegistry()

@@ -6,6 +6,7 @@
 package diskcache
 
 import (
+	"bytes"
 	"errors"
 	"strings"
 	"sync"
@@ -97,6 +98,24 @@ func BenchmarkPutGet(b *T.B) {
 	b.Run(`get`, func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			c.Get(func(_ []byte) error { return nil })
+		}
+	})
+
+	b.Run(`buf-get`, func(b *T.B) {
+		buf := bytes.NewBuffer(nil)
+		for i := 0; i < b.N; i++ {
+			c.BufGet(buf, nil)
+			buf.Reset()
+		}
+	})
+
+	b.Run(`buf-get-with-callback`, func(b *T.B) {
+		buf := bytes.NewBuffer(nil)
+		for i := 0; i < b.N; i++ {
+			c.BufGet(buf, func(_ []byte) error {
+				return nil
+			})
+			buf.Reset()
 		}
 	})
 
