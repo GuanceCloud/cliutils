@@ -71,11 +71,9 @@ func (c *DiskCache) doGet(buf *bytes.Buffer, fn Fn) error {
 
 	defer func() {
 		if uint32(nbytes) != EOFHint {
-			getBytesVec.WithLabelValues(c.path).Add(float64(nbytes)) // deprecated
-			getBytesV2Vec.WithLabelValues(c.path).Observe(float64(nbytes))
+			getBytesVec.WithLabelValues(c.path).Observe(float64(nbytes))
 
 			// get on EOF not counted as a real Get
-			getVec.WithLabelValues(c.path).Inc()
 			getLatencyVec.WithLabelValues(c.path).Observe(float64(time.Since(start) / time.Microsecond))
 		}
 	}()

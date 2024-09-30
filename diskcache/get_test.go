@@ -149,7 +149,7 @@ func TestDropInvalidDataFile(t *T.T) {
 		}
 
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
 
@@ -218,7 +218,7 @@ func TestFallbackOnError(t *T.T) {
 		}))
 
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
 
@@ -270,7 +270,7 @@ func TestFallbackOnError(t *T.T) {
 func TestPutGet(t *T.T) {
 	t.Run(`clean-pos-on-eof`, func(t *T.T) {
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
@@ -293,8 +293,6 @@ func TestPutGet(t *T.T) {
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
 
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
-
 		t.Cleanup(func() {
 			c.Close()
 			ResetMetrics()
@@ -303,7 +301,7 @@ func TestPutGet(t *T.T) {
 
 	t.Run("put-get", func(t *T.T) {
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
@@ -325,7 +323,6 @@ func TestPutGet(t *T.T) {
 
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 		t.Cleanup(func() {
 			c.Close()
@@ -335,7 +332,7 @@ func TestPutGet(t *T.T) {
 
 	t.Run(`get-without-pos`, func(t *T.T) {
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 
 		p := t.TempDir()
 
@@ -367,7 +364,6 @@ func TestPutGet(t *T.T) {
 
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 		c2, err := Open(WithPath(p), WithNoPos(true))
 		assert.NoError(t, err)
@@ -392,7 +388,6 @@ func TestPutGet(t *T.T) {
 
 		mfs, err = reg.Gather()
 		require.NoError(t, err)
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 		// without .pos, still got 10 cache
 		assert.Equal(t, 10, ncached, "cache: %s", c2)

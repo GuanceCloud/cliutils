@@ -20,7 +20,7 @@ import (
 
 func TestDropBatch(t *T.T) {
 	reg := prometheus.NewRegistry()
-	register(reg)
+	reg.MustRegister(Metrics()...)
 
 	p := t.TempDir()
 	capacity := int64(32 * 1024 * 1024)
@@ -69,7 +69,7 @@ func TestDropBatch(t *T.T) {
 
 func TestDropDuringGet(t *T.T) {
 	reg := prometheus.NewRegistry()
-	register(reg)
+	reg.MustRegister(Metrics()...)
 
 	p := t.TempDir()
 	capacity := int64(2 * 1024 * 1024)
@@ -127,8 +127,6 @@ func TestDropDuringGet(t *T.T) {
 
 	mfs, err := reg.Gather()
 	assert.NoError(t, err)
-
-	t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 	t.Cleanup(func() {
 		assert.NoError(t, c.Close())

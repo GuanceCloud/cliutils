@@ -11,9 +11,6 @@ import (
 )
 
 var (
-	// deprecated
-	putVec, getVec, putBytesVec, getBytesVec *prometheus.CounterVec
-
 	droppedBatchVec,
 	droppedBytesVec,
 	rotateVec,
@@ -29,9 +26,9 @@ var (
 	batchSizeVec,
 	datafilesVec *prometheus.GaugeVec
 
-	putBytesV2Vec,
+	putBytesVec,
+	getBytesVec,
 	streamPutVec,
-	getBytesV2Vec,
 	getLatencyVec,
 	putLatencyVec *prometheus.SummaryVec
 
@@ -39,7 +36,6 @@ var (
 )
 
 func setupMetrics() {
-
 	streamPutVec = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace: ns,
@@ -82,7 +78,7 @@ func setupMetrics() {
 		[]string{"path"},
 	)
 
-	putBytesV2Vec = prometheus.NewSummaryVec(
+	putBytesVec = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace: ns,
 			Name:      "put_bytes",
@@ -96,7 +92,7 @@ func setupMetrics() {
 		[]string{"path"},
 	)
 
-	getBytesV2Vec = prometheus.NewSummaryVec(
+	getBytesVec = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace: ns,
 			Name:      "get_bytes",
@@ -146,33 +142,6 @@ func setupMetrics() {
 		[]string{"path"},
 	)
 
-	putVec = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: ns,
-			Name:      "put_total",
-			Help:      "Cache Put() count",
-		},
-		[]string{"path"},
-	)
-
-	putBytesVec = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: ns,
-			Name:      "put_bytes_total",
-			Help:      "Cache Put() bytes count",
-		},
-		[]string{"path"},
-	)
-
-	getVec = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: ns,
-			Name:      "get_total",
-			Help:      "Cache Get() count",
-		},
-		[]string{"path"},
-	)
-
 	wakeupVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: ns,
@@ -187,15 +156,6 @@ func setupMetrics() {
 			Namespace: ns,
 			Name:      "seek_back_total",
 			Help:      "Seek back when Get() got any error",
-		},
-		[]string{"path"},
-	)
-
-	getBytesVec = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: ns,
-			Name:      "get_bytes_total",
-			Help:      "Cache Get() bytes count",
 		},
 		[]string{"path"},
 	)
@@ -270,55 +230,30 @@ func setupMetrics() {
 		[]string{"path"},
 	)
 
-	metrics.MustRegister(
-		streamPutVec,
-		droppedBatchVec,
-		droppedBytesVec,
-		rotateVec,
-		putVec,
-		getVec,
-		putBytesVec,
-		wakeupVec,
-		seekBackVec,
-		getBytesVec,
-
-		openTimeVec,
-		lastCloseTimeVec,
-		capVec,
-		batchSizeVec,
-		maxDataVec,
-		sizeVec,
-		datafilesVec,
-
-		getLatencyVec,
-		putLatencyVec)
+	metrics.MustRegister(Metrics()...)
 }
 
 // register to specified registry for testing.
-func register(reg *prometheus.Registry) {
-	reg.MustRegister(
-		streamPutVec,
-		droppedBatchVec,
-		droppedBytesVec,
-		rotateVec,
-		putVec,
-		getVec,
-		putBytesVec,
-		wakeupVec,
-		seekBackVec,
-		getBytesVec,
-		putBytesV2Vec,
-		getBytesV2Vec,
-
-		capVec,
-		batchSizeVec,
-		maxDataVec,
-		sizeVec,
-		datafilesVec,
-
-		getLatencyVec,
-		putLatencyVec)
-}
+//func register(reg *prometheus.Registry) {
+//	reg.MustRegister(
+//		streamPutVec,
+//		droppedBatchVec,
+//		droppedBytesVec,
+//		rotateVec,
+//		wakeupVec,
+//		seekBackVec,
+//		putBytesVec,
+//		getBytesVec,
+//
+//		capVec,
+//		batchSizeVec,
+//		maxDataVec,
+//		sizeVec,
+//		datafilesVec,
+//
+//		getLatencyVec,
+//		putLatencyVec)
+//}
 
 // ResetMetrics used to cleanup exist metrics of diskcache.
 func ResetMetrics() {
@@ -326,12 +261,8 @@ func ResetMetrics() {
 	droppedBatchVec.Reset()
 	droppedBytesVec.Reset()
 	rotateVec.Reset()
-	putVec.Reset()
-	getVec.Reset()
-	putBytesVec.Reset()
 	wakeupVec.Reset()
 	seekBackVec.Reset()
-	getBytesVec.Reset()
 	capVec.Reset()
 	batchSizeVec.Reset()
 	maxDataVec.Reset()
@@ -339,8 +270,8 @@ func ResetMetrics() {
 	datafilesVec.Reset()
 	getLatencyVec.Reset()
 	putLatencyVec.Reset()
-	putBytesV2Vec.Reset()
-	getBytesV2Vec.Reset()
+	putBytesVec.Reset()
+	getBytesVec.Reset()
 }
 
 // Labels export cache's labels used to query prometheus metrics.
@@ -354,12 +285,8 @@ func Metrics() []prometheus.Collector {
 		droppedBytesVec,
 		rotateVec,
 		removeVec,
-		putVec,
-		getVec,
-		putBytesVec,
 		wakeupVec,
 		seekBackVec,
-		getBytesVec,
 
 		sizeVec,
 		openTimeVec,
@@ -371,8 +298,8 @@ func Metrics() []prometheus.Collector {
 
 		getLatencyVec,
 		putLatencyVec,
-		getBytesV2Vec,
-		putBytesV2Vec,
+		getBytesVec,
+		putBytesVec,
 	}
 }
 

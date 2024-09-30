@@ -10,7 +10,6 @@ import (
 	"errors"
 	T "testing"
 
-	"github.com/GuanceCloud/cliutils/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,7 +65,7 @@ func TestRotate(t *T.T) {
 
 	t.Run("rotate", func(t *T.T) {
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 
 		p := t.TempDir()
 		batchSize := int64(1024 * 1024)
@@ -123,7 +122,6 @@ func TestRotate(t *T.T) {
 
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
-		t.Logf("metrics \n%s", metrics.MetricFamily2Text(mfs))
 
 		t.Cleanup(func() {
 			assert.NoError(t, c.Close())

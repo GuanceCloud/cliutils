@@ -22,7 +22,7 @@ import (
 
 func BenchmarkNosyncPutGet(b *T.B) {
 	reg := prometheus.NewRegistry()
-	register(reg)
+	reg.MustRegister(Metrics()...)
 
 	p := b.TempDir()
 	c, err := Open(WithPath(p), WithNoSync(true), WithBatchSize(1024*1024*4), WithCapacity(4*1024*1024*1024))
@@ -58,7 +58,6 @@ func BenchmarkNosyncPutGet(b *T.B) {
 
 	mfs, err := reg.Gather()
 	require.NoError(b, err)
-	b.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 	b.Cleanup(func() {
 		assert.NoError(b, c.Close())
@@ -68,7 +67,8 @@ func BenchmarkNosyncPutGet(b *T.B) {
 
 func BenchmarkPutGet(b *T.B) {
 	reg := prometheus.NewRegistry()
-	register(reg)
+	reg.MustRegister(Metrics()...)
+
 	p := b.TempDir()
 	c, err := Open(WithPath(p), WithBatchSize(1024*1024*4), WithCapacity(4*1024*1024*1024))
 	require.NoError(b, err)
@@ -122,8 +122,6 @@ func BenchmarkPutGet(b *T.B) {
 	mfs, err := reg.Gather()
 	require.NoError(b, err)
 
-	b.Logf("\n%s", metrics.MetricFamily2Text(mfs))
-
 	b.Cleanup(func() {
 		assert.NoError(b, c.Close())
 		ResetMetrics()
@@ -139,7 +137,7 @@ func TestConcurrentPutGet(t *T.T) {
 		reg    = prometheus.NewRegistry()
 	)
 
-	register(reg)
+	reg.MustRegister(Metrics()...)
 
 	c, err := Open(WithPath(p), WithBatchSize(4*mb), WithCapacity(128*mb))
 	assert.NoError(t, err)
@@ -222,7 +220,6 @@ func TestConcurrentPutGet(t *T.T) {
 
 	mfs, err := reg.Gather()
 	require.NoError(t, err)
-	t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 	t.Cleanup(func() {
 		assert.NoError(t, c.Close())
@@ -242,7 +239,7 @@ func TestPutOnCapacityReached(t *T.T) {
 		)
 
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 
 		t.Logf("path: %s", p)
 
@@ -297,7 +294,7 @@ func TestPutOnCapacityReached(t *T.T) {
 		)
 
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 
 		t.Logf("path: %s", p)
 
@@ -352,7 +349,7 @@ func TestPutOnCapacityReached(t *T.T) {
 func TestStreamPut(t *T.T) {
 	t.Run("basic", func(t *T.T) {
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 
 		raw := "0123456789"
 		r := strings.NewReader(raw)
@@ -376,7 +373,6 @@ func TestStreamPut(t *T.T) {
 
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 		t.Cleanup(func() {
 			assert.NoError(t, c.Close())

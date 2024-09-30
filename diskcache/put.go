@@ -24,11 +24,7 @@ func (c *DiskCache) Put(data []byte) error {
 	defer c.wlock.Unlock()
 
 	defer func() {
-		putVec.WithLabelValues(c.path).Inc()
-
-		putBytesVec.WithLabelValues(c.path).Add(float64(len(data)))
-		putBytesV2Vec.WithLabelValues(c.path).Observe(float64(len(data)))
-
+		putBytesVec.WithLabelValues(c.path).Observe(float64(len(data)))
 		putLatencyVec.WithLabelValues(c.path).Observe(float64(time.Since(start) / time.Microsecond))
 		sizeVec.WithLabelValues(c.path).Set(float64(c.size))
 	}()
@@ -116,7 +112,7 @@ func (c *DiskCache) StreamPut(r io.Reader, size int) error {
 			}
 		}
 
-		putBytesV2Vec.WithLabelValues(c.path).Observe(float64(size))
+		putBytesVec.WithLabelValues(c.path).Observe(float64(size))
 		putLatencyVec.WithLabelValues(c.path).Observe(float64(time.Since(start) / time.Microsecond))
 		sizeVec.WithLabelValues(c.path).Set(float64(c.size))
 		streamPutVec.WithLabelValues(c.path).Observe(float64(round))
