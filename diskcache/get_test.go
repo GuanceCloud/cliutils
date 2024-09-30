@@ -269,9 +269,6 @@ func TestFallbackOnError(t *T.T) {
 
 func TestPutGet(t *T.T) {
 	t.Run(`clean-pos-on-eof`, func(t *T.T) {
-		reg := prometheus.NewRegistry()
-		reg.MustRegister(Metrics()...)
-
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
 		assert.NoError(t, err)
@@ -290,9 +287,6 @@ func TestPutGet(t *T.T) {
 
 		t.Logf("pos: %s", pos)
 
-		mfs, err := reg.Gather()
-		require.NoError(t, err)
-
 		t.Cleanup(func() {
 			c.Close()
 			ResetMetrics()
@@ -300,9 +294,6 @@ func TestPutGet(t *T.T) {
 	})
 
 	t.Run("put-get", func(t *T.T) {
-		reg := prometheus.NewRegistry()
-		reg.MustRegister(Metrics()...)
-
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
 		assert.NoError(t, err)
@@ -321,9 +312,6 @@ func TestPutGet(t *T.T) {
 			t.Logf("get: %s", err)
 		}
 
-		mfs, err := reg.Gather()
-		require.NoError(t, err)
-
 		t.Cleanup(func() {
 			c.Close()
 			os.RemoveAll(p)
@@ -331,9 +319,6 @@ func TestPutGet(t *T.T) {
 	})
 
 	t.Run(`get-without-pos`, func(t *T.T) {
-		reg := prometheus.NewRegistry()
-		reg.MustRegister(Metrics()...)
-
 		p := t.TempDir()
 
 		kbdata := make([]byte, 1024)
@@ -362,9 +347,6 @@ func TestPutGet(t *T.T) {
 		// close the cache for next re-Open()
 		assert.NoError(t, c.Close())
 
-		mfs, err := reg.Gather()
-		require.NoError(t, err)
-
 		c2, err := Open(WithPath(p), WithNoPos(true))
 		assert.NoError(t, err)
 		defer c2.Close()
@@ -385,9 +367,6 @@ func TestPutGet(t *T.T) {
 				}
 			}
 		}
-
-		mfs, err = reg.Gather()
-		require.NoError(t, err)
 
 		// without .pos, still got 10 cache
 		assert.Equal(t, 10, ncached, "cache: %s", c2)

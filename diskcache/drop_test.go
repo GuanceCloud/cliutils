@@ -125,9 +125,6 @@ func TestDropDuringGet(t *T.T) {
 
 	wg.Wait()
 
-	mfs, err := reg.Gather()
-	assert.NoError(t, err)
-
 	t.Cleanup(func() {
 		assert.NoError(t, c.Close())
 		ResetMetrics()
