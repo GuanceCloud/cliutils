@@ -103,26 +103,26 @@ log.Println(m.LineProto()) // get line-protocol format of metrics
 
 指标列表如下：
 
-| TYPE    | NAME                            | LABELS                                             | HELP                                                                     |
-| ---     | ---                             | ---                                                | ---                                                                      |
-| COUNTER | `diskcache_put_bytes_total`     | `path`                                             | Cache Put() bytes count                                                  |
-| COUNTER | `diskcache_get_total`           | `path`                                             | Cache Get() count                                                        |
-| COUNTER | `diskcache_wakeup_total`        | `path`                                             | Wakeup count on sleeping write file                                      |
-| COUNTER | `diskcache_get_bytes_total`     | `path`                                             | Cache Get() bytes count                                                  |
-| GAUGE   | `diskcache_capacity`            | `path`                                             | Current capacity(in bytes)                                               |
-| GAUGE   | `diskcache_max_data`            | `path`                                             | Max data to Put(in bytes), default 0                                     |
-| GAUGE   | `diskcache_batch_size`          | `path`                                             | Data file size(in bytes)                                                 |
-| GAUGE   | `diskcache_size`                | `path`                                             | Current cache size(in bytes)                                             |
-| GAUGE   | `diskcache_open_time`           | `no_fallback_on_error,no_lock,no_pos,no_sync,path` | Current cache Open time in unix timestamp(second)                        |
-| GAUGE   | `diskcache_last_close_time`     | `path`                                             | Current cache last Close time in unix timestamp(second)                  |
-| GAUGE   | `diskcache_datafiles`           | `path`                                             | Current un-readed data files                                             |
-| SUMMARY | `diskcache_get_latency`         | `path`                                             | Get() time cost(micro-second)                                            |
-| SUMMARY | `diskcache_put_latency`         | `path`                                             | Put() time cost(micro-second)                                            |
-| COUNTER | `diskcache_dropped_bytes_total` | `path`                                             | Dropped bytes during Put() when capacity reached.                        |
-| COUNTER | `diskcache_dropped_total`       | `path`                                             | Dropped files during Put() when capacity reached.                        |
-| COUNTER | `diskcache_rotate_total`        | `path`                                             | Cache rotate count, mean file rotate from data to data.0000xxx           |
-| COUNTER | `diskcache_remove_total`        | `path`                                             | Removed file count, if some file read EOF, remove it from un-readed list |
-| COUNTER | `diskcache_put_total`           | `path`                                             | Cache Put() count                                                        |
+| TYPE    | NAME                            | LABELS                                             | HELP                                                                   |
+| ---     | ---                             | ---                                                | ---                                                                    |
+| COUNTER | `diskcache_dropped_bytes_total` | `path`                                             | Dropped bytes during Put() when capacity reached.                      |
+| COUNTER | `diskcache_dropped_total`       | `path,reason`                                      | Dropped files during Put() when capacity reached.                      |
+| COUNTER | `diskcache_rotate_total`        | `path`                                             | Cache rotate count, mean file rotate from data to data.0000xxx         |
+| COUNTER | `diskcache_remove_total`        | `path`                                             | Removed file count, if some file read EOF, remove it from un-read list |
+| COUNTER | `diskcache_wakeup_total`        | `path`                                             | Wakeup count on sleeping write file                                    |
+| COUNTER | `diskcache_seek_back_total`     | `path`                                             | Seek back when Get() got any error                                     |
+| GAUGE   | `diskcache_capacity`            | `path`                                             | Current capacity(in bytes)                                             |
+| GAUGE   | `diskcache_max_data`            | `path`                                             | Max data to Put(in bytes), default 0                                   |
+| GAUGE   | `diskcache_batch_size`          | `path`                                             | Data file size(in bytes)                                               |
+| GAUGE   | `diskcache_size`                | `path`                                             | Current cache size(in bytes)                                           |
+| GAUGE   | `diskcache_open_time`           | `no_fallback_on_error,no_lock,no_pos,no_sync,path` | Current cache Open time in unix timestamp(second)                      |
+| GAUGE   | `diskcache_last_close_time`     | `path`                                             | Current cache last Close time in unix timestamp(second)                |
+| GAUGE   | `diskcache_datafiles`           | `path`                                             | Current un-read data files                                             |
+| SUMMARY | `diskcache_stream_put`          | `path`                                             | Stream put times                                                       |
+| SUMMARY | `diskcache_get_latency`         | `path`                                             | Get() cost seconds                                                     |
+| SUMMARY | `diskcache_put_latency`         | `path`                                             | Put() cost seconds                                                     |
+| SUMMARY | `diskcache_put_bytes`           | `path`                                             | Cache Put() bytes                                                      |
+| SUMMARY | `diskcache_get_bytes`           | `path`                                             | Cache Get() bytes                                                      |
 
 ## 性能估算
 

@@ -74,7 +74,7 @@ func (c *DiskCache) doGet(buf *bytes.Buffer, fn Fn) error {
 			getBytesVec.WithLabelValues(c.path).Observe(float64(nbytes))
 
 			// get on EOF not counted as a real Get
-			getLatencyVec.WithLabelValues(c.path).Observe(float64(time.Since(start) / time.Microsecond))
+			getLatencyVec.WithLabelValues(c.path).Observe(float64(time.Since(start) / time.Second))
 		}
 	}()
 

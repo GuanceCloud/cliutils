@@ -54,7 +54,7 @@ func setupMetrics() {
 		prometheus.SummaryOpts{
 			Namespace: ns,
 			Name:      "get_latency",
-			Help:      "Get() time cost(micro-second)",
+			Help:      "Get() cost seconds",
 			Objectives: map[float64]float64{
 				0.5:  0.05,
 				0.9:  0.01,
@@ -68,7 +68,7 @@ func setupMetrics() {
 		prometheus.SummaryOpts{
 			Namespace: ns,
 			Name:      "put_latency",
-			Help:      "Put() time cost(micro-second)",
+			Help:      "Put() cost seconds",
 			Objectives: map[float64]float64{
 				0.5:  0.05,
 				0.9:  0.01,
@@ -233,28 +233,6 @@ func setupMetrics() {
 	metrics.MustRegister(Metrics()...)
 }
 
-// register to specified registry for testing.
-//func register(reg *prometheus.Registry) {
-//	reg.MustRegister(
-//		streamPutVec,
-//		droppedBatchVec,
-//		droppedBytesVec,
-//		rotateVec,
-//		wakeupVec,
-//		seekBackVec,
-//		putBytesVec,
-//		getBytesVec,
-//
-//		capVec,
-//		batchSizeVec,
-//		maxDataVec,
-//		sizeVec,
-//		datafilesVec,
-//
-//		getLatencyVec,
-//		putLatencyVec)
-//}
-
 // ResetMetrics used to cleanup exist metrics of diskcache.
 func ResetMetrics() {
 	streamPutVec.Reset()
@@ -273,11 +251,6 @@ func ResetMetrics() {
 	putBytesVec.Reset()
 	getBytesVec.Reset()
 }
-
-// Labels export cache's labels used to query prometheus metrics.
-// func (c *DiskCache) Labels() []string {
-//	return c.labels
-//}
 
 func Metrics() []prometheus.Collector {
 	return []prometheus.Collector{
