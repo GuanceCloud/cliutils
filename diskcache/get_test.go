@@ -153,12 +153,12 @@ func TestDropInvalidDataFile(t *T.T) {
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
 
-		assert.Equalf(t, float64(5),
+		assert.Equalf(t, uint64(5),
 			metrics.GetMetricOnLabels(mfs,
-				"diskcache_dropped_total",
+				"diskcache_dropped_data",
 				c.path,
 				reasonBadDataFile,
-			).GetCounter().GetValue(),
+			).GetSummary().GetSampleCount(),
 			"got metrics\n%s", metrics.MetricFamily2Text(mfs))
 	})
 }

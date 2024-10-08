@@ -50,15 +50,15 @@ func TestDropBatch(t *T.T) {
 	assert.NoError(t, err)
 
 	m := metrics.GetMetricOnLabels(mfs,
-		"diskcache_dropped_total",
+		"diskcache_dropped_data",
 		c.path,
 		reasonExceedCapacity)
 
 	require.NotNil(t, m, "got metrics\n%s", metrics.MetricFamily2Text(mfs))
 
 	assert.Equal(t,
-		float64(1),
-		m.GetCounter().GetValue(),
+		uint64(1),
+		m.GetSummary().GetSampleCount(),
 		"got metrics\n%s", metrics.MetricFamily2Text(mfs))
 
 	t.Cleanup(func() {

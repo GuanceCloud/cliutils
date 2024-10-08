@@ -30,6 +30,11 @@ func (c *DiskCache) Put(data []byte) error {
 	}()
 
 	if c.capacity > 0 && c.size+int64(len(data)) > c.capacity {
+		if c.fifoDrop { // do not accept new data
+			droppedDataVec.WithLabelValues(c.path, reasonExceedCapacity).Observe(float64(len(data)))
+			return ErrCacheFull
+		}
+
 		if err := c.dropBatch(); err != nil {
 			return err
 		}
@@ -84,6 +89,9 @@ func (c *DiskCache) putPart(part []byte) error {
 }
 
 // StreamPut read from r for bytes and write to storage.
+//
+// If we read the data from some network stream(such as HTTP response body),
+// we can use StreamPut to avoid a intermidiate buffer to accept the huge(may be) body.
 func (c *DiskCache) StreamPut(r io.Reader, size int) error {
 	var (
 		n           = 0
@@ -108,7 +116,6 @@ func (c *DiskCache) StreamPut(r io.Reader, size int) error {
 	defer func() {
 		if total > 0 && err != nil { // fallback to origin postion
 			if _, serr := c.wfd.Seek(startOffset, os.SEEK_SET); serr != nil {
-				// TODO:
 			}
 		}
 

@@ -75,9 +75,9 @@ type DiskCache struct {
 	// how long to wakeup a sleeping write-file
 	wakeup time.Duration
 
-	wlock, // used to exclude concurrent Put.
-	rlock *sync.Mutex // used to exclude concurrent Get.
-	rwlock *sync.Mutex // used to exclude switch/rotate/drop/Close
+	wlock, // write-lock: used to exclude concurrent Put to the header file.
+	rlock *sync.Mutex // read-lock: used to exclude concurrent Get on the tail file.
+	rwlock *sync.Mutex // used to exclude switch/rotate/drop/Close on current disk cache instance.
 
 	flock *flock // disabled multi-Open on same path
 	pos   *pos   // current read fd position info
@@ -85,6 +85,7 @@ type DiskCache struct {
 	// specs of current diskcache
 	size, // current byte size
 	curBatchSize, // current writing file's size
+	curReadSize, // current reading file's size
 	batchSize, // current batch size(static)
 	capacity int64 // capacity of the diskcache
 	maxDataSize int32 // max data size of single Put()
@@ -101,6 +102,7 @@ type DiskCache struct {
 	noSync, // NoSync if enabled, may cause data missing, default false
 	noFallbackOnError, // ignore Fn() error
 	noPos, // no position
+	fifoDrop, // first-in-first-out drop, meas we chooes to drop the new-commint data
 	noLock bool // no file lock
 
 	// labels used to export prometheus flags

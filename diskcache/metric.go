@@ -11,8 +11,6 @@ import (
 )
 
 var (
-	droppedBatchVec,
-	droppedBytesVec,
 	rotateVec,
 	removeVec,
 	wakeupVec,
@@ -26,6 +24,7 @@ var (
 	batchSizeVec,
 	datafilesVec *prometheus.GaugeVec
 
+	droppedDataVec,
 	putBytesVec,
 	getBytesVec,
 	streamPutVec,
@@ -106,20 +105,16 @@ func setupMetrics() {
 		[]string{"path"},
 	)
 
-	droppedBytesVec = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
+	droppedDataVec = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
 			Namespace: ns,
-			Name:      "dropped_bytes_total",
-			Help:      "Dropped bytes during Put() when capacity reached.",
-		},
-		[]string{"path"},
-	)
-
-	droppedBatchVec = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: ns,
-			Name:      "dropped_total",
-			Help:      "Dropped files during Put() when capacity reached.",
+			Name:      "dropped_data",
+			Help:      "Dropped data during Put() when capacity reached.",
+			Objectives: map[float64]float64{
+				0.5:  0.05,
+				0.9:  0.01,
+				0.99: 0.001,
+			},
 		},
 		[]string{"path", "reason"},
 	)
@@ -236,8 +231,7 @@ func setupMetrics() {
 // ResetMetrics used to cleanup exist metrics of diskcache.
 func ResetMetrics() {
 	streamPutVec.Reset()
-	droppedBatchVec.Reset()
-	droppedBytesVec.Reset()
+	droppedDataVec.Reset()
 	rotateVec.Reset()
 	wakeupVec.Reset()
 	seekBackVec.Reset()
@@ -254,8 +248,7 @@ func ResetMetrics() {
 
 func Metrics() []prometheus.Collector {
 	return []prometheus.Collector{
-		droppedBatchVec,
-		droppedBytesVec,
+		droppedDataVec,
 		rotateVec,
 		removeVec,
 		wakeupVec,

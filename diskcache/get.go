@@ -37,7 +37,7 @@ func (c *DiskCache) switchNextFile() error {
 
 func (c *DiskCache) skipBadFile() error {
 	defer func() {
-		droppedBatchVec.WithLabelValues(c.path, reasonBadDataFile).Inc()
+		droppedDataVec.WithLabelValues(c.path, reasonBadDataFile).Observe(float64(c.curReadSize))
 	}()
 
 	return c.switchNextFile()

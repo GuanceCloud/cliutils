@@ -253,12 +253,12 @@ func TestPutOnCapacityReached(t *T.T) {
 		require.NoError(t, err)
 
 		m := metrics.GetMetricOnLabels(mfs,
-			"diskcache_dropped_total",
+			"diskcache_dropped_data",
 			c.path,
 			reasonExceedCapacity)
 
 		require.NotNil(t, m, "got metrics:\n%s", metrics.MetricFamily2Text(mfs))
-		assert.True(t, m.GetCounter().GetValue() > 0.0)
+		assert.True(t, m.GetSummary().GetSampleCount() > 0)
 
 		t.Cleanup(func() {
 			require.NoError(t, c.Close())
@@ -316,16 +316,75 @@ func TestPutOnCapacityReached(t *T.T) {
 		require.NoError(t, err)
 
 		m := metrics.GetMetricOnLabels(mfs,
-			"diskcache_dropped_total",
+			"diskcache_dropped_data",
 			c.path,
 			reasonExceedCapacity)
 		require.NotNil(t, m, "got metrics:\n%s", metrics.MetricFamily2Text(mfs))
 
-		assert.True(t, m.GetCounter().GetValue() > 0.0)
+		assert.True(t, m.GetSummary().GetSampleCount() > 0)
 
 		t.Cleanup(func() {
 			assert.NoError(t, c.Close())
 			ResetMetrics()
+		})
+	})
+
+	t.Run(`fifo-drop`, func(t *T.T) {
+		var (
+			mb       = int64(1024 * 1024)
+			p        = t.TempDir()
+			capacity = 32 * mb
+			large    = make([]byte, mb)
+			small    = make([]byte, 1024*3)
+			maxPut   = 4 * capacity
+		)
+
+		reg := prometheus.NewRegistry()
+		reg.MustRegister(Metrics()...)
+
+		t.Logf("path: %s", p)
+
+		c, err := Open(WithPath(p),
+			WithCapacity(capacity),
+			WithBatchSize(4*mb),
+			WithFIFODrop(true),
+		)
+		assert.NoError(t, err)
+
+		putBytes := 0
+
+		n := 0
+		for {
+			switch n % 2 {
+			case 0:
+				c.Put(small)
+				putBytes += len(small)
+			case 1:
+				c.Put(large)
+				putBytes += len(large)
+			}
+			n++
+
+			if int64(putBytes) > maxPut {
+				break
+			}
+		}
+
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+
+		m := metrics.GetMetricOnLabels(mfs,
+			"diskcache_dropped_data",
+			c.path,
+			reasonExceedCapacity)
+
+		require.NotNil(t, m, "got metrics:\n%s", metrics.MetricFamily2Text(mfs))
+		assert.True(t, m.GetSummary().GetSampleCount() > 0)
+
+		t.Cleanup(func() {
+			require.NoError(t, c.Close())
+			ResetMetrics()
+			t.Logf("metrics:\n%s", metrics.MetricFamily2Text(mfs))
 		})
 	})
 }
