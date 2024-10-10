@@ -20,7 +20,7 @@ import (
 
 func TestDropBatch(t *T.T) {
 	reg := prometheus.NewRegistry()
-	register(reg)
+	reg.MustRegister(Metrics()...)
 
 	p := t.TempDir()
 	capacity := int64(32 * 1024 * 1024)
@@ -50,15 +50,15 @@ func TestDropBatch(t *T.T) {
 	assert.NoError(t, err)
 
 	m := metrics.GetMetricOnLabels(mfs,
-		"diskcache_dropped_total",
+		"diskcache_dropped_data",
 		c.path,
 		reasonExceedCapacity)
 
 	require.NotNil(t, m, "got metrics\n%s", metrics.MetricFamily2Text(mfs))
 
 	assert.Equal(t,
-		float64(1),
-		m.GetCounter().GetValue(),
+		uint64(1),
+		m.GetSummary().GetSampleCount(),
 		"got metrics\n%s", metrics.MetricFamily2Text(mfs))
 
 	t.Cleanup(func() {
@@ -69,7 +69,7 @@ func TestDropBatch(t *T.T) {
 
 func TestDropDuringGet(t *T.T) {
 	reg := prometheus.NewRegistry()
-	register(reg)
+	reg.MustRegister(Metrics()...)
 
 	p := t.TempDir()
 	capacity := int64(2 * 1024 * 1024)
@@ -106,7 +106,7 @@ func TestDropDuringGet(t *T.T) {
 			assert.Equal(t, sample, x)
 			return nil
 		}); err != nil {
-			if errors.Is(err, ErrEOF) {
+			if errors.Is(err, ErrNoData) {
 				t.Logf("[%s] read: %s", time.Now(), err)
 				time.Sleep(time.Second)
 				eof++
@@ -124,11 +124,6 @@ func TestDropDuringGet(t *T.T) {
 	}
 
 	wg.Wait()
-
-	mfs, err := reg.Gather()
-	assert.NoError(t, err)
-
-	t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 	t.Cleanup(func() {
 		assert.NoError(t, c.Close())

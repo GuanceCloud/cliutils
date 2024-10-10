@@ -7,6 +7,7 @@ package diskcache
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	T "testing"
@@ -19,9 +20,6 @@ import (
 )
 
 func BenchmarkNosyncPutGet(b *T.B) {
-	reg := prometheus.NewRegistry()
-	register(reg)
-
 	p := b.TempDir()
 	c, err := Open(WithPath(p), WithNoSync(true), WithBatchSize(1024*1024*4), WithCapacity(4*1024*1024*1024))
 	require.NoError(b, err)
@@ -54,10 +52,6 @@ func BenchmarkNosyncPutGet(b *T.B) {
 		}
 	})
 
-	mfs, err := reg.Gather()
-	require.NoError(b, err)
-	b.Logf("\n%s", metrics.MetricFamily2Text(mfs))
-
 	b.Cleanup(func() {
 		assert.NoError(b, c.Close())
 		ResetMetrics()
@@ -65,8 +59,6 @@ func BenchmarkNosyncPutGet(b *T.B) {
 }
 
 func BenchmarkPutGet(b *T.B) {
-	reg := prometheus.NewRegistry()
-	register(reg)
 	p := b.TempDir()
 	c, err := Open(WithPath(p), WithBatchSize(1024*1024*4), WithCapacity(4*1024*1024*1024))
 	require.NoError(b, err)
@@ -99,10 +91,23 @@ func BenchmarkPutGet(b *T.B) {
 		}
 	})
 
-	mfs, err := reg.Gather()
-	require.NoError(b, err)
+	b.Run(`buf-get`, func(b *T.B) {
+		buf := make([]byte, 1<<20)
+		for i := 0; i < b.N; i++ {
+			c.BufGet(buf, nil)
+		}
+	})
 
-	b.Logf("\n%s", metrics.MetricFamily2Text(mfs))
+	b.Run(`buf-get-with-callback`, func(b *T.B) {
+		buf := make([]byte, 1<<20)
+		for i := 0; i < b.N; i++ {
+			c.BufGet(buf, func(_ []byte) error {
+				return nil
+			})
+		}
+	})
+
+	require.NoError(b, err)
 
 	b.Cleanup(func() {
 		assert.NoError(b, c.Close())
@@ -116,10 +121,7 @@ func TestConcurrentPutGet(t *T.T) {
 		mb     = int64(1024 * 1024)
 		sample = make([]byte, 5*7351)
 		eof    = 0
-		reg    = prometheus.NewRegistry()
 	)
-
-	register(reg)
 
 	c, err := Open(WithPath(p), WithBatchSize(4*mb), WithCapacity(128*mb))
 	assert.NoError(t, err)
@@ -177,7 +179,7 @@ func TestConcurrentPutGet(t *T.T) {
 
 				return nil
 			}); err != nil {
-				if errors.Is(err, ErrEOF) {
+				if errors.Is(err, ErrNoData) {
 					time.Sleep(time.Second)
 					eof++
 					if eof >= 10 {
@@ -200,10 +202,6 @@ func TestConcurrentPutGet(t *T.T) {
 
 	wg.Wait()
 
-	mfs, err := reg.Gather()
-	require.NoError(t, err)
-	t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
-
 	t.Cleanup(func() {
 		assert.NoError(t, c.Close())
 		ResetMetrics()
@@ -222,7 +220,7 @@ func TestPutOnCapacityReached(t *T.T) {
 		)
 
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 
 		t.Logf("path: %s", p)
 
@@ -252,12 +250,12 @@ func TestPutOnCapacityReached(t *T.T) {
 		require.NoError(t, err)
 
 		m := metrics.GetMetricOnLabels(mfs,
-			"diskcache_dropped_total",
+			"diskcache_dropped_data",
 			c.path,
 			reasonExceedCapacity)
 
 		require.NotNil(t, m, "got metrics:\n%s", metrics.MetricFamily2Text(mfs))
-		assert.True(t, m.GetCounter().GetValue() > 0.0)
+		assert.True(t, m.GetSummary().GetSampleCount() > 0)
 
 		t.Cleanup(func() {
 			require.NoError(t, c.Close())
@@ -277,7 +275,7 @@ func TestPutOnCapacityReached(t *T.T) {
 		)
 
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 
 		t.Logf("path: %s", p)
 
@@ -315,12 +313,102 @@ func TestPutOnCapacityReached(t *T.T) {
 		require.NoError(t, err)
 
 		m := metrics.GetMetricOnLabels(mfs,
-			"diskcache_dropped_total",
+			"diskcache_dropped_data",
 			c.path,
 			reasonExceedCapacity)
 		require.NotNil(t, m, "got metrics:\n%s", metrics.MetricFamily2Text(mfs))
 
-		assert.True(t, m.GetCounter().GetValue() > 0.0)
+		assert.True(t, m.GetSummary().GetSampleCount() > 0)
+
+		t.Cleanup(func() {
+			assert.NoError(t, c.Close())
+			ResetMetrics()
+		})
+	})
+
+	t.Run(`fifo-drop`, func(t *T.T) {
+		var (
+			mb       = int64(1024 * 1024)
+			p        = t.TempDir()
+			capacity = 32 * mb
+			large    = make([]byte, mb)
+			small    = make([]byte, 1024*3)
+			maxPut   = 4 * capacity
+		)
+
+		reg := prometheus.NewRegistry()
+		reg.MustRegister(Metrics()...)
+
+		t.Logf("path: %s", p)
+
+		c, err := Open(WithPath(p),
+			WithCapacity(capacity),
+			WithBatchSize(4*mb),
+			WithFILODrop(true),
+		)
+		assert.NoError(t, err)
+
+		putBytes := 0
+
+		n := 0
+		for {
+			switch n % 2 {
+			case 0:
+				c.Put(small)
+				putBytes += len(small)
+			case 1:
+				c.Put(large)
+				putBytes += len(large)
+			}
+			n++
+
+			if int64(putBytes) > maxPut {
+				break
+			}
+		}
+
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+
+		m := metrics.GetMetricOnLabels(mfs,
+			"diskcache_dropped_data",
+			c.path,
+			reasonExceedCapacity)
+
+		require.NotNil(t, m, "got metrics:\n%s", metrics.MetricFamily2Text(mfs))
+		assert.True(t, m.GetSummary().GetSampleCount() > 0)
+
+		t.Cleanup(func() {
+			require.NoError(t, c.Close())
+			ResetMetrics()
+			t.Logf("metrics:\n%s", metrics.MetricFamily2Text(mfs))
+		})
+	})
+}
+
+func TestStreamPut(t *T.T) {
+	t.Run("basic", func(t *T.T) {
+		raw := "0123456789"
+		r := strings.NewReader(raw)
+
+		var (
+			p = t.TempDir()
+		)
+
+		t.Logf("path: %s", p)
+
+		c, err := Open(WithPath(p), WithStreamSize(2))
+		assert.NoError(t, err)
+
+		assert.NoError(t, c.StreamPut(r, len(raw)))
+		assert.NoError(t, c.Rotate())
+
+		assert.NoError(t, c.Get(func(data []byte) error {
+			assert.Equal(t, []byte(raw), data)
+			return nil
+		}))
+
+		require.NoError(t, err)
 
 		t.Cleanup(func() {
 			assert.NoError(t, c.Close())
