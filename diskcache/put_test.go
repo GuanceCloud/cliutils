@@ -6,7 +6,6 @@
 package diskcache
 
 import (
-	"bytes"
 	"errors"
 	"strings"
 	"sync"
@@ -93,20 +92,18 @@ func BenchmarkPutGet(b *T.B) {
 	})
 
 	b.Run(`buf-get`, func(b *T.B) {
-		buf := bytes.NewBuffer(nil)
+		buf := make([]byte, 1<<20)
 		for i := 0; i < b.N; i++ {
 			c.BufGet(buf, nil)
-			buf.Reset()
 		}
 	})
 
 	b.Run(`buf-get-with-callback`, func(b *T.B) {
-		buf := bytes.NewBuffer(nil)
+		buf := make([]byte, 1<<20)
 		for i := 0; i < b.N; i++ {
 			c.BufGet(buf, func(_ []byte) error {
 				return nil
 			})
-			buf.Reset()
 		}
 	})
 
@@ -182,7 +179,7 @@ func TestConcurrentPutGet(t *T.T) {
 
 				return nil
 			}); err != nil {
-				if errors.Is(err, ErrEOF) {
+				if errors.Is(err, ErrNoData) {
 					time.Sleep(time.Second)
 					eof++
 					if eof >= 10 {
@@ -347,7 +344,7 @@ func TestPutOnCapacityReached(t *T.T) {
 		c, err := Open(WithPath(p),
 			WithCapacity(capacity),
 			WithBatchSize(4*mb),
-			WithFIFODrop(true),
+			WithFILODrop(true),
 		)
 		assert.NoError(t, err)
 

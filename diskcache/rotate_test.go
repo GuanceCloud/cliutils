@@ -35,7 +35,7 @@ func TestRotate(t *T.T) {
 				assert.Len(t, data, 1024)
 				return nil
 			}); err != nil {
-				if errors.Is(err, ErrEOF) {
+				if errors.Is(err, ErrNoData) {
 					break
 				} else {
 					assert.NoError(t, err)
@@ -105,7 +105,7 @@ func TestRotate(t *T.T) {
 			}
 
 			if err := c.Get(fn); err != nil {
-				if errors.Is(err, ErrEOF) {
+				if errors.Is(err, ErrNoData) {
 					t.Logf("read EOF")
 				} else {
 					t.Error(err)

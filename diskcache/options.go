@@ -26,15 +26,15 @@ func WithNoFallbackOnError(on bool) CacheOption {
 	}
 }
 
-// WithFIFODrop set drop policy during Put() when cache's size
+// WithFILODrop set drop policy during Put() when cache's size
 // almost reached it's capacity(). When set FILO drop, the Put()
 // will fail immediately with a error.
 //
-// Default drop policy is FILO, means all Put() will OK and the
+// Default drop policy is FIFO, means all Put() will OK and the
 // cache drop old data automatically.
-func WithFIFODrop(on bool) CacheOption {
+func WithFILODrop(on bool) CacheOption {
 	return func(c *DiskCache) {
-		c.fifoDrop = true
+		c.filoDrop = on
 	}
 }
 

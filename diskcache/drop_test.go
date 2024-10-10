@@ -106,7 +106,7 @@ func TestDropDuringGet(t *T.T) {
 			assert.Equal(t, sample, x)
 			return nil
 		}); err != nil {
-			if errors.Is(err, ErrEOF) {
+			if errors.Is(err, ErrNoData) {
 				t.Logf("[%s] read: %s", time.Now(), err)
 				time.Sleep(time.Second)
 				eof++

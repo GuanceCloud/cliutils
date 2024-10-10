@@ -30,7 +30,7 @@ func (c *DiskCache) Put(data []byte) error {
 	}()
 
 	if c.capacity > 0 && c.size+int64(len(data)) > c.capacity {
-		if c.fifoDrop { // do not accept new data
+		if c.filoDrop { // do not accept new data
 			droppedDataVec.WithLabelValues(c.path, reasonExceedCapacity).Observe(float64(len(data)))
 			return ErrCacheFull
 		}

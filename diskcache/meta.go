@@ -14,15 +14,11 @@ func (c *DiskCache) Size() int64 {
 
 // Capacity return max capacity of the cache.
 func (c *DiskCache) Capacity() int64 {
-	c.rwlock.Lock()
-	defer c.rwlock.Unlock()
 	return c.capacity
 }
 
 // MaxDataSize return max single data piece size of the cache.
 func (c *DiskCache) MaxDataSize() int32 {
-	c.rwlock.Lock()
-	defer c.rwlock.Unlock()
 	return c.maxDataSize
 }
 
@@ -32,7 +28,10 @@ func (c *DiskCache) MaxDataSize() int32 {
 // and garbage collection more quickly when all piece of data wthin the data
 // file has been Get() out of the file.
 func (c *DiskCache) MaxBatchSize() int64 {
-	c.rwlock.Lock()
-	defer c.rwlock.Unlock()
 	return c.batchSize
+}
+
+// Path return dir of current diskcache.
+func (c *DiskCache) Path() string {
+	return c.path
 }

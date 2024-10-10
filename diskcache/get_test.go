@@ -6,7 +6,6 @@
 package diskcache
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -30,29 +29,35 @@ func TestGetPut(t *T.T) {
 
 		raw := []byte("hello message-1")
 		assert.NoError(t, dq.Put(raw))
+		assert.NoError(t, dq.Rotate())
 
-		buf := bytes.NewBuffer(nil)
+		buf := make([]byte, 1<<20)
 
 		for {
 			if err := dq.BufGet(buf, nil); err != nil {
-				t.Log(time.Now().Format(time.RFC3339Nano),
-					" fail to get message: ", err)
+				t.Logf("fail to get message: %s", err)
 				time.Sleep(time.Second * 1)
 			} else {
-				assert.Equal(t, raw, buf.Bytes())
+				assert.Equal(t, raw, buf[:len(raw)])
 				break
 			}
 		}
 
 		raw2 := []byte("hello message-2")
 		assert.NoError(t, dq.Put(raw2))
+		assert.NoError(t, dq.Rotate())
 
 		ok := false
-		buf.Reset()
 
 		for i := 0; i < 10; i++ {
 			if err := dq.BufGet(buf, func(msg []byte) error {
+				t.Logf("msg: %p/%d", msg, len(msg))
+				t.Logf("msg: %p/%d", buf, len(buf))
 				t.Logf("get message: %q\n", string(msg))
+
+				assert.Equal(t, len(buf), cap(buf)) // buf's length should not changed
+
+				assert.Equal(t, buf[:len(msg)], msg)
 				ok = true
 				return nil
 			}); err != nil {
@@ -142,7 +147,7 @@ func TestDropInvalidDataFile(t *T.T) {
 				return nil
 			})
 			if err != nil {
-				require.ErrorIs(t, err, ErrEOF)
+				require.ErrorIs(t, err, ErrNoData)
 				break
 			}
 			round++
@@ -164,7 +169,7 @@ func TestDropInvalidDataFile(t *T.T) {
 }
 
 func TestFallbackOnError(t *T.T) {
-	t.Run(`get-erro-on-EOF`, func(t *T.T) {
+	t.Run(`get-error-on-EOF`, func(t *T.T) {
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
 		require.NoError(t, err)
@@ -184,10 +189,10 @@ func TestFallbackOnError(t *T.T) {
 			return nil
 		})
 
-		assert.ErrorIs(t, err, ErrEOF)
+		assert.ErrorIs(t, err, ErrNoData)
 		t.Logf("get: %s", err)
 
-		if errors.Is(err, ErrEOF) {
+		if errors.Is(err, ErrNoData) {
 			t.Logf("we should ignore the error")
 		}
 	})
@@ -239,12 +244,12 @@ func TestFallbackOnError(t *T.T) {
 		// while on EOF, Fn error ignored
 		assert.ErrorIs(t, c.Get(func(_ []byte) error {
 			return fmt.Errorf("get error")
-		}), ErrEOF)
+		}), ErrNoData)
 
 		// still got EOF
 		assert.ErrorIs(t, c.Get(func(x []byte) error {
 			return nil
-		}), ErrEOF)
+		}), ErrNoData)
 	})
 
 	t.Run(`no-fallback-on-error`, func(t *T.T) {
@@ -263,7 +268,7 @@ func TestFallbackOnError(t *T.T) {
 
 		assert.ErrorIs(t, c.Get(func(x []byte) error {
 			return nil
-		}), ErrEOF)
+		}), ErrNoData)
 	})
 }
 
@@ -359,7 +364,7 @@ func TestPutGet(t *T.T) {
 				ncached++
 				return nil
 			}); err != nil {
-				if errors.Is(err, ErrEOF) {
+				if errors.Is(err, ErrNoData) {
 					t.Logf("cache EOF")
 					break
 				} else {

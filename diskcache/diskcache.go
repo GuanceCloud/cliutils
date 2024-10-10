@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -36,11 +37,13 @@ var (
 	// Invalid read size.
 	ErrUnexpectedReadSize = errors.New("unexpected read size")
 
+	ErrTooSmallReadBuf = errors.New("too small read buffer")
+
 	// Data send to Put() exceed the maxDataSize.
 	ErrTooLargeData = errors.New("too large data")
 
 	// Get on no data cache.
-	ErrEOF = errors.New("EOF")
+	ErrNoData = errors.New("no data")
 
 	// Diskcache full, no data can be write now
 	ErrCacheFull = errors.New("cache full")
@@ -102,7 +105,7 @@ type DiskCache struct {
 	noSync, // NoSync if enabled, may cause data missing, default false
 	noFallbackOnError, // ignore Fn() error
 	noPos, // no position
-	fifoDrop, // first-in-first-out drop, meas we chooes to drop the new-commint data
+	filoDrop, // first-in-last-out drop, meas we chooes to drop the new-comming data first
 	noLock bool // no file lock
 
 	// labels used to export prometheus flags
@@ -125,4 +128,32 @@ func (c *DiskCache) String() string {
 			c.path, c.size, c.noFallbackOnError, c.noSync, c.noLock, c.noPos, len(c.dataFiles), c.maxDataSize, c.batchSize, c.capacity, c.dataFiles,
 		)
 	}
+}
+
+func (c *DiskCache) Pretty() string {
+	c.rwlock.Lock()
+	defer c.rwlock.Unlock()
+
+	arr := []string{}
+
+	arr = append(arr, "path: "+c.path)
+	arr = append(arr, fmt.Sprintf("size: %d", c.size))
+	arr = append(arr, fmt.Sprintf("max-data-size: %d", c.maxDataSize))
+	arr = append(arr, fmt.Sprintf("capacity: %d", c.capacity))
+	arr = append(arr, fmt.Sprintf("data-files(%d):", len(c.dataFiles)))
+
+	for i, df := range c.dataFiles {
+		arr = append(arr, "\t"+df)
+		if i > 10 {
+			arr = append(arr, fmt.Sprintf("omitted %d files...", len(c.dataFiles)-i))
+		}
+	}
+
+	if c.rfd != nil {
+		arr = append(arr, fmt.Sprintf("cur-read: %s", c.rfd.Name()))
+	} else {
+		arr = append(arr, "no-Get()")
+	}
+
+	return strings.Join(arr, "\n")
 }
