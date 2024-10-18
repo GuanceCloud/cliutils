@@ -26,10 +26,10 @@ func (c *DiskCache) Put(data []byte) error {
 	defer func() {
 		putBytesVec.WithLabelValues(c.path).Observe(float64(len(data)))
 		putLatencyVec.WithLabelValues(c.path).Observe(float64(time.Since(start)) / float64(time.Second))
-		sizeVec.WithLabelValues(c.path).Set(float64(c.size))
+		sizeVec.WithLabelValues(c.path).Set(float64(c.size.Load()))
 	}()
 
-	if c.capacity > 0 && c.size+int64(len(data)) > c.capacity {
+	if c.capacity > 0 && c.size.Load()+int64(len(data)) > c.capacity {
 		if c.filoDrop { // do not accept new data
 			droppedDataVec.WithLabelValues(c.path, reasonExceedCapacity).Observe(float64(len(data)))
 			return ErrCacheFull
@@ -62,7 +62,7 @@ func (c *DiskCache) Put(data []byte) error {
 	}
 
 	c.curBatchSize += int64(len(data) + dataHeaderLen)
-	c.size += int64(len(data) + dataHeaderLen)
+	c.size.Add(int64(len(data) + dataHeaderLen))
 	c.wfdLastWrite = time.Now()
 
 	// rotate new file
@@ -105,7 +105,7 @@ func (c *DiskCache) StreamPut(r io.Reader, size int) error {
 	c.wlock.Lock()
 	defer c.wlock.Unlock()
 
-	if c.capacity > 0 && c.size+int64(size) > c.capacity {
+	if c.capacity > 0 && c.size.Load()+int64(size) > c.capacity {
 		return ErrCacheFull
 	}
 
@@ -121,7 +121,7 @@ func (c *DiskCache) StreamPut(r io.Reader, size int) error {
 
 		putBytesVec.WithLabelValues(c.path).Observe(float64(size))
 		putLatencyVec.WithLabelValues(c.path).Observe(float64(time.Since(start)) / float64(time.Second))
-		sizeVec.WithLabelValues(c.path).Set(float64(c.size))
+		sizeVec.WithLabelValues(c.path).Set(float64(c.size.Load()))
 		streamPutVec.WithLabelValues(c.path).Observe(float64(round))
 	}()
 

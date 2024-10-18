@@ -9,7 +9,17 @@ package diskcache
 func (c *DiskCache) Size() int64 {
 	c.rwlock.Lock()
 	defer c.rwlock.Unlock()
-	return c.size
+
+	if len(c.dataFiles) > 0 { // there are files waiting to be read
+		return c.size.Load()
+	} else {
+		return 0
+	}
+}
+
+// RawSize return current size plus current writing file(`data') of the cache.
+func (c *DiskCache) RawSize() int64 {
+	return c.size.Load()
 }
 
 // Capacity return max capacity of the cache.

@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -86,7 +87,7 @@ type DiskCache struct {
 	pos   *pos   // current read fd position info
 
 	// specs of current diskcache
-	size, // current byte size
+	size          atomic.Int64 // current byte size
 	curBatchSize, // current writing file's size
 	curReadSize, // current reading file's size
 	batchSize, // current batch size(static)
@@ -94,8 +95,7 @@ type DiskCache struct {
 	maxDataSize int32 // max data size of single Put()
 
 	batchHeader []byte
-	//streamBuf   *bytes.Buffer
-	streamBuf []byte
+	streamBuf   []byte
 
 	// File permission, default 0750/0640
 	dirPerms,
@@ -120,12 +120,12 @@ func (c *DiskCache) String() string {
 	// if there too many files(>10), only print file count
 	if n := len(c.dataFiles); n > 10 {
 		return fmt.Sprintf("%s/[size: %d][fallback: %v][nosync: %v][nopos: %v][nolock: %v][files: %d][maxDataSize: %d][batchSize: %d][capacity: %d][dataFiles: %d]",
-			c.path, c.size, c.noFallbackOnError, c.noSync, c.noPos, c.noLock, len(c.dataFiles), c.maxDataSize, c.batchSize, c.capacity, n,
+			c.path, c.size.Load(), c.noFallbackOnError, c.noSync, c.noPos, c.noLock, len(c.dataFiles), c.maxDataSize, c.batchSize, c.capacity, n,
 		)
 	} else {
 		// nolint: lll
 		return fmt.Sprintf("%s/[size: %d][fallback: %v][nosync: %v][nopos: %v][nolock: %v][files: %d][maxDataSize: %d][batchSize: %d][capacity: %d][dataFiles: %v]",
-			c.path, c.size, c.noFallbackOnError, c.noSync, c.noLock, c.noPos, len(c.dataFiles), c.maxDataSize, c.batchSize, c.capacity, c.dataFiles,
+			c.path, c.size.Load(), c.noFallbackOnError, c.noSync, c.noLock, c.noPos, len(c.dataFiles), c.maxDataSize, c.batchSize, c.capacity, c.dataFiles,
 		)
 	}
 }
@@ -137,7 +137,7 @@ func (c *DiskCache) Pretty() string {
 	arr := []string{}
 
 	arr = append(arr, "path: "+c.path)
-	arr = append(arr, fmt.Sprintf("size: %d", c.size))
+	arr = append(arr, fmt.Sprintf("size: %d", c.size.Load()))
 	arr = append(arr, fmt.Sprintf("max-data-size: %d", c.maxDataSize))
 	arr = append(arr, fmt.Sprintf("capacity: %d", c.capacity))
 	arr = append(arr, fmt.Sprintf("data-files(%d):", len(c.dataFiles)))

@@ -9,7 +9,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"time"
 )
 
@@ -124,13 +123,18 @@ retry:
 	}
 
 	if len(buf) < nbytes {
+		// seek to next read position
+		if _, err := c.rfd.Seek(int64(nbytes), io.SeekCurrent); err != nil {
+			return err
+		}
+
+		droppedDataVec.WithLabelValues(c.path, reasonTooSmallReadBuffer).Observe(float64(nbytes))
 		return ErrTooSmallReadBuf
 	}
 
 	if n, err := c.rfd.Read(buf[:nbytes]); err != nil {
 		return err
 	} else if n != nbytes {
-		log.Printf("bad read size, expect %d bytes, got %d(%q) bytes", nbytes, n, buf[:n])
 		return ErrUnexpectedReadSize
 	}
 

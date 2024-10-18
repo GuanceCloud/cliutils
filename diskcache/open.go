@@ -132,9 +132,9 @@ func (c *DiskCache) doOpen() error {
 			switch filepath.Base(path) {
 			case ".lock", ".pos": // ignore them
 			case "data": // count on size
-				c.size += fi.Size()
+				c.size.Add(fi.Size())
 			default:
-				c.size += fi.Size()
+				c.size.Add(fi.Size())
 				c.dataFiles = append(c.dataFiles, path)
 			}
 

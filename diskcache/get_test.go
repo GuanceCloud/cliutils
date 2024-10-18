@@ -166,6 +166,64 @@ func TestDropInvalidDataFile(t *T.T) {
 			).GetSummary().GetSampleCount(),
 			"got metrics\n%s", metrics.MetricFamily2Text(mfs))
 	})
+
+	t.Run(`get-on-too-small-read-buffer`, func(t *T.T) {
+		ResetMetrics()
+		p := t.TempDir()
+		c, err := Open(WithPath(p))
+		require.NoError(t, err)
+
+		dataLarge := make([]byte, 100) // 100 bytes to Put
+		assert.NoError(t, c.Put(dataLarge))
+
+		dataSmall := make([]byte, 10) // 10 bytes to Put
+		assert.NoError(t, c.Put(dataSmall))
+
+		// next large and small data
+		assert.NoError(t, c.Put(dataLarge))
+		assert.NoError(t, c.Put(dataSmall))
+
+		require.NoError(t, c.Rotate())
+
+		readBuf := make([]byte, 10)
+		assert.ErrorIs(t, c.BufGet(readBuf, func(x []byte) error { // get 100 bytes
+			assert.Nil(t, x) // nothing should returned
+			return nil
+		}), ErrTooSmallReadBuf)
+
+		assert.NoError(t, c.BufGet(readBuf, func(x []byte) error { // get 10 bytes
+			assert.Len(t, x, 10)
+			return nil
+		}))
+
+		assert.ErrorIs(t, c.BufGet(readBuf, func(x []byte) error { // get 100 bytes
+			assert.Nil(t, x) // nothing should returned
+			return nil
+		}), ErrTooSmallReadBuf)
+
+		assert.NoError(t, c.BufGet(readBuf, func(x []byte) error { // get 10 bytes
+			assert.Len(t, x, 10)
+			return nil
+		}))
+
+		assert.ErrorIs(t, c.BufGet(readBuf, func(x []byte) error { // get 10 bytes
+			assert.Nil(t, x) // nothing should returned
+			return nil
+		}), ErrNoData)
+
+		reg := prometheus.NewRegistry()
+		reg.MustRegister(Metrics()...)
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+
+		assert.Equalf(t, float64(200),
+			metrics.GetMetricOnLabels(mfs,
+				"diskcache_dropped_data",
+				c.path,
+				reasonTooSmallReadBuffer,
+			).GetSummary().GetSampleSum(),
+			"got metrics\n%s", metrics.MetricFamily2Text(mfs))
+	})
 }
 
 func TestFallbackOnError(t *T.T) {
@@ -230,10 +288,6 @@ func TestFallbackOnError(t *T.T) {
 		assert.Equalf(t, float64(1),
 			metrics.GetMetricOnLabels(mfs, "diskcache_seek_back_total", c.path).GetCounter().GetValue(),
 			"got metrics\n%s", metrics.MetricFamily2Text(mfs))
-
-		t.Cleanup(func() {
-			ResetMetrics()
-		})
 	})
 
 	t.Run(`fallback-on-eof-error`, func(t *T.T) {

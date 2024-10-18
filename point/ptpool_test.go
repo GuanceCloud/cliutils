@@ -151,7 +151,7 @@ func BenchmarkReservedCapPool(b *T.B) {
 			pp.Put(pt)
 		}
 
-		mfs, err := metrics.Gather()
+		_, err := metrics.Gather()
 		assert.NoError(b, err)
 	})
 }
@@ -316,7 +316,7 @@ func TestPointPoolMetrics(t *T.T) {
 			}()
 		}
 
-		mfs, err := metrics.Gather()
+		_, err := metrics.Gather()
 		assert.NoError(t, err)
 	})
 }
@@ -572,7 +572,7 @@ func TestPoolKVResuable(t *T.T) {
 				tc.pp.Put(pt)
 			}
 
-			mfs, err := metrics.Gather()
+			_, err := metrics.Gather()
 			assert.NoError(t, err)
 		})
 	}

@@ -99,7 +99,7 @@ func TestPutGetMetrics(t *T.T) {
 		m := metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
 		require.NotNil(t, m)
 		got := int(m.GetGauge().GetValue())
-		assert.Equal(t, totalPut, got, "c.size: %d, size-expect=%d", c.size, got-totalPut)
+		assert.Equal(t, totalPut, got, "c.size: %d, size-expect=%d", c.size.Load(), got-totalPut)
 
 		t.Cleanup(func() {
 			ResetMetrics()
@@ -148,7 +148,7 @@ func TestPutGetMetrics(t *T.T) {
 		m := metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
 		require.NotNil(t, m)
 		got := int(m.GetGauge().GetValue())
-		assert.Equal(t, 0, got, "c.size: %d", c.size)
+		assert.Equal(t, 0, got, "c.size: %d", c.size.Load())
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_bytes", c.path)
 		require.NotNilf(t, m, "metrics:\n%s", c.path, metrics.MetricFamily2Text(mfs))

@@ -8,8 +8,9 @@ package diskcache
 import "os"
 
 const (
-	reasonExceedCapacity = "exceed-max-capacity"
-	reasonBadDataFile    = "bad-data-file"
+	reasonExceedCapacity     = "exceed-max-capacity"
+	reasonBadDataFile        = "bad-data-file"
+	reasonTooSmallReadBuffer = "too-small-read-buffer"
 )
 
 func (c *DiskCache) dropBatch() error {
@@ -36,13 +37,13 @@ func (c *DiskCache) dropBatch() error {
 			return err
 		}
 
-		c.size -= fi.Size()
+		c.size.Add(-fi.Size())
 
 		c.dataFiles = c.dataFiles[1:]
 
 		droppedDataVec.WithLabelValues(c.path, reasonExceedCapacity).Observe(float64(fi.Size()))
 		datafilesVec.WithLabelValues(c.path).Set(float64(len(c.dataFiles)))
-		sizeVec.WithLabelValues(c.path).Set(float64(c.size))
+		sizeVec.WithLabelValues(c.path).Set(float64(c.size.Load()))
 	}
 
 	return nil
