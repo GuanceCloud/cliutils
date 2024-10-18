@@ -151,10 +151,8 @@ func BenchmarkReservedCapPool(b *T.B) {
 			pp.Put(pt)
 		}
 
-		mfs, err := metrics.Gather()
+		_, err := metrics.Gather()
 		assert.NoError(b, err)
-
-		b.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 	})
 }
 
@@ -318,10 +316,8 @@ func TestPointPoolMetrics(t *T.T) {
 			}()
 		}
 
-		mfs, err := metrics.Gather()
+		_, err := metrics.Gather()
 		assert.NoError(t, err)
-
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 	})
 }
 
@@ -391,8 +387,6 @@ func TestPoolEscape(t *T.T) {
 		mfs, err := metrics.Gather()
 		assert.NoError(t, err)
 
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
-
 		mf := metrics.GetMetric(mfs, "pointpool_escaped", 0)
 		assert.Equal(t, 100.0, mf.GetCounter().GetValue()) // decoded 100 points(not easyproto) not from point pool
 	})
@@ -438,8 +432,6 @@ func TestPoolEscape(t *T.T) {
 
 		mfs, err := metrics.Gather()
 		assert.NoError(t, err)
-
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 		mf := metrics.GetMetric(mfs, "pointpool_escaped", 0)
 		assert.Equal(t, 0.0, mf.GetCounter().GetValue()) // decoded 100 points(not easyproto) not from point pool
@@ -580,10 +572,8 @@ func TestPoolKVResuable(t *T.T) {
 				tc.pp.Put(pt)
 			}
 
-			mfs, err := metrics.Gather()
+			_, err := metrics.Gather()
 			assert.NoError(t, err)
-
-			t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 		})
 	}
 }

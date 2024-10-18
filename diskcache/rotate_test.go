@@ -10,8 +10,6 @@ import (
 	"errors"
 	T "testing"
 
-	"github.com/GuanceCloud/cliutils/metrics"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,7 +35,7 @@ func TestRotate(t *T.T) {
 				assert.Len(t, data, 1024)
 				return nil
 			}); err != nil {
-				if errors.Is(err, ErrEOF) {
+				if errors.Is(err, ErrNoData) {
 					break
 				} else {
 					assert.NoError(t, err)
@@ -65,9 +63,6 @@ func TestRotate(t *T.T) {
 	})
 
 	t.Run("rotate", func(t *T.T) {
-		reg := prometheus.NewRegistry()
-		register(reg)
-
 		p := t.TempDir()
 		batchSize := int64(1024 * 1024)
 		c, err := Open(WithPath(p), WithBatchSize(batchSize))
@@ -110,7 +105,7 @@ func TestRotate(t *T.T) {
 			}
 
 			if err := c.Get(fn); err != nil {
-				if errors.Is(err, ErrEOF) {
+				if errors.Is(err, ErrNoData) {
 					t.Logf("read EOF")
 				} else {
 					t.Error(err)
@@ -120,10 +115,6 @@ func TestRotate(t *T.T) {
 		}
 
 		t.Logf("total read bytes: %d", readBytes)
-
-		mfs, err := reg.Gather()
-		require.NoError(t, err)
-		t.Logf("metrics \n%s", metrics.MetricFamily2Text(mfs))
 
 		t.Cleanup(func() {
 			assert.NoError(t, c.Close())

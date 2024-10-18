@@ -40,7 +40,7 @@ func getSamples(data []byte) []byte {
 func TestPutGetMetrics(t *T.T) {
 	t.Run("test-wakeup-count", func(t *T.T) {
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 
 		p := t.TempDir()
 		c, err := Open(WithPath(p), WithWakeup(time.Second))
@@ -74,7 +74,7 @@ func TestPutGetMetrics(t *T.T) {
 	// test if metric size ok
 	t.Run("metrics-on-only-put", func(t *T.T) {
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 
 		p := t.TempDir()
 		bsize := int64(100)
@@ -99,9 +99,7 @@ func TestPutGetMetrics(t *T.T) {
 		m := metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
 		require.NotNil(t, m)
 		got := int(m.GetGauge().GetValue())
-		assert.Equal(t, totalPut, got, "c.size: %d, size-expect=%d", c.size, got-totalPut)
-
-		t.Logf("metrics:\n%s", metrics.MetricFamily2Text(mfs))
+		assert.Equal(t, totalPut, got, "c.size: %d, size-expect=%d", c.size.Load(), got-totalPut)
 
 		t.Cleanup(func() {
 			ResetMetrics()
@@ -111,7 +109,7 @@ func TestPutGetMetrics(t *T.T) {
 
 	t.Run("metrics-on-put-get", func(t *T.T) {
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 
 		p := t.TempDir()
 		bsize := int64(100)
@@ -124,17 +122,18 @@ func TestPutGetMetrics(t *T.T) {
 
 		data := make([]byte, bsize/2)
 
-		totalPut := 0
-		for i := 0; i < 10; i++ {
+		totalPutBytes := 0
+		times := 10
+		for i := 0; i < times; i++ {
 			c.Put(data)
-			totalPut += len(data) // without dataHeaderLen
+			totalPutBytes += len(data) // without dataHeaderLen
 		}
 
 		// force rotate
 		assert.NoError(t, c.rotate())
 
 		totalGet := 0
-		for i := 0; i < 10; i++ {
+		for i := 0; i < times; i++ {
 			c.Get(func(x []byte) error {
 				totalGet += len(x)
 				return nil
@@ -143,34 +142,27 @@ func TestPutGetMetrics(t *T.T) {
 
 		c.Get(nil) // read EOF to tiger remove
 
-		// check if size == totalPut
+		// check if size == totalPutBytes
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
 		m := metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
 		require.NotNil(t, m)
 		got := int(m.GetGauge().GetValue())
-		assert.Equal(t, 0, got, "c.size: %d", c.size)
+		assert.Equal(t, 0, got, "c.size: %d", c.size.Load())
 
-		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_bytes_total", c.path)
-		require.NotNil(t, m)
-		got = int(m.GetCounter().GetValue())
-		assert.Equal(t, totalGet, got)
-		assert.Equal(t, totalGet, totalPut)
-
-		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_total", c.path)
-		require.NotNil(t, m)
-		got = int(m.GetCounter().GetValue())
-		assert.Equal(t, 10, got)
+		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_bytes", c.path)
+		require.NotNilf(t, m, "metrics:\n%s", c.path, metrics.MetricFamily2Text(mfs))
+		assert.Equal(t, totalGet, int(m.GetSummary().GetSampleSum()))
+		assert.Equal(t, totalGet, totalPutBytes)
+		assert.Equal(t, uint64(times), m.GetSummary().GetSampleCount())
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_latency", c.path)
 		require.NotNil(t, m)
-		got = int(m.GetSummary().GetSampleCount())
-		assert.Equal(t, 10, got)
+		assert.Equal(t, uint64(times), m.GetSummary().GetSampleCount())
 
-		m = metrics.GetMetricOnLabels(mfs, "diskcache_put_total", c.path)
+		m = metrics.GetMetricOnLabels(mfs, "diskcache_put_bytes", c.path)
 		require.NotNil(t, m)
-		got = int(m.GetCounter().GetValue())
-		assert.Equal(t, 10, got)
+		assert.Equal(t, uint64(times), m.GetSummary().GetSampleCount())
 
 		t.Cleanup(func() {
 			ResetMetrics()
@@ -181,6 +173,9 @@ func TestPutGetMetrics(t *T.T) {
 
 func TestMetric(t *T.T) {
 	t.Run("basic", func(t *T.T) {
+		reg := prometheus.NewRegistry()
+		reg.MustRegister(Metrics()...)
+
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
 		assert.NoError(t, err)
@@ -189,18 +184,15 @@ func TestMetric(t *T.T) {
 
 		assert.NoError(t, c.Put(smallBytes))
 
-		mfs, err := metrics.Gather()
+		mfs, err := reg.Gather()
+
 		assert.NoError(t, err)
 
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
-
-		m := metrics.GetMetricOnLabels(mfs, "diskcache_put_total", c.path)
-		assert.Equal(t, float64(1), m.GetCounter().GetValue())
-
-		m = metrics.GetMetricOnLabels(mfs, "diskcache_put_bytes_total", c.path)
-		require.NotNil(t, m)
+		m := metrics.GetMetricOnLabels(mfs, "diskcache_put_bytes", c.path)
+		require.NotNilf(t, m, "metrics:\n%s", c.path, metrics.MetricFamily2Text(mfs))
+		assert.Equal(t, uint64(1), m.GetSummary().GetSampleCount())
 		assert.Equal(t, float64(100), /* dataHeaderLen not counted in put_bytes */
-			m.GetCounter().GetValue())
+			m.GetSummary().GetSampleSum())
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
 		require.NotNil(t, m)
@@ -227,30 +219,26 @@ func TestMetric(t *T.T) {
 		assert.NoError(t, c.rotate())
 		assert.NoError(t, c.Get(nil))
 
-		mfs, err = metrics.Gather()
+		mfs, err = reg.Gather()
 		assert.NoError(t, err)
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
-		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_total", c.path)
-		require.NotNil(t, m)
-		assert.Equal(t, float64(1), m.GetCounter().GetValue())
-
-		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_bytes_total", c.path)
-		require.NotNil(t, m)
-		assert.Equal(t, float64(100), m.GetCounter().GetValue())
+		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_bytes", c.path)
+		require.NotNil(t, m, "metrics:\n%s", c.path, metrics.MetricFamily2Text(mfs))
+		assert.Equal(t, uint64(1), m.GetSummary().GetSampleCount())
+		assert.Equal(t, float64(100), m.GetSummary().GetSampleSum())
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
 		require.NotNil(t, m)
 		assert.Equal(t, float64(100+dataHeaderLen /*EOFHint*/), m.GetGauge().GetValue())
 
 		assert.NoError(t, c.Close())
-		mfs, err = metrics.Gather()
+
+		mfs, err = reg.Gather()
 		assert.NoError(t, err)
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 		// check if open/close time metric exist.
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_last_close_time", c.path)
-		require.NotNil(t, m)
+		require.NotNil(t, m, "metrics:\n%s", c.path, metrics.MetricFamily2Text(mfs))
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_open_time", c.labels...)
 		require.NotNil(t, m)
 
