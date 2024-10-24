@@ -603,7 +603,7 @@ func TestV2Encode(t *T.T) {
 		var (
 			decodePts []*Point
 			round     int
-			buf       = make([]byte, 1<<20) // KB
+			buf       = make([]byte, 1<<20)
 		)
 
 		for {
@@ -742,6 +742,135 @@ func TestV2Encode(t *T.T) {
 			}
 		}
 		PutEncoder(enc)
+	})
+}
+
+func TestSkipLargePoint(t *T.T) {
+	t.Run("pb-2-large-point", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+
+		var (
+			kvs1 KVs
+			kvs2 KVs
+			kvs3 KVs
+		)
+
+		kvs1 = kvs1.Add("msg1", strings.Repeat("x", 70), false, false)
+		kvs2 = kvs2.Add("msg2", strings.Repeat("y", 70), false, false)
+		kvs3 = kvs3.Add("msg3", strings.Repeat("z", 100), false, false)
+		pt1 := NewPointV2("p1", kvs1, append(DefaultLoggingOptions(),
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+		pt2 := NewPointV2("p2", kvs2, append(DefaultLoggingOptions(),
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+
+		// p3 larger than encode buf
+		pt3 := NewPointV2("p3", kvs3, append(DefaultLoggingOptions(),
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+
+		enc.EncodeV2([]*Point{pt1, pt2, pt3})
+		defer PutEncoder(enc)
+
+		buf := make([]byte, 90)
+
+		encBuf, ok := enc.Next(buf)
+		assert.NoError(t, enc.LastErr()) // p1 encode this time
+		assert.True(t, ok)
+		assert.NotNil(t, encBuf)
+		assert.Equal(t, 1, enc.parts)
+		t.Logf("encoder: %s", enc)
+
+		encBuf, ok = enc.Next(buf)
+		assert.NoError(t, enc.LastErr()) // p2 encoded
+		assert.True(t, ok)
+		assert.NotNil(t, encBuf)
+		assert.Equal(t, 2, enc.parts)
+		t.Logf("encoder: %s", enc)
+
+		encBuf, ok = enc.Next(buf)
+		assert.Error(t, enc.LastErr()) // p3 not encoded
+		t.Logf("[expected] %s", enc.LastErr())
+		assert.False(t, ok)
+		assert.Nil(t, encBuf)
+		t.Logf("encoder: %s", enc)
+
+		//done
+		//encBuf, ok = enc.Next(buf)
+		//assert.False(t, ok)
+		//assert.Nil(t, encBuf)
+
+		//t.Logf("encoder: %s", enc)
+		//assert.NoError(t, enc.LastErr()) // error clean every Next()
+	})
+
+	t.Run("too-small-buffer-pb-skip-huge-point", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+
+		var (
+			kvs1 KVs
+			kvs2 KVs
+			kvs3 KVs
+		)
+
+		kvs1 = kvs1.Add("msg1", strings.Repeat("x", 70), false, false)
+		kvs2 = kvs2.Add("msg2", strings.Repeat("y", 70), false, false)
+		kvs3 = kvs3.Add("msg3", strings.Repeat("z", 100), false, false)
+		pt1 := NewPointV2("p1", kvs1, append(DefaultLoggingOptions(),
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+		pt2 := NewPointV2("p2", kvs2, append(DefaultLoggingOptions(),
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+
+		// p3 larger than encode buf
+		pt3 := NewPointV2("p3", kvs3, append(DefaultLoggingOptions(),
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+
+		pt4 := NewPointV2("p4", kvs1, append(DefaultLoggingOptions(), // small
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+
+		enc.EncodeV2([]*Point{pt1, pt2, pt3, pt4})
+		defer PutEncoder(enc)
+
+		buf := make([]byte, 90)
+
+		encBuf, ok := enc.Next(buf)
+		assert.NoError(t, enc.LastErr()) // p1 encode this time
+		assert.True(t, ok)
+		assert.NotNil(t, encBuf)
+		assert.Equal(t, 1, enc.parts)
+		t.Logf("encoder: %s", enc)
+
+		encBuf, ok = enc.Next(buf)
+		assert.NoError(t, enc.LastErr()) // p2 encoded
+		assert.True(t, ok)
+		assert.NotNil(t, encBuf)
+		assert.Equal(t, 2, enc.parts)
+		t.Logf("encoder: %s", enc)
+
+		encBuf, ok = enc.Next(buf)
+		assert.NoError(t, enc.LastErr()) // p3 skipped
+
+		assert.False(t, ok)
+		assert.Nil(t, encBuf)
+		t.Logf("encoder: %s", enc)
+
+		encBuf, ok = enc.Next(buf)
+		assert.NoError(t, enc.LastErr()) // p4 encoded
+		assert.True(t, ok)
+		assert.NotNil(t, encBuf)
+		t.Logf("encoder: %s", enc)
+
+		//done
+		encBuf, ok = enc.Next(buf)
+		assert.False(t, ok)
+		assert.Nil(t, encBuf)
+
+		assert.NoError(t, enc.LastErr())
 	})
 }
 

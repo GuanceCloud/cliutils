@@ -5,6 +5,11 @@
 
 package point
 
+import (
+	"fmt"
+	"log"
+)
+
 // EncodeV2 set points to be encoded.
 func (e *Encoder) EncodeV2(pts []*Point) {
 	e.pts = pts
@@ -35,44 +40,67 @@ func (e *Encoder) doEncodeProtobuf(buf []byte) ([]byte, bool) {
 		trimmed = 1
 	)
 
-	for _, pt := range e.pts[e.lastPtsIdx:] {
+	e.lastErr = nil // clear previous error
+
+	for idx, pt := range e.pts[e.lastPtsIdx:] {
 		if pt == nil {
 			continue
 		}
+
+		log.Printf("[%d] point(%d): %s", idx, pt.pt.Size(), pt.Pretty())
 
 		curSize += pt.Size()
 
 		// e.pbpts size larger than buf, we must trim some of points
 		// until size fit ok or MarshalTo will panic.
 		if curSize >= len(buf) {
-			if len(e.pbpts.Arr) <= 1 { // nothing to trim
-				e.lastErr = errTooSmallBuffer
-				return nil, false
-			}
-
-			for {
-				if pbptsSize = e.pbpts.Size(); pbptsSize > len(buf) {
-					e.pbpts.Arr = e.pbpts.Arr[:len(e.pbpts.Arr)-trimmed]
-					e.lastPtsIdx -= trimmed
-					trimmed *= 2
+			switch len(e.pbpts.Arr) {
+			case 0: // nothing added, current @pt too large
+				e.lastPtsIdx++
+				if e.ignoreLargePoint {
+					e.skippedPts++
+					continue
 				} else {
-					goto __doEncode
+					e.lastErr = fmt.Errorf("%w: need at least %d bytes, only %d available, current points: %d",
+						errTooSmallBuffer, curSize, len(buf), len(e.pbpts.Arr))
+					return nil, false
+				}
+			case 1: // try encode previous added point
+				// TODO: if current point still too large, we should skip this too
+				goto __doEncode
+			default:
+				// we need to trim some tail points
+				for {
+					if pbptsSize = e.pbpts.Size(); pbptsSize > len(buf) {
+						e.pbpts.Arr = e.pbpts.Arr[:len(e.pbpts.Arr)-trimmed]
+						e.trimmedPts += trimmed
+						e.lastPtsIdx -= trimmed
+						trimmed *= 2
+					} else {
+						goto __doEncode
+					}
 				}
 			}
 		} else {
 			e.pbpts.Arr = append(e.pbpts.Arr, pt.pt)
+			e.addedPts++
 			e.lastPtsIdx++
 		}
 	}
 
 __doEncode:
-	e.trimmed = trimmed
+	// size checking to protect panic.
+	if need := e.pbpts.Size(); need > len(buf) {
+		e.lastErr = fmt.Errorf("%w: got %d bytes, only %d available, current points: %d", errTooSmallBuffer, need, len(buf), len(e.pbpts.Arr))
+		return nil, false
+	}
 
 	if len(e.pbpts.Arr) == 0 {
 		return nil, false
 	}
 
 	defer func() {
+		// clear encode array
 		e.pbpts.Arr = e.pbpts.Arr[:0]
 	}()
 

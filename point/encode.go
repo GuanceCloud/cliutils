@@ -34,21 +34,28 @@ func WithEncBatchBytes(bytes int) EncoderOption {
 	return func(e *Encoder) { e.bytesSize = bytes }
 }
 
+func WithIgnoreLargePoint(on bool) EncoderOption {
+	return func(e *Encoder) { e.ignoreLargePoint = on }
+}
+
 type Encoder struct {
 	bytesSize,
 	batchSize int
 
 	pts []*Point
 	lastPtsIdx,
-	trimmed,
+	addedPts,
+	trimmedPts,
+	skippedPts,
 	parts int
 	lastErr error
 
 	lpPointBuf []byte
 	pbpts      *PBPoints
 
-	fn  EncodeFn
-	enc Encoding
+	fn               EncodeFn
+	enc              Encoding
+	ignoreLargePoint bool
 }
 
 var encPool sync.Pool
@@ -90,7 +97,9 @@ func (e *Encoder) reset() {
 	e.lastPtsIdx = 0
 	e.lastErr = nil
 	e.parts = 0
-	e.trimmed = 0
+	e.addedPts = 0
+	e.trimmedPts = 0
+	e.skippedPts = 0
 	e.pbpts.Arr = e.pbpts.Arr[:0]
 	e.lpPointBuf = e.lpPointBuf[:0]
 }
@@ -228,9 +237,13 @@ func (e *Encoder) LastErr() error {
 	return e.lastErr
 }
 
+func (e *Encoder) SkippedPoints() int {
+	return e.skippedPts
+}
+
 func (e *Encoder) String() string {
-	return fmt.Sprintf("encoding: %s, parts: %d, byte size: %d, e.batchSize: %d, lastPtsIdx: %d, trimmed: %d",
-		e.enc, e.parts, e.bytesSize, e.batchSize, e.lastPtsIdx, e.trimmed,
+	return fmt.Sprintf("encoding: %s, parts: %d, byte size: %d, e.batchSize: %d, lastPtsIdx: %d, added: %d, trimmed: %d, skipped: %d, lastErr: %v",
+		e.enc, e.parts, e.bytesSize, e.batchSize, e.lastPtsIdx, e.addedPts, e.trimmedPts, e.skippedPts, e.lastErr,
 	)
 }
 
