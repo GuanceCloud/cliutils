@@ -7,8 +7,10 @@ package point
 
 import (
 	"encoding/json"
+	"math"
 	"strings"
 	"testing"
+	T "testing"
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
@@ -228,6 +230,27 @@ func TestPBPointPayload(t *testing.T) {
 		name   string
 		repeat int
 	}{
+
+		{
+			name:   "1-point",
+			repeat: 1,
+		},
+
+		{
+			name:   "2-point",
+			repeat: 2,
+		},
+
+		{
+			name:   "4-point",
+			repeat: 4,
+		},
+
+		{
+			name:   "8-point",
+			repeat: 8,
+		},
+
 		{
 			name:   "100-point",
 			repeat: 100,
@@ -249,9 +272,14 @@ func TestPBPointPayload(t *testing.T) {
 			lppts := RandPoints(tc.repeat)
 			pbpts := RandPBPoints(tc.repeat)
 
+			totalPtsSize := 0
+			for _, pt := range pbpts.Arr {
+				totalPtsSize += pt.Size()
+			}
+
 			pb, err := proto.Marshal(pbpts)
 			assert.NoError(t, err)
-			t.Logf("pb len: %d", len(pb))
+			t.Logf("pb len: %d, pts size: %d, diff: %d", len(pb), totalPtsSize, len(pb)-totalPtsSize)
 
 			ratio, size := func() (float64, int) {
 				x, err := cliutils.GZip(pb)
@@ -278,4 +306,147 @@ func TestPBPointPayload(t *testing.T) {
 			t.Logf("lp gz ratio: %f/%d", ratio, size)
 		})
 	}
+}
+
+func TestPBPointPayloadSize(t *testing.T) {
+	type tcase struct {
+		name string
+		n    int
+
+		withLargeNum,
+		withStr,
+		withBytes,
+		withBool bool
+	}
+
+	cases := []tcase{
+		{name: "1-point", n: 1},
+		{name: "2-point", n: 2},
+		{name: "4-point", n: 4},
+		{name: "8-point", n: 8},
+		{name: "100-point", n: 100},
+		{name: "1000-point", n: 1000},
+		{name: "10000-point", n: 10000},
+
+		{withStr: true, name: "with-str-1-point", n: 1},
+		{withStr: true, name: "with-str-2-point", n: 2},
+		{withStr: true, name: "with-str-4-point", n: 4},
+		{withStr: true, name: "with-str-8-point", n: 8},
+		{withStr: true, name: "with-str-100-point", n: 100},
+		{withStr: true, name: "with-str-1000-point", n: 1000},
+		{withStr: true, name: "with-str-10000-point", n: 10000},
+
+		{withBytes: true, name: "with-bytes-1-point", n: 1},
+		{withBytes: true, name: "with-bytes-2-point", n: 2},
+		{withBytes: true, name: "with-bytes-4-point", n: 4},
+		{withBytes: true, name: "with-bytes-8-point", n: 8},
+		{withBytes: true, name: "with-bytes-100-point", n: 100},
+		{withBytes: true, name: "with-bytes-1000-point", n: 1000},
+		{withBytes: true, name: "with-bytes-10000-point", n: 10000},
+
+		{withBool: true, name: "with-bool-1-point", n: 1},
+		{withBool: true, name: "with-bool-2-point", n: 2},
+		{withBool: true, name: "with-bool-4-point", n: 4},
+		{withBool: true, name: "with-bool-8-point", n: 8},
+		{withBool: true, name: "with-bool-100-point", n: 100},
+		{withBool: true, name: "with-bool-1000-point", n: 1000},
+		{withBool: true, name: "with-bool-10000-point", n: 10000},
+
+		{withLargeNum: true, name: "with-large-num-1-point", n: 1},
+		{withLargeNum: true, name: "with-large-num-2-point", n: 2},
+		{withLargeNum: true, name: "with-large-num-4-point", n: 4},
+		{withLargeNum: true, name: "with-large-num-8-point", n: 8},
+		{withLargeNum: true, name: "with-large-num-100-point", n: 100},
+		{withLargeNum: true, name: "with-large-num-1000-point", n: 1000},
+		{withLargeNum: true, name: "with-large-num-10000-point", n: 10000},
+	}
+
+	strTiny := strings.Repeat("x", 4)
+	strSmall := strings.Repeat("x", 32)
+	str1M := strings.Repeat("x", 1<<20)
+	str1K := strings.Repeat("x", 1<<10)
+	str32K := strings.Repeat("x", 32*(1<<10))
+	str128K := strings.Repeat("x", 128*(1<<10))
+
+	var kvsBasic KVs
+	kvsBasic = kvsBasic.AddV2("int8", int8(1), true)
+	kvsBasic = kvsBasic.AddV2("int16", int16(1), true)
+	kvsBasic = kvsBasic.AddV2("int32", int32(1), true)
+	kvsBasic = kvsBasic.AddV2("int64", int64(1), true)
+	kvsBasic = kvsBasic.AddV2("f32", float32(1.0), true)
+	kvsBasic = kvsBasic.AddV2("f64", float64(1.0), true)
+
+	var kvsStr KVs
+	kvsStr = kvsStr.AddV2("str-tiny", strTiny, true)
+	kvsStr = kvsStr.AddV2("str-small", strSmall, true)
+	kvsStr = kvsStr.AddV2("str-1m", str1M, true)
+	kvsStr = kvsStr.AddV2("str-1k", str1K, true)
+	kvsStr = kvsStr.AddV2("str-32k", str32K, true)
+	kvsStr = kvsStr.AddV2("str-128k", str128K, true)
+
+	var kvsBytes KVs
+	kvsBytes = kvsBytes.AddV2("bytes-tiny", []byte(strTiny), true)
+	kvsBytes = kvsBytes.AddV2("bytes-small", []byte(strSmall), true)
+	kvsBytes = kvsBytes.AddV2("bytes-1m", []byte(str1M), true)
+	kvsBytes = kvsBytes.AddV2("bytes-1k", []byte(str1K), true)
+	kvsBytes = kvsBytes.AddV2("bytes-32k", []byte(str32K), true)
+	kvsBytes = kvsBytes.AddV2("bytes-128k", []byte(str128K), true)
+
+	var kvsBool KVs
+	kvsBool = kvsBasic.AddV2("bool-yes", true, true)
+	kvsBool = kvsBasic.AddV2("bool-no", false, true)
+
+	var kvsLargeNum KVs
+	kvsLargeNum = kvsLargeNum.AddV2("large-i64", int64(math.MaxInt64), true)
+	kvsLargeNum = kvsLargeNum.AddV2("large-u64", uint64(math.MaxUint64), true)
+	kvsLargeNum = kvsLargeNum.AddV2("large-f64", math.MaxFloat64, true)
+
+	newPts := func(tc *tcase) (pbpts PBPoints) {
+		for i := 0; i < tc.n; i++ {
+			ptkvs := kvsBasic
+
+			if tc.withStr {
+				ptkvs = append(ptkvs, kvsStr...)
+			}
+
+			if tc.withBytes {
+				ptkvs = append(ptkvs, kvsBytes...)
+			}
+
+			if tc.withBool {
+				ptkvs = append(ptkvs, kvsBool...)
+			}
+
+			if tc.withLargeNum {
+				ptkvs = append(ptkvs, kvsLargeNum...)
+			}
+
+			pbpts.Arr = append(pbpts.Arr, NewPointV2(t.Name(), ptkvs, WithPrecheck(false), WithTime(time.Now())).pt)
+		}
+		return
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *T.T) {
+			pts := newPts(&tc)
+			ptSizeSum := 0
+			for _, pt := range pts.Arr {
+				ptSizeSum += pt.Size()
+			}
+			t.Logf("pts size: %d, sum size: %d, diff_per_pt: %d", pts.Size(), ptSizeSum, (pts.Size()-ptSizeSum)/tc.n)
+		})
+	}
+
+	t.Run("timestamp", func(t *T.T) {
+		var kvs KVs
+		kvs = kvs.AddV2("f1", 123, false)
+		pt := NewPointV2(t.Name(), kvs, WithPrecheck(false), WithTimestamp(0))
+		t.Logf("ts = 0/size: %d", pt.pt.Size())
+
+		pt = NewPointV2(t.Name(), kvs, WithPrecheck(false), WithTimestamp(123))
+		t.Logf("ts = 123/size: %d", pt.pt.Size())
+
+		pt = NewPointV2(t.Name(), kvs, WithPrecheck(false), WithTimestamp(time.Now().UnixNano()))
+		t.Logf("ts = now/size: %d", pt.pt.Size())
+	})
 }

@@ -465,6 +465,78 @@ func TestEncodeLen(t *T.T) {
 	})
 }
 
+func TestEncBufUsage(t *T.T) {
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	pts := r.Rand(10000)
+
+	cases := []struct {
+		name string
+		buf  []byte
+	}{
+		{
+			`4k`, make([]byte, 4*1024),
+		},
+
+		{
+			`8k`, make([]byte, 8*1024),
+		},
+
+		{
+			`64k`, make([]byte, 64*1024),
+		},
+
+		{
+			`128k`, make([]byte, 128*1024),
+		},
+
+		{
+			`512k`, make([]byte, 512*1024),
+		},
+
+		{
+			`1m`, make([]byte, 1<<20),
+		},
+	}
+
+	totalSize := 0
+	for _, pt := range pts {
+		pt.MustAdd("s-arr", []string{"s1", "s2"}) // anypb
+		totalSize += pt.Size()
+	}
+
+	t.Logf("avg size: %d", totalSize/len(pts))
+
+	// the larger the buf, the higher usage of buf for encoding
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *T.T) {
+			n := 0
+
+			usages := 0.0
+			for i := 0; i < 100; i++ {
+				enc := GetEncoder(WithEncEncoding(Protobuf))
+				enc.EncodeV2(pts)
+
+				for {
+					if x, ok := enc.Next(tc.buf); ok {
+						u := (float64(len(x)) / float64(len(tc.buf)))
+						if enc.lastPtsIdx != len(pts) {
+							usages += u
+							n++
+						}
+					} else {
+						break
+					}
+				}
+
+				PutEncoder(enc)
+			}
+
+			t.Logf("avg usage: %.4f", usages/float64(n))
+		})
+
+	}
+}
+
 func BenchmarkEncode(b *T.B) {
 	r := NewRander(WithFixedTags(true), WithRandText(3))
 	pts := r.Rand(1000)
@@ -472,8 +544,7 @@ func BenchmarkEncode(b *T.B) {
 	buf := make([]byte, 1<<20)
 
 	b.ResetTimer()
-
-	b.Run("bench-encode-json", func(b *T.B) {
+	b.Run("encode-json", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			enc := GetEncoder(WithEncEncoding(JSON))
 			enc.Encode(pts)
@@ -481,7 +552,8 @@ func BenchmarkEncode(b *T.B) {
 		}
 	})
 
-	b.Run("bench-encode-lp", func(b *T.B) {
+	b.ResetTimer()
+	b.Run("encode-lp", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			enc := GetEncoder()
 			enc.Encode(pts)
@@ -489,7 +561,8 @@ func BenchmarkEncode(b *T.B) {
 		}
 	})
 
-	b.Run("bench-encode-pb", func(b *T.B) {
+	b.ResetTimer()
+	b.Run("v1-encode-pb", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			enc := GetEncoder(WithEncEncoding(Protobuf), WithEncBatchBytes(1<<20))
 			enc.Encode(pts)
@@ -497,7 +570,8 @@ func BenchmarkEncode(b *T.B) {
 		}
 	})
 
-	b.Run("v2-encode-pb", func(b *T.B) {
+	b.ResetTimer()
+	b.Run("v2-encode-pb-PBSize()", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			enc := GetEncoder(WithEncEncoding(Protobuf))
 			enc.EncodeV2(pts)
@@ -513,6 +587,25 @@ func BenchmarkEncode(b *T.B) {
 		}
 	})
 
+	b.ResetTimer()
+	b.Run("v2-encode-pb-Size()", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			enc := GetEncoder(WithEncEncoding(Protobuf))
+			enc.looseSize = true
+			enc.EncodeV2(pts)
+
+			for {
+				if _, ok := enc.Next(buf); ok {
+				} else {
+					break
+				}
+			}
+
+			PutEncoder(enc)
+		}
+	})
+
+	b.ResetTimer()
 	b.Run("v2-encode-lp", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			enc := GetEncoder(WithEncEncoding(LineProtocol))
@@ -551,7 +644,7 @@ func TestGoGoPBDecodePB(t *T.T) {
 
 func BenchmarkV2Encode(b *T.B) {
 	r := NewRander(WithFixedTags(true), WithRandText(3))
-	randPts := r.Rand(10000)
+	randPts := r.Rand(1000)
 
 	buf := make([]byte, 1<<20)
 
@@ -603,7 +696,7 @@ func TestV2Encode(t *T.T) {
 		var (
 			decodePts []*Point
 			round     int
-			buf       = make([]byte, 1<<20) // KB
+			buf       = make([]byte, 1<<20)
 		)
 
 		for {
@@ -745,6 +838,442 @@ func TestV2Encode(t *T.T) {
 	})
 }
 
+func TestEncNilPoint(t *T.T) {
+	t.Run(`nil-point-in-array`, func(t *T.T) {
+		r := NewRander(WithFixedTags(true), WithRandText(3))
+		pts := r.Rand(1)
+
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+		enc.EncodeV2(append([]*Point{nil, nil, pts[0], nil}, pts...))
+		defer PutEncoder(enc)
+
+		buf := make([]byte, 1<<20)
+
+		x, ok := enc.Next(buf)
+		assert.True(t, ok)
+		assert.NotNil(t, x)
+		assert.Equal(t, 2, enc.TotalPoints())
+		t.Logf("enc: %s", enc)
+
+		x, ok = enc.Next(buf)
+		assert.False(t, ok)
+		assert.Nil(t, x)
+		assert.Equal(t, 2, enc.TotalPoints())
+		t.Logf("enc: %s", enc)
+	})
+
+	t.Run(`all-nil-point`, func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+		enc.EncodeV2([]*Point{nil, nil, nil})
+		defer PutEncoder(enc)
+
+		x, ok := enc.Next(nil)
+		assert.False(t, ok)
+		assert.Nil(t, x)
+		assert.Equal(t, 0, enc.TotalPoints())
+		t.Logf("enc: %s", enc)
+
+		// always fail
+		x, ok = enc.Next(nil)
+		assert.False(t, ok)
+		assert.Nil(t, x)
+		assert.Equal(t, 0, enc.TotalPoints())
+		t.Logf("enc: %s", enc)
+	})
+}
+
+func TestEncTrim(t *T.T) {
+	strTiny := strings.Repeat("x", 4)
+	strSmall := strings.Repeat("x", 32)
+	str1M := strings.Repeat("x", 1<<20)
+	str1K := strings.Repeat("x", 1<<10)
+	str32K := strings.Repeat("x", 32*(1<<10))
+	str128K := strings.Repeat("x", 128*(1<<10))
+
+	var kvsBasic KVs
+	kvsBasic = kvsBasic.AddV2("int8", int8(1), true)
+	kvsBasic = kvsBasic.AddV2("int16", int16(1), true)
+	kvsBasic = kvsBasic.AddV2("int32", int32(1), true)
+	kvsBasic = kvsBasic.AddV2("int64", int64(1), true)
+	kvsBasic = kvsBasic.AddV2("f32", float32(1.0), true)
+	kvsBasic = kvsBasic.AddV2("f64", float64(1.0), true)
+
+	var kvsStr KVs
+	kvsStr = kvsStr.AddV2("str-tiny", strTiny, true)
+	kvsStr = kvsStr.AddV2("str-small", strSmall, true)
+	kvsStr = kvsStr.AddV2("str-1m", str1M, true)
+	kvsStr = kvsStr.AddV2("str-1k", str1K, true)
+	kvsStr = kvsStr.AddV2("str-32k", str32K, true)
+	kvsStr = kvsStr.AddV2("str-128k", str128K, true)
+
+	var kvsBytes KVs
+	kvsBytes = kvsBytes.AddV2("bytes-tiny", []byte(strTiny), true)
+	kvsBytes = kvsBytes.AddV2("bytes-small", []byte(strSmall), true)
+	kvsBytes = kvsBytes.AddV2("bytes-1m", []byte(str1M), true)
+	kvsBytes = kvsBytes.AddV2("bytes-1k", []byte(str1K), true)
+	kvsBytes = kvsBytes.AddV2("bytes-32k", []byte(str32K), true)
+	kvsBytes = kvsBytes.AddV2("bytes-128k", []byte(str128K), true)
+
+	var kvsBool KVs
+	kvsBool = kvsBasic.AddV2("bool-yes", true, true)
+	kvsBool = kvsBasic.AddV2("bool-no", false, true)
+
+	var kvsLargeNum KVs
+	kvsLargeNum = kvsLargeNum.AddV2("large-i64", int64(math.MaxInt64), true)
+	kvsLargeNum = kvsLargeNum.AddV2("large-u64", uint64(math.MaxUint64), true)
+	kvsLargeNum = kvsLargeNum.AddV2("large-f64", math.MaxFloat64, true)
+
+	type tcase struct {
+		name string
+		n    int
+		pbSize,
+		sumSize int
+
+		withLargeNum,
+		withStr,
+		withBytes,
+		withBool bool
+		buf []byte
+	}
+
+	newPts := func(tc *tcase) (pts []*Point) {
+		for i := 0; i < tc.n; i++ {
+			ptkvs := kvsBasic
+
+			if tc.withStr {
+				ptkvs = append(ptkvs, kvsStr...)
+			}
+
+			if tc.withBytes {
+				ptkvs = append(ptkvs, kvsBytes...)
+			}
+
+			if tc.withBool {
+				ptkvs = append(ptkvs, kvsBool...)
+			}
+
+			if tc.withLargeNum {
+				ptkvs = append(ptkvs, kvsLargeNum...)
+			}
+
+			pt := NewPointV2(t.Name(), ptkvs, WithPrecheck(false), WithTime(time.Now()))
+			pts = append(pts, pt)
+		}
+
+		return
+	}
+
+	cases := []tcase{
+		{
+			name: `4`,
+			n:    4,
+		},
+
+		{
+			name:         `8`,
+			n:            8,
+			withLargeNum: true,
+			withStr:      true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *T.T) {
+			pts := newPts(&tc)
+			var pbpts PBPoints
+			sum := 0
+			for _, pt := range pts {
+				sum += pt.pt.Size()
+				pbpts.Arr = append(pbpts.Arr, pt.pt)
+			}
+
+			t.Logf("sum: %d, pbsize: %d", sum, pbpts.Size())
+
+			tc.buf = make([]byte, sum/tc.n*(tc.n-1)) // size is n-1 point size sum
+
+			enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+			enc.EncodeV2(pts)
+			defer PutEncoder(enc)
+
+			encBuf, ok := enc.Next(tc.buf)
+			assert.NoError(t, enc.LastErr())
+			assert.True(t, ok)
+			assert.NotNil(t, encBuf)
+			assert.Equal(t, 1, enc.parts)
+			assert.Equal(t, 1, enc.trimmedPts)
+			t.Logf("encoder: %s", enc)
+
+			encBuf, ok = enc.Next(tc.buf) // encode last trimmed point
+			assert.NoError(t, enc.LastErr())
+			assert.True(t, ok)
+			assert.NotNil(t, encBuf)
+			assert.Equal(t, 2, enc.parts)
+			t.Logf("encoder: %s", enc)
+
+			assert.Equal(t, tc.n, enc.TotalPoints())
+		})
+	}
+
+	t.Run("too-small-buf-for-single-point", func(t *T.T) {
+		// If single point's size is the same as encode-buf, nothing encoded, because we need some more bytes to
+		// encode them into pbpts.
+		tc := tcase{
+			n: 2,
+		}
+
+		pts := newPts(&tc)
+		var pbpts PBPoints
+		sum := 0
+		for _, pt := range pts {
+			sum += pt.pt.Size()
+			pbpts.Arr = append(pbpts.Arr, pt.pt)
+		}
+
+		t.Logf("sum: %d, pbsize: %d", sum, pbpts.Size())
+
+		// buf size is n-1 point size sum
+		tc.buf = make([]byte, sum/tc.n*(tc.n-1))
+
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+		enc.EncodeV2(pts)
+		defer PutEncoder(enc)
+
+		encBuf, ok := enc.Next(tc.buf)
+		assert.NoError(t, enc.LastErr())
+		assert.False(t, ok) // noting encode
+		assert.Nil(t, encBuf)
+		assert.Equal(t, 1, enc.SkippedPoints())
+		t.Logf("encoder: %s", enc)
+
+		encBuf, ok = enc.Next(tc.buf)
+		assert.NoError(t, enc.LastErr())
+		assert.False(t, ok) // noting encode
+		assert.Nil(t, encBuf)
+		assert.Equal(t, 2, enc.SkippedPoints())
+		t.Logf("encoder: %s", enc)
+	})
+
+	t.Run(`single-point-too-large`, func(t *T.T) {
+		tc := tcase{
+			name: `1`,
+			n:    1,
+		}
+
+		pts := newPts(&tc)
+		var pbpts PBPoints
+		sum := 0
+		for _, pt := range pts {
+			sum += pt.pt.Size()
+			pbpts.Arr = append(pbpts.Arr, pt.pt)
+		}
+
+		t.Logf("sum: %d, pbsize: %d", sum, pbpts.Size())
+
+		// 0 bytes
+		tc.buf = make([]byte, sum/tc.n*(tc.n-1))
+
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+		enc.EncodeV2(pts)
+		defer PutEncoder(enc)
+
+		encBuf, ok := enc.Next(tc.buf)
+		assert.NoError(t, enc.LastErr())
+		assert.False(t, ok) // noting encode
+		assert.Nil(t, encBuf)
+		assert.Equal(t, 1, enc.SkippedPoints())
+		t.Logf("encoder: %s", enc)
+	})
+}
+
+func TestSkipLargePoint(t *T.T) {
+	t.Run("too-small-buffer-pb-trim", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+
+		var (
+			kvs1, kvs2, kvs3, kvs4 KVs
+		)
+
+		kvs1 = kvs1.Add("msg1", strings.Repeat("x", 70), false, false)
+		kvs1 = kvs1.Add("f1", 3.14, false, false)
+		kvs2 = kvs2.Add("msg2", strings.Repeat("y", 70), false, false) // small point
+		kvs2 = kvs2.Add("f1", 3.14, false, false)
+		kvs3 = kvs3.Add("msg3", strings.Repeat("z", 70), false, false)
+		kvs3 = kvs3.Add("f1", 3.14, false, false)
+		kvs4 = kvs3.Add("msg4", strings.Repeat("0", 700), false, false) // large point that should skip
+
+		pt1 := NewPointV2("p1", kvs1, append(DefaultLoggingOptions(),
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+
+		pt2 := NewPointV2("p2", kvs2, append(DefaultLoggingOptions(),
+			WithTimestamp(time.Now().Unix()),
+			WithPrecheck(false))...)
+
+		pt3 := NewPointV2("p3", kvs3, append(DefaultLoggingOptions(),
+			WithTimestamp(time.Now().Unix()),
+			WithPrecheck(false))...)
+
+		// p3 larger than encode buf
+		pt4 := NewPointV2("p4", kvs4, append(DefaultLoggingOptions(), // small
+			WithTimestamp(time.Now().Unix()),
+			WithPrecheck(false))...)
+
+		enc.EncodeV2([]*Point{pt1, pt2, pt3, pt4})
+		defer PutEncoder(enc)
+
+		// 172 used to accept 2 point
+		buf := make([]byte, 206)
+
+		encBuf, ok := enc.Next(buf)
+		assert.NoError(t, enc.LastErr()) // p1 encode this time
+		assert.True(t, ok)
+		assert.NotNil(t, encBuf)
+		assert.Equal(t, 1, enc.parts)
+		t.Logf("encoder: %s", enc)
+
+		encBuf, ok = enc.Next(buf)
+		assert.NoError(t, enc.LastErr()) // p2 encoded, and p3 should trimmed
+		assert.True(t, ok)
+		assert.NotNil(t, encBuf)
+		assert.Equal(t, 2, enc.parts)
+		t.Logf("encoder: %s", enc)
+
+		encBuf, ok = enc.Next(buf) // p3 encode again, and p4 skipped
+		assert.NoError(t, enc.LastErr())
+		assert.True(t, ok)
+		assert.NotNil(t, encBuf)
+		t.Logf("encoder: %s", enc)
+
+		//done
+		encBuf, ok = enc.Next(buf)
+		assert.False(t, ok)
+		assert.Nil(t, encBuf)
+		assert.NoError(t, enc.LastErr())
+		t.Logf("encoder: %s", enc)
+	})
+
+	t.Run("pb-2-large-point", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(Protobuf))
+
+		var (
+			kvs1 KVs
+			kvs2 KVs
+			kvs3 KVs
+		)
+
+		kvs1 = kvs1.Add("msg1", strings.Repeat("x", 70), false, false)
+		kvs2 = kvs2.Add("msg2", strings.Repeat("y", 70), false, false)
+		kvs3 = kvs3.Add("msg3", strings.Repeat("z", 100), false, false)
+		pt1 := NewPointV2("p1", kvs1, append(DefaultLoggingOptions(),
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+		pt2 := NewPointV2("p2", kvs2, append(DefaultLoggingOptions(),
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+
+		// p3 larger than encode buf
+		pt3 := NewPointV2("p3", kvs3, append(DefaultLoggingOptions(),
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+
+		enc.EncodeV2([]*Point{pt1, pt2, pt3})
+		defer PutEncoder(enc)
+
+		buf := make([]byte, 90)
+
+		encBuf, ok := enc.Next(buf)
+		assert.NoError(t, enc.LastErr()) // p1 encode this time
+		assert.True(t, ok)
+		assert.NotNil(t, encBuf)
+		assert.Equal(t, 1, enc.parts)
+		t.Logf("encoder: %s", enc)
+
+		encBuf, ok = enc.Next(buf)
+		assert.NoError(t, enc.LastErr()) // p2 encoded
+		assert.True(t, ok)
+		assert.NotNil(t, encBuf)
+		assert.Equal(t, 2, enc.parts)
+		t.Logf("encoder: %s", enc)
+
+		encBuf, ok = enc.Next(buf)
+		assert.Error(t, enc.LastErr()) // p3 not encoded, under ignoreLargePoint = false, got error
+		t.Logf("[expected] %s", enc.LastErr())
+		assert.False(t, ok)
+		assert.Nil(t, encBuf)
+		t.Logf("encoder: %s", enc)
+
+		//done
+		encBuf, ok = enc.Next(buf)
+		assert.False(t, ok)
+		assert.Nil(t, encBuf)
+
+		//t.Logf("encoder: %s", enc)
+		assert.Error(t, enc.LastErr()) // still error once encode failed once
+	})
+
+	t.Run("too-small-buffer-pb-skip-huge-point", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+
+		var (
+			kvs1 KVs
+			kvs2 KVs
+			kvs3 KVs
+		)
+
+		kvs1 = kvs1.Add("msg1", strings.Repeat("x", 70), false, false)
+		kvs2 = kvs2.Add("msg2", strings.Repeat("y", 70), false, false)
+		kvs3 = kvs3.Add("msg3", strings.Repeat("z", 100), false, false)
+		pt1 := NewPointV2("p1", kvs1, append(DefaultLoggingOptions(),
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+		pt2 := NewPointV2("p2", kvs2, append(DefaultLoggingOptions(),
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+
+		// p3 larger than encode buf
+		pt3 := NewPointV2("p3", kvs3, append(DefaultLoggingOptions(),
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+
+		pt4 := NewPointV2("p4", kvs1, append(DefaultLoggingOptions(), // small
+			WithTimestamp(123),
+			WithPrecheck(false))...)
+
+		enc.EncodeV2([]*Point{pt1, pt2, pt3, pt4})
+		defer PutEncoder(enc)
+
+		buf := make([]byte, 90)
+
+		encBuf, ok := enc.Next(buf)
+		assert.NoError(t, enc.LastErr()) // p1 encode this time
+		assert.True(t, ok)
+		assert.NotNil(t, encBuf)
+		assert.Equal(t, 1, enc.parts)
+		t.Logf("encoder: %s", enc)
+
+		encBuf, ok = enc.Next(buf)
+		assert.NoError(t, enc.LastErr()) // p2 encoded
+		assert.True(t, ok)
+		assert.NotNil(t, encBuf)
+		assert.Equal(t, 2, enc.parts)
+		t.Logf("encoder: %s", enc)
+
+		encBuf, ok = enc.Next(buf)
+		assert.NoError(t, enc.LastErr()) // p3 skipped
+
+		assert.True(t, ok) // and p4 encoded
+		assert.NotNil(t, encBuf)
+		t.Logf("encoder: %s", enc)
+
+		//done
+		encBuf, ok = enc.Next(buf)
+		assert.False(t, ok)
+		assert.Nil(t, encBuf)
+		assert.NoError(t, enc.LastErr())
+		t.Logf("encoder: %s", enc)
+	})
+}
+
 func BenchmarkPointsSize(b *T.B) {
 	r := NewRander(WithFixedTags(true), WithRandText(3))
 	randPts := r.Rand(1)
@@ -764,12 +1293,17 @@ func BenchmarkPointsSize(b *T.B) {
 }
 
 func TestPointsSize(t *T.T) {
-	r := NewRander(WithFixedTags(true), WithRandText(3))
-	randPts := r.Rand(1)
+	r := NewRander(WithFixedTags(true), WithRandText(1))
 
-	t.Logf("pt.pt.size: %d, pt.size: %d",
-		randPts[0].pt.Size(),
-		randPts[0].Size())
+	for i := 0; i < 10; i++ {
+		pt := r.Rand(1)[0]
+		pt.MustAdd("s-arr", []string{"s1", "s2"})
+
+		t.Logf("pt: %s", pt.Pretty())
+
+		pbsize, rawSize := pt.pt.Size(), pt.Size()
+		t.Logf("pt.pt.size: %d, pt.size: %d, diff: %.2f", pbsize, rawSize, float64(pbsize)/float64(rawSize))
+	}
 }
 
 func TestEncodePayloadSize(t *T.T) {
