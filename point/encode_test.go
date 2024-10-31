@@ -549,27 +549,49 @@ func TestGoGoPBDecodePB(t *T.T) {
 	t.Logf("gogopts:\n%s", string(j))
 }
 
+func TestPBArraySize(t *T.T) {
+	r := NewRander(WithFixedTags(true), WithRandText(3))
+	randPts := r.Rand(10000)
+
+	total := 0
+	for i := range randPts {
+		ptsize := randPts[i].pt.Size()
+		total += (1 + ptsize + sovPoint(uint64(ptsize)))
+	}
+
+	pbpts := PBPoints{}
+	for i := range randPts {
+		pbpts.Arr = append(pbpts.Arr, randPts[i].pt)
+	}
+
+	assert.Equal(t, pbpts.Size(), total)
+}
+
 func BenchmarkV2Encode(b *T.B) {
 	r := NewRander(WithFixedTags(true), WithRandText(3))
 	randPts := r.Rand(10000)
 
 	buf := make([]byte, 1<<20)
+	_ = buf
+
+	var arr [][]byte
+	_ = arr
 
 	b.Logf("start...")
 
 	b.ResetTimer()
-
 	b.Run("encode-v1", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			enc := GetEncoder(WithEncEncoding(Protobuf))
-			enc.Encode(randPts)
+			arr, _ = enc.Encode(randPts)
 
 			assert.NoError(b, enc.LastErr())
 			PutEncoder(enc)
 		}
 	})
 
-	b.Run("Next", func(b *T.B) {
+	b.Run("encode-v2", func(b *T.B) {
+		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			enc := GetEncoder(WithEncEncoding(Protobuf))
 			enc.EncodeV2(randPts)
