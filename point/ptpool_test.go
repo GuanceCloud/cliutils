@@ -156,6 +156,48 @@ func BenchmarkReservedCapPool(b *T.B) {
 	})
 }
 
+func BenchmarkParallelNoPool(b *T.B) {
+	now := time.Now()
+
+	b.RunParallel(func(b *T.PB) {
+		for b.Next() {
+			var kvs KVs
+
+			kvs = kvs.Add("f0", 123, false, true)
+			kvs = kvs.Add("f1", 3.14, false, true)
+			kvs = kvs.Add("f2", "hello", false, true)
+			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, true)
+			kvs = kvs.Add("f4", false, false, false)
+			kvs = kvs.Add("f5", -123, false, false)
+
+			NewPointV2("m1", kvs, WithTime(now), WithPrecheck(false))
+		}
+	})
+}
+
+func BenchmarkParallelReserveCapPool(b *T.B) {
+	b.RunParallel(func(b *T.PB) {
+		pp := NewReservedCapPointPool(1000)
+		SetPointPool(pp)
+		defer func() {
+			SetPointPool(nil)
+		}()
+
+		for b.Next() {
+			var kvs KVs
+			kvs = kvs.Add("f0", 123, false, false)
+			kvs = kvs.Add("f1", 3.14, false, false)
+			kvs = kvs.Add("f2", "hello", false, false)
+			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, false)
+			kvs = kvs.Add("f4", false, false, false)
+			kvs = kvs.Add("f5", -123, false, false)
+
+			pt := NewPointV2("m1", kvs, WithPrecheck(false))
+			pp.Put(pt)
+		}
+	})
+}
+
 func TestPointPool(t *T.T) {
 	t.Run("reserve-cap-pool-put-kv", func(t *T.T) {
 		pp := NewReservedCapPointPool(1000)
