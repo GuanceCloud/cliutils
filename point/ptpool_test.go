@@ -106,7 +106,7 @@ var sampleLogs = []string{
 	`2022-10-27T16:12:42.050+0800	DEBUG	ddtrace	ddtrace/ddtrace_http.go:34	### received tracing data from path: /v0.4/traces`,
 }
 
-func BenchmarkReservedCapPool(b *T.B) {
+func BenchmarkNoReservedCapPool(b *T.B) {
 	now := time.Now()
 
 	b.Run("without-pool", func(b *T.B) {
@@ -123,37 +123,62 @@ func BenchmarkReservedCapPool(b *T.B) {
 			NewPointV2("m1", kvs, WithTime(now), WithPrecheck(false))
 		}
 	})
+}
 
-	b.Run("reservedCapPool", func(b *T.B) {
-		pp := NewReservedCapPointPool(1000)
-		SetPointPool(pp)
-		defer func() {
-			SetPointPool(nil)
-		}()
+func BenchmarkReserved1KCapPool(b *T.B) {
+	pp := NewReservedCapPointPool(1000)
+	SetPointPool(pp)
+	defer func() {
+		SetPointPool(nil)
+	}()
 
-		b.Cleanup(func() {
-			metrics.Unregister(pp)
-		})
-
-		metrics.MustRegister(pp)
-
-		b.ResetTimer()
-		var kvs KVs
-		for i := 0; i < b.N; i++ {
-			kvs = kvs.Add("f0", 123, false, false)
-			kvs = kvs.Add("f1", 3.14, false, false)
-			kvs = kvs.Add("f2", "hello", false, false)
-			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, false)
-			kvs = kvs.Add("f4", false, false, false)
-			kvs = kvs.Add("f5", -123, false, false)
-
-			pt := NewPointV2("m1", kvs, WithPrecheck(false))
-			pp.Put(pt)
-		}
-
-		_, err := metrics.Gather()
-		assert.NoError(b, err)
+	b.Cleanup(func() {
+		metrics.Unregister(pp)
 	})
+
+	metrics.MustRegister(pp)
+
+	b.ResetTimer()
+	var kvs KVs
+	for i := 0; i < b.N; i++ {
+		kvs = kvs.Add("f0", 123, false, false)
+		kvs = kvs.Add("f1", 3.14, false, false)
+		kvs = kvs.Add("f2", "hello", false, false)
+		kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, false)
+		kvs = kvs.Add("f4", false, false, false)
+		kvs = kvs.Add("f5", -123, false, false)
+
+		pt := NewPointV2("m1", kvs, WithPrecheck(false))
+		pp.Put(pt)
+	}
+}
+
+func BenchmarkReservedZeroCapPool(b *T.B) {
+	pp := NewReservedCapPointPool(0)
+	SetPointPool(pp)
+	defer func() {
+		SetPointPool(nil)
+	}()
+
+	b.Cleanup(func() {
+		metrics.Unregister(pp)
+	})
+
+	metrics.MustRegister(pp)
+
+	b.ResetTimer()
+	var kvs KVs
+	for i := 0; i < b.N; i++ {
+		kvs = kvs.Add("f0", 123, false, false)
+		kvs = kvs.Add("f1", 3.14, false, false)
+		kvs = kvs.Add("f2", "hello", false, false)
+		kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, false)
+		kvs = kvs.Add("f4", false, false, false)
+		kvs = kvs.Add("f5", -123, false, false)
+
+		pt := NewPointV2("m1", kvs, WithPrecheck(false))
+		pp.Put(pt)
+	}
 }
 
 func BenchmarkParallelNoPool(b *T.B) {
@@ -178,6 +203,29 @@ func BenchmarkParallelNoPool(b *T.B) {
 func BenchmarkParallelReserveCapPool(b *T.B) {
 	b.RunParallel(func(b *T.PB) {
 		pp := NewReservedCapPointPool(1000)
+		SetPointPool(pp)
+		defer func() {
+			SetPointPool(nil)
+		}()
+
+		for b.Next() {
+			var kvs KVs
+			kvs = kvs.Add("f0", 123, false, false)
+			kvs = kvs.Add("f1", 3.14, false, false)
+			kvs = kvs.Add("f2", "hello", false, false)
+			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, false)
+			kvs = kvs.Add("f4", false, false, false)
+			kvs = kvs.Add("f5", -123, false, false)
+
+			pt := NewPointV2("m1", kvs, WithPrecheck(false))
+			pp.Put(pt)
+		}
+	})
+}
+
+func BenchmarkParallelNoReserveCapPool(b *T.B) {
+	b.RunParallel(func(b *T.PB) {
+		pp := NewReservedCapPointPool(0)
 		SetPointPool(pp)
 		defer func() {
 			SetPointPool(nil)
