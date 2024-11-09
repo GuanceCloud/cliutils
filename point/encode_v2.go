@@ -85,22 +85,22 @@ func (e *Encoder) trim(curSize, ptsize, bufLen int) (int, error) {
 }
 
 func (e *Encoder) doEncodeProtobuf(buf []byte) ([]byte, bool) {
-	var (
-		need    = -1
-		curSize int
-		err     error
-	)
-
 	if e.lastErr != nil { // on any error, we should break on iterator.
 		return nil, false
 	}
 
-	defer func() {
-		// clear encoding array
+	defer func() { // clear encoding array
 		e.pbpts.Arr = e.pbpts.Arr[:0]
 	}()
 
-	for _, pt := range e.pts[e.lastPtsIdx:] {
+	curSize := 0
+	for {
+		if e.lastPtsIdx >= len(e.pts) {
+			break
+		}
+
+		pt := e.pts[e.lastPtsIdx]
+
 		if pt == nil {
 			e.lastPtsIdx++
 			continue
@@ -120,43 +120,43 @@ func (e *Encoder) doEncodeProtobuf(buf []byte) ([]byte, bool) {
 			e.lastPtsIdx++
 		} else {
 			// current new points will larger than buf.
-			need, err = e.trim(curSize, ptsize, len(buf))
-			if err != nil {
-				e.lastErr = err
-				return nil, false
-			} else {
-				if need > 0 { // we do not need to sum size of e.pbpts
-					goto __doEncodeDirectly
-				} else {
+			if len(e.pbpts.Arr) == 0 { // nothing added
+				e.lastPtsIdx++
+				e.skippedPts++
+				if e.ignoreLargePoint {
 					continue
+				} else {
+					e.lastErr = fmt.Errorf("%w: need at least %d bytes, only %d available",
+						errTooSmallBuffer, ptsize, len(buf))
+					return nil, false
 				}
+			} else {
+				break // we got something to encoding
 			}
 		}
 	}
 
-	// Until now, all points within e.pts has been pushed to e.pbpts.Arr during
-	// multiple Next() iterator, but these tail points may still larger than the buf size.
-	need = e.pbpts.Size()
-	if need > len(buf) { // trim
-		need, err = e.trim(curSize, need, len(buf))
+	var (
+		err    error
+		before = e.pbpts.Size()
+		after  = before
+	)
+
+	if before > len(buf) {
+		after, err = e.trim(curSize, before, len(buf))
 		if err != nil {
 			e.lastErr = err
-		} else {
-			if need > 0 {
-				goto __doEncodeDirectly
-			} else {
-				// the last point skipped
-				return nil, false
-			}
+		} else if after == 0 {
+			// the last point skipped
+			return nil, false
 		}
 	}
 
-__doEncodeDirectly:
-	if len(e.pbpts.Arr) == 0 || need <= 0 {
+	if len(e.pbpts.Arr) == 0 || after <= 0 {
 		return nil, false
 	}
 
-	if n, err := e.pbpts.MarshalToSizedBuffer(buf[:need]); err != nil {
+	if n, err := e.pbpts.MarshalToSizedBuffer(buf[:after]); err != nil {
 		e.lastErr = err
 		return nil, false
 	} else {

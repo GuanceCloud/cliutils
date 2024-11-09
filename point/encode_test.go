@@ -682,7 +682,6 @@ func BenchmarkV2Encode(b *T.B) {
 }
 
 func TestV2Encode(t *T.T) {
-
 	t.Run("skip-huge-tail-point", func(t *T.T) {
 		pts := []*Point{
 			NewPointV2("small", NewKVs(map[string]any{
@@ -739,13 +738,13 @@ func TestV2Encode(t *T.T) {
 
 		t.Logf("encoder: %s", enc)
 
-		assert.Equal(t, 2, enc.parts)
-		assert.Equal(t, 1, enc.SkippedPoints())
-		assert.NoError(t, enc.LastErr())
-
 		for i, pt := range decodePts {
 			assert.Equal(t, pts[i].Pretty(), pt.Pretty())
 		}
+
+		assert.Equal(t, 1, enc.parts)
+		assert.Equal(t, 1, enc.SkippedPoints())
+		assert.NoError(t, enc.LastErr())
 	})
 
 	t.Run("encode-huge-tail-point", func(t *T.T) {
@@ -954,13 +953,37 @@ func TestV2Encode(t *T.T) {
 		buf := make([]byte, 4) // too small
 
 		for {
-			_, ok := enc.Next(buf)
+			buf, ok := enc.Next(buf)
 			require.False(t, ok)
+			require.Nil(t, buf)
 			break
 		}
 
+		t.Logf("enc: %s", enc)
+
 		assert.Error(t, enc.LastErr())
 		t.Logf("go error: %s", enc.LastErr())
+	})
+
+	t.Run("too-small-buffer-pb-and-skipped", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+		enc.EncodeV2(randPts)
+		defer PutEncoder(enc)
+
+		buf := make([]byte, 4) // too small
+
+		for {
+			buf, ok := enc.Next(buf)
+			require.Nil(t, buf)
+			if !ok {
+				break
+			}
+		}
+
+		t.Logf("enc: %s", enc)
+
+		assert.Equal(t, len(randPts), enc.SkippedPoints())
+		assert.NoError(t, enc.LastErr())
 	})
 
 	t.Run("with-encode-callback-line-proto", func(t *T.T) {
