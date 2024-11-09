@@ -682,8 +682,176 @@ func BenchmarkV2Encode(b *T.B) {
 }
 
 func TestV2Encode(t *T.T) {
+
+	t.Run("skip-huge-tail-point", func(t *T.T) {
+		pts := []*Point{
+			NewPointV2("small", NewKVs(map[string]any{
+				"f1":   123,
+				"str1": strings.Repeat("x", 100),
+			}), WithTimestamp(123)),
+
+			NewPointV2("huge", NewKVs(map[string]any{
+				"f1":   123,
+				"str1": strings.Repeat("x", 100),
+				"str2": strings.Repeat("y", 200),
+				"str3": strings.Repeat("z", 400),
+			}), WithTimestamp(123)),
+		}
+
+		var pbpts PBPoints
+		sum := 0
+		for _, pt := range pts {
+			sum += pt.pt.Size()
+			pbpts.Arr = append(pbpts.Arr, pt.pt)
+		}
+
+		t.Logf("sum: %d, size: %d", sum, pbpts.Size())
+
+		assert.True(t, sum < pbpts.Size())    // pb need some more bytes
+		buf := make([]byte, pts[1].pt.Size()) // size only fit to huge point
+
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+		enc.EncodeV2(pts)
+		defer PutEncoder(enc)
+
+		var (
+			decodePts []*Point
+			round     int
+			dec       = GetDecoder(WithDecEncoding(Protobuf))
+		)
+		defer PutDecoder(dec)
+
+		for {
+			if x, ok := enc.Next(buf); ok {
+				decPts, err := dec.Decode(x)
+				assert.NoErrorf(t, err, "decode %s failed", x)
+
+				t.Logf("encoded %d(%d remain) bytes, %d points, encoder: %s",
+					len(x), (len(buf) - len(x)), len(decPts), enc.String())
+				decodePts = append(decodePts, decPts...)
+				round++
+				assert.Equal(t, round, enc.parts)
+				t.Logf("trimmed: %d", enc.LastTrimmed())
+			} else {
+				break
+			}
+		}
+
+		t.Logf("encoder: %s", enc)
+
+		assert.Equal(t, 2, enc.parts)
+		assert.Equal(t, 1, enc.SkippedPoints())
+		assert.NoError(t, enc.LastErr())
+
+		for i, pt := range decodePts {
+			assert.Equal(t, pts[i].Pretty(), pt.Pretty())
+		}
+	})
+
+	t.Run("encode-huge-tail-point", func(t *T.T) {
+		pts := []*Point{
+			NewPointV2("p1", NewKVs(map[string]any{
+				"f1":   123,
+				"str1": strings.Repeat("x", 100),
+				"str2": strings.Repeat("y", 200),
+				"str3": strings.Repeat("z", 400),
+			}), WithTimestamp(123)),
+
+			NewPointV2("p2", NewKVs(map[string]any{
+				"f1":   123,
+				"str1": strings.Repeat("x", 100),
+				"str2": strings.Repeat("y", 200),
+				"str3": strings.Repeat("z", 400),
+			}), WithTimestamp(123)),
+		}
+
+		var pbpts PBPoints
+		sum := 0
+		for _, pt := range pts {
+			sum += pt.pt.Size()
+			pbpts.Arr = append(pbpts.Arr, pt.pt)
+		}
+
+		t.Logf("sum: %d, size: %d", sum, pbpts.Size())
+
+		assert.True(t, sum < pbpts.Size()) // pb need some more bytes
+		buf := make([]byte, sum)
+
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+		enc.EncodeV2(pts)
+		defer PutEncoder(enc)
+
+		var (
+			decodePts []*Point
+			round     int
+			dec       = GetDecoder(WithDecEncoding(Protobuf))
+		)
+		defer PutDecoder(dec)
+
+		for {
+			if x, ok := enc.Next(buf); ok {
+				decPts, err := dec.Decode(x)
+				assert.NoErrorf(t, err, "decode %s failed", x)
+
+				t.Logf("encoded %d(%d remain) bytes, %d points, encoder: %s",
+					len(x), (len(buf) - len(x)), len(decPts), enc.String())
+				decodePts = append(decodePts, decPts...)
+				round++
+				assert.Equal(t, round, enc.parts)
+				t.Logf("trimmed: %d", enc.LastTrimmed())
+			} else {
+				t.Logf("trimmed: %d", enc.LastTrimmed())
+				break
+			}
+		}
+
+		assert.NoError(t, enc.LastErr())
+
+		for i, pt := range decodePts {
+			assert.Equal(t, pts[i].Pretty(), pt.Pretty())
+		}
+	})
+
 	r := NewRander(WithFixedTags(true), WithRandText(3))
 	randPts := r.Rand(10000)
+
+	t.Run("encode-pb-loose-size", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithLoosePointSize(true))
+		enc.EncodeV2(randPts)
+		defer PutEncoder(enc)
+
+		dec := GetDecoder(WithDecEncoding(Protobuf))
+		defer PutDecoder(dec)
+
+		var (
+			decodePts []*Point
+			round     int
+			buf       = make([]byte, 1<<20)
+		)
+
+		for {
+			if x, ok := enc.Next(buf); ok {
+				decPts, err := dec.Decode(x)
+				assert.NoErrorf(t, err, "decode %s failed", x)
+
+				t.Logf("encoded %d(%d remain) bytes, %d points, encoder: %s",
+					len(x), (len(buf) - len(x)), len(decPts), enc.String())
+				decodePts = append(decodePts, decPts...)
+				round++
+				assert.Equal(t, round, enc.parts)
+				t.Logf("trimmed: %d", enc.LastTrimmed())
+			} else {
+				t.Logf("trimmed: %d", enc.LastTrimmed())
+				break
+			}
+		}
+
+		assert.NoError(t, enc.LastErr())
+
+		for i, pt := range decodePts {
+			assert.Equal(t, randPts[i].Pretty(), pt.Pretty())
+		}
+	})
 
 	t.Run("encode-pb", func(t *T.T) {
 		enc := GetEncoder(WithEncEncoding(Protobuf))
@@ -709,7 +877,9 @@ func TestV2Encode(t *T.T) {
 				decodePts = append(decodePts, decPts...)
 				round++
 				assert.Equal(t, round, enc.parts)
+				t.Logf("trimmed: %d", enc.LastTrimmed())
 			} else {
+				t.Logf("trimmed: %d", enc.LastTrimmed())
 				break
 			}
 		}
