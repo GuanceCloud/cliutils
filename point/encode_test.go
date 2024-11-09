@@ -571,9 +571,9 @@ func BenchmarkEncode(b *T.B) {
 	})
 
 	b.ResetTimer()
-	b.Run("v2-encode-pb-PBSize()", func(b *T.B) {
+	b.Run("v2-encode-pb-pbsize", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
-			enc := GetEncoder(WithEncEncoding(Protobuf))
+			enc := GetEncoder(WithEncEncoding(Protobuf), WithApproxSize(false))
 			enc.EncodeV2(pts)
 
 			for {
@@ -588,10 +588,9 @@ func BenchmarkEncode(b *T.B) {
 	})
 
 	b.ResetTimer()
-	b.Run("v2-encode-pb-Size()", func(b *T.B) {
+	b.Run("v2-encode-pb-approx-size", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			enc := GetEncoder(WithEncEncoding(Protobuf))
-			enc.looseSize = true
 			enc.EncodeV2(pts)
 
 			for {
@@ -814,45 +813,7 @@ func TestV2Encode(t *T.T) {
 	r := NewRander(WithFixedTags(true), WithRandText(3))
 	randPts := r.Rand(10000)
 
-	t.Run("encode-pb-loose-size", func(t *T.T) {
-		enc := GetEncoder(WithEncEncoding(Protobuf), WithLoosePointSize(true))
-		enc.EncodeV2(randPts)
-		defer PutEncoder(enc)
-
-		dec := GetDecoder(WithDecEncoding(Protobuf))
-		defer PutDecoder(dec)
-
-		var (
-			decodePts []*Point
-			round     int
-			buf       = make([]byte, 1<<20)
-		)
-
-		for {
-			if x, ok := enc.Next(buf); ok {
-				decPts, err := dec.Decode(x)
-				assert.NoErrorf(t, err, "decode %s failed", x)
-
-				t.Logf("encoded %d(%d remain) bytes, %d points, encoder: %s",
-					len(x), (len(buf) - len(x)), len(decPts), enc.String())
-				decodePts = append(decodePts, decPts...)
-				round++
-				assert.Equal(t, round, enc.parts)
-				t.Logf("trimmed: %d", enc.LastTrimmed())
-			} else {
-				t.Logf("trimmed: %d", enc.LastTrimmed())
-				break
-			}
-		}
-
-		assert.NoError(t, enc.LastErr())
-
-		for i, pt := range decodePts {
-			assert.Equal(t, randPts[i].Pretty(), pt.Pretty())
-		}
-	})
-
-	t.Run("encode-pb", func(t *T.T) {
+	t.Run("encode-pb-approx-size", func(t *T.T) {
 		enc := GetEncoder(WithEncEncoding(Protobuf))
 		enc.EncodeV2(randPts)
 		defer PutEncoder(enc)
@@ -890,8 +851,46 @@ func TestV2Encode(t *T.T) {
 		}
 	})
 
+	t.Run("encode-pb", func(t *T.T) {
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithApproxSize(false))
+		enc.EncodeV2(randPts)
+		defer PutEncoder(enc)
+
+		dec := GetDecoder(WithDecEncoding(Protobuf))
+		defer PutDecoder(dec)
+
+		var (
+			decodePts []*Point
+			round     int
+			buf       = make([]byte, 1<<20)
+		)
+
+		for {
+			if x, ok := enc.Next(buf); ok {
+				decPts, err := dec.Decode(x)
+				assert.NoErrorf(t, err, "decode %s failed", x)
+
+				t.Logf("encoded %d(%d remain) bytes, %d points, encoder: %s",
+					len(x), (len(buf) - len(x)), len(decPts), enc.String())
+				decodePts = append(decodePts, decPts...)
+				round++
+				assert.Equal(t, round, enc.parts)
+				t.Logf("trimmed: %d", enc.LastTrimmed())
+			} else {
+				t.Logf("trimmed: %d", enc.LastTrimmed())
+				break
+			}
+		}
+
+		assert.NoError(t, enc.LastErr())
+
+		for i, pt := range decodePts {
+			assert.Equal(t, randPts[i].Pretty(), pt.Pretty())
+		}
+	})
+
 	t.Run("encode-lp", func(t *T.T) {
-		enc := GetEncoder(WithEncEncoding(LineProtocol))
+		enc := GetEncoder(WithEncEncoding(LineProtocol), WithApproxSize(false))
 		enc.EncodeV2(randPts)
 		defer PutEncoder(enc)
 
@@ -946,7 +945,7 @@ func TestV2Encode(t *T.T) {
 	})
 
 	t.Run("too-small-buffer-pb", func(t *T.T) {
-		enc := GetEncoder(WithEncEncoding(Protobuf))
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithApproxSize(false))
 		enc.EncodeV2(randPts)
 		defer PutEncoder(enc)
 
@@ -966,7 +965,7 @@ func TestV2Encode(t *T.T) {
 	})
 
 	t.Run("too-small-buffer-pb-and-skipped", func(t *T.T) {
-		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true), WithApproxSize(false))
 		enc.EncodeV2(randPts)
 		defer PutEncoder(enc)
 
@@ -1184,7 +1183,7 @@ func TestEncTrim(t *T.T) {
 
 			tc.buf = make([]byte, sum/tc.n*(tc.n-1)) // size is n-1 point size sum
 
-			enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+			enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true), WithApproxSize(false))
 			enc.EncodeV2(pts)
 			defer PutEncoder(enc)
 
@@ -1227,7 +1226,7 @@ func TestEncTrim(t *T.T) {
 		// buf size is n-1 point size sum
 		tc.buf = make([]byte, sum/tc.n*(tc.n-1))
 
-		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true), WithApproxSize(false))
 		enc.EncodeV2(pts)
 		defer PutEncoder(enc)
 
@@ -1265,7 +1264,7 @@ func TestEncTrim(t *T.T) {
 		// 0 bytes
 		tc.buf = make([]byte, sum/tc.n*(tc.n-1))
 
-		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
+		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true), WithApproxSize(false))
 		enc.EncodeV2(pts)
 		defer PutEncoder(enc)
 

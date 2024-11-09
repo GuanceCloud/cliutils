@@ -39,48 +39,40 @@ func (e *Encoder) Next(buf []byte) ([]byte, bool) {
 	}
 }
 
-func (e *Encoder) trim(curSize, ptsize, bufLen int) (int, error) {
-	trimmed := 1
+// tryTrim will truncate tail-points if total size largar than bufLen.
+func (e *Encoder) tryTrim(curSize, ptsize, bufLen int) (int, error) {
+	if len(e.pbpts.Arr) == 0 {
+		return 0, nil
+	}
 
-	switch len(e.pbpts.Arr) {
-	case 0:
-		e.lastPtsIdx++
-		e.skippedPts++
-		if e.ignoreLargePoint {
-			return 0, nil
-		} else {
-			return -1, fmt.Errorf("%w: need at least %d bytes, only %d available, nothing has added, this is a huge point",
-				errTooSmallBuffer, curSize+ptsize, bufLen)
+	trimmed := 1
+	for { // exists point(added) may still exceed buf, try tail points until size fit to @buf.
+		pbptsSize := e.pbpts.Size()
+		if pbptsSize < bufLen {
+			return pbptsSize, nil
 		}
 
-	default:
-		for { // exists point(added) may still exceed buf, try trim tail points until size fit to @buf.
-			if pbptsSize := e.pbpts.Size(); pbptsSize > bufLen {
-				if len(e.pbpts.Arr) == 1 {
-					// NOTE: we have added the lastPtsIdx when append the last
-					// point to pbpts.Arr, so do not add here
-					e.skippedPts++
-					e.totalPts--                  // remove the single huge point, we haven't encode it indeed
-					e.pbpts.Arr = e.pbpts.Arr[:0] // clear the last one: it's too large for buf
+		if len(e.pbpts.Arr) == 1 {
+			// NOTE: we have added the lastPtsIdx when append the last
+			// point to pbpts.Arr, so do not add here
+			e.skippedPts++
+			e.totalPts--                  // remove the single huge point, we haven't encode it indeed
+			e.pbpts.Arr = e.pbpts.Arr[:0] // clear the last one: it's too large for buf
 
-					if e.ignoreLargePoint {
-						return 0, nil
-					} else {
-						return -1, fmt.Errorf("%w: need at least %d bytes, only %d available, current points: %d",
-							errTooSmallBuffer, curSize, bufLen, len(e.pbpts.Arr))
-					}
-				}
-
-				// Pop some points and step back point index for next iterator.
-				e.pbpts.Arr = e.pbpts.Arr[:len(e.pbpts.Arr)-trimmed]
-				e.trimmedPts += trimmed
-				e.lastPtsIdx -= trimmed
-				e.totalPts -= trimmed
-				trimmed *= 2 // try trim more tail points to save e.pbpts.Size() cost
+			if e.ignoreLargePoint {
+				return 0, nil
 			} else {
-				return pbptsSize, nil
+				return -1, fmt.Errorf("%w: need at least %d bytes, only %d available, current points: %d",
+					errTooSmallBuffer, curSize, bufLen, len(e.pbpts.Arr))
 			}
 		}
+
+		// Pop some points and step back point index for next iterator.
+		e.pbpts.Arr = e.pbpts.Arr[:len(e.pbpts.Arr)-trimmed]
+		e.trimmedPts += trimmed
+		e.lastPtsIdx -= trimmed
+		e.totalPts -= trimmed
+		trimmed *= 2 // try trim more tail points to save e.pbpts.Size() cost
 	}
 }
 
@@ -107,10 +99,10 @@ func (e *Encoder) doEncodeProtobuf(buf []byte) ([]byte, bool) {
 		}
 
 		var ptsize int
-		if !e.looseSize {
-			ptsize = pt.PBSize()
-		} else {
+		if e.approxsize {
 			ptsize = pt.Size()
+		} else {
+			ptsize = pt.PBSize()
 		}
 
 		if curSize+ptsize <= len(buf) {
@@ -136,20 +128,12 @@ func (e *Encoder) doEncodeProtobuf(buf []byte) ([]byte, bool) {
 		}
 	}
 
-	var (
-		err    error
-		before = e.pbpts.Size()
-		after  = before
-	)
-
-	if before > len(buf) {
-		after, err = e.trim(curSize, before, len(buf))
-		if err != nil {
-			e.lastErr = err
-		} else if after == 0 {
-			// the last point skipped
-			return nil, false
-		}
+	after, err := e.tryTrim(curSize, curSize, len(buf))
+	if err != nil {
+		e.lastErr = err
+	} else if after == 0 {
+		// nothing left
+		return nil, false
 	}
 
 	if len(e.pbpts.Arr) == 0 || after <= 0 {
