@@ -65,7 +65,9 @@ func TestSliceString(t *testing.T) {
 			substring = slice_string("abcdefghijklmnop",-1,10)
 			pt_kvs_set("result", substring)
 			`,
-			fail: true,
+			keyName: "result",
+			expect:  "",
+			fail:    false,
 		},
 		{
 			name: "out of range2",
@@ -73,7 +75,9 @@ func TestSliceString(t *testing.T) {
 			substring = slice_string("abcdefghijklmnop",0,100)
 			pt_kvs_set("result", substring)
 			`,
-			fail: true,
+			keyName: "result",
+			expect:  "",
+			fail:    false,
 		},
 		{
 			name: "not integer1",
@@ -81,7 +85,9 @@ func TestSliceString(t *testing.T) {
 			substring = slice_string("abcdefghijklmnop","a","b")
 			pt_kvs_set("result", substring)
 			`,
-			fail: true,
+			keyName: "result",
+			expect:  "",
+			fail:    true,
 		},
 		{
 			name: "not integer2",
@@ -89,7 +95,9 @@ func TestSliceString(t *testing.T) {
 			substring = slice_string("abcdefghijklmnop","abc","def")
 			pt_kvs_set("result", substring)
 			`,
-			fail: true,
+			keyName: "result",
+			expect:  "",
+			fail:    true,
 		},
 		{
 			name: "not string",
@@ -97,7 +105,9 @@ func TestSliceString(t *testing.T) {
 			substring = slice_string(12345,0,3)
 			pt_kvs_set("result", substring)
 			`,
-			fail: true,
+			keyName: "result",
+			expect:  "",
+			fail:    true,
 		},
 		{
 			name: "not correct args",
@@ -105,7 +115,9 @@ func TestSliceString(t *testing.T) {
 			substring = slice_string("abcdefghijklmnop",0)
 			pt_kvs_set("result", substring)
 			`,
-			fail: true,
+			keyName: "result",
+			expect:  "",
+			fail:    true,
 		},
 		{
 			name: "not correct args",
@@ -113,7 +125,9 @@ func TestSliceString(t *testing.T) {
 			substring = slice_string("abcdefghijklmnop",0,1,2)
 			pt_kvs_set("result", substring)
 			`,
-			fail: true,
+			keyName: "result",
+			expect:  "",
+			fail:    true,
 		},
 	}
 

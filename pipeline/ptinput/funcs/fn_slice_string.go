@@ -17,7 +17,7 @@ var (
 	docSliceStringEN string
 
 	// todo: parse function definition
-	_ = "fn slice_string(name: str,start: int,end: int) -> str"
+	_ = "fn slice_string(name: str, start: int, end: int) -> str"
 
 	FnSliceString = NewFunc(
 		"slice_string",
@@ -53,23 +53,24 @@ var (
 )
 
 func sliceString(ctx *runtime.Task, funcExpr *ast.CallExpr, vals ...any) *errchain.PlError {
+	errstring := ""
 	if len(vals) != 3 {
-		ctx.Regs.ReturnAppend(nil, ast.Nil)
+		ctx.Regs.ReturnAppend(errstring, ast.String)
 		return nil
 	}
 	name := vals[0].(string)
 	start, ok := vals[1].(int64)
 	if !ok {
-		ctx.Regs.ReturnAppend(nil, ast.Nil)
+		ctx.Regs.ReturnAppend(errstring, ast.String)
 		return nil
 	}
 	end, ok := vals[2].(int64)
 	if !ok {
-		ctx.Regs.ReturnAppend(nil, ast.Nil)
+		ctx.Regs.ReturnAppend(errstring, ast.String)
 		return nil
 	}
 	if start < 0 || end > int64(len(name)) || start > end {
-		ctx.Regs.ReturnAppend(nil, ast.Nil)
+		ctx.Regs.ReturnAppend(errstring, ast.String)
 		return nil
 	}
 
