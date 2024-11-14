@@ -16,7 +16,7 @@ require (
 	github.com/gin-gonic/gin v1.9.0
 	github.com/go-ping/ping v1.1.0
 	github.com/gobwas/ws v1.1.0
-	github.com/goccy/go-json v0.10.0
+	github.com/goccy/go-json v0.10.3
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/pprof v0.0.0-20230705174524-200ffdc848b8
 	github.com/gorilla/websocket v1.5.0
