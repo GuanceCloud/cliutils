@@ -72,7 +72,8 @@ func TestPt(t *testing.T) {
 
 	pt.Set("time", 1, ast.Int)
 	pt.KeyTime2Time()
-	if pt.PtTime().UnixNano() != 1 {
+	ppt := pt.Point()
+	if ppt.Time().UnixNano() != 1 {
 		t.Fatal("time != 1")
 	}
 

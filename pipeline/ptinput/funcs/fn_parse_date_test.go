@@ -252,9 +252,9 @@ parse_date(key="time", yy=year, MM=month, dd=day, hh=hour, mm=min, ss=sec, zone=
 				return
 			}
 
-			pt := ptinput.NewPlPoint(
+			plpt := ptinput.NewPlPoint(
 				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
-			errR := runScript(runner, pt)
+			errR := runScript(runner, plpt)
 
 			if errR != nil {
 				if tc.fail {
@@ -263,12 +263,13 @@ parse_date(key="time", yy=year, MM=month, dd=day, hh=hour, mm=min, ss=sec, zone=
 					t.Error(errR.Error())
 				}
 			} else {
-				pt.KeyTime2Time()
+				plpt.KeyTime2Time()
+				pt := plpt.Point()
 				var v interface{}
-				if tc.outKey != "time" && tc.outKey != "" {
-					v, _, _ = pt.Get(tc.outKey)
+				if tc.outKey != "time" {
+					v = pt.Get(tc.outKey)
 				} else {
-					v = pt.PtTime().UnixNano()
+					v = pt.Time().UnixNano()
 				}
 				tu.Equals(t, tc.expected, v)
 				t.Logf("[%d] PASS", idx)

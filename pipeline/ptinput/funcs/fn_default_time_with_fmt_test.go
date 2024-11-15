@@ -101,20 +101,20 @@ func TestDefaultTimeWithFmt(t *testing.T) {
 				return
 			}
 			for idxIn := 0; idxIn < len(tc.in); idxIn++ {
-				pt := ptinput.NewPlPoint(
+				plpt := ptinput.NewPlPoint(
 					point.Logging, "test", nil, map[string]any{"message": tc.in[idxIn]}, time.Now())
-				errR := runScript(runner, pt)
+				errR := runScript(runner, plpt)
 				if errR != nil {
 					t.Fatal(errR)
 				}
 
-				pt.KeyTime2Time()
-
+				plpt.KeyTime2Time()
+				pt := plpt.Point()
 				var v interface{}
-				if tc.outkey != "time" && tc.outkey != "" {
-					v, _, _ = pt.Get(tc.outkey)
+				if tc.outkey != "time" {
+					v = pt.Get(tc.outkey)
 				} else {
-					v = pt.PtTime().UnixNano()
+					v = pt.Time().UnixNano()
 				}
 				tu.Equals(t, tc.expect[idxIn], v)
 				t.Logf("[%d] PASS", idx)

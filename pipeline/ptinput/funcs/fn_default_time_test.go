@@ -1082,20 +1082,22 @@ func TestDefaultTime(t *testing.T) {
 				return
 			}
 
-			pt := ptinput.NewPlPoint(
+			plpt := ptinput.NewPlPoint(
 				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
-			errR := runScript(runner, pt)
+			errR := runScript(runner, plpt)
 			if errR != nil {
 				t.Fatal(errR)
 			}
 
-			pt.KeyTime2Time()
+			plpt.KeyTime2Time()
+
+			pt := plpt.Point()
 
 			var v interface{}
 			if tc.outkey != "time" && tc.outkey != "" {
-				v, _, _ = pt.Get(tc.outkey)
+				v = pt.Get(tc.outkey)
 			} else {
-				v = pt.PtTime().UnixNano()
+				v = pt.Time().UnixNano()
 			}
 			tu.Equals(t, tc.expect, v)
 			t.Logf("[%d] PASS", idx)
