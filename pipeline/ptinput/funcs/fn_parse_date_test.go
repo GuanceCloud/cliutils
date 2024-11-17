@@ -252,7 +252,7 @@ parse_date(key="time", yy=year, MM=month, dd=day, hh=hour, mm=min, ss=sec, zone=
 				return
 			}
 
-			plpt := ptinput.NewPlPoint(
+			plpt := ptinput.NewPlPt(
 				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
 			errR := runScript(runner, plpt)
 

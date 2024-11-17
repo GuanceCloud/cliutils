@@ -66,7 +66,7 @@ func TestAdjustTimezone(t *testing.T) {
 				return
 			}
 			{
-				plpt := ptinput.NewPlPoint(
+				plpt := ptinput.NewPlPt(
 					point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
 				errR := runScript(runner, plpt)
 				if errR != nil {
@@ -86,7 +86,7 @@ func TestAdjustTimezone(t *testing.T) {
 			}
 
 			{
-				plpt := ptinput.NewPlPoint(point.Logging,
+				plpt := ptinput.NewPlPt(point.Logging,
 					"test", nil, map[string]any{"message": tc.in}, time.Now())
 				errR := runScript(runner, plpt)
 				if errR != nil {

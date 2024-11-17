@@ -150,7 +150,7 @@ func CreatePoint(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlError {
 		}
 	}
 
-	plpt := ptinput.NewPlPoint(ptCat, ptName, ptTags, ptFields, ptTime)
+	plpt := ptinput.NewPlPt(ptCat, ptName, ptTags, ptFields, ptTime)
 	if arg := funcExpr.Param[5]; arg != nil {
 		if refCall, ok := funcExpr.PrivateData.(*ast.CallExpr); ok {
 			if srcipt, ok := refCall.PrivateData.(*runtime.Script); ok {

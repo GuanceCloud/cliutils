@@ -95,7 +95,7 @@ func TestAgg(t *testing.T) {
 
 			buks := plmap.NewAggBuks(fn, nil)
 			for _, tcIn := range tc.in {
-				pt := ptinput.NewPlPoint(
+				pt := ptinput.NewPlPt(
 					point.Logging, "test", nil, map[string]any{"message": tcIn}, time.Now())
 				pt.SetAggBuckets(buks)
 				errR := runScript(runner, pt)

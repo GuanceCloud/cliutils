@@ -101,7 +101,7 @@ func TestDefaultTimeWithFmt(t *testing.T) {
 				return
 			}
 			for idxIn := 0; idxIn < len(tc.in); idxIn++ {
-				plpt := ptinput.NewPlPoint(
+				plpt := ptinput.NewPlPt(
 					point.Logging, "test", nil, map[string]any{"message": tc.in[idxIn]}, time.Now())
 				errR := runScript(runner, plpt)
 				if errR != nil {

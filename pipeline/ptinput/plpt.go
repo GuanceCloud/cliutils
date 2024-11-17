@@ -146,8 +146,12 @@ func (pp *PlPt) Dropped() bool {
 }
 
 func (pp *PlPt) PtTime() time.Time {
-	return time.Unix(0, pp.time)
-
+	if nanots := pp.time; nanots != 0 {
+		return time.Unix(nanots/int64(time.Second),
+			nanots%int64(time.Second))
+	} else {
+		return time.Time{}
+	}
 }
 
 func (pp *PlPt) Category() point.Category {
@@ -178,7 +182,7 @@ func (pp *PlPt) Fields() map[string]any {
 
 func (pp *PlPt) Point() *point.Point {
 	opt := utils.PtCatOption(pp.category)
-	opt = append(opt, point.WithTime(pp.PtTime()))
+	opt = append(opt, point.WithTimestamp(pp.time))
 
 	return point.NewPointV2(pp.name, pp.kvs, opt...)
 }
@@ -307,5 +311,33 @@ func Conv2String(v any, dtype ast.DType) (string, error) {
 		return "", nil
 	default:
 		return "", fmt.Errorf("unsupported data type %d", dtype)
+	}
+}
+
+func NewPlPt(cat point.Category, name string,
+	tags map[string]string, fields map[string]any, ptTime time.Time,
+) PlInputPt {
+	if tags == nil {
+		tags = map[string]string{}
+	}
+
+	if fields == nil {
+		fields = map[string]any{}
+	}
+
+	kvs := point.NewKVs(fields)
+	for k, v := range tags {
+		kvs = kvs.AddV2(k, v, true, point.WithKVTagSet(true))
+	}
+
+	var ts int64
+	if !ptTime.IsZero() {
+		ts = ptTime.UnixNano()
+	}
+	return &PlPt{
+		name:     name,
+		kvs:      kvs,
+		time:     ts,
+		category: cat,
 	}
 }

@@ -14,7 +14,7 @@ import (
 )
 
 func TestPt(t *testing.T) {
-	pt := NewPlPoint(point.Logging, "t", nil, nil, time.Now())
+	pt := NewPlPt(point.Logging, "t", nil, nil, time.Now())
 	if _, _, err := pt.Get("a"); err == nil {
 		t.Fatal("err == nil")
 	}

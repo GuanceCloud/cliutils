@@ -164,7 +164,7 @@ func BenchmarkParseLog(b *testing.B) {
 	data := `2017-12-29T12:33:33.095243Z         2 Query     SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE CREATE_OPTIONS LIKE '%partitioned%'`
 
 	for n := 0; n < b.N; n++ {
-		pt := ptinput.NewPlPoint(
+		pt := ptinput.NewPlPt(
 			point.Logging, "test", nil, map[string]any{"message": data}, time.Now())
 		errR := runScript(runner, pt)
 
@@ -197,7 +197,7 @@ func BenchmarkParseLog_tz(b *testing.B) {
 	data := `2017-12-29T12:33:33.095243Z     1.1.1.1    2 `
 
 	for n := 0; n < b.N; n++ {
-		pt := ptinput.NewPlPoint(
+		pt := ptinput.NewPlPt(
 			point.Logging, "test", nil, map[string]any{"message": data}, time.Now())
 		errR := runScript(runner, pt)
 
@@ -220,7 +220,7 @@ grok(_, "%{IPORHOST:client_ip} %{NOTSPACE:http_ident} %{NOTSPACE:http_auth} \\[%
 	data := `127.0.0.1 - - [21/Jul/2021:14:14:38 +0800] "GET /?1 HTTP/1.1" 200 2178 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36"`
 	// data := `fe80:d::127.0.0.1 - - [21/Jul/2021:14:14:38 +0800] "GET /?1 HTTP/1.1" 200 2178 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36"`
 
-	pt := ptinput.NewPlPoint(
+	pt := ptinput.NewPlPt(
 		point.Logging, "test", nil, map[string]any{"message": data}, time.Now())
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -276,36 +276,13 @@ group_between(status_code, [500,599], "error", status)
 	b.ResetTimer()
 	pt.MustAdd("message", data)
 
-	b.Run("pl-old-mkdrop", func(b *testing.B) {
-		for n := 0; n < b.N; n++ {
-			plpt := ptinput.WrapPoint(
-				point.Logging, pt)
-			errR := runScript(runner, plpt)
-			_ = plpt.Point()
-			if errR != nil {
-				b.Fatal(errR)
-			}
-		}
-	})
-
 	b.Run("pl-old", func(b *testing.B) {
 		for n := 0; n < b.N; n++ {
 			plpt := ptinput.WrapPoint(
 				point.Logging, pt)
 			errR := runScript(runner, plpt)
-			_ = plpt.Point()
-			if errR != nil {
-				b.Fatal(errR)
-			}
-		}
-	})
-
-	b.Run("pl-new-mkdrop", func(b *testing.B) {
-		for n := 0; n < b.N; n++ {
-			plpt := ptinput.PtWrap(
-				point.Logging, pt)
-			errR := runScript(runner, plpt)
-			_ = plpt.Point()
+			npt := plpt.Point()
+			_ = npt
 			if errR != nil {
 				b.Fatal(errR)
 			}
@@ -317,7 +294,8 @@ group_between(status_code, [500,599], "error", status)
 			plpt := ptinput.PtWrap(
 				point.Logging, pt)
 			errR := runScript(runner, plpt)
-			_ = plpt.Point()
+			npt := plpt.Point()
+			_ = npt
 			if errR != nil {
 				b.Fatal(errR)
 			}
@@ -419,7 +397,7 @@ func BenchmarkParseLogWithTfmt(b *testing.B) {
 	data := `2021-07-20T12:33:33.095243Z         2 Query     SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE CREATE_OPTIONS LIKE '%partitioned%'`
 
 	for n := 0; n < b.N; n++ {
-		pt := ptinput.NewPlPoint(
+		pt := ptinput.NewPlPt(
 			point.Logging, "test", nil, map[string]any{"message": data}, time.Now())
 		errR := runScript(runner, pt)
 
@@ -448,7 +426,7 @@ func BenchmarkParseLogWithTfmt_tz(b *testing.B) {
 	data := `2021-07-20T12:33:33.095243Z         2 Query     SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE CREATE_OPTIONS LIKE '%partitioned%'`
 
 	for n := 0; n < b.N; n++ {
-		pt := ptinput.NewPlPoint(
+		pt := ptinput.NewPlPt(
 			point.Logging, "test", nil, map[string]any{"message": data}, time.Now())
 		errR := runScript(runner, pt)
 
@@ -472,7 +450,7 @@ func BenchmarkParseLogWithTfmt_NoAddPattern(b *testing.B) {
 	data := `2021-07-20T12:33:33.095243Z         2 Query     SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE CREATE_OPTIONS LIKE '%partitioned%'`
 
 	for n := 0; n < b.N; n++ {
-		pt := ptinput.NewPlPoint(
+		pt := ptinput.NewPlPt(
 			point.Logging, "test", nil, map[string]any{"message": data}, time.Now())
 		errR := runScript(runner, pt)
 
