@@ -301,7 +301,6 @@ group_between(status_code, [500,599], "error", status)
 			}
 		}
 	})
-
 }
 
 func BenchmarkPtWrap(b *testing.B) {

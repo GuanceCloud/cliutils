@@ -174,7 +174,7 @@ func TestPlPt2(t *testing.T) {
 	}
 }
 
-const lp = `gin app="deployment-forethought-kodo-kodo",client_ip="172.1***03",cluster_name_k8s="k8s-daily",container_id="dcbacc667c1534127d4f4c531fc26f613f4e6f822e646dee4e4bdbc5e87920c4",container_name="kodo",deployment="kodo",filepath="/rootfs/var/log/pods/forethought-kodo_kodo-7dc8b5c448-rmcpb_bd5159c7-df57-4346-987d-fc6883aeabea/kodo/0.log",guance_site="daily",host="cluster_a_cn-hangzhou.172.1***.102",host_ip="172.1***.102",image="registry.****.com/ko**:testing-202*****",log_read_lines=289892,message="[GIN] 2024/11/15 - 10:56:07 | 403 | 759.859µs |  172.16.200.203 | POST    \"/v1/write/metric?token=****************842cda605c6cb87e3a7b8\"",message_length=137,namespace="forethought-kodo",pod-template-hash="7dc8b5c448",pod_ip="10.113.0.204",pod_name="kodo-7dc8b5c448-rmcpb",real_host="hz-dataflux-daily-002",region="cn-hangzhou",service="kodo",status="warning",time_ns=1731639367526632400,time_us=1731639367526632,timestamp="2024/11/15 - 10:56:07",zone_id="cn-hangzhou-j" 1731639367526000000`
+var lp = []byte(`gin app="deployment-forethought-kodo-kodo",client_ip="172.1***03",cluster_name_k8s="k8s-daily",container_id="dcbacc667c1534127d4f4c531fc26f613f4e6f822e646dee4e4bdbc5e87920c4",container_name="kodo",deployment="kodo",filepath="/rootfs/var/log/pods/forethought-kodo_kodo-7dc8b5c448-rmcpb_bd5159c7-df57-4346-987d-fc6883aeabea/kodo/0.log",guance_site="daily",host="cluster_a_cn-hangzhou.172.1***.102",host_ip="172.1***.102",image="registry.****.com/ko**:testing-202*****",log_read_lines=289892,message="[GIN] 2024/11/15 - 10:56:07 | 403 | 759.859µs |  172.16.200.203 | POST    \"/v1/write/metric?token=****************842cda605c6cb87e3a7b8\"",message_length=137,namespace="forethought-kodo",pod-template-hash="7dc8b5c448",pod_ip="10.113.0.204",pod_name="kodo-7dc8b5c448-rmcpb",real_host="hz-dataflux-daily-002",region="cn-hangzhou",service="kodo",status="warning",time_ns=1731639367526632400,time_us=1731639367526632,timestamp="2024/11/15 - 10:56:07",zone_id="cn-hangzhou-j" 1731639367526000000`)
 
 func BenchmarkPts(b *testing.B) {
 	dec := point.GetDecoder()
@@ -183,49 +183,61 @@ func BenchmarkPts(b *testing.B) {
 	pt := pts[0]
 	pt.KVs().AddV2("message", "", true, point.WithKVTagSet(false))
 
-	b.Run("pt_new_add", func(b *testing.B) {
+	b.Run("pt_old_add", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			pti := PtWrap(point.Logging, pt)
-			ptMockOperatorAdd(pti)
-			pti.Point()
-		}
-	})
-
-	b.Run("pt_cur_add", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+			pts, _ := dec.Decode(lp)
+			pt := pts[0]
 			pti := WrapPoint(point.Logging, pt)
 			ptMockOperatorAdd(pti)
 			pti.Point()
 		}
 	})
 
-	b.Run("pt_new_drop", func(b *testing.B) {
+	b.Run("pt_add", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
+			pts, _ := dec.Decode(lp)
+			pt := pts[0]
 			pti := PtWrap(point.Logging, pt)
-			ptMockOperatorDrop(pti)
+			ptMockOperatorAdd(pti)
 			pti.Point()
 		}
 	})
 
-	b.Run("pt_cur_drop", func(b *testing.B) {
+	b.Run("pt_old_drop", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
+			pts, _ := dec.Decode(lp)
+			pt := pts[0]
 			pti := WrapPoint(point.Logging, pt)
 			ptMockOperatorDrop(pti)
 			pti.Point()
 		}
 	})
 
-	b.Run("pt_new_del", func(b *testing.B) {
+	b.Run("pt_drop", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
+			pts, _ := dec.Decode(lp)
+			pt := pts[0]
 			pti := PtWrap(point.Logging, pt)
+			ptMockOperatorDrop(pti)
+			pti.Point()
+		}
+	})
+
+	b.Run("pt_old_del", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			pts, _ := dec.Decode(lp)
+			pt := pts[0]
+			pti := WrapPoint(point.Logging, pt)
 			ptMockOperatorDel(pti)
 			pti.Point()
 		}
 	})
 
-	b.Run("pt_cur_del", func(b *testing.B) {
+	b.Run("pt_del", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			pti := WrapPoint(point.Logging, pt)
+			pts, _ := dec.Decode(lp)
+			pt := pts[0]
+			pti := PtWrap(point.Logging, pt)
 			ptMockOperatorDel(pti)
 			pti.Point()
 		}
@@ -238,7 +250,7 @@ func ptMockOperatorAdd(pti PlInputPt) {
 	}
 
 	n := "xyz_"
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 20; i++ {
 		n := n + strconv.Itoa(i)
 		pti.Set(n, n, ast.String)
 	}

@@ -1,7 +1,3 @@
-// Unless explicitly stated otherwise all files in this repository are licensed
-// under the MIT License.
-// This product includes software developed at Guance Cloud (https://www.guance.com/).
-// Copyright 2021-present Guance, Inc.
 package ptinput
 
 import (
@@ -13,29 +9,29 @@ import (
 	"github.com/GuanceCloud/cliutils/point"
 )
 
-var _ PlInputPt = (*PlPt)(nil)
+var _ PlInputPt = (*Pt)(nil)
 
-func (pt *PlPt) GetAggBuckets() *plmap.AggBuckets {
+func (pt *Pt) GetAggBuckets() *plmap.AggBuckets {
 	return pt.aggBuckets
 }
 
-func (pt *PlPt) SetAggBuckets(buks *plmap.AggBuckets) {
+func (pt *Pt) SetAggBuckets(buks *plmap.AggBuckets) {
 	pt.aggBuckets = buks
 }
 
-func (pt *PlPt) SetPlReferTables(refTable refertable.PlReferTables) {
+func (pt *Pt) SetPlReferTables(refTable refertable.PlReferTables) {
 	pt.refTable = refTable
 }
 
-func (pt *PlPt) GetPlReferTables() refertable.PlReferTables {
+func (pt *Pt) GetPlReferTables() refertable.PlReferTables {
 	return pt.refTable
 }
 
-func (pt *PlPt) SetPtWinPool(w *ptwindow.WindowPool) {
+func (pt *Pt) SetPtWinPool(w *ptwindow.WindowPool) {
 	pt.ptWindowPool = w
 }
 
-func (pt *PlPt) PtWinRegister(before, after int, k, v []string) {
+func (pt *Pt) PtWinRegister(before, after int, k, v []string) {
 	if len(k) != len(v) || len(k) == 0 {
 		return
 	}
@@ -46,7 +42,7 @@ func (pt *PlPt) PtWinRegister(before, after int, k, v []string) {
 	}
 }
 
-func (pt *PlPt) PtWinHit() {
+func (pt *Pt) PtWinHit() {
 	if pt.ptWindowPool != nil && pt.ptWindowRegistered {
 		if len(pt.winKeyVal[0]) != len(pt.winKeyVal[1]) || len(pt.winKeyVal[0]) == 0 {
 			return
@@ -60,7 +56,7 @@ func (pt *PlPt) PtWinHit() {
 	}
 }
 
-func (pt *PlPt) CallbackPtWinMove() (result []*point.Point) {
+func (pt *Pt) CallbackPtWinMove() (result []*point.Point) {
 	if pt.ptWindowPool != nil && pt.ptWindowRegistered {
 		if v, ok := pt.ptWindowPool.Get(pt.winKeyVal[0], pt.winKeyVal[1]); ok {
 			if pt.Dropped() {
@@ -73,26 +69,26 @@ func (pt *PlPt) CallbackPtWinMove() (result []*point.Point) {
 	return
 }
 
-func (pt *PlPt) SetIPDB(db ipdb.IPdb) {
+func (pt *Pt) SetIPDB(db ipdb.IPdb) {
 	pt.ipdb = db
 }
 
-func (pt *PlPt) GetIPDB() ipdb.IPdb {
+func (pt *Pt) GetIPDB() ipdb.IPdb {
 	return pt.ipdb
 }
 
-func (pt *PlPt) GetCache() *plcache.Cache {
+func (pt *Pt) GetCache() *plcache.Cache {
 	return pt.cache
 }
 
-func (pt *PlPt) SetCache(c *plcache.Cache) {
+func (pt *Pt) SetCache(c *plcache.Cache) {
 	pt.cache = c
 }
 
-func (pt *PlPt) AppendSubPoint(plpt PlInputPt) {
+func (pt *Pt) AppendSubPoint(plpt PlInputPt) {
 	pt.subPlpt = append(pt.subPlpt, plpt)
 }
 
-func (pt *PlPt) GetSubPoint() []PlInputPt {
+func (pt *Pt) GetSubPoint() []PlInputPt {
 	return pt.subPlpt
 }

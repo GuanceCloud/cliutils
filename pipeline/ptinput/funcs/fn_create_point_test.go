@@ -15,6 +15,7 @@ import (
 )
 
 func TestCreatePoint(t *testing.T) {
+	tn := time.Now()
 	cases := []struct {
 		name, in string
 		allPl    map[string]string
@@ -43,7 +44,7 @@ func TestCreatePoint(t *testing.T) {
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 			},
 		},
 		{
@@ -69,7 +70,7 @@ func TestCreatePoint(t *testing.T) {
 					"d":  "x1",
 					"b":  float64(2.0),
 					"aa": int64(1),
-				}, time.Time{}),
+				}, tn),
 			},
 		},
 		{
@@ -122,7 +123,7 @@ func TestCreatePoint(t *testing.T) {
 					"d":  "x1",
 					"b":  float64(2.0),
 					"aa": int64(1),
-				}, time.Time{}),
+				}, tn),
 			},
 		},
 		{
@@ -154,55 +155,55 @@ func TestCreatePoint(t *testing.T) {
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.Logging, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.Metric, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.Tracing, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.RUM, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.Network, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.Object, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.CustomObject, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.Security, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 			},
 		},
 		{
@@ -234,55 +235,55 @@ func TestCreatePoint(t *testing.T) {
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.Logging, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.Metric, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.Tracing, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.RUM, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.Network, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.Object, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.CustomObject, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 				ptinput.NewPlPt(point.Security, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 			},
 		},
 	}
@@ -304,7 +305,7 @@ func TestCreatePoint(t *testing.T) {
 			}
 
 			pt := ptinput.NewPlPt(
-				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
+				point.Logging, "test", nil, map[string]any{"message": tc.in}, tn)
 			errR := runScript(runner, pt)
 
 			t.Log(pt.Fields())

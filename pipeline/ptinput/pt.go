@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/goccy/go-json"
-
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/ipdb"
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/plcache"
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/plmap"
@@ -19,13 +17,12 @@ import (
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput/utils"
 	"github.com/GuanceCloud/cliutils/point"
 	"github.com/GuanceCloud/platypus/pkg/ast"
+	"github.com/goccy/go-json"
 	"github.com/spf13/cast"
 )
 
-type PlPt struct {
-	name     string
-	kvs      point.KVs
-	time     int64
+type Pt struct {
+	pt       *point.Point
 	category point.Category
 
 	aggBuckets *plmap.AggBuckets
@@ -42,37 +39,16 @@ type PlPt struct {
 	drop bool
 }
 
-func PtWrap(cat point.Category, pt *point.Point) *PlPt {
-	var kvs point.KVs
-	if pt.HasFlag(point.Ppooled) {
-		ptKVs := pt.KVs()
-		kvs = make(point.KVs, 0, len(ptKVs))
-		for _, kv := range ptKVs {
-			kvs = append(kvs, point.NewKV(kv.Key, kv.Raw(), point.WithKVTagSet(kv.IsTag)))
-		}
-	} else {
-		ptKVs := pt.KVs()
-		kvs = make(point.KVs, 0, len(ptKVs))
-		kvs = append(kvs, pt.KVs()...)
-	}
-	return &PlPt{
-		name:     pt.Name(),
-		kvs:      kvs,
-		time:     pt.PBPoint().Time,
-		category: cat,
-	}
+func (pp *Pt) GetPtName() string {
+	return pp.pt.Name()
 }
 
-func (pp *PlPt) GetPtName() string {
-	return pp.name
+func (pp *Pt) SetPtName(name string) {
+	pp.pt.SetName(name)
 }
 
-func (pp *PlPt) SetPtName(name string) {
-	pp.name = name
-}
-
-func (pp *PlPt) Get(k string) (any, ast.DType, error) {
-	kv := pp.kvs.Get(k)
+func (pp *Pt) Get(k string) (any, ast.DType, error) {
+	kv := pp.pt.KVs().Get(k)
 	if kv == nil {
 		return nil, ast.Nil, ErrKeyNotExist
 	}
@@ -80,87 +56,80 @@ func (pp *PlPt) Get(k string) (any, ast.DType, error) {
 	return v1, v2, nil
 }
 
-func (pp *PlPt) Set(k string, v any, dtype ast.DType) bool {
+func (pp *Pt) Set(k string, v any, dtype ast.DType) bool {
 	pp._set(k, v, false, false)
 	return true
 }
 
-func (pp *PlPt) SetTag(k string, v any, dtype ast.DType) bool {
+func (pp *Pt) SetTag(k string, v any, dtype ast.DType) bool {
 	pp._set(k, v, true, false)
 	return true
 }
 
-func (pp *PlPt) _set(k string, v any, asTag bool, asField bool) {
+func (pp *Pt) _set(k string, v any, asTag bool, asField bool) {
 	// replace high level
-	for i, kv := range pp.kvs {
-		if kv.Key != k {
-			continue
-		}
-		if !asTag && !asField && kv.IsTag {
-			asTag = true
-		}
-
-		v, _ := normalVal(v, asTag, false)
-		pp.kvs[i] = point.NewKV(k, v, point.WithKVTagSet(asTag))
-		return
+	kv := pp.pt.KVs().Get(k)
+	if kv != nil && kv.IsTag && !asField {
+		asTag = true
 	}
 
-	// append
 	v, _ = normalVal(v, asTag, false)
-	pp.kvs = append(pp.kvs, point.NewKV(k, v, point.WithKVTagSet(asTag)))
+
+	pp.pt.MustAddKVs(point.NewKV(k, v, point.WithKVTagSet(asTag)))
 }
 
-func (pp *PlPt) Delete(k string) {
-	pp.delete(k)
+func (pp *Pt) Delete(k string) {
+	pp.pt.Del(k)
 }
 
-func (pp *PlPt) delete(k string) (found bool, val any, isTag bool) {
-	for i, kv := range pp.kvs {
-		if kv.Key == k {
-			isTag = kv.IsTag
-			val, _ = getVal(kv, false)
+func (pp *Pt) RenameKey(from, to string) error {
+	if from == to {
+		return nil
+	}
 
-			l := len(pp.kvs) - 1
-			pp.kvs[i] = pp.kvs[l]
-			pp.kvs = pp.kvs[:l]
-			return true, val, isTag
+	idxFrom, idxTo := -1, -1
+	kvs := pp.pt.KVs()
+	for i := range kvs {
+		switch kvs[i].Key {
+		case from:
+			idxFrom = i
+		case to:
+			idxTo = i
 		}
 	}
-
-	return
-}
-
-func (pp *PlPt) RenameKey(from, to string) error {
-	if found, val, isTag := pp.delete(from); found {
-		pp._set(to, val, isTag, false)
+	if idxFrom < 0 {
+		return nil
 	}
+	kvs[idxFrom].Key = to
+	if idxTo >= 0 {
+		tail := len(kvs) - 1
+		kvs[idxTo] = kvs[tail]
+		kvs = kvs[:tail]
+	}
+	pp.pt.PBPoint().Fields = kvs
+
 	return nil
 }
 
-func (pp *PlPt) MarkDrop(drop bool) {
+func (pp *Pt) MarkDrop(drop bool) {
 	pp.drop = drop
 }
 
-func (pp *PlPt) Dropped() bool {
+func (pp *Pt) Dropped() bool {
 	return pp.drop
 }
 
-func (pp *PlPt) PtTime() time.Time {
-	if nanots := pp.time; nanots != 0 {
-		return time.Unix(nanots/int64(time.Second),
-			nanots%int64(time.Second))
-	} else {
-		return time.Time{}
-	}
+func (pp *Pt) PtTime() time.Time {
+	return pp.pt.Time()
 }
 
-func (pp *PlPt) Category() point.Category {
+func (pp *Pt) Category() point.Category {
 	return pp.category
 }
 
-func (pp *PlPt) Tags() map[string]string {
+func (pp *Pt) Tags() map[string]string {
 	tags := map[string]string{}
-	for _, kv := range pp.kvs {
+	for _, kv := range pp.pt.KVs() {
 		if kv.IsTag {
 			if v, ok := kv.Raw().(string); ok {
 				tags[kv.Key] = v
@@ -170,9 +139,9 @@ func (pp *PlPt) Tags() map[string]string {
 	return tags
 }
 
-func (pp *PlPt) Fields() map[string]any {
+func (pp *Pt) Fields() map[string]any {
 	fields := map[string]any{}
-	for _, kv := range pp.kvs {
+	for _, kv := range pp.pt.KVs() {
 		if !kv.IsTag {
 			fields[kv.Key] = kv.Raw()
 		}
@@ -180,21 +149,23 @@ func (pp *PlPt) Fields() map[string]any {
 	return fields
 }
 
-func (pp *PlPt) Point() *point.Point {
-	opt := utils.PtCatOption(pp.category)
-	opt = append(opt, point.WithTimestamp(pp.time))
-
-	return point.NewPointV2(pp.name, pp.kvs, opt...)
+func (pp *Pt) Point() *point.Point {
+	return pp.pt
 }
 
-func (pp *PlPt) KeyTime2Time() {
+func (pp *Pt) KeyTime2Time() {
 	if v, _, err := pp.Get("time"); err == nil {
-		if nanots, ok := v.(int64); ok {
-			if pp.time != 0 {
-				pp.time = nanots
-			}
+		if nanots, ok := v.(int64); ok && nanots != 0 {
+			pp.pt.PBPoint().Time = nanots
 		}
 		pp.Delete("time")
+	}
+}
+
+func PtWrap(cat point.Category, pt *point.Point) *Pt {
+	return &Pt{
+		category: cat,
+		pt:       pt,
 	}
 }
 
@@ -317,27 +288,20 @@ func Conv2String(v any, dtype ast.DType) (string, error) {
 func NewPlPt(cat point.Category, name string,
 	tags map[string]string, fields map[string]any, ptTime time.Time,
 ) PlInputPt {
-	if tags == nil {
-		tags = map[string]string{}
-	}
-
-	if fields == nil {
-		fields = map[string]any{}
-	}
-
 	kvs := point.NewKVs(fields)
 	for k, v := range tags {
 		kvs = kvs.AddV2(k, v, true, point.WithKVTagSet(true))
 	}
 
-	var ts int64
+	opt := utils.PtCatOption(cat)
+
 	if !ptTime.IsZero() {
-		ts = ptTime.UnixNano()
+		opt = append(opt, point.WithTime(ptTime))
 	}
-	return &PlPt{
-		name:     name,
-		kvs:      kvs,
-		time:     ts,
+
+	pt := point.NewPointV2(name, kvs, opt...)
+	return &Pt{
+		pt:       pt,
 		category: cat,
 	}
 }
