@@ -94,7 +94,7 @@ select abc from def where x > 3 and y < 5`,
 				return
 			}
 
-			pt := ptinput.NewPlPoint(
+			pt := ptinput.NewPlPt(
 				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
 			errR := runScript(runner, pt)
 

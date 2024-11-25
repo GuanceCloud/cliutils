@@ -1,7 +1,6 @@
 package funcs
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput"
 	"github.com/GuanceCloud/cliutils/point"
@@ -117,7 +118,7 @@ func TestHTTPRequest(t *testing.T) {
 				}
 				return
 			}
-			pt := ptinput.NewPlPoint(
+			pt := ptinput.NewPlPt(
 				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
 			errR := runScript(runner, pt)
 

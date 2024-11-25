@@ -110,7 +110,7 @@ func TestXML(t *testing.T) {
 			runner, err := NewTestingRunner(tc.script)
 			tu.Equals(t, nil, err)
 
-			pt := ptinput.NewPlPoint(
+			pt := ptinput.NewPlPt(
 				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
 			errR := runScript(runner, pt)
 
