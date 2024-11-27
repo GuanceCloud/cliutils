@@ -13,6 +13,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestDel(t *T.T) {
+	kvs := KVs{&Field{
+		Key: "a",
+	}, &Field{
+		Key: "c",
+	}, &Field{
+		Key: "c",
+	}}
+
+	kvs.Del("c")
+}
+
 func TestTrim(t *T.T) {
 	t.Run("trim-field", func(t *T.T) {
 		var kvs KVs

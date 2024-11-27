@@ -327,6 +327,7 @@ func (x KVs) Del(k string) KVs {
 			if defaultPTPool != nil {
 				defaultPTPool.PutKV(f)
 			}
+			return x
 		}
 	}
 
