@@ -14,15 +14,55 @@ import (
 )
 
 func TestDel(t *T.T) {
-	kvs := KVs{&Field{
-		Key: "a",
-	}, &Field{
-		Key: "c",
-	}, &Field{
-		Key: "c",
-	}}
+	kvs := KVs{
+		&Field{
+			Key: "a",
+		},
+		&Field{
+			Key: "c",
+		},
+		&Field{
+			Key: "c",
+		},
+		&Field{
+			Key: "d",
+		}}
 
-	kvs.Del("c")
+	assert.Equal(t, len(kvs.Del("c")), 2)
+
+	kvs = KVs{
+		&Field{
+			Key: "a",
+		},
+		&Field{
+			Key: "c",
+		},
+		&Field{
+			Key: "c",
+		}}
+
+	assert.Equal(t, len(kvs.Del("a")), 2)
+
+	kvs = KVs{
+		&Field{
+			Key: "c",
+		},
+		&Field{
+			Key: "c",
+		},
+		&Field{
+			Key: "c",
+		}}
+
+	assert.Equal(t, len(kvs.Del("c")), 0)
+
+	kvs = KVs{
+		&Field{
+			Key: "c",
+		},
+	}
+
+	assert.Equal(t, len(kvs.Del("c")), 0)
 }
 
 func TestTrim(t *T.T) {
