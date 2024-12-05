@@ -3,8 +3,6 @@ package funcs
 import (
 	_ "embed"
 
-	"math"
-
 	"github.com/GuanceCloud/platypus/pkg/ast"
 	"github.com/GuanceCloud/platypus/pkg/engine/runtime"
 	"github.com/GuanceCloud/platypus/pkg/errchain"
@@ -33,12 +31,8 @@ var (
 				Type: []ast.DType{ast.Int},
 			},
 			{
-				Name:     "end",
-				Type:     []ast.DType{ast.Int},
-				Optional: true,
-				DefaultVal: func() (any, ast.DType) {
-					return int64(math.MaxInt64), ast.Int
-				},
+				Name: "end",
+				Type: []ast.DType{ast.Int},
 			},
 			{
 				Name:     "step",
