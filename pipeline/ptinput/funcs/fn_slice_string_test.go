@@ -60,7 +60,7 @@ func TestSliceString(t *testing.T) {
 			fail:    false,
 		},
 		{
-			name: "out of range1",
+			name: "normal4",
 			pl: `
 			substring = slice_string("abcdefghijklmnop",-1,10)
 			pt_kvs_set("result", substring)
@@ -70,29 +70,49 @@ func TestSliceString(t *testing.T) {
 			fail:    false,
 		},
 		{
-			name: "out of range2",
+			name: "normal5",
 			pl: `
 			substring = slice_string("abcdefghijklmnop",0,100)
 			pt_kvs_set("result", substring)
 			`,
 			keyName: "result",
-			expect:  "",
+			expect:  "abcdefghijklmnop",
 			fail:    false,
 		},
 		{
-			name: "not integer1",
+			name: "normal6",
 			pl: `
-			substring = slice_string("abcdefghijklmnop","a","b")
+			substring = slice_string("abcdefghijklmnop",0,1,2)
 			pt_kvs_set("result", substring)
 			`,
 			keyName: "result",
-			expect:  "",
-			fail:    true,
+			expect:  "a",
+			fail:    false,
 		},
 		{
-			name: "not integer2",
+			name: "normal7",
 			pl: `
-			substring = slice_string("abcdefghijklmnop","abc","def")
+			substring = slice_string("abcdefghijklmnop",0,-1,2)
+			pt_kvs_set("result", substring)
+			`,
+			keyName: "result",
+			expect:  "acegikmo",
+			fail:    false,
+		},
+		{
+			name: "normal8",
+			pl: `
+			substring = slice_string("15384073392", 9, 0, -2)
+			pt_kvs_set("result", substring)
+			`,
+			keyName: "result",
+			expect:  "93085",
+			fail:    false,
+		},
+		{
+			name: "not integer",
+			pl: `
+			substring = slice_string("abcdefghijklmnop","a","b")
 			pt_kvs_set("result", substring)
 			`,
 			keyName: "result",
@@ -103,26 +123,6 @@ func TestSliceString(t *testing.T) {
 			name: "not string",
 			pl: `
 			substring = slice_string(12345,0,3)
-			pt_kvs_set("result", substring)
-			`,
-			keyName: "result",
-			expect:  "",
-			fail:    true,
-		},
-		{
-			name: "not correct args",
-			pl: `
-			substring = slice_string("abcdefghijklmnop",0)
-			pt_kvs_set("result", substring)
-			`,
-			keyName: "result",
-			expect:  "",
-			fail:    true,
-		},
-		{
-			name: "not correct args",
-			pl: `
-			substring = slice_string("abcdefghijklmnop",0,1,2)
 			pt_kvs_set("result", substring)
 			`,
 			keyName: "result",
