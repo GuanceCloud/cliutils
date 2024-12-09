@@ -16,6 +16,102 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestFilter(t *testing.T) {
+	cases := []struct {
+		url     string
+		filter  bool
+		disable bool
+		cidrs   []string
+	}{
+		{
+			"http://0.0.0.0/",
+			true,
+			true,
+			nil,
+		},
+		{
+			"http://localhost/",
+			true,
+			true,
+			nil,
+		},
+		{
+			"http://1.0.0.1/",
+			false,
+			true,
+			nil,
+		},
+		{
+			"http://1.0.0.1:1234/",
+			false,
+			true,
+			nil,
+		},
+		{
+			"http://[::]:1234/",
+			false,
+			false,
+			nil,
+		},
+		{
+			"http://[::]:1234/",
+			true,
+			true,
+			nil,
+		},
+		{
+			"http://[::]/",
+			true,
+			true,
+			nil,
+		},
+		{
+			"http://1.0.0.1",
+			true,
+			true,
+			[]string{"1.0.0.0/16"},
+		},
+		{
+			"http://10.0.0.1",
+			true,
+			true,
+			nil,
+		},
+		{
+			"http://10.0.0.1",
+			false,
+			false,
+			nil,
+		},
+		{
+			"http://10.0.0.1",
+			true,
+			false,
+			[]string{"10.0.0.1/16"},
+		},
+		{
+			"file://ccc/",
+			true,
+			true,
+			nil,
+		},
+		{
+			"https://guance.com",
+			false,
+			true,
+			nil,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.url, func(t *testing.T) {
+			assert.Equal(t, c.filter, filterURL(
+				c.url, c.disable, c.cidrs,
+			))
+		})
+	}
+}
+
 func TestBuildBody(t *testing.T) {
 	cases := []struct {
 		val    any
@@ -86,20 +182,31 @@ func TestHTTPRequest(t *testing.T) {
 		{
 			name: "test_post",
 			pl: fmt.Sprintf(`
-			resp = http_request("POST", %s, {"extraHeader": "1", 
+			resp = http_request("POST", %s, {"extraHeader": "1",
 			"extraHeader": "1"}, {"a": "1"})
-			add_key(abc, resp["body"])	
+			add_key(abc, resp["body"])
 			`, url),
 			in:       `[]`,
 			outkey:   "abc",
 			expected: `{"a":"1"}`,
 		},
 		{
+			name: "test_file",
+			pl: `
+			resp = http_request("POST", "file:///etc/", {"extraHeader": "1", 
+			"extraHeader": "1"}, {"a": "1"})
+			add_key(abc, resp)
+			`,
+			in:       `[]`,
+			outkey:   "abc",
+			expected: nil,
+		},
+		{
 			name: "test_put",
 			pl: fmt.Sprintf(`
-			resp = http_request("put", %s, {"extraHeader": "1", 
+			resp = http_request("put", %s, {"extraHeader": "1",
 			"extraHeader": "1"}, {"a": "1"})
-			add_key(abc, resp["body"])	
+			add_key(abc, resp["body"])
 			`, url),
 			in:       `[]`,
 			outkey:   "abc",

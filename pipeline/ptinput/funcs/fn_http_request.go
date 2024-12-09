@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +26,61 @@ var defaultTransport http.RoundTripper = &http.Transport{
 	IdleConnTimeout:       90 * time.Second,
 	TLSHandshakeTimeout:   10 * time.Second,
 	ExpectContinueTimeout: 1 * time.Second,
+}
+
+var disableInternalHost bool
+var cidrs []string
+
+func SetNetFilter(disableInternal bool, cidrList []string) {
+	disableInternalHost = disableInternal
+	cidrs = append(cidrs, cidrList...)
+}
+
+func filterHost(host string, disableInternal bool, cidrs []string) bool {
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return true
+	}
+
+	for _, cidr := range cidrs {
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			l.Debug("parse cidr %s failed: %s", cidr, err)
+			continue
+		}
+		for _, ip := range ips {
+			if ipNet.Contains(ip) {
+				return true
+			}
+		}
+	}
+
+	if disableInternal {
+		for _, ip := range ips {
+			if ip.IsLoopback() ||
+				ip.IsPrivate() ||
+				ip.IsLinkLocalUnicast() ||
+				ip.IsLinkLocalMulticast() ||
+				ip.IsUnspecified() {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func filterURL(urlStr string, disable bool, cidrs []string) bool {
+	urlP, err := url.Parse(urlStr)
+	if err != nil || urlP == nil {
+		return true
+	}
+
+	if urlP.Scheme != "http" && urlP.Scheme != "https" {
+		return true
+	}
+
+	return filterHost(urlP.Hostname(), disable, cidrs)
 }
 
 func HTTPRequestChecking(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlError {
@@ -55,6 +111,11 @@ func HTTPRequest(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlError {
 	if urlType != ast.String {
 		return runtime.NewRunError(ctx, "param data type expect string",
 			funcExpr.Param[1].StartPos())
+	}
+
+	if filterURL(url.(string), disableInternalHost, cidrs) {
+		ctx.Regs.ReturnAppend(nil, ast.Nil)
+		return nil
 	}
 
 	var headers any
