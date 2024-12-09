@@ -29,11 +29,11 @@ var defaultTransport http.RoundTripper = &http.Transport{
 }
 
 var gDisableInternalHost bool
-var gCidrs []string
+var gCIDRs []string
 
 func SetNetFilter(disableInternal bool, cidrList []string) {
 	gDisableInternalHost = disableInternal
-	gCidrs = append(gCidrs, cidrList...)
+	gCIDRs = append(gCIDRs, cidrList...)
 }
 
 func filterHost(host string, disableInternal bool, cidrs []string) bool {
@@ -113,7 +113,7 @@ func HTTPRequest(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlError {
 			funcExpr.Param[1].StartPos())
 	}
 
-	if filterURL(url.(string), gDisableInternalHost, gCidrs) {
+	if filterURL(url.(string), gDisableInternalHost, gCIDRs) {
 		ctx.Regs.ReturnAppend(nil, ast.Nil)
 		return nil
 	}
