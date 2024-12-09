@@ -17,6 +17,7 @@ var (
 	seekBackVec *prometheus.CounterVec
 
 	sizeVec,
+	histSizeVec,
 	openTimeVec,
 	lastCloseTimeVec,
 	capVec,
@@ -191,6 +192,15 @@ func setupMetrics() {
 		[]string{"path"},
 	)
 
+	histSizeVec = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: ns,
+			Name:      "histsize",
+			Help:      "Hisgory cache size(in bytes)",
+		},
+		[]string{"path"},
+	)
+
 	openTimeVec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: ns,
@@ -239,6 +249,7 @@ func ResetMetrics() {
 	batchSizeVec.Reset()
 	maxDataVec.Reset()
 	sizeVec.Reset()
+	histSizeVec.Reset()
 	datafilesVec.Reset()
 	getLatencyVec.Reset()
 	putLatencyVec.Reset()
@@ -255,6 +266,7 @@ func Metrics() []prometheus.Collector {
 		seekBackVec,
 
 		sizeVec,
+		histSizeVec,
 		openTimeVec,
 		lastCloseTimeVec,
 		capVec,

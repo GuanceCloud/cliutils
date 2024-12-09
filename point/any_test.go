@@ -124,6 +124,27 @@ func TestAny(t *T.T) {
 
 		t.Logf("%s", pt.Pretty())
 	})
+
+	t.Run("elem-same-type-array", func(t *T.T) {
+		arr, err := NewArray(1, 2, 3)
+		assert.NoError(t, err)
+		assert.Len(t, arr.Arr, 3)
+
+		t.Logf("array: %+#v", arr.GetArr())
+
+		for _, x := range arr.GetArr() {
+			switch v := x.GetX().(type) {
+			case *BasicTypes_I:
+				t.Logf("I: %d", v.I)
+
+			case *BasicTypes_S:
+				t.Logf("I: %s", v.S)
+
+			case *BasicTypes_F:
+				t.Logf("I: %f", v.F)
+			}
+		}
+	})
 }
 
 func TestAnyRaw(t *T.T) {

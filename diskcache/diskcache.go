@@ -91,6 +91,7 @@ type DiskCache struct {
 	curBatchSize, // current writing file's size
 	curReadSize, // current reading file's size
 	batchSize, // current batch size(static)
+	histSize, // old data before current running
 	capacity int64 // capacity of the diskcache
 	maxDataSize int32 // max data size of single Put()
 
