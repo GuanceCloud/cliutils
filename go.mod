@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/DataDog/datadog-agent/pkg/obfuscate v0.47.1
 	github.com/GuanceCloud/grok v1.1.4
-	github.com/GuanceCloud/platypus v0.2.10-0.20240815092339-21f3924850ee
+	github.com/GuanceCloud/platypus v0.3.1
 	github.com/VictoriaMetrics/easyproto v0.1.4
 	github.com/aliyun/aliyun-oss-go-sdk v2.1.2+incompatible
 	github.com/antchfx/xmlquery v1.3.18
