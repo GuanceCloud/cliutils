@@ -159,7 +159,7 @@ func TestPtWindow(t *testing.T) {
 				for j, v := range c.commTags {
 					tags[v] = c.tagsVal[i][j]
 				}
-				pt := ptinput.NewPlPoint(
+				pt := ptinput.NewPlPt(
 					point.Logging, "test", tags, map[string]any{"message": x}, time.Now())
 				pt.SetPtWinPool(ptPool)
 				errR := runScript(runner, pt)

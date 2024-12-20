@@ -46,7 +46,7 @@ func TestDrop(t *testing.T) {
 				}
 				return
 			}
-			pt := ptinput.NewPlPoint(
+			pt := ptinput.NewPlPt(
 				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
 			errR := runScript(runner, pt)
 			if errR != nil {

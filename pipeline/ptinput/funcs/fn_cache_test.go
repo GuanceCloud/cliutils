@@ -49,7 +49,7 @@ func TestCache(t *testing.T) {
 				return
 			}
 			cache, _ := plcache.NewCache(time.Second, 100)
-			pt := ptinput.NewPlPoint(
+			pt := ptinput.NewPlPt(
 				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
 			pt.SetCache(cache)
 			errR := runScript(runner, pt)

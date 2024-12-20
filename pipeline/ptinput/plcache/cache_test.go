@@ -1,6 +1,7 @@
 package plcache
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -51,4 +52,32 @@ func TestCache_Stop(t *testing.T) {
 
 	assert.NotNil(t, err1, "err1 is nil")
 	assert.NotNil(t, err2, "err2 is nil")
+}
+
+func TestCache(t *testing.T) {
+	cache, _ := NewCache(time.Second, 10)
+
+	times := 10_0000
+
+	var wg sync.WaitGroup
+	fnSet := func() {
+		for i := 0; i < times; i++ {
+			cache.Set("k", "v", time.Millisecond*10)
+		}
+		wg.Done()
+	}
+
+	fnGet := func() {
+		for i := 0; i < times; i++ {
+			cache.Get("k1")
+		}
+		wg.Done()
+	}
+
+	for i := 0; i < 50; i++ {
+		wg.Add(2)
+		go fnSet()
+		go fnGet()
+	}
+	wg.Wait()
 }

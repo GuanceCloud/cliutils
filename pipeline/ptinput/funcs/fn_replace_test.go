@@ -98,7 +98,7 @@ func TestReplace(t *testing.T) {
 				return
 			}
 
-			pt := ptinput.NewPlPoint(
+			pt := ptinput.NewPlPt(
 				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
 			errR := runScript(runner, pt)
 
@@ -108,7 +108,7 @@ func TestReplace(t *testing.T) {
 
 			if v, _, e := pt.Get(tc.outKey); e != nil {
 				if !tc.fail {
-					t.Errorf("[%d]expect error: %s", idx, errR.Error())
+					t.Errorf("[%d]expect error: %s", idx, e.Error())
 				}
 			} else {
 				tu.Equals(t, tc.expected, v)

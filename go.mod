@@ -16,6 +16,7 @@ require (
 	github.com/gin-gonic/gin v1.9.0
 	github.com/go-ping/ping v1.1.0
 	github.com/gobwas/ws v1.1.0
+	github.com/goccy/go-json v0.10.3
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/pprof v0.0.0-20230705174524-200ffdc848b8
 	github.com/gorilla/websocket v1.5.0
@@ -70,7 +71,6 @@ require (
 	github.com/go-playground/validator/v10 v10.11.2 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
-	github.com/goccy/go-json v0.10.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/uuid v1.3.0 // indirect

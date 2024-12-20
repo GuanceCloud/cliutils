@@ -136,7 +136,7 @@ func TestPtKvsTag(t *testing.T) {
 				return
 			}
 
-			pt := ptinput.NewPlPoint(
+			pt := ptinput.NewPlPt(
 				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
 			errR := script.Run(pt, nil)
 			if errR != nil {
@@ -243,7 +243,7 @@ func TestPtKvsSet(t *testing.T) {
 				return
 			}
 
-			pt := ptinput.NewPlPoint(
+			pt := ptinput.NewPlPt(
 				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
 			errR := script.Run(pt, nil)
 			if errR != nil {
