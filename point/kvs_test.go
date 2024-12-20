@@ -6,10 +6,12 @@
 package point
 
 import (
+	"bytes"
 	"math"
 	"sort"
 	T "testing"
 
+	gzip "github.com/klauspost/compress/gzip"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -583,6 +585,94 @@ func BenchmarkKVsDel(b *T.B) {
 			var kvs KVs
 			kvs = addTestKVs(kvs)
 			_ = del(kvs, `f1`)
+		}
+	})
+}
+
+func Test_shuffle(t *T.T) {
+	var kvs KVs
+	kvs = kvs.Add(`f1`, false, false, false)
+	kvs = kvs.Add(`f2`, 123, false, false)
+	kvs = kvs.Add(`f3`, "some string", false, false)
+	kvs = kvs.Add(`f4`, []byte("hello world"), false, false)
+	kvs = kvs.Add(`f5`, 3.14, false, false)
+	kvs = kvs.Add(`f6`, uint(8), false, false)
+
+	kvs = kvs.shuffle()
+
+	p := NewPointV2(t.Name(), kvs)
+
+	t.Logf(p.Pretty())
+}
+
+func TestShuffleGzip(t *T.T) {
+	var pts []*Point
+	for i := 0; i < 1000; i++ {
+		var kvs KVs
+		kvs = kvs.Add(`f1`, false, false, false)
+		kvs = kvs.Add(`f2`, 123, false, false)
+		kvs = kvs.Add(`f3`, "some string", false, false)
+		kvs = kvs.Add(`f4`, []byte("hello world"), false, false)
+		kvs = kvs.Add(`f5`, 3.14, false, false)
+		kvs = kvs.Add(`f6`, uint(8), false, false)
+		pts = append(pts, NewPointV2(t.Name(), kvs))
+	}
+
+	enc := GetEncoder(WithEncEncoding(Protobuf))
+	defer PutEncoder(enc)
+
+	arr, err := enc.Encode(pts)
+	assert.NoError(t, err)
+	raw1 := arr[0]
+
+	for _, pt := range pts {
+		pt.pt.Fields = KVs(pt.pt.Fields).shuffle()
+	}
+
+	// make sure kvs are shuffled.
+	t.Logf("shuffled point: %s\n%s", pts[0].Pretty(), pts[len(pts)-1].Pretty())
+
+	arr, err = enc.Encode(pts)
+	assert.NoError(t, err)
+	raw2 := arr[0]
+
+	t.Logf("#raw1: %d, #raw2: %d", len(raw1), len(raw2))
+
+	// new gzip handler
+	buf := &bytes.Buffer{}
+	w := gzip.NewWriter(buf)
+
+	_, err = w.Write(raw1)
+	assert.NoError(t, err)
+	w.Flush()
+	w.Close()
+	zlen1 := buf.Len()
+
+	// clear & reset gzip
+	buf.Reset()
+	w.Reset(buf)
+
+	// gzip on shuffled body
+	_, err = w.Write(raw2)
+	assert.NoError(t, err)
+	w.Flush()
+	w.Close()
+	zlen2 := buf.Len()
+	t.Logf("#zraw1: %d, #zraw2: %d", zlen1, zlen2)
+}
+
+func BenchmarkShuffle(b *T.B) {
+	b.Run(`basic`, func(b *T.B) {
+		var kvs KVs
+		kvs = kvs.Add(`f1`, false, false, false)
+		kvs = kvs.Add(`f2`, 123, false, false)
+		kvs = kvs.Add(`f3`, "some string", false, false)
+		kvs = kvs.Add(`f4`, []byte("hello world"), false, false)
+		kvs = kvs.Add(`f5`, 3.14, false, false)
+		kvs = kvs.Add(`f6`, uint(8), false, false)
+
+		for i := 0; i < b.N; i++ {
+			kvs = kvs.shuffle()
 		}
 	})
 }
