@@ -25,6 +25,7 @@ require (
 	github.com/influxdata/line-protocol/v2 v2.2.1
 	github.com/ip2location/ip2location-go v8.3.0+incompatible
 	github.com/itchyny/timefmt-go v0.1.5
+	github.com/klauspost/compress v1.16.7
 	github.com/mssola/user_agent v0.6.0
 	github.com/oschwald/geoip2-golang v1.9.0
 	github.com/pierrec/lz4/v4 v4.1.18
