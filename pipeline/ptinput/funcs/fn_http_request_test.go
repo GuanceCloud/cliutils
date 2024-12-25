@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -18,96 +19,133 @@ import (
 
 func TestFilter(t *testing.T) {
 	cases := []struct {
-		url     string
-		filter  bool
-		disable bool
-		cidrs   []string
+		url             string
+		filterResult    bool
+		disableInternal bool
+		cidrs, hosts    []string
 	}{
 		{
-			"http://0.0.0.0/",
-			true,
-			true,
-			nil,
+			url:             "http://0.0.0.0/",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
 		},
 		{
-			"http://localhost/",
-			true,
-			true,
-			nil,
+			url:             "http://localhost/",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
 		},
 		{
-			"http://1.0.0.1/",
-			false,
-			true,
-			nil,
+			url:             "http://127.0.0.0.1/",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
 		},
 		{
-			"http://1.0.0.1:1234/",
-			false,
-			true,
-			nil,
+			url:             "http://1.0.0.1/",
+			filterResult:    false,
+			disableInternal: true,
+			cidrs:           nil,
 		},
 		{
-			"http://[::]:1234/",
-			false,
-			false,
-			nil,
+			url:             "http://1.0.0.1:1234/",
+			filterResult:    false,
+			disableInternal: true,
+			cidrs:           nil,
 		},
 		{
-			"http://[::]:1234/",
-			true,
-			true,
-			nil,
+			url:             "http://[::]:1234/",
+			filterResult:    false,
+			disableInternal: false,
+			cidrs:           nil,
 		},
 		{
-			"http://[::]/",
-			true,
-			true,
-			nil,
+			url:             "http://[::]:1234/",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
 		},
 		{
-			"http://1.0.0.1",
-			true,
-			true,
-			[]string{"1.0.0.0/16"},
+			url:             "http://[::]/",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
 		},
 		{
-			"http://10.0.0.1",
-			true,
-			true,
-			nil,
+			url:             "http://1.0.0.1",
+			filterResult:    false,
+			disableInternal: true,
+			cidrs:           []string{"1.0.0.0/16"},
 		},
 		{
-			"http://10.0.0.1",
-			false,
-			false,
-			nil,
+			url:             "http://10.0.0.1",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
 		},
 		{
-			"http://10.0.0.1",
-			true,
-			false,
-			[]string{"10.0.0.1/16"},
+			url:             "http://192.168.0.1",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
 		},
 		{
-			"file://ccc/",
-			true,
-			true,
-			nil,
+			url:             "http://10.0.0.1",
+			filterResult:    false,
+			disableInternal: false,
+			cidrs:           nil,
 		},
 		{
-			"https://guance.com",
-			false,
-			true,
-			nil,
+			url:             "http://10.0.0.1",
+			filterResult:    false,
+			disableInternal: false,
+			cidrs:           []string{"10.0.0.1/16"},
+		},
+		{
+			url:             "file://ccc/",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
+		},
+		{
+			url:             "https://guance.com",
+			filterResult:    false,
+			disableInternal: true,
+			cidrs:           nil,
+		},
+		{
+			url:          "https://guance.com",
+			hosts:        []string{"guance.com"},
+			filterResult: false,
+		},
+		{
+			url:          "https://guance.com",
+			hosts:        []string{"guancez.com"},
+			filterResult: true,
+		},
+		{
+			url:             "https://127.0.0.1",
+			hosts:           []string{"127.0.0.1"},
+			filterResult:    false,
+			disableInternal: true,
+		},
+		{
+			url:             "https://127.0.0.1",
+			cidrs:           []string{"127.0.0.1/32"},
+			filterResult:    false,
+			disableInternal: true,
 		},
 	}
 
-	for _, c := range cases {
-		t.Run(c.url, func(t *testing.T) {
-			assert.Equal(t, c.filter, filterURL(
-				c.url, c.disable, c.cidrs,
-			))
+	for i, c := range cases {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			r := filterURL(
+				c.url, c.disableInternal, c.cidrs, c.hosts,
+			)
+			if r != c.filterResult {
+				assert.Equal(t, c.filterResult, r)
+			}
 		})
 	}
 }

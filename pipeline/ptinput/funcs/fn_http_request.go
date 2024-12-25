@@ -28,33 +28,50 @@ var defaultTransport http.RoundTripper = &http.Transport{
 	ExpectContinueTimeout: 1 * time.Second,
 }
 
-var gDisableInternalHost bool
-var gCIDRs []string
+var gDisableInternalNet bool
+var gCIDRsWhitelist []string
+var gHostWhitelist []string
 
-func SetNetFilter(disableInternal bool, cidrList []string) {
-	gDisableInternalHost = disableInternal
-	gCIDRs = append(gCIDRs, cidrList...)
+func SetNetFilter(disableInternal bool, cidrWList, hostWList []string) {
+	gDisableInternalNet = disableInternal
+	gCIDRsWhitelist = append(gCIDRsWhitelist, cidrWList...)
+	gHostWhitelist = append(gHostWhitelist, hostWList...)
 }
 
-func filterHost(host string, disableInternal bool, cidrs []string) bool {
-	ips, err := net.LookupIP(host)
-	if err != nil {
-		return true
+func filterHost(host string, disableInternal bool, cidrsWhite []string, hostWhite []string) bool {
+	// host whitelist
+	for i := range hostWhite {
+		if host == hostWhite[i] {
+			return false
+		}
 	}
 
-	for _, cidr := range cidrs {
-		_, ipNet, err := net.ParseCIDR(cidr)
-		if err != nil {
+	var ips []net.IP
+	if len(cidrsWhite) > 0 || disableInternal {
+		var err error
+		if ips, err = net.LookupIP(host); err != nil {
+			return true
+		}
+	}
+
+	// cidr whitelist
+	for _, cidr := range cidrsWhite {
+		if _, ipNet, err := net.ParseCIDR(cidr); err != nil {
 			l.Debug("parse cidr %s failed: %s", cidr, err)
 			continue
-		}
-		for _, ip := range ips {
-			if ipNet.Contains(ip) {
-				return true
+		} else if ipNet != nil {
+			for i := range ips {
+				if ipNet.Contains(ips[i]) {
+					return false
+				}
 			}
 		}
 	}
+	if len(hostWhite) > 0 || len(cidrsWhite) > 0 {
+		return true
+	}
 
+	// disable internal netwrok
 	if disableInternal {
 		for _, ip := range ips {
 			if ip.IsLoopback() ||
@@ -70,7 +87,7 @@ func filterHost(host string, disableInternal bool, cidrs []string) bool {
 	return false
 }
 
-func filterURL(urlStr string, disable bool, cidrs []string) bool {
+func filterURL(urlStr string, disable bool, cidrs, hosts []string) bool {
 	urlP, err := url.Parse(urlStr)
 	if err != nil || urlP == nil {
 		return true
@@ -80,7 +97,7 @@ func filterURL(urlStr string, disable bool, cidrs []string) bool {
 		return true
 	}
 
-	return filterHost(urlP.Hostname(), disable, cidrs)
+	return filterHost(urlP.Hostname(), disable, cidrs, hosts)
 }
 
 func HTTPRequestChecking(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlError {
@@ -113,7 +130,7 @@ func HTTPRequest(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlError {
 			funcExpr.Param[1].StartPos())
 	}
 
-	if filterURL(url.(string), gDisableInternalHost, gCIDRs) {
+	if filterURL(url.(string), gDisableInternalNet, gCIDRsWhitelist, gHostWhitelist) {
 		ctx.Regs.ReturnAppend(nil, ast.Nil)
 		return nil
 	}
