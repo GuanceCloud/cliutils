@@ -18,7 +18,7 @@ github.com/DataDog/sketches-go/ddsketch/store
 # github.com/GuanceCloud/grok v1.1.4
 ## explicit; go 1.18
 github.com/GuanceCloud/grok
-# github.com/GuanceCloud/platypus v0.2.10-0.20240815092339-21f3924850ee
+# github.com/GuanceCloud/platypus v0.3.1
 ## explicit; go 1.19
 github.com/GuanceCloud/platypus/internal/logger
 github.com/GuanceCloud/platypus/pkg/ast
