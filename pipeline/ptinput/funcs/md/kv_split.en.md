@@ -1,6 +1,6 @@
 ### `kv_split()` {#fn-kv_split}
 
-Function prototype: `fn kv_split(key, field_split_pattern = " ", value_split_pattern = "=", trim_key = "", trim_value = "", include_keys = [], prefix = "") -> bool`
+Function prototype: `fn kv_split(key, field_split_pattern = " ", value_split_pattern = "=", trim_key = "", trim_value = "", include_keys = [], prefix = "", value_delimiters = []) -> bool`
 
 Function description: extract all key-value pairs from a string
 
@@ -13,6 +13,7 @@ Function parameters:
 - `trim_key`: delete all the specified characters leading and trailing the extracted key; the default value is ""
 - `trim_value`: remove all leading and trailing characters from the extracted value; the default value is ""
 - `prefix`: add prefix to all keys
+- `value_delimiters`: defines paired delimiters (e.g., ['[', ']']) for handling values wrapped by specified characters; default value is [], do not process any delimiters.
 
 Example:
 

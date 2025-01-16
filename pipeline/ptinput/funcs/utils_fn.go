@@ -37,10 +37,20 @@ func WrapFnCall(fn FnCall, paramDesc []*Param) runtime.FuncCall {
 		// Note that some functions do not take the value of the variable
 		// corresponding to the parameter, but its name.
 
-		vals := make([]any, len(funcExpr.Param))
+		var vals []any
 
 		lenP := len(paramDesc)
 		varP := false
+		lenF := len(funcExpr.Param)
+		paramMap := make(map[string]any, lenP)
+
+		if lenF < lenP {
+			vals = make([]any, lenP)
+
+		} else {
+			vals = make([]any, lenF)
+		}
+
 		if lenP > 0 {
 			if paramDesc[lenP-1].VariableP {
 				lenP -= 1
@@ -48,7 +58,27 @@ func WrapFnCall(fn FnCall, paramDesc []*Param) runtime.FuncCall {
 			}
 
 			for i := 0; i < lenP; i++ {
-				if val, err := getParam(ctx, paramDesc[i], funcExpr.Param[i]); err != nil {
+				if i < lenF {
+					input := funcExpr.Param[i]
+					if val, err := getParam(ctx, paramDesc[i], input); err != nil {
+						return err
+					} else if input != nil && input.NodeType == ast.TypeAssignmentExpr {
+						paramMap[input.AssignmentExpr().LHS.Identifier().String()] = val
+					} else {
+						paramMap[paramDesc[i].Name] = val
+					}
+				} else {
+					if val, err := getParam(ctx, paramDesc[i], nil); err != nil {
+						return err
+					} else if _, exist := paramMap[paramDesc[i].Name]; !exist {
+						paramMap[paramDesc[i].Name] = val
+					}
+				}
+			}
+			for i := 0; i < lenP; i++ {
+				if param, exist := paramMap[paramDesc[i].Name]; exist {
+					vals[i] = param
+				} else if val, err := getParam(ctx, paramDesc[i], nil); err != nil {
 					return err
 				} else {
 					vals[i] = val
