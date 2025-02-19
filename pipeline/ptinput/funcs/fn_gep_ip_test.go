@@ -44,6 +44,7 @@ func (m *mockGEO) Geo(ip string) (*ipdb.IPdbRecord, error) {
 				return "CN"
 			}
 		}(),
+		Isp: m.SearchIsp(ip),
 	}, nil
 }
 

@@ -46,8 +46,12 @@ func TestScript(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(plpt.Fields()) != 0 {
+	if len(plpt.Fields()) != 1 {
 		t.Fatal(plpt.Fields())
+	} else {
+		if _, ok := plpt.Fields()["status"]; !ok {
+			t.Fatal("without status")
+		}
 	}
 
 	//nolint:dogsled
