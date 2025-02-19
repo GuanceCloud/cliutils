@@ -20,6 +20,11 @@ func InitLog() {
 	log = logger.SLogger("iploc")
 }
 
+type cfg struct {
+	dir  string
+	file string
+	lang string
+}
 type IPIP struct {
 	db   *ipipdb.City
 	lang string
@@ -31,62 +36,82 @@ const (
 )
 
 func (ipip *IPIP) Init(dataDir string, config map[string]string) {
-	var ipipFile string
-	if f, ok := config[CfgIPIPFile]; ok {
-		ipipFile = filepath.Join(dataDir, f)
+	cfg := cfg{
+		dir: dataDir,
+	}
+
+	if v, ok := config[CfgIPIPFile]; ok {
+		cfg.file = v
+	}
+
+	if v, ok := config[CfgIPIPLanguage]; ok {
+		cfg.lang = v
+	}
+	ipip.db, ipip.lang = newIPDB(cfg)
+}
+
+func newIPDB(cfg cfg) (*ipipdb.City, string) {
+	var fp string
+	if cfg.file != "" {
+		fp = filepath.Join(cfg.dir, cfg.file)
 	} else {
-		dLi, err := os.ReadDir(dataDir)
+		dLi, err := os.ReadDir(cfg.dir)
 		if err != nil {
-			return
+			log.Error(err)
+			return nil, ""
 		}
 		for _, e := range dLi {
 			name := e.Name()
 			if filepath.Ext(name) == ".ipdb" {
-				ipipFile = filepath.Join(dataDir, name)
+				fp = filepath.Join(cfg.dir, name)
 				log.Warnf(
 					"no file was specified, the file in the `%s` will be used: `%s`",
-					dataDir, ipipFile)
+					cfg.dir, fp)
 				break
 			}
 		}
 	}
 
-	if ipipFile == "" {
+	if fp == "" {
 		log.Error("no file was specified")
-		return
+		return nil, ""
 	} else {
-		log.Infof("load ip database from file `%s`", ipipFile)
+		log.Infof("load ip database from file `%s`", fp)
 	}
 
-	if db, err := ipipdb.NewCity(ipipFile); err != nil {
+	var ipdb *ipipdb.City
+	if db, err := ipipdb.NewCity(fp); err != nil {
 		log.Error(err)
-		return
+		return nil, ""
 	} else {
-		ipip.db = db
+		ipdb = db
 	}
 
-	langLi := ipip.db.Languages()
-	if lang, ok := config[CfgIPIPLanguage]; ok {
-		var br bool
+	return ipdb, checkLang(cfg.lang, ipdb)
+}
+
+func checkLang(lang string, ipdb *ipipdb.City) string {
+	// var lang string
+	langLi := ipdb.Languages()
+	if lang != "" {
 		for i := range langLi {
 			if lang == langLi[i] {
-				ipip.lang = lang
-				br = true
-				break
+				return lang
 			}
 		}
-		if !br {
-			log.Errorf("supported languages include `%v`, actual specified is `%s`",
-				strings.Join(langLi, ", "), lang)
-		}
+		log.Errorf("supported languages include `%v`, actual specified is `%s`",
+			strings.Join(langLi, ", "), lang)
 	}
 
-	if ipip.lang == "" && len(langLi) > 0 {
-		ipip.lang = langLi[0]
+	if len(langLi) > 0 {
+		lang = langLi[0]
 		log.Warnf("use `%s` from the provided language list `%s`",
-			ipip.lang, strings.Join(langLi, ", "),
+			lang, strings.Join(langLi, ", "),
 		)
+		return lang
 	}
+
+	return ""
 }
 
 func (ipip *IPIP) SearchIsp(ip string) string {

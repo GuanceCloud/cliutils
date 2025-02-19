@@ -14,21 +14,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test(t *testing.T) {
+func TestISP(t *testing.T) {
 	dir := "./testdata/"
 	var ipip IPIP
 	ipip.Init(dir, nil)
 
-	rec, err := ipip.Geo("221.0.0.0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, ipdb.IPdbRecord{
-		Country: "中国",
-		Region:  "山东",
-		City:    "济南",
-		Isp:     "unknown",
-	}, *rec)
+	assert.Equal(t, "", ipip.SearchIsp("221.0.0.0"))
+	assert.Equal(t, "unknown", ipip.SearchIsp("aaa"))
+}
+
+func TestGEO(t *testing.T) {
+	dir := "./testdata/"
 
 	cases := []struct {
 		ip     string
@@ -49,6 +45,22 @@ func Test(t *testing.T) {
 				City:    "济南",
 				Isp:     "unknown",
 			},
+		},
+		{
+			ip:  "aaa",
+			dir: dir,
+			cfg: map[string]string{
+				CfgIPIPLanguage: "CN",
+			},
+			failed: true,
+		},
+		{
+			ip:  "221.0.0.0",
+			dir: dir + "-xxxx-test",
+			cfg: map[string]string{
+				CfgIPIPLanguage: "CN",
+			},
+			failed: true,
 		},
 		{
 			ip:  "221.0.0.0",
