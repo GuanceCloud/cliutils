@@ -37,7 +37,7 @@ func TestFilter(t *testing.T) {
 			cidrs:           nil,
 		},
 		{
-			url:             "http://127.0.0.0.1/",
+			url:             "http://127.0.1.1/",
 			filterResult:    true,
 			disableInternal: true,
 			cidrs:           nil,
