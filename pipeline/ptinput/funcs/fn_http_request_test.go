@@ -1,19 +1,154 @@
 package funcs
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/GuanceCloud/cliutils/pipeline/ptinput"
 	"github.com/GuanceCloud/cliutils/point"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestFilter(t *testing.T) {
+	cases := []struct {
+		url             string
+		filterResult    bool
+		disableInternal bool
+		cidrs, hosts    []string
+	}{
+		{
+			url:             "http://0.0.0.0/",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
+		},
+		{
+			url:             "http://localhost/",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
+		},
+		{
+			url:             "http://127.0.1.1/",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
+		},
+		{
+			url:             "http://1.0.0.1/",
+			filterResult:    false,
+			disableInternal: true,
+			cidrs:           nil,
+		},
+		{
+			url:             "http://1.0.0.1:1234/",
+			filterResult:    false,
+			disableInternal: true,
+			cidrs:           nil,
+		},
+		{
+			url:             "http://[::]:1234/",
+			filterResult:    false,
+			disableInternal: false,
+			cidrs:           nil,
+		},
+		{
+			url:             "http://[::]:1234/",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
+		},
+		{
+			url:             "http://[::]/",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
+		},
+		{
+			url:             "http://1.0.0.1",
+			filterResult:    false,
+			disableInternal: true,
+			cidrs:           []string{"1.0.0.0/16"},
+		},
+		{
+			url:             "http://10.0.0.1",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
+		},
+		{
+			url:             "http://192.168.0.1",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
+		},
+		{
+			url:             "http://10.0.0.1",
+			filterResult:    false,
+			disableInternal: false,
+			cidrs:           nil,
+		},
+		{
+			url:             "http://10.0.0.1",
+			filterResult:    false,
+			disableInternal: false,
+			cidrs:           []string{"10.0.0.1/16"},
+		},
+		{
+			url:             "file://ccc/",
+			filterResult:    true,
+			disableInternal: true,
+			cidrs:           nil,
+		},
+		{
+			url:             "https://guance.com",
+			filterResult:    false,
+			disableInternal: true,
+			cidrs:           nil,
+		},
+		{
+			url:          "https://guance.com",
+			hosts:        []string{"guance.com"},
+			filterResult: false,
+		},
+		{
+			url:          "https://guance.com",
+			hosts:        []string{"guancez.com"},
+			filterResult: true,
+		},
+		{
+			url:             "https://127.0.0.1",
+			hosts:           []string{"127.0.0.1"},
+			filterResult:    false,
+			disableInternal: true,
+		},
+		{
+			url:             "https://127.0.0.1",
+			cidrs:           []string{"127.0.0.1/32"},
+			filterResult:    false,
+			disableInternal: true,
+		},
+	}
+
+	for i, c := range cases {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			r := filterURL(
+				c.url, c.disableInternal, c.cidrs, c.hosts,
+			)
+			if r != c.filterResult {
+				assert.Equal(t, c.filterResult, r)
+			}
+		})
+	}
+}
 
 func TestBuildBody(t *testing.T) {
 	cases := []struct {
@@ -85,20 +220,31 @@ func TestHTTPRequest(t *testing.T) {
 		{
 			name: "test_post",
 			pl: fmt.Sprintf(`
-			resp = http_request("POST", %s, {"extraHeader": "1", 
+			resp = http_request("POST", %s, {"extraHeader": "1",
 			"extraHeader": "1"}, {"a": "1"})
-			add_key(abc, resp["body"])	
+			add_key(abc, resp["body"])
 			`, url),
 			in:       `[]`,
 			outkey:   "abc",
 			expected: `{"a":"1"}`,
 		},
 		{
+			name: "test_file",
+			pl: `
+			resp = http_request("POST", "file:///etc/", {"extraHeader": "1", 
+			"extraHeader": "1"}, {"a": "1"})
+			add_key(abc, resp)
+			`,
+			in:       `[]`,
+			outkey:   "abc",
+			expected: nil,
+		},
+		{
 			name: "test_put",
 			pl: fmt.Sprintf(`
-			resp = http_request("put", %s, {"extraHeader": "1", 
+			resp = http_request("put", %s, {"extraHeader": "1",
 			"extraHeader": "1"}, {"a": "1"})
-			add_key(abc, resp["body"])	
+			add_key(abc, resp["body"])
 			`, url),
 			in:       `[]`,
 			outkey:   "abc",
@@ -117,7 +263,7 @@ func TestHTTPRequest(t *testing.T) {
 				}
 				return
 			}
-			pt := ptinput.NewPlPoint(
+			pt := ptinput.NewPlPt(
 				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
 			errR := runScript(runner, pt)
 

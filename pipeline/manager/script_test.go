@@ -28,7 +28,7 @@ func TestScript(t *testing.T) {
 	if ng := s.Engine(); ng == nil {
 		t.Fatalf("no engine")
 	}
-	plpt := ptinput.NewPlPoint(point.Logging, "ng", nil, nil, time.Now())
+	plpt := ptinput.NewPlPt(point.Logging, "ng", nil, nil, time.Now())
 	err := s.Run(plpt, nil, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -40,18 +40,22 @@ func TestScript(t *testing.T) {
 	assert.Equal(t, s.NS(), NSGitRepo)
 
 	//nolint:dogsled
-	plpt = ptinput.NewPlPoint(point.Logging, "ng", nil, nil, time.Now())
+	plpt = ptinput.NewPlPt(point.Logging, "ng", nil, nil, time.Now())
 	err = s.Run(plpt, nil, &Option{DisableAddStatusField: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(plpt.Fields()) != 0 {
+	if len(plpt.Fields()) != 1 {
 		t.Fatal(plpt.Fields())
+	} else {
+		if _, ok := plpt.Fields()["status"]; !ok {
+			t.Fatal("without status")
+		}
 	}
 
 	//nolint:dogsled
-	plpt = ptinput.NewPlPoint(point.Logging, "ng", nil, nil, time.Now())
+	plpt = ptinput.NewPlPt(point.Logging, "ng", nil, nil, time.Now())
 	err = s.Run(plpt, nil, &Option{
 		DisableAddStatusField: false,
 		IgnoreStatus:          []string{DefaultStatus},
@@ -73,7 +77,7 @@ func TestDrop(t *testing.T) {
 
 	s := ret["abc.p"]
 
-	plpt := ptinput.NewPlPoint(point.Logging, "ng", nil, nil, time.Now())
+	plpt := ptinput.NewPlPt(point.Logging, "ng", nil, nil, time.Now())
 	if err := s.Run(plpt, nil, nil); err != nil {
 		t.Fatal(err)
 	}

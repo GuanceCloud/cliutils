@@ -18,30 +18,30 @@ type EncodeFn func(batchSize int, payload []byte) error
 
 type EncoderOption func(e *Encoder)
 
-func WithEncEncoding(enc Encoding) EncoderOption {
-	return func(e *Encoder) { e.enc = enc }
-}
+func WithEncEncoding(enc Encoding) EncoderOption { return func(e *Encoder) { e.enc = enc } }
+func WithEncFn(fn EncodeFn) EncoderOption        { return func(enc *Encoder) { enc.fn = fn } }
+func WithEncBatchSize(size int) EncoderOption    { return func(e *Encoder) { e.batchSize = size } }
+func WithEncBatchBytes(bytes int) EncoderOption  { return func(e *Encoder) { e.bytesSize = bytes } }
 
-func WithEncFn(fn EncodeFn) EncoderOption {
-	return func(enc *Encoder) { enc.fn = fn }
-}
+// WithIgnoreLargePoint will skip too-large point that can't encoded into buffer.
+func WithIgnoreLargePoint(on bool) EncoderOption { return func(e *Encoder) { e.ignoreLargePoint = on } }
 
-func WithEncBatchSize(size int) EncoderOption {
-	return func(e *Encoder) { e.batchSize = size }
-}
-
-func WithEncBatchBytes(bytes int) EncoderOption {
-	return func(e *Encoder) { e.bytesSize = bytes }
-}
+// WithApproxSize used to calculate the not-precise bytes required for protobuf encoding. Default to true
+// for better performance under busy encoding conditions.
+func WithApproxSize(on bool) EncoderOption { return func(e *Encoder) { e.approxsize = on } }
 
 type Encoder struct {
-	bytesSize,
-	batchSize int
-
 	pts []*Point
+
+	bytesSize,
+	batchSize,
+	totalBytes, // total bytes encoded
+	totalPts, // total points encoded
+	trimmedPts, // total points trimmed before encoding when size exceed buffer length
 	lastPtsIdx,
-	trimmed,
+	skippedPts,
 	parts int
+
 	lastErr error
 
 	lpPointBuf []byte
@@ -49,6 +49,11 @@ type Encoder struct {
 
 	fn  EncodeFn
 	enc Encoding
+
+	// get point size on pt.Size() instead of pt.PBSize()
+	// pt.Size() is faster(2X) than pt.PBSize(), but the later is more precise.
+	approxsize       bool
+	ignoreLargePoint bool
 }
 
 var encPool sync.Pool
@@ -90,9 +95,15 @@ func (e *Encoder) reset() {
 	e.lastPtsIdx = 0
 	e.lastErr = nil
 	e.parts = 0
-	e.trimmed = 0
+	e.totalPts = 0
+	e.trimmedPts = 0
+	e.skippedPts = 0
 	e.pbpts.Arr = e.pbpts.Arr[:0]
 	e.lpPointBuf = e.lpPointBuf[:0]
+	e.ignoreLargePoint = false
+	e.approxsize = true
+
+	e.totalBytes = 0
 }
 
 func (e *Encoder) getPayload(pts []*Point) ([]byte, error) {
@@ -222,15 +233,29 @@ func (e *Encoder) Encode(pts []*Point) ([][]byte, error) {
 	return e.doEncode(pts)
 }
 
-var errTooSmallBuffer = errors.New("too small buffer")
+var (
+	errTooSmallBuffer = errors.New("too small buffer")
+)
 
 func (e *Encoder) LastErr() error {
 	return e.lastErr
 }
 
+func (e *Encoder) SkippedPoints() int {
+	return e.skippedPts
+}
+
+func (e *Encoder) TotalPoints() int {
+	return e.totalPts
+}
+
+func (e *Encoder) LastTrimmed() int {
+	return e.trimmedPts
+}
+
 func (e *Encoder) String() string {
-	return fmt.Sprintf("encoding: %s, parts: %d, byte size: %d, e.batchSize: %d, lastPtsIdx: %d, trimmed: %d",
-		e.enc, e.parts, e.bytesSize, e.batchSize, e.lastPtsIdx, e.trimmed,
+	return fmt.Sprintf("encoding: %s, parts: %d, byte size: %d, e.batchSize: %d, lastPtsIdx: %d, total pts: %d, total bytes: %d, trimmed: %d, skipped: %d, lastErr: %v",
+		e.enc, e.parts, e.bytesSize, e.batchSize, e.lastPtsIdx, e.totalPts, e.totalBytes, e.trimmedPts, e.skippedPts, e.lastErr,
 	)
 }
 

@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/DataDog/datadog-agent/pkg/obfuscate v0.47.1
 	github.com/GuanceCloud/grok v1.1.4
-	github.com/GuanceCloud/platypus v0.2.10-0.20240815092339-21f3924850ee
+	github.com/GuanceCloud/platypus v0.3.1
 	github.com/VictoriaMetrics/easyproto v0.1.4
 	github.com/aliyun/aliyun-oss-go-sdk v2.1.2+incompatible
 	github.com/antchfx/xmlquery v1.3.18
@@ -16,6 +16,7 @@ require (
 	github.com/gin-gonic/gin v1.9.0
 	github.com/go-ping/ping v1.1.0
 	github.com/gobwas/ws v1.1.0
+	github.com/goccy/go-json v0.10.3
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/pprof v0.0.0-20230705174524-200ffdc848b8
 	github.com/gorilla/websocket v1.5.0
@@ -25,6 +26,7 @@ require (
 	github.com/ip2location/ip2location-go v8.3.0+incompatible
 	github.com/ipipdotnet/ipdb-go v1.3.3
 	github.com/itchyny/timefmt-go v0.1.5
+	github.com/klauspost/compress v1.16.7
 	github.com/mssola/user_agent v0.6.0
 	github.com/oschwald/geoip2-golang v1.9.0
 	github.com/pierrec/lz4/v4 v4.1.18
@@ -71,7 +73,6 @@ require (
 	github.com/go-playground/validator/v10 v10.11.2 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
-	github.com/goccy/go-json v0.10.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/uuid v1.3.0 // indirect

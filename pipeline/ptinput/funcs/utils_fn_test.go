@@ -429,7 +429,7 @@ x = trigger2( msg="aaa", args = "")
 				return
 			}
 
-			pt := ptinput.NewPlPoint(
+			pt := ptinput.NewPlPt(
 				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
 
 			errR := script.Run(pt, nil)

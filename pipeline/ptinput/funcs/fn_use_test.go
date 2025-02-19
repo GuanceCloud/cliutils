@@ -46,7 +46,7 @@ func TestUse(t *testing.T) {
 	}
 
 	for _, name := range ret[0] {
-		pt := ptinput.NewPlPoint(
+		pt := ptinput.NewPlPt(
 			point.Network, "default", map[string]string{"ax": "1"}, nil, timenow)
 
 		errR := runScript(ret1[name], pt)

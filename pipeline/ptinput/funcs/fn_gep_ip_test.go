@@ -44,6 +44,7 @@ func (m *mockGEO) Geo(ip string) (*ipdb.IPdbRecord, error) {
 				return "CN"
 			}
 		}(),
+		Isp: m.SearchIsp(ip),
 	}, nil
 }
 
@@ -131,7 +132,7 @@ func TestGeoIpFunc(t *testing.T) {
 			return
 		}
 
-		pt := ptinput.NewPlPoint(
+		pt := ptinput.NewPlPt(
 			point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
 		pt.SetIPDB(&mockGEO{})
 		errR := runScript(runner, pt)

@@ -19,48 +19,103 @@ import (
 )
 
 func TestGetPut(t *T.T) {
-	testDir := t.TempDir()
+	t.Run(`buf-get`, func(t *T.T) {
+		testDir := t.TempDir()
+		err := os.MkdirAll(testDir, 0o755)
+		assert.NoError(t, err)
 
-	err := os.MkdirAll(testDir, 0o755)
-	assert.NoError(t, err)
+		dq, err := Open(WithPath(testDir), WithCapacity(1<<30))
+		assert.NoError(t, err)
 
-	dq, err := Open(WithPath(testDir), WithCapacity(1<<30))
-	assert.NoError(t, err)
+		raw := []byte("hello message-1")
+		assert.NoError(t, dq.Put(raw))
+		assert.NoError(t, dq.Rotate())
 
-	assert.NoError(t, dq.Put([]byte("hello message-1")))
+		buf := make([]byte, 1<<20)
 
-	for {
-		if err := dq.Get(func(msg []byte) error {
-			t.Logf("get message: %q\n", string(msg))
-			return nil
-		}); err != nil {
-			t.Log(time.Now().Format(time.RFC3339Nano), " fail to get message: ", err)
-			time.Sleep(time.Second * 1)
-		} else {
-			break
+		for {
+			if err := dq.BufGet(buf, nil); err != nil {
+				t.Logf("fail to get message: %s", err)
+				time.Sleep(time.Second * 1)
+			} else {
+				assert.Equal(t, raw, buf[:len(raw)])
+				break
+			}
 		}
-	}
 
-	assert.NoError(t, dq.Put([]byte("hello message-2")))
+		raw2 := []byte("hello message-2")
+		assert.NoError(t, dq.Put(raw2))
+		assert.NoError(t, dq.Rotate())
 
-	ok := false
+		ok := false
 
-	for i := 0; i < 10; i++ {
-		if err := dq.Get(func(msg []byte) error {
-			t.Logf("get message: %q\n", string(msg))
-			ok = true
-			return nil
-		}); err != nil {
-			t.Log(time.Now().Format(time.RFC3339Nano), " fail to get message: ", err)
-			time.Sleep(time.Second * 1)
-		} else {
-			break
+		for i := 0; i < 10; i++ {
+			if err := dq.BufGet(buf, func(msg []byte) error {
+				t.Logf("msg: %p/%d", msg, len(msg))
+				t.Logf("msg: %p/%d", buf, len(buf))
+				t.Logf("get message: %q\n", string(msg))
+
+				assert.Equal(t, len(buf), cap(buf)) // buf's length should not changed
+
+				assert.Equal(t, buf[:len(msg)], msg)
+				ok = true
+				return nil
+			}); err != nil {
+				t.Log(time.Now().Format(time.RFC3339Nano), " fail to get message: ", err)
+				time.Sleep(time.Second * 1)
+			} else {
+				break
+			}
 		}
-	}
 
-	assert.True(t, ok, "expected consume 1 message in 10 seconds, but got no message")
+		assert.True(t, ok, "expected consume 1 message in 10 seconds, but got no message")
 
-	assert.NoError(t, dq.Close())
+		assert.NoError(t, dq.Close())
+	})
+
+	t.Run(`basic`, func(t *T.T) {
+		testDir := t.TempDir()
+		err := os.MkdirAll(testDir, 0o755)
+		assert.NoError(t, err)
+
+		dq, err := Open(WithPath(testDir), WithCapacity(1<<30))
+		assert.NoError(t, err)
+
+		assert.NoError(t, dq.Put([]byte("hello message-1")))
+
+		for {
+			if err := dq.Get(func(msg []byte) error {
+				t.Logf("get message: %q\n", string(msg))
+				return nil
+			}); err != nil {
+				t.Log(time.Now().Format(time.RFC3339Nano), " fail to get message: ", err)
+				time.Sleep(time.Second * 1)
+			} else {
+				break
+			}
+		}
+
+		assert.NoError(t, dq.Put([]byte("hello message-2")))
+
+		ok := false
+
+		for i := 0; i < 10; i++ {
+			if err := dq.Get(func(msg []byte) error {
+				t.Logf("get message: %q\n", string(msg))
+				ok = true
+				return nil
+			}); err != nil {
+				t.Log(time.Now().Format(time.RFC3339Nano), " fail to get message: ", err)
+				time.Sleep(time.Second * 1)
+			} else {
+				break
+			}
+		}
+
+		assert.True(t, ok, "expected consume 1 message in 10 seconds, but got no message")
+
+		assert.NoError(t, dq.Close())
+	})
 }
 
 func TestDropInvalidDataFile(t *T.T) {
@@ -83,35 +138,96 @@ func TestDropInvalidDataFile(t *T.T) {
 
 		assert.Len(t, c.dataFiles, 10)
 
+		round := 0
 		for {
 			err := c.Get(func(get []byte) error {
 				// switch to 2nd file
-				assert.Equal(t, data, get)
+				assert.Equalf(t, data, get, "at round %d, get %d bytes",
+					round, len(get))
 				return nil
 			})
 			if err != nil {
-				require.ErrorIs(t, err, ErrEOF)
+				require.ErrorIs(t, err, ErrNoData)
 				break
 			}
+			round++
 		}
 
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
 
-		assert.Equalf(t, float64(5),
+		assert.Equalf(t, uint64(5),
 			metrics.GetMetricOnLabels(mfs,
-				"diskcache_dropped_total",
+				"diskcache_dropped_data",
 				c.path,
 				reasonBadDataFile,
-			).GetCounter().GetValue(),
+			).GetSummary().GetSampleCount(),
+			"got metrics\n%s", metrics.MetricFamily2Text(mfs))
+	})
+
+	t.Run(`get-on-too-small-read-buffer`, func(t *T.T) {
+		ResetMetrics()
+		p := t.TempDir()
+		c, err := Open(WithPath(p))
+		require.NoError(t, err)
+
+		dataLarge := make([]byte, 100) // 100 bytes to Put
+		assert.NoError(t, c.Put(dataLarge))
+
+		dataSmall := make([]byte, 10) // 10 bytes to Put
+		assert.NoError(t, c.Put(dataSmall))
+
+		// next large and small data
+		assert.NoError(t, c.Put(dataLarge))
+		assert.NoError(t, c.Put(dataSmall))
+
+		require.NoError(t, c.Rotate())
+
+		readBuf := make([]byte, 10)
+		assert.ErrorIs(t, c.BufGet(readBuf, func(x []byte) error { // get 100 bytes
+			assert.Nil(t, x) // nothing should returned
+			return nil
+		}), ErrTooSmallReadBuf)
+
+		assert.NoError(t, c.BufGet(readBuf, func(x []byte) error { // get 10 bytes
+			assert.Len(t, x, 10)
+			return nil
+		}))
+
+		assert.ErrorIs(t, c.BufGet(readBuf, func(x []byte) error { // get 100 bytes
+			assert.Nil(t, x) // nothing should returned
+			return nil
+		}), ErrTooSmallReadBuf)
+
+		assert.NoError(t, c.BufGet(readBuf, func(x []byte) error { // get 10 bytes
+			assert.Len(t, x, 10)
+			return nil
+		}))
+
+		assert.ErrorIs(t, c.BufGet(readBuf, func(x []byte) error { // get 10 bytes
+			assert.Nil(t, x) // nothing should returned
+			return nil
+		}), ErrNoData)
+
+		reg := prometheus.NewRegistry()
+		reg.MustRegister(Metrics()...)
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+
+		assert.Equalf(t, float64(200),
+			metrics.GetMetricOnLabels(mfs,
+				"diskcache_dropped_data",
+				c.path,
+				reasonTooSmallReadBuffer,
+			).GetSummary().GetSampleSum(),
 			"got metrics\n%s", metrics.MetricFamily2Text(mfs))
 	})
 }
 
 func TestFallbackOnError(t *T.T) {
-	t.Run(`get-erro-on-EOF`, func(t *T.T) {
+	t.Run(`get-error-on-EOF`, func(t *T.T) {
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
 		require.NoError(t, err)
@@ -131,10 +247,10 @@ func TestFallbackOnError(t *T.T) {
 			return nil
 		})
 
-		assert.ErrorIs(t, err, ErrEOF)
+		assert.ErrorIs(t, err, ErrNoData)
 		t.Logf("get: %s", err)
 
-		if errors.Is(err, ErrEOF) {
+		if errors.Is(err, ErrNoData) {
 			t.Logf("we should ignore the error")
 		}
 	})
@@ -165,17 +281,13 @@ func TestFallbackOnError(t *T.T) {
 		}))
 
 		reg := prometheus.NewRegistry()
-		register(reg)
+		reg.MustRegister(Metrics()...)
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
 
 		assert.Equalf(t, float64(1),
 			metrics.GetMetricOnLabels(mfs, "diskcache_seek_back_total", c.path).GetCounter().GetValue(),
 			"got metrics\n%s", metrics.MetricFamily2Text(mfs))
-
-		t.Cleanup(func() {
-			ResetMetrics()
-		})
 	})
 
 	t.Run(`fallback-on-eof-error`, func(t *T.T) {
@@ -186,12 +298,12 @@ func TestFallbackOnError(t *T.T) {
 		// while on EOF, Fn error ignored
 		assert.ErrorIs(t, c.Get(func(_ []byte) error {
 			return fmt.Errorf("get error")
-		}), ErrEOF)
+		}), ErrNoData)
 
 		// still got EOF
 		assert.ErrorIs(t, c.Get(func(x []byte) error {
 			return nil
-		}), ErrEOF)
+		}), ErrNoData)
 	})
 
 	t.Run(`no-fallback-on-error`, func(t *T.T) {
@@ -210,15 +322,12 @@ func TestFallbackOnError(t *T.T) {
 
 		assert.ErrorIs(t, c.Get(func(x []byte) error {
 			return nil
-		}), ErrEOF)
+		}), ErrNoData)
 	})
 }
 
 func TestPutGet(t *T.T) {
 	t.Run(`clean-pos-on-eof`, func(t *T.T) {
-		reg := prometheus.NewRegistry()
-		register(reg)
-
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
 		assert.NoError(t, err)
@@ -237,11 +346,6 @@ func TestPutGet(t *T.T) {
 
 		t.Logf("pos: %s", pos)
 
-		mfs, err := reg.Gather()
-		require.NoError(t, err)
-
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
-
 		t.Cleanup(func() {
 			c.Close()
 			ResetMetrics()
@@ -249,9 +353,6 @@ func TestPutGet(t *T.T) {
 	})
 
 	t.Run("put-get", func(t *T.T) {
-		reg := prometheus.NewRegistry()
-		register(reg)
-
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
 		assert.NoError(t, err)
@@ -270,10 +371,6 @@ func TestPutGet(t *T.T) {
 			t.Logf("get: %s", err)
 		}
 
-		mfs, err := reg.Gather()
-		require.NoError(t, err)
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
-
 		t.Cleanup(func() {
 			c.Close()
 			os.RemoveAll(p)
@@ -281,9 +378,6 @@ func TestPutGet(t *T.T) {
 	})
 
 	t.Run(`get-without-pos`, func(t *T.T) {
-		reg := prometheus.NewRegistry()
-		register(reg)
-
 		p := t.TempDir()
 
 		kbdata := make([]byte, 1024)
@@ -312,10 +406,6 @@ func TestPutGet(t *T.T) {
 		// close the cache for next re-Open()
 		assert.NoError(t, c.Close())
 
-		mfs, err := reg.Gather()
-		require.NoError(t, err)
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
-
 		c2, err := Open(WithPath(p), WithNoPos(true))
 		assert.NoError(t, err)
 		defer c2.Close()
@@ -328,7 +418,7 @@ func TestPutGet(t *T.T) {
 				ncached++
 				return nil
 			}); err != nil {
-				if errors.Is(err, ErrEOF) {
+				if errors.Is(err, ErrNoData) {
 					t.Logf("cache EOF")
 					break
 				} else {
@@ -336,10 +426,6 @@ func TestPutGet(t *T.T) {
 				}
 			}
 		}
-
-		mfs, err = reg.Gather()
-		require.NoError(t, err)
-		t.Logf("\n%s", metrics.MetricFamily2Text(mfs))
 
 		// without .pos, still got 10 cache
 		assert.Equal(t, 10, ncached, "cache: %s", c2)

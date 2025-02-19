@@ -15,6 +15,7 @@ import (
 )
 
 func TestCreatePoint(t *testing.T) {
+	tn := time.Now()
 	cases := []struct {
 		name, in string
 		allPl    map[string]string
@@ -38,12 +39,12 @@ func TestCreatePoint(t *testing.T) {
 			},
 			outkey: "abc",
 			expect: []ptinput.PlInputPt{
-				ptinput.NewPlPoint(point.Metric, "n1", map[string]string{
+				ptinput.NewPlPt(point.Metric, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 			},
 		},
 		{
@@ -63,13 +64,13 @@ func TestCreatePoint(t *testing.T) {
 			},
 			outkey: "abc",
 			expect: []ptinput.PlInputPt{
-				ptinput.NewPlPoint(point.Metric, "n1", map[string]string{
+				ptinput.NewPlPt(point.Metric, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d":  "x1",
 					"b":  float64(2.0),
 					"aa": int64(1),
-				}, time.Time{}),
+				}, tn),
 			},
 		},
 		{
@@ -89,7 +90,7 @@ func TestCreatePoint(t *testing.T) {
 			},
 			outkey: "abc",
 			expect: []ptinput.PlInputPt{
-				ptinput.NewPlPoint(point.Metric, "n1", map[string]string{
+				ptinput.NewPlPt(point.Metric, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d":  "x1",
@@ -116,13 +117,13 @@ func TestCreatePoint(t *testing.T) {
 			outkey: "abc",
 			fail:   true,
 			expect: []ptinput.PlInputPt{
-				ptinput.NewPlPoint(point.Metric, "n1", map[string]string{
+				ptinput.NewPlPt(point.Metric, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d":  "x1",
 					"b":  float64(2.0),
 					"aa": int64(1),
-				}, time.Time{}),
+				}, tn),
 			},
 		},
 		{
@@ -149,60 +150,60 @@ func TestCreatePoint(t *testing.T) {
 			},
 			outkey: "abc",
 			expect: []ptinput.PlInputPt{
-				ptinput.NewPlPoint(point.Metric, "n1", map[string]string{
+				ptinput.NewPlPt(point.Metric, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.Logging, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.Logging, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.Metric, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.Metric, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.Tracing, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.Tracing, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.RUM, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.RUM, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.Network, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.Network, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.Object, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.Object, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.CustomObject, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.CustomObject, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.Security, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.Security, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 			},
 		},
 		{
@@ -229,60 +230,60 @@ func TestCreatePoint(t *testing.T) {
 			},
 			outkey: "abc",
 			expect: []ptinput.PlInputPt{
-				ptinput.NewPlPoint(point.Metric, "n1", map[string]string{
+				ptinput.NewPlPt(point.Metric, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.Logging, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.Logging, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.Metric, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.Metric, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.Tracing, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.Tracing, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.RUM, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.RUM, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.Network, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.Network, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.Object, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.Object, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.CustomObject, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.CustomObject, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
-				ptinput.NewPlPoint(point.Security, "n1", map[string]string{
+				}, tn),
+				ptinput.NewPlPt(point.Security, "n1", map[string]string{
 					"a": "1",
 				}, map[string]any{
 					"d": "x1",
 					"b": float64(2.0),
-				}, time.Time{}),
+				}, tn),
 			},
 		},
 	}
@@ -303,8 +304,8 @@ func TestCreatePoint(t *testing.T) {
 				t.Fatal(ok)
 			}
 
-			pt := ptinput.NewPlPoint(
-				point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
+			pt := ptinput.NewPlPt(
+				point.Logging, "test", nil, map[string]any{"message": tc.in}, tn)
 			errR := runScript(runner, pt)
 
 			t.Log(pt.Fields())

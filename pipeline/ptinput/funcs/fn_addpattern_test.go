@@ -165,7 +165,7 @@ func TestAddPattern(t *testing.T) {
 				return
 			}
 
-			pt := ptinput.NewPlPoint(point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
+			pt := ptinput.NewPlPt(point.Logging, "test", nil, map[string]any{"message": tc.in}, time.Now())
 			errR := runScript(runner, pt)
 			if errR != nil {
 				t.Fatal(errR)

@@ -5,6 +5,17 @@
 
 package point
 
+import (
+	"fmt"
+
+	"github.com/GuanceCloud/cliutils/logger"
+)
+
+var (
+	// logger for debugging, do NOT add logging in release code.
+	l = logger.DefaultSLogger("point")
+)
+
 // EncodeV2 set points to be encoded.
 func (e *Encoder) EncodeV2(pts []*Point) {
 	e.pts = pts
@@ -28,55 +39,108 @@ func (e *Encoder) Next(buf []byte) ([]byte, bool) {
 	}
 }
 
-func (e *Encoder) doEncodeProtobuf(buf []byte) ([]byte, bool) {
-	var (
-		curSize,
-		pbptsSize int
-		trimmed = 1
-	)
-
-	for _, pt := range e.pts[e.lastPtsIdx:] {
-		if pt == nil {
-			continue
-		}
-
-		curSize += pt.Size()
-
-		// e.pbpts size larger than buf, we must trim some of points
-		// until size fit ok or MarshalTo will panic.
-		if curSize >= len(buf) {
-			if len(e.pbpts.Arr) <= 1 { // nothing to trim
-				e.lastErr = errTooSmallBuffer
-				return nil, false
-			}
-
-			for {
-				if pbptsSize = e.pbpts.Size(); pbptsSize > len(buf) {
-					e.pbpts.Arr = e.pbpts.Arr[:len(e.pbpts.Arr)-trimmed]
-					e.lastPtsIdx -= trimmed
-					trimmed *= 2
-				} else {
-					goto __doEncode
-				}
-			}
-		} else {
-			e.pbpts.Arr = append(e.pbpts.Arr, pt.pt)
-			e.lastPtsIdx++
-		}
+// tryTrim will truncate tail-points if total size largar than bufLen.
+func (e *Encoder) tryTrim(curSize, ptsize, bufLen int) (int, error) {
+	if len(e.pbpts.Arr) == 0 {
+		return 0, nil
 	}
 
-__doEncode:
-	e.trimmed = trimmed
+	trimmed := 1
+	for { // exists point(added) may still exceed buf, try tail points until size fit to @buf.
+		pbptsSize := e.pbpts.Size()
+		if pbptsSize < bufLen {
+			return pbptsSize, nil
+		}
 
-	if len(e.pbpts.Arr) == 0 {
+		if len(e.pbpts.Arr) == 1 {
+			// NOTE: we have added the lastPtsIdx when append the last
+			// point to pbpts.Arr, so do not add here
+			e.skippedPts++
+			e.totalPts--                  // remove the single huge point, we haven't encode it indeed
+			e.pbpts.Arr = e.pbpts.Arr[:0] // clear the last one: it's too large for buf
+
+			if e.ignoreLargePoint {
+				return 0, nil
+			} else {
+				return -1, fmt.Errorf("%w: need at least %d bytes, only %d available, current points: %d",
+					errTooSmallBuffer, curSize, bufLen, len(e.pbpts.Arr))
+			}
+		}
+
+		// Pop some points and step back point index for next iterator.
+		e.pbpts.Arr = e.pbpts.Arr[:len(e.pbpts.Arr)-trimmed]
+		e.trimmedPts += trimmed
+		e.lastPtsIdx -= trimmed
+		e.totalPts -= trimmed
+		trimmed *= 2 // try trim more tail points to save e.pbpts.Size() cost
+	}
+}
+
+func (e *Encoder) doEncodeProtobuf(buf []byte) ([]byte, bool) {
+	if e.lastErr != nil { // on any error, we should break on iterator.
 		return nil, false
 	}
 
-	defer func() {
+	defer func() { // clear encoding array
 		e.pbpts.Arr = e.pbpts.Arr[:0]
 	}()
 
-	if n, err := e.pbpts.MarshalTo(buf); err != nil {
+	curSize := 0
+	for {
+		if e.lastPtsIdx >= len(e.pts) {
+			break
+		}
+
+		pt := e.pts[e.lastPtsIdx]
+
+		if pt == nil {
+			e.lastPtsIdx++
+			continue
+		}
+
+		var ptsize int
+		if e.approxsize {
+			ptsize = pt.Size()
+		} else {
+			ptsize = pt.PBSize()
+		}
+
+		if curSize+ptsize <= len(buf) {
+			curSize += ptsize
+			e.pbpts.Arr = append(e.pbpts.Arr, pt.pt)
+			e.totalPts++
+			e.lastPtsIdx++
+		} else {
+			// current new points will larger than buf.
+			if len(e.pbpts.Arr) == 0 { // nothing added
+				e.lastPtsIdx++
+				e.skippedPts++
+				if e.ignoreLargePoint {
+					continue
+				} else {
+					e.lastErr = fmt.Errorf("%w: need at least %d bytes, only %d available",
+						errTooSmallBuffer, ptsize, len(buf))
+					return nil, false
+				}
+			} else {
+				break // we got something to encoding
+			}
+		}
+	}
+
+	after, err := e.tryTrim(curSize, curSize, len(buf))
+	if err != nil {
+		e.lastErr = err
+	} else if after == 0 {
+		// nothing left
+		return nil, false
+	}
+
+	if len(e.pbpts.Arr) == 0 || after <= 0 {
+		return nil, false
+	}
+
+	if n, err := e.pbpts.MarshalToSizedBuffer(buf[:after]); err != nil {
 		e.lastErr = err
 		return nil, false
 	} else {
@@ -88,6 +152,7 @@ __doEncode:
 		}
 
 		e.parts++
+		e.totalBytes += n
 		return buf[:n], true
 	}
 }
