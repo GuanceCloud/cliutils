@@ -23,6 +23,7 @@ require (
 	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c
 	github.com/influxdata/line-protocol/v2 v2.2.1
 	github.com/ip2location/ip2location-go v8.3.0+incompatible
+	github.com/ipipdotnet/ipdb-go v1.3.3
 	github.com/itchyny/timefmt-go v0.1.5
 	github.com/mssola/user_agent v0.6.0
 	github.com/oschwald/geoip2-golang v1.9.0
