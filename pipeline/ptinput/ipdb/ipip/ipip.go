@@ -28,6 +28,8 @@ type cfg struct {
 type IPIP struct {
 	db   *ipipdb.City
 	lang string
+
+	cfg cfg
 }
 
 const (
@@ -36,49 +38,24 @@ const (
 )
 
 func (ipip *IPIP) Init(dataDir string, config map[string]string) {
-	cfg := cfg{
-		dir: dataDir,
-	}
+	ipip.cfg.dir = dataDir
 
 	if v, ok := config[CfgIPIPFile]; ok {
-		cfg.file = v
+		ipip.cfg.file = v
 	}
 
 	if v, ok := config[CfgIPIPLanguage]; ok {
-		cfg.lang = v
+		ipip.cfg.lang = v
 	}
-	ipip.db, ipip.lang = newIPDB(cfg)
+	ipip.db, ipip.lang = newIPDB(ipip.cfg)
+}
+
+func (ipip *IPIP) Reload() {
+	ipip.db, ipip.lang = newIPDB(ipip.cfg)
 }
 
 func newIPDB(cfg cfg) (*ipipdb.City, string) {
-	var fp string
-	if cfg.file != "" {
-		fp = filepath.Join(cfg.dir, cfg.file)
-	} else {
-		dLi, err := os.ReadDir(cfg.dir)
-		if err != nil {
-			log.Error(err)
-			return nil, ""
-		}
-		for _, e := range dLi {
-			name := e.Name()
-			if filepath.Ext(name) == ".ipdb" {
-				fp = filepath.Join(cfg.dir, name)
-				log.Warnf(
-					"no file was specified, the file in the `%s` will be used: `%s`",
-					cfg.dir, fp)
-				break
-			}
-		}
-	}
-
-	if fp == "" {
-		log.Error("no file was specified")
-		return nil, ""
-	} else {
-		log.Infof("load ip database from file `%s`", fp)
-	}
-
+	fp := checkPath(cfg)
 	var ipdb *ipipdb.City
 	if db, err := ipipdb.NewCity(fp); err != nil {
 		log.Error(err)
@@ -90,8 +67,41 @@ func newIPDB(cfg cfg) (*ipipdb.City, string) {
 	return ipdb, checkLang(cfg.lang, ipdb)
 }
 
+func checkPath(cfg cfg) string {
+	if cfg.file != "" {
+		fp := filepath.Join(cfg.dir, cfg.file)
+		if _, err := os.Stat(fp); err != nil {
+			log.Error(err)
+			return ""
+		}
+		return fp
+	} else {
+		dLi, err := os.ReadDir(cfg.dir)
+		if err != nil {
+			log.Error(err)
+			return ""
+		}
+		for _, e := range dLi {
+			name := e.Name()
+			if filepath.Ext(name) == ".ipdb" {
+				fp := filepath.Join(cfg.dir, name)
+				log.Warnf(
+					"no file was specified, the file in the `%s` will be used: `%s`",
+					cfg.dir, fp)
+				return fp
+			}
+		}
+	}
+
+	log.Error("no file was specified")
+	return ""
+}
+
 func checkLang(lang string, ipdb *ipipdb.City) string {
 	// var lang string
+	if ipdb == nil {
+		return ""
+	}
 	langLi := ipdb.Languages()
 	if lang != "" {
 		for i := range langLi {
@@ -115,10 +125,12 @@ func checkLang(lang string, ipdb *ipipdb.City) string {
 }
 
 func (ipip *IPIP) SearchIsp(ip string) string {
-	if ipip.db == nil {
+	db := ipip.db
+	if db == nil {
 		return "unknown"
 	}
-	c, err := ipip.db.FindInfo(ip, ipip.lang)
+
+	c, err := db.FindInfo(ip, ipip.lang)
 	if err != nil {
 		return "unknown"
 	}
@@ -126,11 +138,12 @@ func (ipip *IPIP) SearchIsp(ip string) string {
 }
 
 func (ipip *IPIP) Geo(ip string) (*ipdb.IPdbRecord, error) {
-	if ipip.db == nil {
+	db := ipip.db
+	if db == nil {
 		return nil, fmt.Errorf("IP database not found")
 	}
 
-	c, err := ipip.db.FindInfo(ip, ipip.lang)
+	c, err := db.FindInfo(ip, ipip.lang)
 	if err != nil {
 		return nil, err
 	}
