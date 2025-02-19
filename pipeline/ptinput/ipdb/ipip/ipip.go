@@ -25,9 +25,14 @@ type IPIP struct {
 	lang string
 }
 
+const (
+	CfgIPIPFile     = "ipip_file"
+	CfgIPIPLanguage = "ipip_language"
+)
+
 func (ipip *IPIP) Init(dataDir string, config map[string]string) {
 	var ipipFile string
-	if f, ok := config["ipip_file"]; ok {
+	if f, ok := config[CfgIPIPFile]; ok {
 		ipipFile = filepath.Join(dataDir, f)
 	} else {
 		dLi, err := os.ReadDir(dataDir)
@@ -61,7 +66,7 @@ func (ipip *IPIP) Init(dataDir string, config map[string]string) {
 	}
 
 	langLi := ipip.db.Languages()
-	if lang, ok := config["ipip_language"]; ok {
+	if lang, ok := config[CfgIPIPLanguage]; ok {
 		var br bool
 		for i := range langLi {
 			if lang == langLi[i] {

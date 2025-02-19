@@ -41,7 +41,7 @@ func Test(t *testing.T) {
 			ip:  "221.0.0.0",
 			dir: dir,
 			cfg: map[string]string{
-				"ipip_language": "CN",
+				CfgIPIPLanguage: "CN",
 			},
 			val: ipdb.IPdbRecord{
 				Country: "中国",
@@ -54,8 +54,8 @@ func Test(t *testing.T) {
 			ip:  "221.0.0.0",
 			dir: dir,
 			cfg: map[string]string{
-				"ipip_language": "CN",
-				"ipip_file":     "xxx",
+				CfgIPIPLanguage: "CN",
+				CfgIPIPFile:     "xxx",
 			},
 			failed: true,
 		},
