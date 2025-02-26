@@ -203,6 +203,9 @@ var (
 
 	//go:embed md/window_hit.en.md
 	docWindowHitEN string
+
+	//go:embed md/pl_settings.en.md
+	docPlSettingsEN string
 )
 
 const (
@@ -621,6 +624,13 @@ var (
 
 	winHitMarkdownEN = PLDoc{
 		Doc: docWindowHitEN,
+		FnCategory: map[string][]string{
+			langTagEnUS: {eOther},
+		},
+	}
+
+	plSettingsMDEN = PLDoc{
+		Doc: docPlSettingsEN,
 		FnCategory: map[string][]string{
 			langTagEnUS: {eOther},
 		},
