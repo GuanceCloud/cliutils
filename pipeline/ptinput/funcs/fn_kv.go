@@ -62,7 +62,7 @@ func (c *reCache) get(p string) (*regexp.Regexp, bool) {
 func KVSplitChecking(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlError {
 	if err := normalizeFuncArgsDeprecated(funcExpr, []string{
 		"key", "field_split_pattern", "value_split_pattern",
-		"trim_key", "trim_value", "include_keys", "prefix",
+		"trim_key", "trim_value", "include_keys", "prefix", "value_delimiters",
 	}, 1); err != nil {
 		return runtime.NewRunError(ctx, err.Error(), funcExpr.NamePos)
 	}
@@ -132,6 +132,15 @@ func KVSplitChecking(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlErro
 		default:
 			return runtime.NewRunError(ctx, fmt.Sprintf("param prefix expect StringLiteral, got %s",
 				funcExpr.Param[6].NodeType), funcExpr.NamePos)
+		}
+	}
+	// value_Delimiters
+	if funcExpr.Param[7] != nil {
+		switch funcExpr.Param[7].NodeType { //nolint:exhaustive
+		case ast.TypeListLiteral, ast.TypeIdentifier:
+		default:
+			return runtime.NewRunError(ctx, fmt.Sprintf("param value_delimiters expect ListInitExpr or Identifier, got %s",
+				funcExpr.Param[7].NodeType), funcExpr.NamePos)
 		}
 	}
 	return nil
@@ -253,7 +262,38 @@ func KVSplit(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlError {
 		}
 	}
 
-	result := kvSplit(val, includeKeys, fieldSplit, valueSplit, trimKey, trimValue, prefix)
+	var valueDelimiters []string
+	if funcExpr.Param[7] != nil {
+		switch funcExpr.Param[7].NodeType { //nolint:exhaustive
+		case ast.TypeListLiteral, ast.TypeIdentifier:
+			v, dt, err := runtime.RunStmt(ctx, funcExpr.Param[7])
+			if err != nil {
+				return err
+			}
+			if dt != ast.List {
+				break
+			}
+			switch v := v.(type) {
+			case []any:
+				for _, k := range v {
+					if k, ok := k.(string); ok {
+						valueDelimiters = append(valueDelimiters, k)
+					}
+				}
+				if len(valueDelimiters)%2 != 0 {
+					return runtime.NewRunError(ctx, fmt.Sprintf("param value_Delimiters expect even number, got %d",
+						len(valueDelimiters)), funcExpr.NamePos)
+				}
+			default:
+			}
+
+		default:
+			return runtime.NewRunError(ctx, fmt.Sprintf("param value_Delimiters expect ListInitExpr or Identifier, got %s",
+				funcExpr.Param[7].NodeType), funcExpr.NamePos)
+		}
+	}
+
+	result := kvSplit(val, includeKeys, fieldSplit, valueSplit, trimKey, trimValue, prefix, valueDelimiters)
 	if len(result) == 0 {
 		ctx.Regs.ReturnAppend(false, ast.Bool)
 		return nil
@@ -268,7 +308,7 @@ func KVSplit(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlError {
 }
 
 func kvSplit(str string, includeKeys []string, fieldSplit, valueSplit *regexp.Regexp,
-	trimKey, trimValue, prefix string,
+	trimKey, trimValue, prefix string, valueDelimiters []string,
 ) map[string]string {
 	if str == "" {
 		return nil
@@ -283,14 +323,19 @@ func kvSplit(str string, includeKeys []string, fieldSplit, valueSplit *regexp.Re
 	}
 
 	ks := map[string]struct{}{}
-
+	vd := map[string]string{}
 	for _, v := range includeKeys {
 		ks[v] = struct{}{}
 	}
 
+	for i := 0; i < len(valueDelimiters); i += 2 {
+		vd[valueDelimiters[i]] = valueDelimiters[i+1]
+	}
+
 	result := map[string]string{}
 	fields := fieldSplit.Split(str, -1)
-	for _, field := range fields {
+	separators := fieldSplit.FindAllString(str, -1)
+	for i, field := range fields {
 		keyValue := valueSplit.Split(field, 2)
 
 		if len(keyValue) == 2 {
@@ -307,10 +352,39 @@ func kvSplit(str string, includeKeys []string, fieldSplit, valueSplit *regexp.Re
 					continue
 				}
 			}
-
+			value := keyValue[1]
+			if last, ok := vd[string(value[0])]; ok {
+				j := i
+				if string(value[0]) == last {
+					count := strings.Count(value, last)
+					for count%2 != 0 {
+						if j+1 >= len(fields) {
+							break
+						}
+						value = value + separators[j] + fields[j+1]
+						count += strings.Count(fields[j+1], last)
+						j++
+					}
+				} else {
+					countA, countB := strings.Count(value, string(value[0])), strings.Count(value, last)
+					for countA > countB {
+						if j+1 >= len(fields) {
+							break
+						}
+						value = value + separators[j] + fields[j+1]
+						countA += strings.Count(fields[j+1], string(value[0]))
+						countB += strings.Count(fields[j+1], last)
+						j++
+					}
+				}
+				end := strings.LastIndex(value, last)
+				if end > 0 {
+					value = value[1:end]
+				}
+			}
 			// trim value
 			if trimValue != "" {
-				keyValue[1] = strings.Trim(keyValue[1], trimValue)
+				value = strings.Trim(value, trimValue)
 			}
 
 			// prefix + key
@@ -319,7 +393,7 @@ func kvSplit(str string, includeKeys []string, fieldSplit, valueSplit *regexp.Re
 			}
 
 			// append to result
-			result[keyValue[0]] = keyValue[1]
+			result[keyValue[0]] = value
 		}
 	}
 	return result
