@@ -14,7 +14,7 @@ import (
 	tu "github.com/GuanceCloud/cliutils/testutil"
 )
 
-func TestPlSettings(t *testing.T) {
+func TestSetopt(t *testing.T) {
 	cases := []struct {
 		name, pl, in string
 		expected     bool
@@ -22,21 +22,27 @@ func TestPlSettings(t *testing.T) {
 	}{
 		{
 			name: "1",
-			pl: `1+1 ; pl_settings(status_mapping=false)
+			pl: `1+1 ; setopt(status_mapping=false)
 			`,
 			expected: false,
 		},
 		{
 			name: "2",
-			pl: `pl_settings(true)
+			pl: `setopt(status_mapping=true)
 			`,
 			expected: true,
+		},
+		{
+			name: "2",
+			pl: `setopt(true)
+			`,
+			fail: true,
 		},
 		{
 			name: "3",
 			pl: `
 			if false {
-				pl_settings(false)
+				setopt(status_mapping=false)
 			}
 			`,
 			expected: true,
@@ -45,7 +51,7 @@ func TestPlSettings(t *testing.T) {
 			name: "3.1",
 			pl: `
 			if true {
-				pl_settings(false)
+				setopt(status_mapping=false)
 			}
 			`,
 			expected: false,
@@ -54,7 +60,7 @@ func TestPlSettings(t *testing.T) {
 			name: "4",
 			pl: `
 			if false {
-				pl_settings(false, 1)
+				setopt(status_mapping=false, x=1)
 			}
 			`,
 			fail: true,
@@ -62,10 +68,9 @@ func TestPlSettings(t *testing.T) {
 		{
 			name: "5",
 			pl: `
-				pl_settings()
+				setopt()
 			`,
 			expected: true,
-			fail:     false,
 		},
 	}
 

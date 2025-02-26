@@ -12,10 +12,30 @@ import (
 )
 
 var (
-	_ = "fn pl_settings(status_mapping: bool = true)"
+	_ = "fn setopt(status_mapping: bool = true)"
 )
 
-func PlSettingsChecking(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlError {
+func mustAssignmentExpr(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlError {
+	if funcExpr == nil {
+		return nil
+	}
+
+	for _, param := range funcExpr.Param {
+		if param == nil {
+			continue
+		}
+		if param.NodeType != ast.TypeAssignmentExpr {
+			return runtime.NewRunError(ctx, "must be a named parameter", param.StartPos())
+		}
+	}
+	return nil
+}
+
+func SetoptChecking(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlError {
+	if err := mustAssignmentExpr(ctx, funcExpr); err != nil {
+		return err
+	}
+
 	if err := normalizeFuncArgsDeprecated(funcExpr, []string{
 		"status_mapping",
 	}, 0); err != nil {
@@ -25,7 +45,7 @@ func PlSettingsChecking(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlE
 	return nil
 }
 
-func PlSettings(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlError {
+func Setopt(ctx *runtime.Task, funcExpr *ast.CallExpr) *errchain.PlError {
 	if len(funcExpr.Param) > 0 {
 		param := funcExpr.Param[0]
 		if param == nil {

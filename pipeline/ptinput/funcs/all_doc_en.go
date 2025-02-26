@@ -204,8 +204,8 @@ var (
 	//go:embed md/window_hit.en.md
 	docWindowHitEN string
 
-	//go:embed md/pl_settings.en.md
-	docPlSettingsEN string
+	//go:embed md/setopt.en.md
+	docSetoptEN string
 )
 
 const (
@@ -629,8 +629,8 @@ var (
 		},
 	}
 
-	plSettingsMDEN = PLDoc{
-		Doc: docPlSettingsEN,
+	setoptMDEN = PLDoc{
+		Doc: docSetoptEN,
 		FnCategory: map[string][]string{
 			langTagEnUS: {eOther},
 		},
