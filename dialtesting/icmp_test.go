@@ -32,7 +32,9 @@ var icmpCases = []struct {
 					},
 				},
 			},
-			ExternalID: "xxxx", Frequency: "10s", Name: "success-ipv4",
+			Task: &Task{
+				ExternalID: "xxxx", Frequency: "10s", Name: "success-ipv4",
+			},
 		},
 	},
 	{
@@ -52,13 +54,16 @@ var icmpCases = []struct {
 					},
 				},
 			},
-			ExternalID: "xxxx", Frequency: "10s", Name: "success-ipv6",
+			Task: &Task{
+				ExternalID: "xxxx", Frequency: "10s", Name: "success-ipv6",
+			},
 		},
 	},
 }
 
 func TestIcmp(t *testing.T) {
 	for _, c := range icmpCases {
+		c.t.SetChild(c.t)
 		if err := c.t.Check(); err != nil {
 			if c.fail == false {
 				t.Errorf("case: %s, failed: %s", c.t.Name, err)
