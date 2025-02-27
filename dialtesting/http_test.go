@@ -7,6 +7,7 @@ package dialtesting
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/GuanceCloud/cliutils"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 )
 
 func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struct {
@@ -35,12 +37,14 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 			fail:      false,
 			reasonCnt: 0,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dtst_"),
-				Method:     "GET",
-				URL:        fmt.Sprintf("%s/_test_no_resp", httpsServer.URL),
-				Name:       "_test_no_resp",
-				Region:     "hangzhou",
-				Frequency:  "1s",
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_no_resp",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				Method: "GET",
+				URL:    fmt.Sprintf("%s/_test_no_resp", httpsServer.URL),
 				AdvanceOptions: &HTTPAdvanceOption{
 					Certificate: &HTTPOptCertificate{
 						IgnoreServerCertificateError: true,
@@ -67,12 +71,14 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 			fail:      false,
 			reasonCnt: 0,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dtst_"),
-				Method:     "GET",
-				URL:        fmt.Sprintf("%s/_test_with_cert", httpsServer.URL),
-				Name:       "_test_with_cert",
-				Region:     "hangzhou",
-				Frequency:  "1s",
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_with_cert",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				Method: "GET",
+				URL:    fmt.Sprintf("%s/_test_with_cert", httpsServer.URL),
 				AdvanceOptions: &HTTPAdvanceOption{
 					Certificate: &HTTPOptCertificate{
 						IgnoreServerCertificateError: true,
@@ -94,12 +100,14 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 			fail:      true,
 			reasonCnt: 0,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dtst_"),
-				Method:     "GET",
-				URL:        fmt.Sprintf("%s/_test_with_cert", httpsServer.URL),
-				Name:       "_test_with_cert",
-				Region:     "hangzhou",
-				Frequency:  "1s",
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_with_cert",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				Method: "GET",
+				URL:    fmt.Sprintf("%s/_test_with_cert", httpsServer.URL),
 				AdvanceOptions: &HTTPAdvanceOption{
 					Certificate: &HTTPOptCertificate{
 						IgnoreServerCertificateError: false, // bad certificate, expect fail
@@ -123,12 +131,14 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 			fail:      false,
 			reasonCnt: 0,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dtst_"),
-				Method:     "POST",
-				URL:        fmt.Sprintf("%s/_test_with_proxy", httpServer.URL),
-				Name:       "_test_with_proxy",
-				Region:     "hangzhou",
-				Frequency:  "1s",
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_with_proxy",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				Method: "POST",
+				URL:    fmt.Sprintf("%s/_test_with_proxy", httpServer.URL),
 				AdvanceOptions: &HTTPAdvanceOption{
 					Proxy: &HTTPOptProxy{
 						URL:     proxyServer.URL,
@@ -151,12 +161,14 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 			fail:      true,
 			reasonCnt: 0,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dtst_"),
-				Method:     "POST",
-				URL:        fmt.Sprintf("%s/_test_with_body", httpServer.URL),
-				Name:       "_test_with_body",
-				Region:     "hangzhou",
-				Frequency:  "1s",
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_with_body",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				Method: "GET",
+				URL:    fmt.Sprintf("%s/_test_with_body", httpServer.URL),
 				AdvanceOptions: &HTTPAdvanceOption{
 					RequestBody: &HTTPOptBody{
 						BodyType: "application/unknown", // XXX: invalid body type
@@ -177,12 +189,14 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 		{
 			reasonCnt: 0,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dtst_"),
-				Method:     "POST",
-				URL:        fmt.Sprintf("%s/_test_with_body", httpServer.URL),
-				Name:       "_test_with_body",
-				Region:     "hangzhou",
-				Frequency:  "1s",
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_with_body",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				Method: "POST",
+				URL:    fmt.Sprintf("%s/_test_with_body", httpServer.URL),
 				AdvanceOptions: &HTTPAdvanceOption{
 					RequestBody: &HTTPOptBody{
 						BodyType: "None", // "application/json",
@@ -204,12 +218,13 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 		{
 			reasonCnt: 0,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dtst_"),
-				Method:     "GET",
-				URL:        fmt.Sprintf("%s/_test_with_headers", httpServer.URL),
-				Name:       "_test_with_headers",
-				Region:     "hangzhou",
-				Frequency:  "1s",
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_with_headers",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				URL: fmt.Sprintf("%s/_test_with_headers", httpServer.URL),
 				AdvanceOptions: &HTTPAdvanceOption{
 					RequestOptions: &HTTPOptRequest{
 						Headers: map[string]string{
@@ -233,12 +248,14 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 		{
 			reasonCnt: 0,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dtst_"),
-				Method:     "GET",
-				URL:        fmt.Sprintf("%s/_test_with_basic_auth", httpServer.URL),
-				Name:       "_test_with_basic_auth",
-				Region:     "hangzhou",
-				Frequency:  "1s",
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_with_basic_auth",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				Method: "GET",
+				URL:    fmt.Sprintf("%s/_test_with_basic_auth", httpServer.URL),
 				AdvanceOptions: &HTTPAdvanceOption{
 					RequestOptions: &HTTPOptRequest{
 						Auth: &HTTPOptAuth{
@@ -262,12 +279,14 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 		{
 			reasonCnt: 0,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dtst_"),
-				Method:     "GET",
-				URL:        fmt.Sprintf("%s/_test_with_cookie", httpServer.URL),
-				Name:       "_test_with_cookie",
-				Region:     "hangzhou",
-				Frequency:  "1s",
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_with_cookie",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				Method: "GET",
+				URL:    fmt.Sprintf("%s/_test_with_cookie", httpServer.URL),
 				AdvanceOptions: &HTTPAdvanceOption{
 					RequestOptions: &HTTPOptRequest{
 						Cookies: (&http.Cookie{
@@ -293,12 +312,14 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 		{
 			reasonCnt: 0,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dtst_"),
-				Method:     "GET",
-				URL:        fmt.Sprintf("%s/_test_redirect", httpServer.URL),
-				Name:       "_test_redirect",
-				Region:     "hangzhou",
-				Frequency:  "1s",
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_redirect",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				Method: "GET",
+				URL:    fmt.Sprintf("%s/_test_redirect", httpServer.URL),
 				AdvanceOptions: &HTTPAdvanceOption{
 					RequestOptions: &HTTPOptRequest{FollowRedirect: true},
 				},
@@ -316,12 +337,14 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 		{
 			reasonCnt: 0,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dtst_"),
-				Method:     "GET",
-				URL:        fmt.Sprintf("%s/_test_redirect", httpServer.URL),
-				Name:       "_test_redirect_disabled",
-				Region:     "hangzhou",
-				Frequency:  "1s",
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_redirect_disabled",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				Method: "GET",
+				URL:    fmt.Sprintf("%s/_test_redirect", httpServer.URL),
 				AdvanceOptions: &HTTPAdvanceOption{
 					RequestOptions: &HTTPOptRequest{FollowRedirect: false},
 				},
@@ -337,15 +360,17 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 		},
 
 		{
-			reasonCnt: 1,
+			reasonCnt: 0,
 			fail:      true,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dtst_"),
-				Method:     "GET",
-				URL:        fmt.Sprintf("%s/_test_http_timeout", httpServer.URL),
-				Name:       "_test_http_timeout_failed",
-				Region:     "hangzhou",
-				Frequency:  "1s",
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_http_timeout_failed",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				Method: "GET",
+				URL:    fmt.Sprintf("%s/_test_http_timeout", httpServer.URL),
 				AdvanceOptions: &HTTPAdvanceOption{
 					RequestTimeout: "1ms",
 				},
@@ -361,14 +386,16 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 
 		{
 			reasonCnt: 0,
-			fail:      true,
+			fail:      false,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dtst_"),
-				Method:     "GET",
-				URL:        fmt.Sprintf("%s/_test_http_timeout", httpServer.URL),
-				Name:       "_test_http_timeout_ok",
-				Region:     "hangzhou",
-				Frequency:  "1s",
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_http_timeout_ok",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				Method: "GET",
+				URL:    fmt.Sprintf("%s/_test_http_timeout", httpServer.URL),
 				AdvanceOptions: &HTTPAdvanceOption{
 					RequestTimeout: "1s",
 				},
@@ -385,13 +412,18 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 		// test dial with response time checking
 		{
 			reasonCnt: 1,
+			fail: true,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dialt_"),
-				Method:     "GET",
-				URL:        fmt.Sprintf("%s/_test_resp_time_less_10ms", httpServer.URL),
-				Name:       "_test_resp_time_less_10ms",
-				Frequency:  "1s",
-				Region:     "hangzhou",
+
+				Task: &Task{
+
+					ExternalID: cliutils.XID("dialt_"),
+					Name:       "_test_resp_time_less_10ms",
+					Frequency:  "1s",
+					Region:     "hangzhou",
+				},
+				Method: "GET",
+				URL:    fmt.Sprintf("%s/_test_resp_time_less_10ms", httpServer.URL),
 				SuccessWhen: []*HTTPSuccess{
 					{ResponseTime: "10ms"},
 				},
@@ -402,12 +434,14 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 		{
 			reasonCnt: 2,
 			t: &HTTPTask{
-				ExternalID: cliutils.XID("dtst_"),
-				Method:     "GET",
-				URL:        fmt.Sprintf("%s/_test_resp_time_less_10ms", httpServer.URL),
-				Name:       "_test_header_checking",
-				Region:     "hangzhou",
-				Frequency:  "1s",
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_header_checking",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				Method: "GET",
+				URL:    fmt.Sprintf("%s/_test_resp_time_less_10ms", httpServer.URL),
 				SuccessWhen: []*HTTPSuccess{
 					{
 						Header: map[string][]*SuccessOption{
@@ -466,6 +500,7 @@ func TestDialHTTP(t *testing.T) {
 	httpCases := getHttpCases(httpServer, httpsServer, proxyServer)
 
 	for _, c := range httpCases {
+		c.t.SetChild(c.t)
 		if err := c.t.Init(); err != nil {
 			if c.fail == false {
 				t.Errorf("case %s failed: %s", c.t.Name, err)
@@ -495,6 +530,12 @@ func TestDialHTTP(t *testing.T) {
 		} else if len(reasons) > 0 {
 			t.Logf("case %s reasons:\n\t%s",
 				c.t.Name, strings.Join(reasons, "\n\t"))
+		}
+
+		if c.reasonCnt > 0 || c.fail {
+			assert.Equal(t, "FAIL", ts["status"])
+		} else {
+			assert.Equal(t, "OK", ts["status"])
 		}
 	}
 }
@@ -686,4 +727,82 @@ func addTestingRoutes(t *testing.T, r *gin.Engine, proxyServer *httptest.Server,
 			c.Data(http.StatusOK, ``, nil)
 		})
 	}
+}
+
+func TestPrepareTemplate(t *testing.T) {
+	globalVars := map[string]Variable{
+		"global_id": {
+			Name:  "global",
+			Value: "global",
+		},
+	}
+
+	task := &HTTPTask{
+		URL:        "http://localhost:8000/{{global}}",
+		PostScript: "{{local}}",
+		Task: &Task{
+
+			ConfigVars: []*ConfigVar{
+				{
+					Name:  "local",
+					Type:  "local",
+					Value: "local",
+				},
+				{
+					Name: "global",
+					Type: "global",
+					ID:   "global_id",
+				},
+			},
+		},
+	}
+	task.SetChild(task)
+	v, err := json.Marshal(task)
+
+	assert.NoError(t, err)
+	task.SetTaskJSONString(string(v))
+
+	err = task.RenderTemplateAndInit(globalVars)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "http://localhost:8000/global", task.URL)
+	assert.Equal(t, "local", task.PostScript)
+}
+
+func TestPostScript(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"token": "tkn_123"}`))
+	}))
+
+	task := &HTTPTask{
+		Task: &Task{
+			Frequency: "1s",
+		},
+		URL: server.URL,
+		PostScript: `
+
+	if response["status_code"] != 200 {
+		result["is_failed"] = true
+		result["error_message"] = "error"
+	}	else {
+		result["is_failed"] = false
+	}
+
+	body = load_json(response["body"])
+
+	vars["token"] = body["token"]
+	`,
+	}
+
+	task.SetChild(task)
+
+	vars := map[string]Variable{}
+	assert.NoError(t, task.RenderTemplateAndInit(vars))
+	assert.NoError(t, task.Run())
+
+	tags, fields := task.GetResults()
+
+	assert.Equal(t, "tkn_123", task.postScriptResult.Vars["token"])
+	assert.Equal(t, "OK", tags["status"])
+	assert.EqualValues(t, 1, fields["success"])
 }

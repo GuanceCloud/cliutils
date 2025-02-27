@@ -27,8 +27,9 @@ var tcpCases = []struct {
 						Target: "10s",
 					}},
 				},
+			}, Task: &Task{
+				ExternalID: "xxxx", Frequency: "10s", Name: "success",
 			},
-			ExternalID: "xxxx", Frequency: "10s", Name: "success",
 		},
 	},
 	{
@@ -41,8 +42,10 @@ var tcpCases = []struct {
 						Target: "1us",
 					}},
 				},
+			}, Task: &Task{
+
+				ExternalID: "xxxx", Frequency: "10s", Name: "response_time_large",
 			},
-			ExternalID: "xxxx", Frequency: "10s", Name: "response_time_large",
 		},
 	},
 	{
@@ -57,7 +60,9 @@ var tcpCases = []struct {
 					}},
 				},
 			},
-			ExternalID: "xxxx", Frequency: "10s", Name: "response_message_valid",
+			Task: &Task{
+				ExternalID: "xxxx", Frequency: "10s", Name: "response_message_valid",
+			},
 		},
 	},
 	{
@@ -72,7 +77,9 @@ var tcpCases = []struct {
 					}},
 				},
 			},
-			ExternalID: "xxxx", Frequency: "10s", Name: "response_message_invalid",
+			Task: &Task{
+				ExternalID: "xxxx", Frequency: "10s", Name: "response_message_invalid",
+			},
 		},
 	},
 }
@@ -89,12 +96,13 @@ func TestTcp(t *testing.T) {
 
 		host, port, err := net.SplitHostPort(addr)
 		if err != nil {
-			t.Errorf(err.Error())
+			t.Fatal(err.Error())
 			continue
 		}
 		c.t.Host = host
 		c.t.Port = port
 
+		c.t.SetChild(c.t)
 		if err := c.t.Check(); err != nil {
 			if c.fail == false {
 				t.Errorf("case: %s, failed: %s", c.t.Name, err)
