@@ -166,6 +166,15 @@ func TestPtKvsSet(t *testing.T) {
 		fail         bool
 	}{
 		{
+			name: "key1",
+			pl: `
+			if "real_call_time_float" in pt_kvs_keys(fields=false,tags=true) {
+			}
+			`,
+			keyName: "key2",
+			expect:  nil,
+		},
+		{
 			name: "set1",
 			pl: `
 			pt_kvs_set("key1", "abc")
