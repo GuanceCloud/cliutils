@@ -1,6 +1,6 @@
 ### `kv_split()` {#fn-kv_split}
 
-函数原型：`fn kv_split(key, field_split_pattern = " ", value_split_pattern = "=", trim_key = "", trim_value = "", include_keys = [], prefix = "") -> bool`
+函数原型：`fn kv_split(key, field_split_pattern = " ", value_split_pattern = "=", trim_key = "", trim_value = "", include_keys = [], prefix = "", value_delimiters = []) -> bool`
 
 函数说明：从字符串中提取出所有的键值对
 
@@ -13,6 +13,7 @@
 - `trim_key`: 删除提取出的 key 的前导和尾随的所有指定的字符；默认值为 `""`
 - `trim_value`: 删除提取出的 value 的前导和尾随的所有指定的字符；默认值为 `""`
 - `prefix`: 给所有的 key 添加前缀字符串
+- `value_delimiters`: 定义成对的分隔符（如 `['[', ']']`），用于处理value被指定字符包裹的情况；默认值为 `[]`,不处理任何分隔符
 
 示例：
 
