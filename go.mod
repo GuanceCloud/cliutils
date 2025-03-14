@@ -3,7 +3,7 @@ module github.com/GuanceCloud/cliutils
 go 1.19
 
 require (
-	github.com/GuanceCloud/pipeline-go v1.0.0
+	github.com/GuanceCloud/pipeline-go v1.0.1
 	github.com/VictoriaMetrics/easyproto v0.1.4
 	github.com/aliyun/aliyun-oss-go-sdk v2.1.2+incompatible
 	github.com/brianvoe/gofakeit/v6 v6.28.0

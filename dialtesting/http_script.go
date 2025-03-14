@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils/point"
-	"github.com/GuanceCloud/pipeline-go/manager"
+	"github.com/GuanceCloud/pipeline-go/lang"
+	"github.com/GuanceCloud/pipeline-go/lang/platypus"
 	"github.com/GuanceCloud/pipeline-go/ptinput"
 )
 
@@ -92,7 +93,16 @@ func runPipeline(script string, response *ScriptHTTPRequestResponse, vars *Vars)
 	add_key(vars, vars)
 	`, script)
 
-	pls, errs := manager.NewScripts(map[string]string{scriptName: script}, nil, "", point.Logging, nil)
+	pls, errs := platypus.NewScripts(
+		map[string]string{scriptName: script},
+		lang.WithCat(point.Logging),
+	)
+
+	defer func() {
+		for _, pl := range pls {
+			pl.Cleanup()
+		}
+	}()
 
 	for k, v := range errs {
 		return nil, fmt.Errorf("new scripts failed: %s, %v", k, v)

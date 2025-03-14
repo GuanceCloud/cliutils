@@ -18,9 +18,11 @@ github.com/DataDog/sketches-go/ddsketch/store
 # github.com/GuanceCloud/grok v1.1.4
 ## explicit; go 1.18
 github.com/GuanceCloud/grok
-# github.com/GuanceCloud/pipeline-go v1.0.0
+# github.com/GuanceCloud/pipeline-go v1.0.1
 ## explicit; go 1.19
-github.com/GuanceCloud/pipeline-go/manager
+github.com/GuanceCloud/pipeline-go/constants
+github.com/GuanceCloud/pipeline-go/lang
+github.com/GuanceCloud/pipeline-go/lang/platypus
 github.com/GuanceCloud/pipeline-go/ptinput
 github.com/GuanceCloud/pipeline-go/ptinput/funcs
 github.com/GuanceCloud/pipeline-go/ptinput/ipdb
