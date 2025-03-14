@@ -17,6 +17,8 @@ import (
 	"github.com/GuanceCloud/pipeline-go/ptinput"
 )
 
+const MaxErrorMessageSize = 1024
+
 type ScriptHTTPRequestResponse struct {
 	Header     http.Header `json:"header"`
 	Body       string      `json:"body"`
@@ -78,8 +80,7 @@ func postScriptDo(script string, bodyBytes []byte, resp *http.Response) (*Script
 }
 
 func runPipeline(script string, response *ScriptHTTPRequestResponse, vars *Vars) (*ScriptResult, error) {
-
-	var scriptName = "script"
+	scriptName := "script"
 
 	script = fmt.Sprintf(`
 	content = load_json(_)
@@ -151,6 +152,11 @@ func runPipeline(script string, response *ScriptHTTPRequestResponse, vars *Vars)
 		return nil, fmt.Errorf("vars not found")
 	} else if err := json.Unmarshal([]byte(getFiledString(val)), &vars); err != nil {
 		return nil, fmt.Errorf("unmarshal vars failed: %w", err)
+	}
+
+	// limit error message length
+	if len(result.ErrorMessage) > MaxErrorMessageSize {
+		result.ErrorMessage = result.ErrorMessage[:MaxErrorMessageSize] + "..."
 	}
 
 	return &ScriptResult{
