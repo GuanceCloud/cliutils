@@ -449,7 +449,7 @@ func TestPointLineProtocol(t *T.T) {
 				t.Logf("pt: %s", pt.Pretty())
 				return pt
 			}(),
-			expect: `abc f1=1i,status="unknown" 123`,
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 123`, defaultLoggingStatus),
 		},
 
 		{
@@ -462,7 +462,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: `abc f1=1i,status="unknown" 12`,
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 12`, defaultLoggingStatus),
 		},
 
 		{
@@ -475,7 +475,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: `abc f1=1i,status="unknown" 12345`,
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 12345`, defaultLoggingStatus),
 		},
 
 		{
@@ -487,7 +487,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: `abc f1=1i,status="unknown" 12345678`,
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 12345678`, defaultLoggingStatus),
 		},
 
 		{
@@ -499,7 +499,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: `abc f1=1i,status="unknown" 12345678`,
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 12345678`, defaultLoggingStatus),
 		},
 
 		{
@@ -511,7 +511,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: `abc f1=1i,status="unknown" 1`,
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 1`, defaultLoggingStatus),
 		},
 
 		{
@@ -523,7 +523,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: `abc f1=1i,status="unknown" 2`,
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 2`, defaultLoggingStatus),
 		},
 
 		{
@@ -535,7 +535,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: `abc f1=1i,status="unknown" 1`, // 7199 not reached 2hour
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 1`, defaultLoggingStatus), // 7199 not reached 2hour
 		},
 
 		// pb point

@@ -7,7 +7,7 @@ package point
 
 const (
 	defaultObjectName    = "default"
-	defaultLoggingStatus = "unknown"
+	defaultLoggingStatus = "info"
 )
 
 var (
