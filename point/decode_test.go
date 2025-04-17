@@ -428,7 +428,7 @@ func TestDecode(t *T.T) {
 		require.NoError(t, err)
 
 		for _, pt := range pts {
-			assert.Equal(t, defaultLoggingStatus, pt.Get("status").(string))
+			assert.Equal(t, DefaultLoggingStatus, pt.Get("status").(string))
 
 			t.Logf("pt: %s", pt.Pretty())
 		}

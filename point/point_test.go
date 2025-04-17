@@ -449,7 +449,7 @@ func TestPointLineProtocol(t *T.T) {
 				t.Logf("pt: %s", pt.Pretty())
 				return pt
 			}(),
-			expect: fmt.Sprintf(`abc f1=1i,status="%s" 123`, defaultLoggingStatus),
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 123`, DefaultLoggingStatus),
 		},
 
 		{
@@ -462,7 +462,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: fmt.Sprintf(`abc f1=1i,status="%s" 12`, defaultLoggingStatus),
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 12`, DefaultLoggingStatus),
 		},
 
 		{
@@ -475,7 +475,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: fmt.Sprintf(`abc f1=1i,status="%s" 12345`, defaultLoggingStatus),
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 12345`, DefaultLoggingStatus),
 		},
 
 		{
@@ -487,7 +487,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: fmt.Sprintf(`abc f1=1i,status="%s" 12345678`, defaultLoggingStatus),
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 12345678`, DefaultLoggingStatus),
 		},
 
 		{
@@ -499,7 +499,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: fmt.Sprintf(`abc f1=1i,status="%s" 12345678`, defaultLoggingStatus),
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 12345678`, DefaultLoggingStatus),
 		},
 
 		{
@@ -511,7 +511,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: fmt.Sprintf(`abc f1=1i,status="%s" 1`, defaultLoggingStatus),
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 1`, DefaultLoggingStatus),
 		},
 
 		{
@@ -523,7 +523,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: fmt.Sprintf(`abc f1=1i,status="%s" 2`, defaultLoggingStatus),
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 2`, DefaultLoggingStatus),
 		},
 
 		{
@@ -535,7 +535,7 @@ func TestPointLineProtocol(t *T.T) {
 				assert.NoError(t, err)
 				return pt
 			}(),
-			expect: fmt.Sprintf(`abc f1=1i,status="%s" 1`, defaultLoggingStatus), // 7199 not reached 2hour
+			expect: fmt.Sprintf(`abc f1=1i,status="%s" 1`, DefaultLoggingStatus), // 7199 not reached 2hour
 		},
 
 		// pb point

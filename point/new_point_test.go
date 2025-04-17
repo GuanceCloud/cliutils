@@ -412,7 +412,7 @@ func TestNewPoint(t *T.T) {
 
 			t:      map[string]string{"source": "s1"},
 			f:      map[string]interface{}{"f1": 123},
-			expect: fmt.Sprintf(`abc f1=123i,status="%s" 123`, defaultLoggingStatus),
+			expect: fmt.Sprintf(`abc f1=123i,status="%s" 123`, DefaultLoggingStatus),
 			warns:  2,
 		},
 		{
