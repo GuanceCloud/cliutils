@@ -96,10 +96,13 @@ func (t *HTTPTask) getResults() (tags map[string]string, fields map[string]inter
 	tags = map[string]string{
 		"name":    t.Name,
 		"url":     t.rawURL,
-		"proto":   t.req.Proto,
 		"status":  "FAIL",
 		"method":  t.Method,
 		"dest_ip": t.destIP,
+	}
+
+	if t.req != nil {
+		tags["proto"] = t.req.Proto
 	}
 
 	fields = map[string]interface{}{
@@ -344,7 +347,7 @@ result:
 	return nil
 }
 
-func (t *HTTPTask) getRequestBody() (*bytes.Buffer, error) {
+func (t *HTTPTask) getRequestBody() (io.Reader, error) {
 	if t.AdvanceOptions == nil || t.AdvanceOptions.RequestBody == nil {
 		return nil, nil
 	}
@@ -353,7 +356,7 @@ func (t *HTTPTask) getRequestBody() (*bytes.Buffer, error) {
 		return t.reqBodyBytesBuffer, nil
 	}
 
-	var body *bytes.Buffer
+	var body *bytes.Buffer = nil
 	requestBody := t.AdvanceOptions.RequestBody
 
 	if requestBody.BodyType == "multipart/form-data" {
@@ -382,6 +385,7 @@ func (t *HTTPTask) getRequestBody() (*bytes.Buffer, error) {
 		}
 		writer.Close()
 		requestBody.bodyType = writer.FormDataContentType()
+		body = buf
 	} else {
 		if requestBody.Body != "" {
 			body = bytes.NewBufferString(requestBody.Body)
