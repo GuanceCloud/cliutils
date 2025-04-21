@@ -76,6 +76,11 @@ func (t *HTTPTask) clear() {
 	t.resp = nil
 	t.respBody = []byte(``)
 	t.reqError = ""
+	t.reqBodyBytesBuffer = nil
+
+	if t.reqBody != nil {
+		t.reqBody.bodyType = t.reqBody.BodyType
+	}
 }
 
 func (t *HTTPTask) stop() {
