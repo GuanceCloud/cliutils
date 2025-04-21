@@ -10,11 +10,14 @@ package dialtesting
 // date: Fri Feb  5 13:17:00 CST 2021
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/httptrace"
@@ -40,16 +43,17 @@ type HTTPTask struct {
 	AdvanceOptions   *HTTPAdvanceOption `json:"advance_options,omitempty"`
 	Option           map[string]string
 
-	cli              *http.Client
-	resp             *http.Response
-	req              *http.Request
-	reqHeader        map[string]string
-	reqBody          *HTTPOptBody
-	respBody         []byte
-	reqStart         time.Time
-	reqCost          time.Duration
-	reqError         string
-	postScriptResult *ScriptResult
+	cli                *http.Client
+	resp               *http.Response
+	req                *http.Request
+	reqHeader          map[string]string
+	reqBody            *HTTPOptBody
+	respBody           []byte
+	reqStart           time.Time
+	reqCost            time.Duration
+	reqError           string
+	postScriptResult   *ScriptResult
+	reqBodyBytesBuffer *bytes.Buffer
 
 	dnsParseTime   float64
 	connectionTime float64
@@ -204,8 +208,21 @@ type HTTPOptRequest struct {
 }
 
 type HTTPOptBody struct {
-	BodyType string `json:"body_type,omitempty"`
-	Body     string `json:"body,omitempty"`
+	BodyType string            `json:"body_type,omitempty"`
+	Body     string            `json:"body,omitempty"`
+	Files    []HTTPOptBodyFile `json:"files,omitempty"`
+	Form     map[string]string `json:"form,omitempty"`
+
+	bodyType string `json:"-"` // used for multipart/form-data
+}
+
+type HTTPOptBodyFile struct {
+	Name             string `json:"name"`
+	Content          string `json:"content"`
+	Type             string `json:"type"`
+	Size             int64  `json:"size"`
+	Encoding         string `json:"encoding"`
+	OriginalFileName string `json:"original_file_name"`
 }
 
 type HTTPOptCertificate struct {
@@ -269,8 +286,9 @@ func (t *HTTPTask) run() error {
 		goto result
 	}
 
-	if t.AdvanceOptions != nil && t.AdvanceOptions.RequestBody != nil && t.AdvanceOptions.RequestBody.Body != "" {
-		body = strings.NewReader(t.AdvanceOptions.RequestBody.Body)
+	body, err = t.getRequestBody()
+	if err != nil {
+		goto result
 	}
 
 	t.req, err = http.NewRequest(t.Method, reqURL.String(), body)
@@ -324,6 +342,54 @@ result:
 	}
 
 	return nil
+}
+
+func (t *HTTPTask) getRequestBody() (*bytes.Buffer, error) {
+	if t.AdvanceOptions == nil || t.AdvanceOptions.RequestBody == nil {
+		return nil, nil
+	}
+
+	if t.reqBodyBytesBuffer != nil {
+		return t.reqBodyBytesBuffer, nil
+	}
+
+	var body *bytes.Buffer
+	requestBody := t.AdvanceOptions.RequestBody
+
+	if requestBody.BodyType == "multipart/form-data" {
+		buf := &bytes.Buffer{}
+		writer := multipart.NewWriter(buf)
+		for k, v := range requestBody.Form {
+			if err := writer.WriteField(k, v); err != nil {
+				return nil, fmt.Errorf("failed to write form field %s: %w", k, err)
+			}
+		}
+
+		for _, v := range requestBody.Files {
+			if v.Encoding != "base64" {
+				return nil, fmt.Errorf("only base64 encoding is supported for file encoding")
+			}
+
+			if fileBytes, err := base64.StdEncoding.DecodeString(v.Content); err != nil {
+				return nil, fmt.Errorf("failed to decode base64 file content: %w", err)
+			} else {
+				if part, err := writer.CreateFormFile(v.Name, v.OriginalFileName); err != nil {
+					return nil, fmt.Errorf("failed to create form file %s: %w", v.Name, err)
+				} else if _, err := io.Copy(part, bytes.NewReader(fileBytes)); err != nil {
+					return nil, fmt.Errorf("failed to copy file content to form file %s: %w", v.Name, err)
+				}
+			}
+		}
+		writer.Close()
+		requestBody.bodyType = writer.FormDataContentType()
+	} else {
+		if requestBody.Body != "" {
+			body = bytes.NewBufferString(requestBody.Body)
+		}
+	}
+
+	t.reqBodyBytesBuffer = body
+	return body, nil
 }
 
 func (t *HTTPTask) check() error {
@@ -429,7 +495,7 @@ func (t *HTTPTask) setupAdvanceOpts(req *http.Request) error {
 	// body options
 	if opt.RequestBody != nil {
 		if opt.RequestBody.BodyType != "" {
-			req.Header.Add("Content-Type", opt.RequestBody.BodyType)
+			req.Header.Add("Content-Type", opt.RequestBody.bodyType)
 			t.reqHeader["Content-Type"] = opt.RequestBody.BodyType
 		}
 		t.reqBody = opt.RequestBody
@@ -488,6 +554,8 @@ func (t *HTTPTask) init() error {
 			default:
 				return fmt.Errorf("invalid body type: `%s'", opt.RequestBody.BodyType)
 			}
+
+			opt.RequestBody.bodyType = opt.RequestBody.BodyType
 		}
 
 		// TLS opotions
