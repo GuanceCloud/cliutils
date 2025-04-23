@@ -28,7 +28,8 @@ func TestDel(t *T.T) {
 		},
 		&Field{
 			Key: "d",
-		}}
+		},
+	}
 
 	assert.Equal(t, len(kvs.Del("c")), 2)
 
@@ -41,7 +42,8 @@ func TestDel(t *T.T) {
 		},
 		&Field{
 			Key: "c",
-		}}
+		},
+	}
 
 	assert.Equal(t, len(kvs.Del("a")), 2)
 
@@ -54,7 +56,8 @@ func TestDel(t *T.T) {
 		},
 		&Field{
 			Key: "c",
-		}}
+		},
+	}
 
 	assert.Equal(t, len(kvs.Del("c")), 0)
 

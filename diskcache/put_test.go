@@ -391,9 +391,7 @@ func TestStreamPut(t *T.T) {
 		raw := "0123456789"
 		r := strings.NewReader(raw)
 
-		var (
-			p = t.TempDir()
-		)
+		p := t.TempDir()
 
 		t.Logf("path: %s", p)
 
