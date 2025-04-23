@@ -28,9 +28,7 @@ const (
 	EnvProduction = "prod"
 )
 
-var (
-	Cfg *Config
-)
+var Cfg *Config
 
 func Load(file string) error {
 	reader, err := os.Open(file)
@@ -65,27 +63,27 @@ type Config struct {
 	Storage Storage `yaml:"storage"`
 }
 
-// Server configuration
+// Server configuration.
 type Server struct {
 	Addr string `yaml:"addr"`
 	Port string `yaml:"port"`
 }
 
-// Log log configuration
+// Log log configuration.
 type Log struct {
 	Path  string `yaml:"path"`
 	File  string `yaml:"file"`
 	Level string `yaml:"level"`
 }
 
-// Gin gin configuration
+// Gin gin configuration.
 type Gin struct {
 	RunMode  string `yaml:"run_mode"`
 	Log      string `yaml:"log"`
 	ErrorLog string `yaml:"error_log"`
 }
 
-// Oss aliyun oss configuration
+// Oss aliyun oss configuration.
 type Oss struct {
 	Host          string `yaml:"host"`
 	AccessKey     string `yaml:"access_key"`

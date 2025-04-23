@@ -187,7 +187,6 @@ func (p *PProf) mergePProf(filename string) (*profile.Profile, error) {
 		}
 
 		reader, err := client.ReadFile(profilePath)
-
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				return nil, fmt.Errorf("profile file [%s] not exists: %w", profilePath, err)
@@ -225,7 +224,7 @@ func (p *PProf) Summary() (map[events.Type]*EventSummary, int64, error) {
 	lang, err := parameter.VerifyLanguage(p.profiles)
 	if err != nil {
 		return nil, 0, fmt.Errorf("unable to resolve language: %w", err)
-		//=======
+		// =======
 		//		return nil, 0, fmt.Errorf("GetSummary VerifyLanguage err: %w", err)
 		//	}
 		//
@@ -249,7 +248,7 @@ func (p *PProf) Summary() (map[events.Type]*EventSummary, int64, error) {
 		//		return summaries, endNanos - startNanos, nil
 		//	} else if err != nil {
 		//		logtoolkit.Warnf("judge if profile is from py-spy err: %s", err)
-		//>>>>>>> 66994b8f59cd601e6e7fbac181122f708d77ef3a:service/parsing/multiparser.go
+		// >>>>>>> 66994b8f59cd601e6e7fbac181122f708d77ef3a:service/parsing/multiparser.go
 	}
 
 	fileSampleTypes := getFileSampleTypes(lang)
@@ -262,7 +261,6 @@ func (p *PProf) Summary() (map[events.Type]*EventSummary, int64, error) {
 
 	filesCount := 0
 	for filename, sampleTypes := range fileSampleTypes {
-
 		mergedPProf, err := p.mergePProf(filename)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
@@ -280,9 +278,7 @@ func (p *PProf) Summary() (map[events.Type]*EventSummary, int64, error) {
 		summaryMap := make(map[int]*EventSummary)
 
 		for i, st := range mergedPProf.SampleType {
-
 			if et, ok := sampleTypes[st.Type]; ok {
-
 				if p.from == parameter.FromTrace && !p.ShowInTrace(et) {
 					continue
 				}
@@ -351,7 +347,7 @@ func (p *PProf) Summary() (map[events.Type]*EventSummary, int64, error) {
 	return summariesTypedMap, totalDurationNanos, nil
 }
 
-// parseAndClose parse profile from a readable stream, and try to close the reader when end
+// parseAndClose parse profile from a readable stream, and try to close the reader when end.
 func parseAndClose(r io.Reader) (*profile.Profile, error) {
 	if r == nil {
 		return nil, fmt.Errorf("nil reader")
@@ -362,7 +358,6 @@ func parseAndClose(r io.Reader) (*profile.Profile, error) {
 	}
 
 	goPprof, err := profile.Parse(r)
-
 	if err != nil {
 		return nil, fmt.Errorf("parse pprof err: %w", err)
 	}
@@ -370,9 +365,8 @@ func parseAndClose(r io.Reader) (*profile.Profile, error) {
 	return goPprof, nil
 }
 
-// ResolveFlameGraph (lang languages.Lang, eType events.Type, pprofSampleType string, filterBySpan bool, span *parameter.Span, spanIDSet *dql.SpanIDSet)
+// ResolveFlameGraph (lang languages.Lang, eType events.Type, pprofSampleType string, filterBySpan bool, span *parameter.Span, spanIDSet *dql.SpanIDSet).
 func (p *PProf) ResolveFlameGraph(eventType events.Type) (*pprof.Frame, AggregatorSelectSlice, error) {
-
 	lang, err := parameter.VerifyLanguage(p.profiles)
 	if err != nil {
 		return nil, nil, fmt.Errorf("VerifyLanguage fail: %s", err)
@@ -478,11 +472,11 @@ func (p *PProf) ResolveFlameGraph(eventType events.Type) (*pprof.Frame, Aggregat
 			line := location.Line[len(location.Line)-1]
 
 			var funcIdentifier string
-			//if i == 0 {
+
 			// 最后一层必须严格相同, 不是最后一层行号不相同也允许合并
-			//funcIdentifier = fmt.Sprintf("%s###%s###%d", line.Function.Filename, line.Function.Name, line.Line)
+			// funcIdentifier = fmt.Sprintf("%s###%s###%d", line.Function.Filename, line.Function.Name, line.Line)
 			funcIdentifier = strconv.FormatUint(location.ID, 10)
-			//} else {
+			// } else {
 			//	funcIdentifier = fmt.Sprintf("%s###%s###%s", parsetoolkit.GetLabel(smp, LabelThreadID), line.Function.Filename, line.Function.Name)
 			//}
 

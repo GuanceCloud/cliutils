@@ -33,8 +33,10 @@ const (
 	PhpID
 )
 
-type Lang string
-type LangID int
+type (
+	Lang   string
+	LangID int
+)
 
 func (l Lang) String() string {
 	return strings.ToLower(string(l))

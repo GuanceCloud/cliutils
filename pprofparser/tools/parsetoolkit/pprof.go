@@ -53,7 +53,6 @@ func GetNumLabel(smp *profile.Sample, key string) (int64, bool) {
 }
 
 func CalcPercentOfAggregator() {
-
 }
 
 func CalcPercentAndQuantity(frame *pprof.Frame, total int64) {

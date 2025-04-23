@@ -10,9 +10,7 @@ import (
 )
 
 func TestReadMetaData(t *testing.T) {
-
 	meta, err := ReadMetaDataFile("./testdata/event.json")
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,5 +24,4 @@ func TestReadMetaData(t *testing.T) {
 	}
 
 	t.Log(meta.Format)
-
 }

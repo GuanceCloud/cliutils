@@ -230,7 +230,6 @@ func TestPBPointPayload(t *testing.T) {
 		name   string
 		repeat int
 	}{
-
 		{
 			name:   "1-point",
 			repeat: 1,
@@ -308,6 +307,7 @@ func TestPBPointPayload(t *testing.T) {
 	}
 }
 
+// nolint:ineffassign
 func TestPBPointPayloadSize(t *testing.T) {
 	type tcase struct {
 		name string

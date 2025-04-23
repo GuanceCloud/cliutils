@@ -36,9 +36,11 @@ nginx;/usr/sbin/nginx+0x24678;__libc_start_main;main;ngx_master_process_cycle;/u
 
 */
 
-var processRegExp = regexp.MustCompile(`^process\s+\d+:"`)
-var threadRexExp = regexp.MustCompile(`^thread\s+\([a-zA-Z\d]+\)$`)
-var stackTraceRegExp = regexp.MustCompile(`^(\S+)(?: +\(([^:]+):(\d+)\))?`)
+var (
+	processRegExp    = regexp.MustCompile(`^process\s+\d+:"`)
+	threadRexExp     = regexp.MustCompile(`^thread\s+\([a-zA-Z\d]+\)$`)
+	stackTraceRegExp = regexp.MustCompile(`^(\S+)(?: +\(([^:]+):(\d+)\))?`)
+)
 
 type Collapse struct {
 	workspaceUUID string
@@ -48,7 +50,8 @@ type Collapse struct {
 }
 
 func NewCollapse(workspaceUUID string, profiles []*parameter.Profile,
-	filterBySpan bool, spanIDSet *tracing.SpanIDSet) *Collapse {
+	filterBySpan bool, spanIDSet *tracing.SpanIDSet,
+) *Collapse {
 	return &Collapse{
 		workspaceUUID: workspaceUUID,
 		profiles:      profiles,
@@ -99,7 +102,6 @@ func summary(filename string) (map[events.Type]*EventSummary, error) {
 }
 
 func (p *Collapse) Summary() (map[events.Type]*EventSummary, int64, error) {
-
 	prof := p.profiles[0]
 
 	startNanos, err := prof.StartTime()
@@ -136,7 +138,6 @@ func IsCollapseProfile(profiles []*parameter.Profile, workspaceUUID string) (boo
 }
 
 func (p *Collapse) ResolveFlameGraph(_ events.Type) (*pprof.Frame, AggregatorSelectSlice, error) {
-
 	prof := p.profiles[0]
 
 	startNanos, err := prof.StartTime()
@@ -169,7 +170,6 @@ func (p *Collapse) ResolveFlameGraph(_ events.Type) (*pprof.Frame, AggregatorSel
 	}
 
 	for scanner.Scan() {
-
 		line := strings.TrimSpace(scanner.Text())
 		if len(line) == 0 {
 			continue
@@ -229,9 +229,7 @@ func (p *Collapse) ResolveFlameGraph(_ events.Type) (*pprof.Frame, AggregatorSel
 			funcIdentifier := fmt.Sprintf("%s###%s###%s###%d", threadName, codeFile, funcName, lineNo)
 
 			if idx == len(stacks)-1 {
-
 				for _, aggregatorSelect := range aggregatorSelects {
-
 					var identifier string
 					var displayStr string
 					var mappingValues []string
@@ -330,7 +328,6 @@ func ParseRawFlameGraph(filename string) (*pprof.Frame, AggregatorSelectSlice, e
 	}
 
 	for scanner.Scan() {
-
 		line := strings.TrimSpace(scanner.Text())
 		if len(line) == 0 {
 			continue
@@ -390,9 +387,7 @@ func ParseRawFlameGraph(filename string) (*pprof.Frame, AggregatorSelectSlice, e
 			funcIdentifier := fmt.Sprintf("%s###%s###%s###%d", threadName, codeFile, funcName, lineNo)
 
 			if idx == len(stacks)-1 {
-
 				for _, aggregatorSelect := range aggregatorSelects {
-
 					var identifier string
 					var displayStr string
 					var mappingValues []string

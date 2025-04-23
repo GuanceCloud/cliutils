@@ -10,9 +10,7 @@ import (
 )
 
 func TestGetPySpySummary(t *testing.T) {
-
 	summaries, err := summary("testdata")
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -23,12 +21,10 @@ func TestGetPySpySummary(t *testing.T) {
 		t.Log(v.Unit.Kind, v.Unit.Name, v.Unit.Base)
 		t.Log(v.Value)
 	}
-
 }
 
 func TestParseRawFlameGraph(t *testing.T) {
 	flame, selectMap, err := ParseRawFlameGraph("testdata")
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,5 +41,4 @@ func TestParseRawFlameGraph(t *testing.T) {
 	}
 
 	_ = flame
-
 }

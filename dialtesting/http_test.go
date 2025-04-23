@@ -412,11 +412,9 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 		// test dial with response time checking
 		{
 			reasonCnt: 1,
-			fail: true,
+			fail:      true,
 			t: &HTTPTask{
-
 				Task: &Task{
-
 					ExternalID: cliutils.XID("dialt_"),
 					Name:       "_test_resp_time_less_10ms",
 					Frequency:  "1s",
@@ -741,7 +739,6 @@ func TestPrepareTemplate(t *testing.T) {
 		URL:        "http://localhost:8000/{{global}}",
 		PostScript: "{{local}}",
 		Task: &Task{
-
 			ConfigVars: []*ConfigVar{
 				{
 					Name:  "local",

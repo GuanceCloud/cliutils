@@ -26,7 +26,7 @@ func TestMeta(t *T.T) {
 		c, err := Open(WithPath(p),
 			WithCapacity(capacity),
 			WithMaxDataSize(int32(mb)),
-			WithBatchSize(int64(4*mb)))
+			WithBatchSize(4*mb))
 		assert.NoError(t, err)
 
 		putBytes := 0
@@ -51,7 +51,7 @@ func TestMeta(t *T.T) {
 		assert.True(t, c.Size() > 0)
 		assert.Equal(t, capacity, c.Capacity())
 		assert.Equal(t, int32(mb), c.MaxDataSize())
-		assert.Equal(t, int64(4*mb), c.MaxBatchSize())
+		assert.Equal(t, 4*mb, c.MaxBatchSize())
 
 		t.Cleanup(func() {
 			require.NoError(t, c.Close())

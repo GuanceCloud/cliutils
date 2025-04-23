@@ -21,12 +21,13 @@ type Parser interface {
 	ResolveFlameGraph(eventType events.Type) (*pprof.Frame, AggregatorSelectSlice, error)
 }
 
-type SummaryValueType = pprof.SummaryValueType
-type EventSummary = pprof.EventSummary
-type SummaryCollection = pprof.SummaryCollection
+type (
+	SummaryValueType  = pprof.SummaryValueType
+	EventSummary      = pprof.EventSummary
+	SummaryCollection = pprof.SummaryCollection
+)
 
 func GetSummary(param parameter.SummaryParam, filterBySpan bool, spanIDSet *tracing.SpanIDSet) (map[events.Type]*EventSummary, int64, error) {
-
 	isCollapseProfile := false
 	meta, err := ReadMetaData(param.Profiles[0], param.WorkspaceUUID)
 	if err != nil {

@@ -8,17 +8,18 @@ package parsing
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/GuanceCloud/cliutils/pprofparser/domain/events"
 	"github.com/GuanceCloud/cliutils/pprofparser/domain/parameter"
 	"github.com/GuanceCloud/cliutils/pprofparser/service/storage"
 	"github.com/GuanceCloud/cliutils/pprofparser/tools/filepathtoolkit"
-	"os"
-	"strings"
 )
 
 const (
 	FlameGraph Format = "flamegraph" // see https://github.com/brendangregg/FlameGraph
-	//Deprecated use Collapsed instead
+
 	RawFlameGraph Format = "rawflamegraph" // flamegraph collapse
 	Collapsed     Format = "collapse"      // flamegraph collapse format see https://github.com/brendangregg/FlameGraph/blob/master/stackcollapse.pl
 	SpeedScope    Format = "speedscope"    // see https://github.com/jlfwong/speedscope

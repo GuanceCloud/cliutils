@@ -285,7 +285,7 @@ func getPackageNameByLine(lang languages.Lang, line profile.Line) string {
 }
 
 // cutGoFuncName 切割pprof go func 为 package 和 func name
-// return package name 和 func name
+// return package name 和 func name.
 func cutGoFuncName(funcName string) (string, string) {
 	pos := strings.LastIndexByte(funcName, '/')
 	packageName := ""
@@ -558,11 +558,9 @@ func (asm AggregatorSelectSlice) CalcPercentAndQuantity(total int64) {
 }
 
 func (asm AggregatorSelectSlice) MarshalJSON() ([]byte, error) {
-
 	JSONMap := make([]*AggregatorSelectForJSON, 0, len(asm))
 
 	for _, aggregatorSelect := range asm {
-
 		selectForJSON := &AggregatorSelectForJSON{
 			Dimension: aggregatorSelect.Aggregator.Name,
 			Mapping:   aggregatorSelect.Mapping,
@@ -617,7 +615,6 @@ type AggregatorOption struct {
 }
 
 func (ao *AggregatorOption) CalcPercentAndQuantity(total int64) {
-
 	if total <= 0 {
 		ao.Percent = "100"
 	} else {

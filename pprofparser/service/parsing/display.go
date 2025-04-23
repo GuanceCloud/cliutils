@@ -29,6 +29,7 @@ type PyroscopeNodejs struct{}
 func (p *PyroscopeNodejs) ShowInTrace(_ events.Type) bool {
 	return false
 }
+
 func (p *PyroscopeNodejs) ShowInProfile(_ events.Type) bool {
 	return true
 }
