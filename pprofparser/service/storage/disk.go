@@ -19,7 +19,8 @@ import (
 
 var _ Storage = &Disk{}
 
-type Disk struct{}
+type Disk struct {
+}
 
 func (d *Disk) GetProfilePathOld(workspaceUUID string, profileID string, unixTimeNS int64, ossFilename string) string {
 	return filepath.Join(d.GetProfileDirOld(workspaceUUID, profileID, unixTimeNS), ossFilename)

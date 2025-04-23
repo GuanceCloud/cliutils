@@ -31,7 +31,9 @@ var (
 	Hour        = &Unit{Kind: Duration, Base: int64(time.Hour), Name: "h"}
 )
 
-var CountUnit = &Unit{Kind: Count, Base: 1, Name: ""}
+var (
+	CountUnit = &Unit{Kind: Count, Base: 1, Name: ""}
+)
 
 var (
 	Byte     = &Unit{Kind: Memory, Base: 1, Name: "Bytes"}
@@ -124,15 +126,15 @@ func (u *Unit) String() string {
 	return u.Name
 }
 
-// ConvertTo convert value for Unit u to Unit target.
+// ConvertTo convert value for Unit u to Unit target
 func (u *Unit) ConvertTo(target *Unit, value int64) (int64, error) {
 	if u.Kind != target.Kind {
-		return 0, fmt.Errorf("unit kinds are not compatible")
+		return 0, fmt.Errorf("unit kinds are not compatiable")
 	}
 	return value * u.Base / target.Base, nil
 }
 
-// ConvertToDefaultUnit convert value in Unit u to Unit Kind's default unit.
+// ConvertToDefaultUnit convert value in Unit u to Unit Kind's default unit
 func (u *Unit) ConvertToDefaultUnit(value int64) int64 {
 	v, _ := u.ConvertTo(u.Kind.DefaultUnit, value)
 	return v

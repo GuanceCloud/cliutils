@@ -62,7 +62,6 @@ var pyPprofTypeMaps = fileSampleTypesMap{
 		"heap-space":        events.HeapLiveSize,
 	},
 }
-
 var dotnetPProfEventMaps = fileSampleTypesMap{
 	"prof|auto|*.pprof": {
 		"cpu":           events.CPUTime,

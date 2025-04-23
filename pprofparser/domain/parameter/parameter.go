@@ -111,14 +111,17 @@ type DownloadParam struct {
 	Profiles []*Profile `json:"profiles" binding:"required"`
 }
 
-// VerifyLanguage 校验多个profiles中的language是否相同.
+// VerifyLanguage 校验多个profiles中的language是否相同
 func VerifyLanguage(profiles []*Profile) (languages.Lang, error) {
+
 	if len(profiles) == 0 {
 		return languages.Unknown, fmt.Errorf("empty profiles param")
 	}
 
+	//lang := profiles[0].Language
+
 	// 对比是否是同一个language
-	// for i := 1; i < len(profiles); i++ {
+	//for i := 1; i < len(profiles); i++ {
 	//	if !lang.Is(profiles[i].Language) {
 	//		return languages.Unknown, fmt.Errorf("the languages are not same")
 	//	}

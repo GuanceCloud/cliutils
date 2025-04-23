@@ -19,11 +19,13 @@ func TestCutGoFuncName(t *testing.T) {
 }
 
 func TestGetDDDotnetMethodName(t *testing.T) {
+
 	fnName := "|lm:System.Private.CoreLib |ns:System |ct:StartupHookProvider |fn:ProcessStartupHooks"
 
 	method := getDDDotnetMethodName(fnName)
 
 	testutil.Equals(t, "StartupHookProvider.ProcessStartupHooks", method)
+
 }
 
 func TestGetDDDotnetField(t *testing.T) {
