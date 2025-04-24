@@ -43,7 +43,6 @@ var tcpCases = []struct {
 					}},
 				},
 			}, Task: &Task{
-
 				ExternalID: "xxxx", Frequency: "10s", Name: "response_time_large",
 			},
 		},

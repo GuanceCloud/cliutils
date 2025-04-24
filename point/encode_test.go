@@ -280,7 +280,7 @@ func TestEscapeEncode(t *T.T) {
 		kvs = kvs.Add("f4,", false, false, false)
 
 		kvs = kvs.Add("f\nnext-line,", []byte("hello"), false, false)
-		kvs = kvs.Add(`f\other`, []byte("hello"), false, false)
+		kvs = kvs.Add(`f\other`, []byte("hello"), false, false) // nolint:misspell
 		kvs = kvs.Add("tag=1", "value", true, false)
 		kvs = kvs.Add("tag 2", "value", true, false)
 		kvs = kvs.Add("tag\t3", "value", true, false)
@@ -533,7 +533,6 @@ func TestEncBufUsage(t *T.T) {
 
 			t.Logf("avg usage: %.4f", usages/float64(n))
 		})
-
 	}
 }
 
@@ -1074,6 +1073,7 @@ func TestEncNilPoint(t *T.T) {
 	})
 }
 
+// nolint: ineffassign
 func TestEncTrim(t *T.T) {
 	strTiny := strings.Repeat("x", 4)
 	strSmall := strings.Repeat("x", 32)
@@ -1281,9 +1281,7 @@ func TestSkipLargePoint(t *T.T) {
 	t.Run("too-small-buffer-pb-trim", func(t *T.T) {
 		enc := GetEncoder(WithEncEncoding(Protobuf), WithIgnoreLargePoint(true))
 
-		var (
-			kvs1, kvs2, kvs3, kvs4 KVs
-		)
+		var kvs1, kvs2, kvs3, kvs4 KVs
 
 		kvs1 = kvs1.Add("msg1", strings.Repeat("x", 70), false, false)
 		kvs1 = kvs1.Add("f1", 3.14, false, false)
@@ -1336,7 +1334,6 @@ func TestSkipLargePoint(t *T.T) {
 		assert.NotNil(t, encBuf)
 		t.Logf("encoder: %s", enc)
 
-		//done
 		encBuf, ok = enc.Next(buf)
 		assert.False(t, ok)
 		assert.Nil(t, encBuf)
@@ -1394,12 +1391,9 @@ func TestSkipLargePoint(t *T.T) {
 		assert.Nil(t, encBuf)
 		t.Logf("encoder: %s", enc)
 
-		//done
 		encBuf, ok = enc.Next(buf)
 		assert.False(t, ok)
 		assert.Nil(t, encBuf)
-
-		//t.Logf("encoder: %s", enc)
 		assert.Error(t, enc.LastErr()) // still error once encode failed once
 	})
 
@@ -1457,7 +1451,6 @@ func TestSkipLargePoint(t *T.T) {
 		assert.NotNil(t, encBuf)
 		t.Logf("encoder: %s", enc)
 
-		//done
 		encBuf, ok = enc.Next(buf)
 		assert.False(t, ok)
 		assert.Nil(t, encBuf)

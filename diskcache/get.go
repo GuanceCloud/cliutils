@@ -49,7 +49,7 @@ func (c *DiskCache) Get(fn Fn) error {
 	return c.doGet(nil, fn)
 }
 
-// BufGet fetch new data from disk cache, and read into buf
+// BufGet fetch new data from disk cache, and read into buf.
 func (c *DiskCache) BufGet(buf []byte, fn Fn) error {
 	return c.doGet(buf, fn)
 }
