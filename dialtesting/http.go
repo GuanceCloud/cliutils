@@ -225,12 +225,15 @@ type HTTPOptBody struct {
 }
 
 type HTTPOptBodyFile struct {
-	Name             string `json:"name"`
-	Content          string `json:"content"`
-	Type             string `json:"type"`
-	Size             int64  `json:"size"`
-	Encoding         string `json:"encoding"`
-	OriginalFileName string `json:"original_file_name"`
+	Name             string `json:"name"`                // field name
+	Content          string `json:"content"`             // file content in base64
+	Type             string `json:"type"`                // file type, e.g. image/jpeg
+	Size             int64  `json:"size"`                // Content size
+	Encoding         string `json:"encoding"`            // Content encoding, base64 only
+	OriginalFileName string `json:"original_file_name"`  // Original file name
+	FilePath         string `json:"file_path,omitempty"` // file path in storage
+
+	Hash string `json:"_"`
 }
 
 type HTTPOptCertificate struct {
@@ -402,6 +405,13 @@ func (t *HTTPTask) getRequestBody() (io.Reader, error) {
 }
 
 func (t *HTTPTask) check() error {
+	if t.reqBody != nil {
+		for _, f := range t.reqBody.Files {
+			if f.Encoding != "base64" {
+				return fmt.Errorf("only base64 encoding is supported for file encoding")
+			}
+		}
+	}
 	return nil
 }
 
