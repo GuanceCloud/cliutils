@@ -27,7 +27,8 @@ func BenchmarkEasyproto(b *T.B) {
 	b.ResetTimer()
 	b.Run("gogopb-encode", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
-			pbpts.Marshal()
+			_, err := pbpts.Marshal()
+			assert.NoError(b, err)
 		}
 	})
 
@@ -37,7 +38,8 @@ func BenchmarkEasyproto(b *T.B) {
 	b.ResetTimer()
 	b.Run("easyproto-decode", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
-			unmarshalPoints(src)
+			_, err := unmarshalPoints(src)
+			assert.NoError(b, err)
 		}
 	})
 
@@ -45,7 +47,8 @@ func BenchmarkEasyproto(b *T.B) {
 	b.Run("gogopb-decode", func(b *T.B) {
 		var pbpts PBPoints
 		for i := 0; i < b.N; i++ {
-			pbpts.Unmarshal(src)
+			err := pbpts.Unmarshal(src)
+			assert.NoError(b, err)
 		}
 	})
 
@@ -54,7 +57,8 @@ func BenchmarkEasyproto(b *T.B) {
 		bp := NewBatchPoints()
 		for i := 0; i < b.N; i++ {
 			bp.Reset()
-			bp.Unmarshal(src)
+			err := bp.Unmarshal(src)
+			assert.NoError(b, err)
 		}
 	})
 }

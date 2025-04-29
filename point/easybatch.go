@@ -26,10 +26,19 @@ type BatchPoints struct {
 
 func (bp *BatchPoints) Reset() {
 	for _, pt := range bp.Points {
+		pt.pt.Name = ""
 		pt.pt.Fields = nil
+		pt.pt.Time = 0
 	}
 	bp.Points = bp.Points[:0]
 
+	for _, field := range bp.fieldsPool {
+		field.IsTag = false
+		field.Type = MetricType(0)
+		field.Unit = ""
+		field.Key = ""
+		field.Val = nil
+	}
 	bp.fieldsPool = bp.fieldsPool[:0]
 	bp.fieldIsPool = bp.fieldIsPool[:0]
 	bp.fieldUsPool = bp.fieldUsPool[:0]
