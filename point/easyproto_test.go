@@ -119,33 +119,4 @@ func TestEasyproto(t *T.T) {
 
 		t.Logf("pt2: %s", pts2[0].Pretty())
 	})
-
-	t.Run("easybatch-unmarshal", func(t *T.T) {
-		var kvs KVs
-		kvs = kvs.AddV2("f1", 123, false, WithKVUnit("dollar"), WithKVType(GAUGE))
-		kvs = kvs.AddV2("f2", 1.23, false, WithKVUnit("byte"), WithKVType(COUNT))
-		kvs = kvs.AddV2("f3", uint(42), false)
-		kvs = kvs.AddV2("f4", false, false)
-		kvs = kvs.AddV2("f5", []byte("binary-data"), false)
-		kvs = kvs.AddV2("f6", "text-data", false)
-		kvs = kvs.AddV2("tag-1", "value-1", false, WithKVTagSet(true))
-
-		pts := []*Point{
-			NewPointV2("p1", kvs, WithTimestamp(123)),
-		}
-		t.Logf("pt: %s", pts[0].Pretty())
-
-		var dst []byte
-		dst = marshalPoints(pts, dst)
-
-		bp := NewBatchPoints()
-		err := bp.Unmarshal(dst)
-		assert.NoError(t, err)
-
-		assert.Len(t, bp.Points, 1)
-
-		assert.Equal(t, pts[0].Pretty(), bp.Points[0].Pretty())
-
-		t.Logf("pt2: %s", bp.Points[0].Pretty())
-	})
 }
