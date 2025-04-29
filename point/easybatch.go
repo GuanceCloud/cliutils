@@ -96,11 +96,11 @@ func (bp *BatchPoints) unmarshalPoint(fc *easyproto.FieldContext, pt *Point, src
 
 		switch fc.FieldNum {
 		case 1:
-			if x, ok := fc.String(); ok {
-				pt.pt.Name = x
-			} else {
+			s, ok := fc.String()
+			if !ok {
 				return fmt.Errorf("cannot read PBPoint name")
 			}
+			pt.pt.Name = s
 		case 2:
 			data, ok := fc.MessageData()
 			if !ok {
@@ -121,11 +121,11 @@ func (bp *BatchPoints) unmarshalPoint(fc *easyproto.FieldContext, pt *Point, src
 				return fmt.Errorf("cannot unmarshal field: %w", err)
 			}
 		case 3:
-			if x, ok := fc.Int64(); ok {
-				pt.pt.Time = x
-			} else {
+			i64, ok := fc.Int64()
+			if !ok {
 				return fmt.Errorf("cannot read PBPoint time")
 			}
+			pt.pt.Time = i64
 		}
 	}
 
@@ -142,92 +142,107 @@ func (bp *BatchPoints) unmarshalField(fc *easyproto.FieldContext, field *Field, 
 
 		switch fc.FieldNum {
 		case 1:
-			if x, ok := fc.String(); ok {
-				field.Key = x
-			} else {
+			key, ok := fc.String()
+			if !ok {
 				return fmt.Errorf("cannot read Field key")
 			}
+			field.Key = key
 		case 8:
-			if x, ok := fc.Bool(); ok {
-				field.IsTag = x
-			} else {
+			isTag, ok := fc.Bool()
+			if !ok {
 				return fmt.Errorf("cannot unmarshal is-tag for Field")
 			}
+			field.IsTag = isTag
 		case 2:
-			if x, ok := fc.Int64(); ok {
-				if cap(bp.fieldIsPool) > len(bp.fieldIsPool) {
-					bp.fieldIsPool = bp.fieldIsPool[:len(bp.fieldIsPool)+1]
-				} else {
-					bp.fieldIsPool = append(bp.fieldIsPool, Field_I{})
-				}
-				iVal := &bp.fieldIsPool[len(bp.fieldIsPool)-1]
-				iVal.I = x
-				field.Val = iVal
+			i64, ok := fc.Int64()
+			if !ok {
+				return fmt.Errorf("cannot unmarshal int64 for Field")
 			}
+			if cap(bp.fieldIsPool) > len(bp.fieldIsPool) {
+				bp.fieldIsPool = bp.fieldIsPool[:len(bp.fieldIsPool)+1]
+			} else {
+				bp.fieldIsPool = append(bp.fieldIsPool, Field_I{})
+			}
+			iVal := &bp.fieldIsPool[len(bp.fieldIsPool)-1]
+			iVal.I = i64
+			field.Val = iVal
 		case 3:
-			if x, ok := fc.Uint64(); ok {
-				if cap(bp.fieldUsPool) > len(bp.fieldUsPool) {
-					bp.fieldUsPool = bp.fieldUsPool[:len(bp.fieldUsPool)+1]
-				} else {
-					bp.fieldUsPool = append(bp.fieldUsPool, Field_U{})
-				}
-				uVal := &bp.fieldUsPool[len(bp.fieldUsPool)-1]
-				uVal.U = x
-				field.Val = uVal
+			u64, ok := fc.Uint64()
+			if !ok {
+				return fmt.Errorf("cannot unmarshal uint64 for Field")
 			}
+			if cap(bp.fieldUsPool) > len(bp.fieldUsPool) {
+				bp.fieldUsPool = bp.fieldUsPool[:len(bp.fieldUsPool)+1]
+			} else {
+				bp.fieldUsPool = append(bp.fieldUsPool, Field_U{})
+			}
+			uVal := &bp.fieldUsPool[len(bp.fieldUsPool)-1]
+			uVal.U = u64
+			field.Val = uVal
 		case 4:
-			if x, ok := fc.Double(); ok {
-				if cap(bp.fieldFsPool) > len(bp.fieldFsPool) {
-					bp.fieldFsPool = bp.fieldFsPool[:len(bp.fieldFsPool)+1]
-				} else {
-					bp.fieldFsPool = append(bp.fieldFsPool, Field_F{})
-				}
-				fVal := &bp.fieldFsPool[len(bp.fieldFsPool)-1]
-				fVal.F = x
-				field.Val = fVal
+			f64, ok := fc.Double()
+			if !ok {
+				return fmt.Errorf("cannot unmarshal double for Field")
 			}
+			if cap(bp.fieldFsPool) > len(bp.fieldFsPool) {
+				bp.fieldFsPool = bp.fieldFsPool[:len(bp.fieldFsPool)+1]
+			} else {
+				bp.fieldFsPool = append(bp.fieldFsPool, Field_F{})
+			}
+			fVal := &bp.fieldFsPool[len(bp.fieldFsPool)-1]
+			fVal.F = f64
+			field.Val = fVal
 		case 5:
-			if x, ok := fc.Bool(); ok {
-				if cap(bp.fieldBsPool) > len(bp.fieldBsPool) {
-					bp.fieldBsPool = bp.fieldBsPool[:len(bp.fieldBsPool)+1]
-				} else {
-					bp.fieldBsPool = append(bp.fieldBsPool, Field_B{})
-				}
-				bVal := &bp.fieldBsPool[len(bp.fieldBsPool)-1]
-				bVal.B = x
-				field.Val = bVal
+			b, ok := fc.Bool()
+			if !ok {
+				return fmt.Errorf("cannot unmarshal bool for Field")
 			}
+			if cap(bp.fieldBsPool) > len(bp.fieldBsPool) {
+				bp.fieldBsPool = bp.fieldBsPool[:len(bp.fieldBsPool)+1]
+			} else {
+				bp.fieldBsPool = append(bp.fieldBsPool, Field_B{})
+			}
+			bVal := &bp.fieldBsPool[len(bp.fieldBsPool)-1]
+			bVal.B = b
+			field.Val = bVal
 		case 6:
-			if x, ok := fc.Bytes(); ok {
-				if cap(bp.fieldDsPool) > len(bp.fieldDsPool) {
-					bp.fieldDsPool = bp.fieldDsPool[:len(bp.fieldDsPool)+1]
-				} else {
-					bp.fieldDsPool = append(bp.fieldDsPool, Field_D{})
-				}
-				dVal := &bp.fieldDsPool[len(bp.fieldDsPool)-1]
-				dVal.D = x
-				field.Val = dVal
+			bytes, ok := fc.Bytes()
+			if !ok {
+				return fmt.Errorf("cannot unmarshal bytes for Field")
 			}
+			if cap(bp.fieldDsPool) > len(bp.fieldDsPool) {
+				bp.fieldDsPool = bp.fieldDsPool[:len(bp.fieldDsPool)+1]
+			} else {
+				bp.fieldDsPool = append(bp.fieldDsPool, Field_D{})
+			}
+			dVal := &bp.fieldDsPool[len(bp.fieldDsPool)-1]
+			dVal.D = bytes
+			field.Val = dVal
 		case 11:
-			if x, ok := fc.String(); ok {
-				if cap(bp.fieldSsPool) > len(bp.fieldSsPool) {
-					bp.fieldSsPool = bp.fieldSsPool[:len(bp.fieldSsPool)+1]
-				} else {
-					bp.fieldSsPool = append(bp.fieldSsPool, Field_S{})
-				}
-				sVal := &bp.fieldSsPool[len(bp.fieldSsPool)-1]
-				sVal.S = x
-				field.Val = sVal
+			s, ok := fc.String()
+			if !ok {
+				return fmt.Errorf("cannot unmarshal string for Field")
 			}
+			if cap(bp.fieldSsPool) > len(bp.fieldSsPool) {
+				bp.fieldSsPool = bp.fieldSsPool[:len(bp.fieldSsPool)+1]
+			} else {
+				bp.fieldSsPool = append(bp.fieldSsPool, Field_S{})
+			}
+			sVal := &bp.fieldSsPool[len(bp.fieldSsPool)-1]
+			sVal.S = s
+			field.Val = sVal
 		case 9:
-			if x, ok := fc.Int32(); ok {
-				field.Type = MetricType(x)
+			i32, ok := fc.Int32()
+			if !ok {
+				return fmt.Errorf("cannot unmarshal int32 for Field")
 			}
+			field.Type = MetricType(i32)
 		case 10:
-			if x, ok := fc.String(); ok {
-				field.Unit = x
+			s, ok := fc.String()
+			if !ok {
+				return fmt.Errorf("cannot unmarshal unit for Field")
 			}
-		default: // pass
+			field.Unit = s
 		}
 	}
 	return nil
