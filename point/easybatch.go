@@ -2,7 +2,7 @@ package point
 
 import (
 	"fmt"
-	sync "sync"
+	"sync"
 
 	"github.com/VictoriaMetrics/easyproto"
 )
@@ -27,7 +27,7 @@ type BatchPoints struct {
 func (bp *BatchPoints) Reset() {
 	for _, pt := range bp.Points {
 		pt.pt.Name = ""
-		pt.pt.Fields = nil
+		pt.pt.Fields = pt.pt.Fields[:0]
 		pt.pt.Time = 0
 	}
 	bp.Points = bp.Points[:0]
@@ -83,6 +83,10 @@ func (bp *BatchPoints) Unmarshal(src []byte) (err error) {
 		}
 		pt := bp.Points[len(bp.Points)-1]
 
+		if pt == nil {
+			panic("BUG: point is nil")
+		}
+
 		if err := bp.unmarshalPoint(fc, pt, data); err != nil {
 			return fmt.Errorf("unmarshal point failed: %w", err)
 		}
@@ -95,8 +99,6 @@ func (bp *BatchPoints) Unmarshal(src []byte) (err error) {
 }
 
 func (bp *BatchPoints) unmarshalPoint(fc *easyproto.FieldContext, pt *Point, src []byte) (err error) {
-	fieldsLen := len(bp.fieldsPool)
-
 	for len(src) > 0 {
 		src, err = fc.NextField(src)
 		if err != nil {
@@ -126,6 +128,11 @@ func (bp *BatchPoints) unmarshalPoint(fc *easyproto.FieldContext, pt *Point, src
 			}
 			field := bp.fieldsPool[len(bp.fieldsPool)-1]
 
+			if field == nil {
+				panic("BUG: field is nil")
+			}
+			pt.pt.Fields = append(pt.pt.Fields, field)
+
 			if err := bp.unmarshalField(fc, field, data); err != nil {
 				return fmt.Errorf("cannot unmarshal field: %w", err)
 			}
@@ -137,8 +144,6 @@ func (bp *BatchPoints) unmarshalPoint(fc *easyproto.FieldContext, pt *Point, src
 			pt.pt.Time = i64
 		}
 	}
-
-	pt.pt.Fields = bp.fieldsPool[fieldsLen:]
 	return nil
 }
 
