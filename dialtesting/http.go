@@ -31,7 +31,10 @@ var (
 	_ ITask     = (*HTTPTask)(nil)
 )
 
-const MaxBodySize = 10 * 1024
+const (
+	MaxBodySize        = 10 * 1024
+	DefaultHTTPTimeout = 60 * time.Second
+)
 
 type HTTPTask struct {
 	*Task
@@ -41,7 +44,6 @@ type HTTPTask struct {
 	SuccessWhenLogic string             `json:"success_when_logic"`
 	SuccessWhen      []*HTTPSuccess     `json:"success_when"`
 	AdvanceOptions   *HTTPAdvanceOption `json:"advance_options,omitempty"`
-	Option           map[string]string
 
 	cli                *http.Client
 	resp               *http.Response
@@ -316,7 +318,7 @@ func (t *HTTPTask) run() error {
 
 	t.req.Header.Add("Connection", "close")
 
-	if agentInfo, ok := t.Option["userAgent"]; ok {
+	if agentInfo, ok := t.GetOption()["userAgent"]; ok {
 		t.req.Header.Add("User-Agent", agentInfo)
 	}
 
@@ -531,11 +533,7 @@ func (t *HTTPTask) setupAdvanceOpts(req *http.Request) error {
 }
 
 func (t *HTTPTask) init() error {
-	httpTimeout := 60 * time.Second // default timeout
-
-	if t.Option == nil {
-		t.Option = map[string]string{}
-	}
+	httpTimeout := DefaultHTTPTimeout
 
 	// advance options
 	opt := t.AdvanceOptions
@@ -546,9 +544,7 @@ func (t *HTTPTask) init() error {
 			return err
 		}
 
-		if du < httpTimeout {
-			httpTimeout = du
-		}
+		httpTimeout = du
 	}
 
 	// setup HTTP client
