@@ -366,7 +366,7 @@ func (t *HTTPTask) getRequestBody() (io.Reader, error) {
 		return t.reqBodyBytesBuffer, nil
 	}
 
-	var body *bytes.Buffer = nil
+	var body *bytes.Buffer = &bytes.Buffer{}
 	requestBody := t.AdvanceOptions.RequestBody
 
 	if requestBody.BodyType == "multipart/form-data" {
