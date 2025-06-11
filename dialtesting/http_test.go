@@ -7,6 +7,7 @@ package dialtesting
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -467,6 +468,54 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 				},
 			},
 		},
+
+		// test multipart/form-data
+		{
+			reasonCnt: 0,
+			t: &HTTPTask{
+				Task: &Task{
+					ExternalID: cliutils.XID("dtst_"),
+					Name:       "_test_multipart_form_data",
+					Region:     "hangzhou",
+					Frequency:  "1s",
+				},
+				Method: "POST",
+				URL:    fmt.Sprintf("%s/_test_multipart_form_data", httpServer.URL),
+				AdvanceOptions: &HTTPAdvanceOption{
+					RequestBody: &HTTPOptBody{
+						Form: map[string]string{
+							"foo": "bar",
+						},
+						BodyType: "multipart/form-data",
+						Files: []HTTPOptBodyFile{
+							{
+								Name:             "foo.txt",
+								OriginalFileName: "foo.txt",
+								Content:          base64.StdEncoding.EncodeToString([]byte("foo.content")),
+								Type:             "text/plain",
+								Encoding:         "base64",
+								Size:             3,
+							},
+						},
+					},
+				},
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{Is: "200"},
+						},
+						Header: map[string][]*SuccessOption{
+							"foo": {
+								{Is: "bar"}, // expect fail: max-age
+							},
+							"foo.txt": {
+								{Is: "foo.content"},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -713,6 +762,35 @@ func addTestingRoutes(t *testing.T, r *gin.Engine, proxyServer *httptest.Server,
 
 		t.Logf("body: %s", string(body))
 
+		c.Data(http.StatusOK, ``, nil)
+	})
+
+	r.POST("_test_multipart_form_data", func(c *gin.Context) {
+		defer c.Request.Body.Close() //nolint:errcheck
+		foo := c.PostForm("foo")
+		form, err := c.MultipartForm()
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		c.Header("foo", foo)
+
+		files := form.File["foo.txt"]
+		if len(files) > 0 {
+			f := files[0]
+			openFile, err := f.Open()
+			if err != nil {
+				c.Error(err)
+				return
+			}
+			defer openFile.Close()
+			fileContent, err := io.ReadAll(openFile)
+			if err != nil {
+				c.Error(err)
+				return
+			}
+			c.Header(f.Filename, string(fileContent))
+		}
 		c.Data(http.StatusOK, ``, nil)
 	})
 
