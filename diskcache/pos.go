@@ -23,6 +23,9 @@ type pos struct {
 }
 
 func (p *pos) String() string {
+	if p.Name == nil {
+		return fmt.Sprintf(":%d", p.Seek)
+	}
 	return fmt.Sprintf("%s:%d", string(p.Name), p.Seek)
 }
 
@@ -73,11 +76,16 @@ func (p *pos) UnmarshalBinary(bin []byte) error {
 }
 
 func (p *pos) reset() error {
-	p.Seek = -1
-	p.Name = nil
 	if p.buf != nil {
 		p.buf.Reset()
 	}
+
+	if p.Name == nil && p.Seek == -1 { // has been reset
+		return nil
+	}
+
+	p.Seek = -1
+	p.Name = nil
 
 	return p.dumpFile()
 }
