@@ -69,6 +69,13 @@ func (c *DiskCache) doSwitchNextFile() error {
 		c.curReadfile = c.dataFiles[0]
 	}
 
+	// clear .pos
+	if !c.noPos && len(c.dataFiles) > 0 {
+		if err := c.pos.reset(); err != nil {
+			return err
+		}
+	}
+
 	fd, err := os.OpenFile(c.curReadfile, os.O_RDONLY, c.filePerms)
 	if err != nil {
 		return fmt.Errorf("under switchNextFile, OpenFile: %w, datafile: %+#v, ", err, c.dataFiles)
