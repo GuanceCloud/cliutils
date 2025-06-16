@@ -18,8 +18,21 @@ type pos struct {
 	Seek int64  `json:"seek"`
 	Name []byte `json:"name"`
 
+	fd    *os.File
 	fname string        // where to dump the binary data
 	buf   *bytes.Buffer // reused buffer to build the binary data
+}
+
+func (p *pos) close() error {
+	if p.fd != nil {
+		if err := p.fd.Close(); err != nil {
+			return err
+		}
+
+		p.fd = nil
+	}
+
+	return nil
 }
 
 func (p *pos) String() string {
@@ -76,6 +89,14 @@ func (p *pos) UnmarshalBinary(bin []byte) error {
 }
 
 func (p *pos) reset() error {
+	if p.fd == nil {
+		if fd, err := os.OpenFile(p.fname, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600); err != nil {
+			return fmt.Errorf("open pos file(%q) failed: %w", p.fname, err)
+		} else {
+			p.fd = fd
+		}
+	}
+
 	if p.buf != nil {
 		p.buf.Reset()
 	}
@@ -91,12 +112,29 @@ func (p *pos) reset() error {
 }
 
 func (p *pos) dumpFile() error {
+	if p.fd == nil {
+		if fd, err := os.OpenFile(p.fname, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600); err != nil {
+			return fmt.Errorf("open pos file(%q) failed: %w", p.fname, err)
+		} else {
+			p.fd = fd
+		}
+	}
+
 	if data, err := p.MarshalBinary(); err != nil {
 		return err
 	} else {
-		if err := os.WriteFile(p.fname, data, 0o600); err != nil {
+		if err := p.fd.Truncate(0); err != nil {
+			return fmt.Errorf("Truncate: %w", err)
+		}
+
+		if _, err := p.fd.Seek(0, 0); err != nil {
+			return fmt.Errorf("Seek: %w", err)
+		}
+
+		if _, err := p.fd.Write(data); err != nil {
 			return fmt.Errorf("dumpFile(%q): %w", p.fname, err)
 		}
+
 		return nil
 	}
 }
