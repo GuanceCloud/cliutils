@@ -124,11 +124,11 @@ func (p *pos) dumpFile() error {
 		return err
 	} else {
 		if err := p.fd.Truncate(0); err != nil {
-			return fmt.Errorf("Truncate: %w", err)
+			return fmt.Errorf("fd.Truncate: %w", err)
 		}
 
 		if _, err := p.fd.Seek(0, 0); err != nil {
-			return fmt.Errorf("Seek: %w", err)
+			return fmt.Errorf("fd.Seek: %w", err)
 		}
 
 		if _, err := p.fd.Write(data); err != nil {

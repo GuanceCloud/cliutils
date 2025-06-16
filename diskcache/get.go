@@ -154,6 +154,8 @@ __updatePos:
 		if derr := c.pos.dumpFile(); derr != nil {
 			return derr
 		}
+
+		posUpdatedVec.WithLabelValues("get", c.path).Inc()
 	}
 
 __end:

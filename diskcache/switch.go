@@ -95,6 +95,8 @@ func (c *DiskCache) doSwitchNextFile() error {
 		if err := c.pos.dumpFile(); err != nil {
 			return err
 		}
+
+		posUpdatedVec.WithLabelValues("switch", c.path).Inc()
 	}
 
 	return nil

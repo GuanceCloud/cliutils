@@ -352,7 +352,7 @@ func TestPutGet(t *T.T) {
 		})
 	})
 
-	t.Run("put-get", func(t *T.T) {
+	t.Run("put-get-no-rotate", func(t *T.T) {
 		p := t.TempDir()
 		c, err := Open(WithPath(p))
 		assert.NoError(t, err)
@@ -364,12 +364,38 @@ func TestPutGet(t *T.T) {
 
 		assert.Equal(t, int64(len(str)+dataHeaderLen), c.curBatchSize)
 
-		if err := c.Get(func(data []byte) error {
-			t.Logf("get: %s", string(data))
+		// not rotated, Get nothing
+		assert.ErrorIs(t, c.Get(func(data []byte) error {
+			assert.Nil(t, data)
 			return nil
-		}); err != nil {
-			t.Logf("get: %s", err)
+		}), ErrNoData)
+
+		t.Cleanup(func() {
+			c.Close()
+			os.RemoveAll(p)
+		})
+	})
+
+	t.Run("put-get-with-rotate", func(t *T.T) {
+		p := t.TempDir()
+		c, err := Open(WithPath(p))
+		assert.NoError(t, err)
+
+		str := "hello world"
+		if err := c.Put([]byte(str)); err != nil {
+			t.Error(err)
 		}
+
+		assert.Equal(t, int64(len(str)+dataHeaderLen), c.curBatchSize)
+
+		assert.NoError(t, c.rotate())
+		assert.Equal(t, int64(0), c.curBatchSize) // clean batch, nothing has been Put
+
+		// not rotated, Get nothing
+		assert.NoError(t, c.Get(func(data []byte) error {
+			assert.Equal(t, str, string(data))
+			return nil
+		}))
 
 		t.Cleanup(func() {
 			c.Close()
@@ -431,26 +457,30 @@ func TestPutGet(t *T.T) {
 		assert.Equal(t, 10, ncached, "cache: %s", c2)
 	})
 
-	t.Run(`get-with-pos`, func(t *T.T) {
+	t.Run(`reopen-with-pos`, func(t *T.T) {
+		ResetMetrics()
 		p := t.TempDir()
 
-		kbdata := make([]byte, 1024)
+		testData := []byte("0123456789")
+		ndata := 10
 
-		c, err := Open(WithPath(p),
-			WithCapacity(int64(len(kbdata)*10)),
-			WithBatchSize(int64(len(kbdata)*2)))
+		c, err := Open(WithPath(p))
+
 		assert.NoError(t, err)
 
-		for i := 0; i < 10; i++ { // write 10kb
-			require.NoError(t, c.Put(kbdata), "cache: %s", c)
+		for i := 0; i < ndata; i++ { // write 10 data
+			require.NoError(t, c.Put(testData), "cache: %s", c)
 		}
+
+		// make data file readable.
+		require.NoError(t, c.rotate())
 
 		// create a read pos
 		assert.NoError(t, c.Get(func(data []byte) error {
-			assert.Len(t, data, len(kbdata))
+			assert.Len(t, data, len(testData))
 			return nil
 		}))
-		assert.Equal(t, int64(len(kbdata)+dataHeaderLen), c.pos.Seek)
+		assert.Equal(t, int64(len(testData)+dataHeaderLen), c.pos.Seek)
 		assert.NoError(t, c.Close())
 
 		_, err = os.Stat(c.pos.fname)
@@ -458,18 +488,30 @@ func TestPutGet(t *T.T) {
 
 		// reopen the cache
 		c2, err := Open(WithPath(p),
-			WithCapacity(int64(len(kbdata)*10)),
-			WithBatchSize(int64(len(kbdata)*2)))
+			WithCapacity(int64(len(testData)*10)),
+			WithBatchSize(int64(len(testData)*2)))
 		require.NoError(t, err, "get error: %s", err)
-		assert.Equal(t, c2.pos.Seek, int64(len(kbdata)+dataHeaderLen))
+		assert.Equal(t, c2.pos.Seek, int64(len(testData)+dataHeaderLen)) // first data has been Get out
 
-		assert.NoError(t, c2.Get(func(data []byte) error {
-			assert.Len(t, data, len(kbdata))
-			return nil
-		}))
-		assert.Equal(t, int64(len(kbdata)+dataHeaderLen), c.pos.Seek)
-		assert.NoError(t, c2.Close())
-		assert.Equal(t, c2.pos.Seek, int64(2*(len(kbdata)+dataHeaderLen)))
+		t.Logf("pos: %s", c2.pos)
+
+		for i := 1; i < ndata; i++ { // get all data out
+			assert.NoError(t, c2.Get(func(data []byte) error {
+				require.Len(t, data, len(testData))
+				require.Equal(t, data, testData)
+				return nil
+			}))
+			t.Logf("pos buf: %v", c2.pos)
+
+			require.Equalf(t, (i+1)*(len(testData)+dataHeaderLen), int(c2.pos.Seek), "i: %d", i)
+		}
+
+		reg := prometheus.NewRegistry()
+		reg.MustRegister(Metrics()...)
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+
+		t.Logf("got metrics\n%s", metrics.MetricFamily2Text(mfs))
 
 		t.Cleanup(func() {
 			c2.Close()
