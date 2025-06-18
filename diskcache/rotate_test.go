@@ -45,14 +45,14 @@ func TestRotate(t *T.T) {
 
 		t.Logf("cache: %s", c)
 
-		t.Logf("cache pos: %s", c.pos)
+		t.Logf("cache pos: %s", c.pos.String())
 
 		// rotate it
 		c.rotate()
 
 		pos, err := posFromFile(c.pos.fname)
 		assert.NoError(t, err)
-		t.Logf("pos: %s", pos)
+		assert.Nil(t, pos)
 
 		assert.Equal(t, ":-1", c.pos.String(), "cache: %s", c)
 
