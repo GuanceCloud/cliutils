@@ -157,7 +157,7 @@ func TestNewArray(t *T.T) {
 
 		raw, err := AnyRaw(x)
 		assert.NoError(t, err)
-		assert.Equal(t, []any{
+		assert.Equal(t, []uint64{
 			uint64(1),
 			uint64(2),
 			uint64(3),
@@ -174,7 +174,7 @@ func TestNewArray(t *T.T) {
 
 		raw, err := AnyRaw(MustNewIntArray(i16s...))
 		assert.NoError(t, err)
-		assert.Equal(t, []any{
+		assert.Equal(t, []int64{
 			int64(1),
 			int64(2),
 			int64(3),
@@ -191,7 +191,7 @@ func TestNewArray(t *T.T) {
 
 		raw, err := AnyRaw(MustNewFloatArray(arr...))
 		assert.NoError(t, err)
-		assert.Equal(t, []any{
+		assert.Equal(t, []float64{
 			float64(1.1),
 			float64(2.2),
 			float64(3.3),
@@ -209,7 +209,7 @@ func TestNewArray(t *T.T) {
 		raw, err := AnyRaw(MustNewFloatArray(arr...))
 		assert.NoError(t, err)
 		assert.Len(t, raw, 3)
-		assert.NotEqual(t, []any{ // float32 -> float64 not equal
+		assert.NotEqual(t, []float64{ // float32 -> float64 not equal
 			float64(1.1),
 			float64(2.2),
 			float64(3.1415926),
@@ -225,7 +225,7 @@ func TestNewArray(t *T.T) {
 		raw, err := AnyRaw(MustNewBoolArray(arr...))
 		assert.NoError(t, err)
 		assert.Len(t, raw, 2)
-		assert.Equal(t, []any{false, true}, raw)
+		assert.Equal(t, []bool{false, true}, raw)
 		t.Logf("any.Raw: %+#v", raw)
 	})
 
@@ -237,7 +237,7 @@ func TestNewArray(t *T.T) {
 		raw, err := AnyRaw(MustNewStringArray(arr...))
 		assert.NoError(t, err)
 		assert.Len(t, raw, 3)
-		assert.Equal(t, []any{"s1", "s2", "s3"}, raw)
+		assert.Equal(t, []string{"s1", "s2", "s3"}, raw)
 		t.Logf("any.Raw: %+#v", raw)
 	})
 
@@ -252,7 +252,7 @@ func TestNewArray(t *T.T) {
 		raw, err := AnyRaw(x)
 		assert.NoError(t, err)
 
-		assert.Equal(t, []any{[]byte("hello"), []byte("world")}, raw)
+		assert.Equal(t, [][]byte{[]byte("hello"), []byte("world")}, raw)
 		t.Logf("any.Raw: %+#v", raw)
 	})
 
