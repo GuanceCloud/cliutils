@@ -357,8 +357,14 @@ func (p *Point) Add(k string, v any) {
 	p.pt.Fields = kvs.Add(k, v)
 }
 
-// MustAddTag add specific key value to fields, if k exist, override it.
-func (p *Point) MustAddTag(k, v string) {
+// Add add specific key value to fields, if k exist, do nothing.
+func (p *Point) Set(k string, v any) {
+	kvs := KVs(p.pt.Fields)
+	p.pt.Fields = kvs.Set(k, v)
+}
+
+// SetTag add specific key value to fields, if k exist, override it.
+func (p *Point) SetTag(k, v string) {
 	kvs := KVs(p.pt.Fields)
 	p.pt.Fields = kvs.SetTag(k, v)
 }
