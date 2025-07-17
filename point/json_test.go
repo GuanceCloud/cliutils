@@ -97,16 +97,15 @@ func TestJSONPointMarhsal(t *testing.T) {
 		EnableMixedArrayField = false
 	}()
 
-	kvs = kvs.AddV2("f1", 123, false)
-	kvs = kvs.AddV2("f2", uint(123), false)
-	kvs = kvs.AddV2("f3", "hello", false)
-	kvs = kvs.AddV2("f4", []byte("world"), false)
-	kvs = kvs.AddV2("f5", false, false)
-	kvs = kvs.AddV2("f6", 3.14, false, WithKVUnit("kb"), WithKVType(GAUGE))
-	kvs = kvs.AddV2("f7", []int{1, 2, 3, 4, 5}, false)
-	kvs = kvs.AddV2("f8", MustNewAnyArray(1.0, 2, uint(3), "hello", []byte("world"), false, 3.14), false)
-
-	kvs = kvs.AddV2("t1", "some-tag-value", false, WithKVTagSet(true))
+	kvs = kvs.Add("f1", 123)
+	kvs = kvs.Add("f2", uint(123))
+	kvs = kvs.Add("f3", "hello")
+	kvs = kvs.Add("f4", []byte("world"))
+	kvs = kvs.Add("f5", false)
+	kvs = kvs.Add("f6", 3.14, WithKVUnit("kb"), WithKVType(GAUGE))
+	kvs = kvs.Add("f7", []int{1, 2, 3, 4, 5})
+	kvs = kvs.Add("f8", MustNewAnyArray(1.0, 2, uint(3), "hello", []byte("world"), false, 3.14))
+	kvs = kvs.AddTag("t1", "some-tag-value")
 
 	pt := NewPointV2("json-point", kvs)
 

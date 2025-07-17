@@ -86,13 +86,13 @@ func BenchmarkEasyproto(b *T.B) {
 func TestEasyproto(t *T.T) {
 	t.Run("marshal", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.AddV2("f1", 123, false)
-		kvs = kvs.AddV2("f2", 1.23, false)
-		kvs = kvs.AddV2("f3", uint(42), false, WithKVUnit("year"), WithKVType(GAUGE))
-		kvs = kvs.AddV2("f4", false, false)
-		kvs = kvs.AddV2("f5", []byte("binary-data"), false)
-		kvs = kvs.AddV2("f6", "text-data", false)
-		kvs = kvs.AddV2("tag-1", "value-1", true, WithKVTagSet(true))
+		kvs = kvs.Add("f1", 123)
+		kvs = kvs.Add("f2", 1.23)
+		kvs = kvs.Add("f3", uint(42), WithKVUnit("year"), WithKVType(GAUGE))
+		kvs = kvs.Add("f4", false)
+		kvs = kvs.Add("f5", []byte("binary-data"))
+		kvs = kvs.Add("f6", "text-data")
+		kvs = kvs.AddTag("tag-1", "value-1")
 
 		pts := []*Point{
 			NewPointV2("p1", kvs, WithTimestamp(123)),
@@ -118,13 +118,13 @@ func TestEasyproto(t *T.T) {
 
 	t.Run("unmarshal", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.AddV2("f1", 123, false, WithKVUnit("dollar"), WithKVType(GAUGE))
-		kvs = kvs.AddV2("f2", 1.23, false, WithKVUnit("byte"), WithKVType(COUNT))
-		kvs = kvs.AddV2("f3", uint(42), false)
-		kvs = kvs.AddV2("f4", false, false)
-		kvs = kvs.AddV2("f5", []byte("binary-data"), false)
-		kvs = kvs.AddV2("f6", "text-data", false)
-		kvs = kvs.AddV2("tag-1", "value-1", false, WithKVTagSet(true))
+		kvs = kvs.Add("f1", 123, WithKVUnit("dollar"), WithKVType(GAUGE))
+		kvs = kvs.Add("f2", 1.23, WithKVUnit("byte"), WithKVType(COUNT))
+		kvs = kvs.Add("f3", uint(42))
+		kvs = kvs.Add("f4", false)
+		kvs = kvs.Add("f5", []byte("binary-data"))
+		kvs = kvs.Add("f6", "text-data")
+		kvs = kvs.AddTag("tag-1", "value-1")
 
 		pts := []*Point{
 			NewPointV2("p1", kvs, WithTimestamp(123)),

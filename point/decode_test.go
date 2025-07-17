@@ -92,25 +92,25 @@ func TestDynamicPrecision(t *T.T) {
 	pts := []*Point{
 		func() *Point {
 			var kvs KVs
-			kvs = kvs.AddV2("f1", 123, true)
+			kvs = kvs.Set("f1", 123)
 			return NewPointV2("p1", kvs, WithTimestamp(1716536956))
 		}(),
 
 		func() *Point {
 			var kvs KVs
-			kvs = kvs.AddV2("f1", 123, true)
+			kvs = kvs.Set("f1", 123)
 			return NewPointV2("p1", kvs, WithTimestamp(1716536956000))
 		}(),
 
 		func() *Point {
 			var kvs KVs
-			kvs = kvs.AddV2("f1", 123, true)
+			kvs = kvs.Set("f1", 123)
 			return NewPointV2("p1", kvs, WithTimestamp(1716536956000000))
 		}(),
 
 		func() *Point {
 			var kvs KVs
-			kvs = kvs.AddV2("f1", 123, true)
+			kvs = kvs.Set("f1", 123)
 			return NewPointV2("p1", kvs, WithTimestamp(1716536956000000000))
 		}(),
 	}
@@ -436,7 +436,7 @@ func TestDecode(t *T.T) {
 
 	t.Run("decode-bytes-array", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f_d_arr", MustNewAnyArray([]byte("hello"), []byte("world")), false, false)
+		kvs = kvs.Add("f_d_arr", MustNewAnyArray([]byte("hello"), []byte("world")))
 		pt := NewPointV2("m1", kvs)
 		enc := GetEncoder(WithEncEncoding(LineProtocol))
 		defer PutEncoder(enc)
@@ -456,9 +456,9 @@ func TestDecode(t *T.T) {
 
 	t.Run("decode-with-check", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.AddV2("f.1", 1.23, false) // f.1 rename to f_1 and key conflict
-		kvs = kvs.AddV2("f_1", 321, false)
-		kvs = kvs.AddV2("tag.1", "some-val", false, WithKVTagSet(true))
+		kvs = kvs.Add("f.1", 1.23) // f.1 rename to f_1 and key conflict
+		kvs = kvs.Add("f_1", 321)
+		kvs = kvs.AddTag("tag.1", "some-val")
 
 		pt := NewPointV2("m1", kvs, WithTime(time.Unix(0, 123)))
 

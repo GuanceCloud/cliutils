@@ -23,7 +23,7 @@ import (
 func TestInfluxFields(t *T.T) {
 	t.Run("bytes-array", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f1", MustNewAnyArray([]byte("hello"), []byte("world")), false, false)
+		kvs = kvs.Add("f1", MustNewAnyArray([]byte("hello"), []byte("world")))
 		pt := NewPointV2("m1", kvs)
 		fields := pt.InfluxFields()
 		t.Logf("fields: %+#v", fields)
@@ -33,10 +33,10 @@ func TestInfluxFields(t *T.T) {
 func TestSizeofPoint(t *T.T) {
 	t.Run("small-pt", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f1", 123, false, true)
-		kvs = kvs.Add("f2", 3.14, false, true)
-		kvs = kvs.MustAddTag("t1", "v1")
-		kvs = kvs.MustAddTag("t2", "v2")
+		kvs = kvs.Set("f1", 123)
+		kvs = kvs.Set("f2", 3.14)
+		kvs = kvs.SetTag("t1", "v1")
+		kvs = kvs.SetTag("t2", "v2")
 
 		pbpt := NewPointV2("some", kvs)
 		t.Logf("type  size(pbpt): %d", reflect.TypeOf(*pbpt).Size())
@@ -73,10 +73,10 @@ func BenchmarkLPPoint(b *T.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
-			kvs = kvs.Add("f1", 123, false, true)
-			kvs = kvs.Add("f2", 3.14, false, true)
-			kvs = kvs.MustAddTag("t1", "v1")
-			kvs = kvs.MustAddTag("t2", "v2")
+			kvs = kvs.Set("f1", 123)
+			kvs = kvs.Set("f2", 3.14)
+			kvs = kvs.SetTag("t1", "v1")
+			kvs = kvs.SetTag("t2", "v2")
 
 			NewPointV2("some", kvs, WithPrecheck(false), WithTime(now))
 		}
@@ -86,10 +86,10 @@ func BenchmarkLPPoint(b *T.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
-			kvs = kvs.Add("f1", 123, false, true)
-			kvs = kvs.Add("f2", 3.14, false, true)
-			kvs = kvs.MustAddTag("t1", "v1")
-			kvs = kvs.MustAddTag("t2", "v2")
+			kvs = kvs.Set("f1", 123)
+			kvs = kvs.Set("f2", 3.14)
+			kvs = kvs.SetTag("t1", "v1")
+			kvs = kvs.SetTag("t2", "v2")
 
 			NewPointV2("some", kvs, WithTime(now))
 		}
@@ -146,13 +146,13 @@ func BenchmarkFromModelsLP(b *T.B) {
 
 func TestGet(t *T.T) {
 	t.Run(`get-tag`, func(t *T.T) {
-		pt := NewPointV2(`abc`, NewKVs(nil).MustAddTag(`t1`, `v1`))
+		pt := NewPointV2(`abc`, NewKVs(nil).SetTag(`t1`, `v1`))
 
 		assert.Equal(t, `v1`, pt.GetTag(`t1`))
 		assert.Equal(t, "", pt.GetTag(`not-exist`))
 
 		// get non-tag key
-		pt.pt.Fields = KVs(pt.pt.Fields).MustAddKV(NewKV(`f1`, 1.23,
+		pt.pt.Fields = KVs(pt.pt.Fields).SetKV(NewKV(`f1`, 1.23,
 			WithKVUnit("bytes"),
 			WithKVTagSet(true), // set failed
 			WithKVType(COUNT)))
@@ -174,26 +174,22 @@ func TestGet(t *T.T) {
 			EnableMixedArrayField = false
 		}()
 
-		kvs = kvs.Add("si1", int8(1), false, true)
-		kvs = kvs.Add("si2", int16(1), false, true)
-		kvs = kvs.Add("si3", int32(1), false, true)
-		kvs = kvs.Add("si4", int(1), false, true)
-		kvs = kvs.Add("si5", int64(1), false, true)
-
-		kvs = kvs.Add("ui1", uint8(1), false, true)
-		kvs = kvs.Add("ui2", uint16(1), false, true)
-		kvs = kvs.Add("ui3", uint32(1), false, true)
-		kvs = kvs.Add("ui4", uint(1), false, true)
-		kvs = kvs.Add("ui5", uint64(1), false, true)
-
-		kvs = kvs.Add("b1", false, false, true)
-		kvs = kvs.Add("b2", true, false, true)
-
-		kvs = kvs.Add("d", []byte(`hello`), false, true)
-		kvs = kvs.Add("s", `hello`, false, true)
-
-		kvs = kvs.Add("arr", MustNewAnyArray(1, 2.0, false), false, true)
-		kvs = kvs.Add("map", MustNewAny(MustNewMap(map[string]any{"i": 1, "f": 3.14, "s": "world"})), false, true)
+		kvs = kvs.Set("si1", int8(1))
+		kvs = kvs.Set("si2", int16(1))
+		kvs = kvs.Set("si3", int32(1))
+		kvs = kvs.Set("si4", int(1))
+		kvs = kvs.Set("si5", int64(1))
+		kvs = kvs.Set("ui1", uint8(1))
+		kvs = kvs.Set("ui2", uint16(1))
+		kvs = kvs.Set("ui3", uint32(1))
+		kvs = kvs.Set("ui4", uint(1))
+		kvs = kvs.Set("ui5", uint64(1))
+		kvs = kvs.Set("b1", false)
+		kvs = kvs.Set("b2", true)
+		kvs = kvs.Set("d", []byte(`hello`))
+		kvs = kvs.Set("s", `hello`)
+		kvs = kvs.Set("arr", MustNewAnyArray(1, 2.0, false))
+		kvs = kvs.Set("map", MustNewAny(MustNewMap(map[string]any{"i": 1, "f": 3.14, "s": "world"})))
 
 		pt := NewPointV2("get", kvs)
 
@@ -230,26 +226,22 @@ func TestGet(t *T.T) {
 			EnableMixedArrayField = false
 		}()
 
-		kvs = kvs.Add("si1", int8(1), false, true)
-		kvs = kvs.Add("si2", int16(1), false, true)
-		kvs = kvs.Add("si3", int32(1), false, true)
-		kvs = kvs.Add("si4", int(1), false, true)
-		kvs = kvs.Add("si5", int64(1), false, true)
-
-		kvs = kvs.Add("ui1", uint8(1), false, true)
-		kvs = kvs.Add("ui2", uint16(1), false, true)
-		kvs = kvs.Add("ui3", uint32(1), false, true)
-		kvs = kvs.Add("ui4", uint(1), false, true)
-		kvs = kvs.Add("ui5", uint64(1), false, true)
-
-		kvs = kvs.Add("b1", false, false, true)
-		kvs = kvs.Add("b2", true, false, true)
-
-		kvs = kvs.Add("d", []byte(`hello`), false, true)
-		kvs = kvs.Add("s", `hello`, false, true)
-
-		kvs = kvs.Add("arr", MustNewAnyArray(1, 2.0, false), false, true)
-		kvs = kvs.Add("map", MustNewAny(MustNewMap(map[string]any{"i": 1, "f": 3.14, "s": "world"})), false, true)
+		kvs = kvs.Set("si1", int8(1))
+		kvs = kvs.Set("si2", int16(1))
+		kvs = kvs.Set("si3", int32(1))
+		kvs = kvs.Set("si4", int(1))
+		kvs = kvs.Set("si5", int64(1))
+		kvs = kvs.Set("ui1", uint8(1))
+		kvs = kvs.Set("ui2", uint16(1))
+		kvs = kvs.Set("ui3", uint32(1))
+		kvs = kvs.Set("ui4", uint(1))
+		kvs = kvs.Set("ui5", uint64(1))
+		kvs = kvs.Set("b1", false)
+		kvs = kvs.Set("b2", true)
+		kvs = kvs.Set("d", []byte(`hello`))
+		kvs = kvs.Set("s", `hello`)
+		kvs = kvs.Set("arr", MustNewAnyArray(1, 2.0, false))
+		kvs = kvs.Set("map", MustNewAny(MustNewMap(map[string]any{"i": 1, "f": 3.14, "s": "world"})))
 
 		pt := NewPointV2("get", kvs)
 
@@ -593,9 +585,7 @@ line" 123`,
 			prec: PrecNS,
 			pt: func() *Point {
 				var kvs KVs
-				kvs = kvs.Add("arr",
-					MustNewAnyArray(1, 3.14, 1.414, "hello"),
-					false, true)
+				kvs = kvs.Set("arr", MustNewAnyArray(1, 3.14, 1.414, "hello"))
 				pt := NewPointV2("abc", kvs, WithTime(time.Unix(0, 123)))
 
 				return pt
@@ -636,8 +626,8 @@ func TestPBJSON(t *T.T) {
 		}))
 
 		kvs := KVs(pt.pt.Fields)
-		kvs = kvs.MustAddTag(`t1`, `v1`).
-			MustAddKV(NewKV(`f2`, 3.14, WithKVUnit("kb"), WithKVType(COUNT)))
+		kvs = kvs.SetTag(`t1`, `v1`).
+			SetKV(NewKV(`f2`, 3.14, WithKVUnit("kb"), WithKVType(COUNT)))
 		pt.pt.Fields = kvs
 
 		j, _ := pt.PBJson()
@@ -1155,8 +1145,8 @@ func TestPayloadSize(t *T.T) {
 
 		// with kv unit/type
 		pt = NewPointV2(`abc`, NewKVs(nil).
-			MustAddKV(NewKV(`f1`, 123, WithKVUnit("MB"), WithKVType(COUNT))).
-			MustAddTag(`t1`, `v1`))
+			SetKV(NewKV(`f1`, 123, WithKVUnit("MB"), WithKVType(COUNT))).
+			SetTag(`t1`, `v1`))
 		t.Logf("pt size: %d, pb size: %d, lp size: %d", pt.Size(), pt.PBSize(), pt.LPSize())
 
 		// rand point

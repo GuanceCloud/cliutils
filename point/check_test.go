@@ -88,9 +88,9 @@ func TestCheckMeasurement(t *testing.T) {
 func TestCheckPoints(t *T.T) {
 	t.Run("string", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f1", 1.23, false, false)
-		kvs = kvs.Add("str", "hello", false, false)
-		kvs = kvs.Add("u64", uint64(math.MaxUint64), false, false)
+		kvs = kvs.Add("f1", 1.23)
+		kvs = kvs.Add("str", "hello")
+		kvs = kvs.Add("u64", uint64(math.MaxUint64))
 
 		pt := NewPointV2("m1", kvs, WithPrecheck(false))
 		pts := CheckPoints([]*Point{pt}, WithStrField(false))
@@ -101,9 +101,9 @@ func TestCheckPoints(t *T.T) {
 
 	t.Run("u64", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f1", 1.23, false, false)
-		kvs = kvs.Add("str", "hello", false, false)
-		kvs = kvs.Add("u64", uint64(math.MaxUint64), false, false)
+		kvs = kvs.Add("f1", 1.23)
+		kvs = kvs.Add("str", "hello")
+		kvs = kvs.Add("u64", uint64(math.MaxUint64))
 
 		pt := NewPointV2("m1", kvs, WithPrecheck(false))
 		pts := CheckPoints([]*Point{pt}, WithU64Field(false))
@@ -114,8 +114,8 @@ func TestCheckPoints(t *T.T) {
 
 	t.Run("dot-in-key", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f.1", 1.23, false, false)
-		kvs = kvs.Add("u64", uint64(math.MaxUint64), false, false)
+		kvs = kvs.Add("f.1", 1.23)
+		kvs = kvs.Add("u64", uint64(math.MaxUint64))
 
 		pt := NewPointV2("m1", kvs, WithPrecheck(false))
 
@@ -213,8 +213,8 @@ func TestCheckTags(t *T.T) {
 		///////////////////////
 		// dot in tag key
 		var kvs KVs
-		kvs = kvs.AddV2("f.1", "some string", false, WithKVTagSet(true))
-		kvs = kvs.AddV2("f_1", 1.23, false)
+		kvs = kvs.Add("f.1", "some string", WithKVTagSet(true))
+		kvs = kvs.Add("f_1", 1.23)
 
 		pt := NewPointV2("m", kvs, WithDotInKey(false))
 
@@ -227,8 +227,8 @@ func TestCheckTags(t *T.T) {
 		///////////////////////
 		// too long tag key
 		kvs = kvs[:0]
-		kvs = kvs.AddV2("f111", "some string", false, WithKVTagSet(true))
-		kvs = kvs.AddV2("f1", 1.23, false)
+		kvs = kvs.Add("f111", "some string", WithKVTagSet(true))
+		kvs = kvs.Add("f1", 1.23)
 		pt = NewPointV2("m", kvs, WithMaxTagKeyLen(2))
 
 		assert.Len(t, pt.pt.Fields, 1)
@@ -239,8 +239,8 @@ func TestCheckTags(t *T.T) {
 		///////////////////////
 		// too long field key
 		kvs = kvs[:0]
-		kvs = kvs.AddV2("f1", 1.23, false)
-		kvs = kvs.AddV2("f111", "some string", false)
+		kvs = kvs.Add("f1", 1.23)
+		kvs = kvs.Add("f111", "some string")
 		pt = NewPointV2("m", kvs, WithMaxFieldKeyLen(2))
 
 		assert.Len(t, pt.pt.Fields, 1)
@@ -251,8 +251,8 @@ func TestCheckTags(t *T.T) {
 		///////////////////////
 		// conflict on updated-key
 		kvs = kvs[:0]
-		kvs = kvs.AddV2("f.1", 1.23, false)            // f.1 => f_1
-		kvs = kvs.AddV2("f_111", "some string", false) // f_111 => f_1: conflict
+		kvs = kvs.Add("f.1", 1.23)            // f.1 => f_1
+		kvs = kvs.Add("f_111", "some string") // f_111 => f_1: conflict
 		pt = NewPointV2("m", kvs, WithMaxFieldKeyLen(3), WithDotInKey(false))
 
 		assert.Len(t, pt.pt.Fields, 1)

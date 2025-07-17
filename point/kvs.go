@@ -59,11 +59,12 @@ func (x KVs) Less(i, j int) bool {
 
 func (x KVs) Pretty() string {
 	var arr []string
+
 	for idx, kv := range x {
 		if kv == nil {
-			arr = append(arr, fmt.Sprintf("[%d] <nil>", idx))
+			arr = append(arr, fmt.Sprintf("[% 5d] <nil>", idx))
 		} else {
-			arr = append(arr, fmt.Sprintf("[%d] %s", idx, kv.String()))
+			arr = append(arr, fmt.Sprintf("[% 5d] %s", idx, kv.String()))
 		}
 	}
 
@@ -341,18 +342,14 @@ func (x KVs) Del(k string) KVs {
 	return x
 }
 
-// AddV2 add new field with opts.
-// If force enabled, overwrite exist key.
-func (x KVs) AddV2(k string, v any, force bool, opts ...KVOption) KVs {
+// Set add new field with opts.
+func (x KVs) Set(k string, v any, opts ...KVOption) KVs {
 	kv := NewKV(k, v, opts...)
 
 	for i := range x {
 		if x[i].Key == k { // k exist
-			if force {
-				x[i] = kv // override exist tag/field
-			}
-
-			goto out // ignore the key
+			x[i] = kv // override exist tag/field
+			goto out  // ignore the key
 		}
 	}
 
@@ -362,27 +359,12 @@ out:
 	return x
 }
 
-// Add add new field.
-// Deprecated: use AddV2
-// If force enabled, overwrite exist key.
-func (x KVs) Add(k string, v any, isTag, force bool) KVs {
-	kv := NewKV(k, v)
-
-	if isTag {
-		switch v.(type) {
-		case string:
-			kv.IsTag = isTag
-		default:
-			// ignore isTag
-		}
-	}
+// Add add new field with opts.
+func (x KVs) Add(k string, v any, opts ...KVOption) KVs {
+	kv := NewKV(k, v, opts...)
 
 	for i := range x {
 		if x[i].Key == k { // k exist
-			if force {
-				x[i] = kv // override exist tag/field
-			}
-
 			goto out // ignore the key
 		}
 	}
@@ -394,24 +376,22 @@ out:
 }
 
 func (x KVs) AddTag(k, v string) KVs {
-	x = x.Add(k, v, true, false)
+	x = x.Add(k, v, WithKVTagSet(true))
 	return x
 }
 
-func (x KVs) MustAddTag(k, v string) KVs {
-	return x.Add(k, v, true, true)
+func (x KVs) SetTag(k, v string) KVs {
+	return x.Set(k, v, WithKVTagSet(true))
 }
 
-func (x KVs) AddKV(kv *Field, force bool) KVs {
+func (x KVs) SetKV(kv *Field) KVs {
 	if kv == nil {
 		return x
 	}
 
 	for i := range x {
 		if x[i].Key == kv.Key {
-			if force {
-				x[i] = kv
-			}
+			x[i] = kv
 			goto out
 		}
 	}
@@ -422,8 +402,20 @@ out:
 	return x
 }
 
-func (x KVs) MustAddKV(kv *Field) KVs {
-	x = x.AddKV(kv, true)
+func (x KVs) AddKV(kv *Field) KVs {
+	if kv == nil {
+		return x
+	}
+
+	for i := range x {
+		if x[i].Key == kv.Key {
+			goto out
+		}
+	}
+
+	x = append(x, kv)
+
+out:
 	return x
 }
 

@@ -113,12 +113,12 @@ func BenchmarkNoReservedCapPool(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
 
-			kvs = kvs.Add("f0", 123, false, true)
-			kvs = kvs.Add("f1", 3.14, false, true)
-			kvs = kvs.Add("f2", "hello", false, true)
-			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, true)
-			kvs = kvs.Add("f4", false, false, false)
-			kvs = kvs.Add("f5", -123, false, false)
+			kvs = kvs.Set("f0", 123)
+			kvs = kvs.Set("f1", 3.14)
+			kvs = kvs.Set("f2", "hello")
+			kvs = kvs.Set("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"))
+			kvs = kvs.Set("f4", false)
+			kvs = kvs.Set("f5", -123)
 
 			NewPointV2("m1", kvs, WithTime(now), WithPrecheck(false))
 		}
@@ -141,12 +141,12 @@ func BenchmarkReserved1KCapPool(b *T.B) {
 	b.ResetTimer()
 	var kvs KVs
 	for i := 0; i < b.N; i++ {
-		kvs = kvs.Add("f0", 123, false, false)
-		kvs = kvs.Add("f1", 3.14, false, false)
-		kvs = kvs.Add("f2", "hello", false, false)
-		kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, false)
-		kvs = kvs.Add("f4", false, false, false)
-		kvs = kvs.Add("f5", -123, false, false)
+		kvs = kvs.Add("f0", 123)
+		kvs = kvs.Add("f1", 3.14)
+		kvs = kvs.Add("f2", "hello")
+		kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"))
+		kvs = kvs.Add("f4", false)
+		kvs = kvs.Add("f5", -123)
 
 		pt := NewPointV2("m1", kvs, WithPrecheck(false))
 		pp.Put(pt)
@@ -169,12 +169,12 @@ func BenchmarkReservedZeroCapPool(b *T.B) {
 	b.ResetTimer()
 	var kvs KVs
 	for i := 0; i < b.N; i++ {
-		kvs = kvs.Add("f0", 123, false, false)
-		kvs = kvs.Add("f1", 3.14, false, false)
-		kvs = kvs.Add("f2", "hello", false, false)
-		kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, false)
-		kvs = kvs.Add("f4", false, false, false)
-		kvs = kvs.Add("f5", -123, false, false)
+		kvs = kvs.Add("f0", 123)
+		kvs = kvs.Add("f1", 3.14)
+		kvs = kvs.Add("f2", "hello")
+		kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"))
+		kvs = kvs.Add("f4", false)
+		kvs = kvs.Add("f5", -123)
 
 		pt := NewPointV2("m1", kvs, WithPrecheck(false))
 		pp.Put(pt)
@@ -188,12 +188,12 @@ func BenchmarkParallelNoPool(b *T.B) {
 		for b.Next() {
 			var kvs KVs
 
-			kvs = kvs.Add("f0", 123, false, true)
-			kvs = kvs.Add("f1", 3.14, false, true)
-			kvs = kvs.Add("f2", "hello", false, true)
-			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, true)
-			kvs = kvs.Add("f4", false, false, false)
-			kvs = kvs.Add("f5", -123, false, false)
+			kvs = kvs.Set("f0", 123)
+			kvs = kvs.Set("f1", 3.14)
+			kvs = kvs.Set("f2", "hello")
+			kvs = kvs.Set("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"))
+			kvs = kvs.Set("f4", false)
+			kvs = kvs.Set("f5", -123)
 
 			NewPointV2("m1", kvs, WithTime(now), WithPrecheck(false))
 		}
@@ -210,12 +210,12 @@ func BenchmarkParallelReserveCapPool(b *T.B) {
 
 		for b.Next() {
 			var kvs KVs
-			kvs = kvs.Add("f0", 123, false, false)
-			kvs = kvs.Add("f1", 3.14, false, false)
-			kvs = kvs.Add("f2", "hello", false, false)
-			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, false)
-			kvs = kvs.Add("f4", false, false, false)
-			kvs = kvs.Add("f5", -123, false, false)
+			kvs = kvs.Add("f0", 123)
+			kvs = kvs.Add("f1", 3.14)
+			kvs = kvs.Add("f2", "hello")
+			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"))
+			kvs = kvs.Add("f4", false)
+			kvs = kvs.Add("f5", -123)
 
 			pt := NewPointV2("m1", kvs, WithPrecheck(false))
 			pp.Put(pt)
@@ -233,12 +233,12 @@ func BenchmarkParallelNoReserveCapPool(b *T.B) {
 
 		for b.Next() {
 			var kvs KVs
-			kvs = kvs.Add("f0", 123, false, false)
-			kvs = kvs.Add("f1", 3.14, false, false)
-			kvs = kvs.Add("f2", "hello", false, false)
-			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"), false, false)
-			kvs = kvs.Add("f4", false, false, false)
-			kvs = kvs.Add("f5", -123, false, false)
+			kvs = kvs.Add("f0", 123)
+			kvs = kvs.Add("f1", 3.14)
+			kvs = kvs.Add("f2", "hello")
+			kvs = kvs.Add("f3", []byte("some looooooooooooooooooooooooooooooooooooooooooooooong text"))
+			kvs = kvs.Add("f4", false)
+			kvs = kvs.Add("f5", -123)
 
 			pt := NewPointV2("m1", kvs, WithPrecheck(false))
 			pp.Put(pt)
@@ -255,10 +255,10 @@ func TestPointPool(t *T.T) {
 		// total add 100 * 4 Field
 		for i := 0; i < 100; i++ {
 			var kvs KVs
-			kvs = kvs.Add(fmt.Sprintf("f%d", i), 123, false, false)
-			kvs = kvs.Add(fmt.Sprintf("f%d", i+1), 123, false, false)
-			kvs = kvs.Add(fmt.Sprintf("f%d", i+2), 123, false, false)
-			kvs = kvs.Add(fmt.Sprintf("f%d", i+3), 123, false, false)
+			kvs = kvs.Add(fmt.Sprintf("f%d", i), 123)
+			kvs = kvs.Add(fmt.Sprintf("f%d", i+1), 123)
+			kvs = kvs.Add(fmt.Sprintf("f%d", i+2), 123)
+			kvs = kvs.Add(fmt.Sprintf("f%d", i+3), 123)
 
 			for _, kv := range kvs {
 				pp.PutKV(kv)
@@ -285,10 +285,10 @@ func TestPointPool(t *T.T) {
 
 			for i := 0; i < 100; i++ {
 				var kvs KVs
-				kvs = kvs.Add(fmt.Sprintf("f-%d", i*100), 123, false, false)
-				kvs = kvs.Add(fmt.Sprintf("f-%d", i*100+1), 123, false, false)
-				kvs = kvs.Add(fmt.Sprintf("f-%d", i*100+2), 123, false, false)
-				kvs = kvs.Add(fmt.Sprintf("f-%d", i*100+3), 123, false, false)
+				kvs = kvs.Add(fmt.Sprintf("f-%d", i*100), 123)
+				kvs = kvs.Add(fmt.Sprintf("f-%d", i*100+1), 123)
+				kvs = kvs.Add(fmt.Sprintf("f-%d", i*100+2), 123)
+				kvs = kvs.Add(fmt.Sprintf("f-%d", i*100+3), 123)
 
 				for _, kv := range kvs {
 					pp.PutKV(kv)
@@ -316,8 +316,8 @@ func TestPointPool(t *T.T) {
 func TestReset(t *T.T) {
 	t.Run("reset", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f1", 123, false, false)
-		kvs = kvs.Add("f2", false, false, false)
+		kvs = kvs.Add("f1", 123)
+		kvs = kvs.Add("f2", false)
 
 		pt := NewPointV2("" /* go warnning */, kvs, WithTime(time.Now()))
 		pt.Reset()
@@ -342,13 +342,13 @@ func BenchmarkStringKV(b *T.B) {
 	b.Run("string-kv", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
-			kvs = kvs.Add("short-f1", shortString, false, false)
-			kvs = kvs.Add("long-f2", longString, false, false)
-			kvs = kvs.Add("huge-f3", hugeString, false, false)
+			kvs = kvs.Add("short-f1", shortString)
+			kvs = kvs.Add("long-f2", longString)
+			kvs = kvs.Add("huge-f3", hugeString)
 
-			kvs = kvs.Add("local-str-f1", "f1", false, false)
-			kvs = kvs.Add("local-str-f2", "f2", false, false)
-			kvs = kvs.Add("local-str-f3", "f3", false, false)
+			kvs = kvs.Add("local-str-f1", "f1")
+			kvs = kvs.Add("local-str-f2", "f2")
+			kvs = kvs.Add("local-str-f3", "f3")
 
 			pt := NewPointV2("m1",
 				kvs,
@@ -363,12 +363,12 @@ func BenchmarkStringKV(b *T.B) {
 	b.Run("non-string-kv", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
-			kvs = kvs.Add("f-i", 1024, false, false)
-			kvs = kvs.Add("f-b", false, false, false)
-			kvs = kvs.Add("f-f", 3.14, false, false)
-			kvs = kvs.Add("f-u", uint(42), false, false)
-			kvs = kvs.Add("f-max-int", int64(math.MaxInt64), false, false)
-			kvs = kvs.Add("f-max-uint", uint64(math.MaxUint64), false, false)
+			kvs = kvs.Add("f-i", 1024)
+			kvs = kvs.Add("f-b", false)
+			kvs = kvs.Add("f-f", 3.14)
+			kvs = kvs.Add("f-u", uint(42))
+			kvs = kvs.Add("f-max-int", int64(math.MaxInt64))
+			kvs = kvs.Add("f-max-uint", uint64(math.MaxUint64))
 
 			pt := NewPointV2("m1",
 				kvs,
@@ -396,10 +396,10 @@ func TestPointPoolMetrics(t *T.T) {
 		for i := 0; i < 100; i++ {
 			func() {
 				var kvs KVs
-				kvs = kvs.Add(fmt.Sprintf("f%d", i), 123, false, false)
-				kvs = kvs.Add(fmt.Sprintf("f%d", i+1), 123, false, false)
-				kvs = kvs.Add(fmt.Sprintf("f%d", i+2), 123, false, false)
-				kvs = kvs.Add(fmt.Sprintf("f%d", i+3), 123, false, false)
+				kvs = kvs.Add(fmt.Sprintf("f%d", i), 123)
+				kvs = kvs.Add(fmt.Sprintf("f%d", i+1), 123)
+				kvs = kvs.Add(fmt.Sprintf("f%d", i+2), 123)
+				kvs = kvs.Add(fmt.Sprintf("f%d", i+3), 123)
 
 				pt := NewPointV2("some", kvs)
 				pp.Put(pt)
@@ -418,10 +418,10 @@ func TestReservedCapPointPool(t *T.T) {
 		defer ClearPointPool()
 
 		var kvs KVs
-		kvs = kvs.Add(fmt.Sprintf("f%d", 0), 123, false, false)
-		kvs = kvs.Add(fmt.Sprintf("f%d", +1), 123, false, false)
-		kvs = kvs.Add(fmt.Sprintf("f%d", +2), 123, false, false)
-		kvs = kvs.Add(fmt.Sprintf("f%d", +3), 123, false, false)
+		kvs = kvs.Add(fmt.Sprintf("f%d", 0), 123)
+		kvs = kvs.Add(fmt.Sprintf("f%d", +1), 123)
+		kvs = kvs.Add(fmt.Sprintf("f%d", +2), 123)
+		kvs = kvs.Add(fmt.Sprintf("f%d", +3), 123)
 
 		pt := NewPointV2("some", kvs)
 		t.Logf("pt: %s", pt.Pretty())
@@ -608,23 +608,19 @@ func TestPoolKVResuable(t *T.T) {
 				kvs = kvs.AddTag("T_"+f.T2Key, f.T2)
 				kvs = kvs.AddTag("T_"+f.T3Key, f.T3)
 
-				kvs = kvs.AddV2("S_"+f.SKey, f.S, true)
-
-				kvs = kvs.AddV2("I8_"+f.I8Key, f.I8, true)
-				kvs = kvs.AddV2("I16_"+f.I16Key, f.I16, true)
-				kvs = kvs.AddV2("I32_"+f.I32Key, f.I32, true)
-				kvs = kvs.AddV2("I64_"+f.I64Key, f.I64, true)
-
-				kvs = kvs.AddV2("U8_"+f.U8Key, f.U8, true)
-				kvs = kvs.AddV2("U16_"+f.U16Key, f.U16, true)
-				kvs = kvs.AddV2("U32_"+f.U32Key, f.U32, true)
-				kvs = kvs.AddV2("U64_"+f.U64Key, f.U64, true)
-
-				kvs = kvs.AddV2("F32_"+f.F32Key, f.F32, true)
-				kvs = kvs.AddV2("F64_"+f.F64Key, f.F64, true)
-
-				kvs = kvs.AddV2("B_"+f.BKey, f.B, true)
-				kvs = kvs.AddV2("D_"+f.DKey, f.D, true)
+				kvs = kvs.Set("S_"+f.SKey, f.S)
+				kvs = kvs.Set("I8_"+f.I8Key, f.I8)
+				kvs = kvs.Set("I16_"+f.I16Key, f.I16)
+				kvs = kvs.Set("I32_"+f.I32Key, f.I32)
+				kvs = kvs.Set("I64_"+f.I64Key, f.I64)
+				kvs = kvs.Set("U8_"+f.U8Key, f.U8)
+				kvs = kvs.Set("U16_"+f.U16Key, f.U16)
+				kvs = kvs.Set("U32_"+f.U32Key, f.U32)
+				kvs = kvs.Set("U64_"+f.U64Key, f.U64)
+				kvs = kvs.Set("F32_"+f.F32Key, f.F32)
+				kvs = kvs.Set("F64_"+f.F64Key, f.F64)
+				kvs = kvs.Set("B_"+f.BKey, f.B)
+				kvs = kvs.Set("D_"+f.DKey, f.D)
 
 				if f.TS < 0 {
 					f.TS = 0

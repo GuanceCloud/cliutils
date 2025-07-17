@@ -102,13 +102,13 @@ func TestLargeJSONTag(t *T.T) {
 
 		var kvs KVs
 		kvs = kvs.AddTag("T", string(dataj))
-		kvs = kvs.Add("value", 200, false, true)
+		kvs = kvs.Set("value", 200)
 		pt := NewPointV2("test_lp", kvs)
 		t.Logf("lp-1 in %%s: %s", pt.LineProto())
 
 		var kvs2 KVs
-		kvs2 = kvs2.Add("value", 200, false, true)
-		kvs2 = kvs2.Add("F", string(dataj), false, true)
+		kvs2 = kvs2.Set("value", 200)
+		kvs2 = kvs2.Set("F", string(dataj))
 		pt2 := NewPointV2("test_lp", kvs2)
 		t.Logf("lp-2 in %%s: %s", pt2.LineProto())
 	})

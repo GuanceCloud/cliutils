@@ -86,7 +86,7 @@ func fromJSONPoint(j *JSONPoint) *Point {
 	kvs := NewKVs(j.Fields)
 
 	for k, v := range j.Tags {
-		kvs = kvs.MustAddTag(k, v)
+		kvs = kvs.SetTag(k, v)
 	}
 
 	return NewPointV2(j.Measurement, kvs, WithTimestamp(j.Time))
