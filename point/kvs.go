@@ -6,7 +6,6 @@
 package point
 
 import (
-	"fmt"
 	"math/rand"
 	"sort"
 	"strings"
@@ -57,16 +56,24 @@ func (x KVs) Less(i, j int) bool {
 	return strings.Compare(x[i].Key, x[j].Key) < 0 // stable sort
 }
 
-func (x KVs) Pretty() string {
-	var arr []string
+func (x KVs) kvPretty() []string {
+	var (
+		arr []string
+	)
 
-	for idx, kv := range x {
+	for _, kv := range x {
 		if kv == nil {
-			arr = append(arr, fmt.Sprintf("[% 5d] <nil>", idx))
+			arr = append(arr, "<nil>")
 		} else {
-			arr = append(arr, fmt.Sprintf("[% 5d] %s", idx, kv.String()))
+			arr = append(arr, kv.String())
 		}
 	}
+	return arr
+}
+
+// Pretty show x' key/value list in orderded(ASC) list.
+func (x KVs) Pretty() string {
+	arr := x.kvPretty()
 
 	// For key-values are not sorted while building the point, we
 	// think they are equal, so sort the string array to remove the
@@ -74,6 +81,11 @@ func (x KVs) Pretty() string {
 	sort.Strings(arr)
 
 	return strings.Join(arr, "\n")
+}
+
+// Pretty show x' key/value list in un-orderded list.
+func (x KVs) RawPretty() string {
+	return strings.Join(x.kvPretty(), "\n")
 }
 
 func (x KVs) PrettySorted() string {
