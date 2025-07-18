@@ -441,7 +441,6 @@ func TestPoolEscape(t *T.T) {
 		metrics.MustRegister(pp)
 
 		enc := GetEncoder(WithEncEncoding(Protobuf))
-
 		dec := GetDecoder(WithDecEncoding(Protobuf), WithDecEasyproto(false))
 
 		r := NewRander()
