@@ -160,7 +160,7 @@ func TestPBPointJSON(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			pt, err := NewPoint(tc.name, tc.tags, tc.fields, WithEncoding(Protobuf), WithTime(tc.time), WithKeySorted(true))
+			pt, err := NewPointDeprecated(tc.name, tc.tags, tc.fields, WithEncoding(Protobuf), WithTime(tc.time), WithKeySorted(true))
 
 			assert.NoError(t, err)
 
@@ -421,7 +421,7 @@ func TestPBPointPayloadSize(t *testing.T) {
 				ptkvs = append(ptkvs, kvsLargeNum...)
 			}
 
-			pbpts.Arr = append(pbpts.Arr, NewPointV2(t.Name(), ptkvs, WithPrecheck(false), WithTime(time.Now())).pt)
+			pbpts.Arr = append(pbpts.Arr, NewPoint(t.Name(), ptkvs, WithPrecheck(false), WithTime(time.Now())).pt)
 		}
 		return
 	}
@@ -440,13 +440,13 @@ func TestPBPointPayloadSize(t *testing.T) {
 	t.Run("timestamp", func(t *T.T) {
 		var kvs KVs
 		kvs = kvs.Add("f1", 123)
-		pt := NewPointV2(t.Name(), kvs, WithPrecheck(false), WithTimestamp(0))
+		pt := NewPoint(t.Name(), kvs, WithPrecheck(false), WithTimestamp(0))
 		t.Logf("ts = 0/size: %d", pt.pt.Size())
 
-		pt = NewPointV2(t.Name(), kvs, WithPrecheck(false), WithTimestamp(123))
+		pt = NewPoint(t.Name(), kvs, WithPrecheck(false), WithTimestamp(123))
 		t.Logf("ts = 123/size: %d", pt.pt.Size())
 
-		pt = NewPointV2(t.Name(), kvs, WithPrecheck(false), WithTimestamp(time.Now().UnixNano()))
+		pt = NewPoint(t.Name(), kvs, WithPrecheck(false), WithTimestamp(time.Now().UnixNano()))
 		t.Logf("ts = now/size: %d", pt.pt.Size())
 	})
 }

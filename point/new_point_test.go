@@ -51,7 +51,7 @@ func getNFields(n int) map[string]interface{} {
 
 func TestV2NewPoint(t *T.T) {
 	t.Run("valid-fields", func(t *T.T) {
-		pt := NewPointV2("abc", NewKVs(
+		pt := NewPoint("abc", NewKVs(
 			map[string]interface{}{
 				"[]byte":  []byte("abc"),
 				"[]uint8": []uint8("abc"),
@@ -101,14 +101,14 @@ func TestV2NewPoint(t *T.T) {
 			"u64-large": uint64(math.MaxInt64 + 1), // skipped in expect string
 			"u8":        uint8(1),
 		}
-		pt := NewPointV2(`abc`, NewKVs(kvs), WithTime(time.Unix(0, 123)), WithEncoding(Protobuf))
+		pt := NewPoint(`abc`, NewKVs(kvs), WithTime(time.Unix(0, 123)), WithEncoding(Protobuf))
 		expect := `abc []byte="YWJj"b,[]uint8="YWJj"b,b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1u,u16=1u,u32=1u,u64=1u,u64-large=9223372036854775808u,u8=1u 123`
 		assert.Equal(t, expect, pt.LineProto())
 	})
 
 	t.Run("basic", func(t *T.T) {
 		kvs := NewKVs(map[string]interface{}{"f1": 12}).SetTag(`t1`, `tval1`)
-		pt := NewPointV2(`abc`, kvs, WithTime(time.Unix(0, 123)))
+		pt := NewPoint(`abc`, kvs, WithTime(time.Unix(0, 123)))
 
 		assert.Equal(t, "abc,t1=tval1 f1=12i 123", pt.LineProto())
 	})
@@ -470,7 +470,7 @@ func TestNewPoint(t *T.T) {
 				}()
 			}
 
-			pt, err = NewPoint(tc.name, tc.t, tc.f, tc.opts...)
+			pt, err = NewPointDeprecated(tc.name, tc.t, tc.f, tc.opts...)
 
 			assert.NoError(t, err)
 
@@ -490,7 +490,7 @@ func TestNewPoint(t *T.T) {
 
 func TestPointKeySorted(t *testing.T) {
 	t.Run("sorted", func(t *testing.T) {
-		pt, err := NewPoint("basic",
+		pt, err := NewPointDeprecated("basic",
 			map[string]string{
 				"t1": "v1",
 				"t2": "v2",
@@ -523,7 +523,7 @@ func TestPointKeySorted(t *testing.T) {
 	})
 
 	t.Run("not-sorted", func(t *testing.T) {
-		pt, err := NewPoint("basic",
+		pt, err := NewPointDeprecated("basic",
 			map[string]string{
 				"t1": "v1",
 				"t2": "v2",
@@ -584,7 +584,7 @@ func BenchmarkV2NewPoint(b *T.B) {
 				"f10": false,
 			}
 
-			NewPointV2("abc", append(NewTags(tags), NewKVs(fields)...))
+			NewPoint("abc", append(NewTags(tags), NewKVs(fields)...))
 		}
 	})
 
@@ -613,7 +613,7 @@ func BenchmarkV2NewPoint(b *T.B) {
 			kvs = kvs.Add("f9", 45.6)
 			kvs = kvs.Add("f10", false)
 
-			NewPointV2("abc", kvs)
+			NewPoint("abc", kvs)
 		}
 	})
 
@@ -642,7 +642,7 @@ func BenchmarkV2NewPoint(b *T.B) {
 			kvs = kvs.Add("f9", 45.6)
 			kvs = kvs.Add("f10", false)
 
-			NewPointV2("abc", kvs)
+			NewPoint("abc", kvs)
 		}
 	})
 
@@ -671,7 +671,7 @@ func BenchmarkV2NewPoint(b *T.B) {
 			kvs = kvs.Set("f9", 45.6)
 			kvs = kvs.Set("f10", false)
 
-			NewPointV2("abc", kvs)
+			NewPoint("abc", kvs)
 		}
 	})
 
@@ -708,7 +708,7 @@ func BenchmarkV2NewPoint(b *T.B) {
 			kvs = kvs.Set("f9", 45.6)
 			kvs = kvs.Set("f10", false)
 
-			pt := NewPointV2("abc", kvs)
+			pt := NewPoint("abc", kvs)
 			pp.Put(pt)
 		}
 	})
@@ -730,7 +730,7 @@ func BenchmarkV2NewPoint(b *T.B) {
 		})
 
 		for i := 0; i < b.N; i++ {
-			NewPointV2(ptName, kvs, WithKeySorted(true))
+			NewPoint(ptName, kvs, WithKeySorted(true))
 		}
 	})
 
@@ -751,7 +751,7 @@ func BenchmarkV2NewPoint(b *T.B) {
 		})
 
 		for i := 0; i < b.N; i++ {
-			NewPointV2(ptName, kvs)
+			NewPoint(ptName, kvs)
 		}
 	})
 }
@@ -797,7 +797,7 @@ func FuzzPLPBEquality(f *testing.F) {
 			ts = 0
 		}
 
-		lppt, err := NewPoint(measurement,
+		lppt, err := NewPointDeprecated(measurement,
 			map[string]string{tagk: tagv},
 			map[string]interface{}{
 				"i64": i64,
@@ -812,7 +812,7 @@ func FuzzPLPBEquality(f *testing.F) {
 
 		assert.NoError(t, err)
 
-		pbpt, err := NewPoint(measurement,
+		pbpt, err := NewPointDeprecated(measurement,
 			map[string]string{tagk: tagv},
 			map[string]interface{}{
 				"i64": i64,

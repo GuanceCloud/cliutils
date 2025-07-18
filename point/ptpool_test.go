@@ -120,7 +120,7 @@ func BenchmarkNoReservedCapPool(b *T.B) {
 			kvs = kvs.Set("f4", false)
 			kvs = kvs.Set("f5", -123)
 
-			NewPointV2("m1", kvs, WithTime(now), WithPrecheck(false))
+			NewPoint("m1", kvs, WithTime(now), WithPrecheck(false))
 		}
 	})
 }
@@ -148,7 +148,7 @@ func BenchmarkReserved1KCapPool(b *T.B) {
 		kvs = kvs.Add("f4", false)
 		kvs = kvs.Add("f5", -123)
 
-		pt := NewPointV2("m1", kvs, WithPrecheck(false))
+		pt := NewPoint("m1", kvs, WithPrecheck(false))
 		pp.Put(pt)
 	}
 }
@@ -176,7 +176,7 @@ func BenchmarkReservedZeroCapPool(b *T.B) {
 		kvs = kvs.Add("f4", false)
 		kvs = kvs.Add("f5", -123)
 
-		pt := NewPointV2("m1", kvs, WithPrecheck(false))
+		pt := NewPoint("m1", kvs, WithPrecheck(false))
 		pp.Put(pt)
 	}
 }
@@ -195,7 +195,7 @@ func BenchmarkParallelNoPool(b *T.B) {
 			kvs = kvs.Set("f4", false)
 			kvs = kvs.Set("f5", -123)
 
-			NewPointV2("m1", kvs, WithTime(now), WithPrecheck(false))
+			NewPoint("m1", kvs, WithTime(now), WithPrecheck(false))
 		}
 	})
 }
@@ -217,7 +217,7 @@ func BenchmarkParallelReserveCapPool(b *T.B) {
 			kvs = kvs.Add("f4", false)
 			kvs = kvs.Add("f5", -123)
 
-			pt := NewPointV2("m1", kvs, WithPrecheck(false))
+			pt := NewPoint("m1", kvs, WithPrecheck(false))
 			pp.Put(pt)
 		}
 	})
@@ -240,7 +240,7 @@ func BenchmarkParallelNoReserveCapPool(b *T.B) {
 			kvs = kvs.Add("f4", false)
 			kvs = kvs.Add("f5", -123)
 
-			pt := NewPointV2("m1", kvs, WithPrecheck(false))
+			pt := NewPoint("m1", kvs, WithPrecheck(false))
 			pp.Put(pt)
 		}
 	})
@@ -319,7 +319,7 @@ func TestReset(t *T.T) {
 		kvs = kvs.Add("f1", 123)
 		kvs = kvs.Add("f2", false)
 
-		pt := NewPointV2("" /* go warnning */, kvs, WithTime(time.Now()))
+		pt := NewPoint("" /* go warnning */, kvs, WithTime(time.Now()))
 		pt.Reset()
 
 		assert.True(t, isEmptyPoint(pt))
@@ -350,7 +350,7 @@ func BenchmarkStringKV(b *T.B) {
 			kvs = kvs.Add("local-str-f2", "f2")
 			kvs = kvs.Add("local-str-f3", "f3")
 
-			pt := NewPointV2("m1",
+			pt := NewPoint("m1",
 				kvs,
 				WithTime(now),
 				WithStrField(true),
@@ -370,7 +370,7 @@ func BenchmarkStringKV(b *T.B) {
 			kvs = kvs.Add("f-max-int", int64(math.MaxInt64))
 			kvs = kvs.Add("f-max-uint", uint64(math.MaxUint64))
 
-			pt := NewPointV2("m1",
+			pt := NewPoint("m1",
 				kvs,
 				WithTime(now),
 				WithPrecheck(false),
@@ -401,7 +401,7 @@ func TestPointPoolMetrics(t *T.T) {
 				kvs = kvs.Add(fmt.Sprintf("f%d", i+2), 123)
 				kvs = kvs.Add(fmt.Sprintf("f%d", i+3), 123)
 
-				pt := NewPointV2("some", kvs)
+				pt := NewPoint("some", kvs)
 				pp.Put(pt)
 			}()
 		}
@@ -423,7 +423,7 @@ func TestReservedCapPointPool(t *T.T) {
 		kvs = kvs.Add(fmt.Sprintf("f%d", +2), 123)
 		kvs = kvs.Add(fmt.Sprintf("f%d", +3), 123)
 
-		pt := NewPointV2("some", kvs)
+		pt := NewPoint("some", kvs)
 		t.Logf("pt: %s", pt.Pretty())
 
 		pp.Put(pt)
@@ -626,7 +626,7 @@ func TestPoolKVResuable(t *T.T) {
 					f.TS = 0
 				}
 
-				pt := NewPointV2(f.Measurement, kvs, WithTimestamp(f.TS))
+				pt := NewPoint(f.Measurement, kvs, WithTimestamp(f.TS))
 
 				require.Equal(t, f.T1, pt.Get("T_"+f.T1Key))
 				require.Equal(t, f.T2, pt.Get("T_"+f.T2Key))

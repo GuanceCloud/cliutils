@@ -10,14 +10,14 @@ import (
 	"time"
 )
 
-func NewPointV2(name string, kvs KVs, opts ...Option) *Point {
+func NewPoint(name string, kvs KVs, opts ...Option) *Point {
 	c := GetCfg(opts...)
 	defer PutCfg(c)
 
 	return doNewPoint(name, kvs, c)
 }
 
-// NewPoint returns a new Point given name(measurement), tags, fields and optional options.
+// NewPointDeprecated returns a new Point given name(measurement), tags, fields and optional options.
 //
 // If fields empty(or nil), error ErrNoField will returned.
 //
@@ -25,7 +25,7 @@ func NewPointV2(name string, kvs KVs, opts ...Option) *Point {
 // float(32-bit/64-bit) and []byte, other types are ignored.
 //
 // Deprecated: use NewPointV2.
-func NewPoint(name string, tags map[string]string, fields map[string]any, opts ...Option) (*Point, error) {
+func NewPointDeprecated(name string, tags map[string]string, fields map[string]any, opts ...Option) (*Point, error) {
 	if len(fields) == 0 {
 		return nil, ErrNoFields
 	}

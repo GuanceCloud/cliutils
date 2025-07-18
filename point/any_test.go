@@ -25,7 +25,7 @@ func TestAny(t *T.T) {
 		assert.Equal(t, ArrayFieldType, x.TypeUrl)
 
 		kvs = kvs.Add("k1", x)
-		pt := NewPointV2("basic", kvs)
+		pt := NewPoint("basic", kvs)
 
 		t.Logf("%s", pt.Pretty())
 	})
@@ -50,7 +50,7 @@ func TestAny(t *T.T) {
 		assert.NoError(t, err)
 
 		kvs = kvs.Add("k1", x)
-		pt := NewPointV2("basic", kvs)
+		pt := NewPoint("basic", kvs)
 
 		assert.Equal(t, ArrayFieldType, x.TypeUrl)
 
@@ -74,7 +74,7 @@ func TestAny(t *T.T) {
 		var kvs KVs
 
 		kvs = kvs.Add("k1", x)
-		pt := NewPointV2("basic", kvs)
+		pt := NewPoint("basic", kvs)
 
 		t.Logf("%s", pt.Pretty())
 
@@ -120,7 +120,7 @@ func TestAny(t *T.T) {
 		t.Logf("any type URL: %s", x.GetTypeUrl())
 
 		kvs = kvs.Add("k1", x)
-		pt := NewPointV2("basic", kvs)
+		pt := NewPoint("basic", kvs)
 
 		t.Logf("%s", pt.Pretty())
 	})

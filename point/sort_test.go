@@ -15,8 +15,8 @@ import (
 func TestSortByTime(t *T.T) {
 	t.Run(`basic`, func(t *T.T) {
 		pts := []*Point{
-			NewPointV2("p1", nil, WithTime(time.Now())),
-			NewPointV2("p2", nil, WithTime(time.Now().Add(-time.Hour))),
+			NewPoint("p1", nil, WithTime(time.Now())),
+			NewPoint("p2", nil, WithTime(time.Now().Add(-time.Hour))),
 		}
 
 		t.Logf("before sort pt[0]: %s", pts[0].Pretty())

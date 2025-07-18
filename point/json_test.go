@@ -27,7 +27,7 @@ func TestJSONPointMarshal(t *T.T) {
 			name: "basic",
 			opts: []Option{WithTime(time.Unix(0, 123))},
 			p: func() *Point {
-				pt, err := NewPoint("abc",
+				pt, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "tv1", "t2": "tv2"},
 					map[string]interface{}{"f1": 123, "f2": false},
 					WithTime(time.Unix(0, 123)))
@@ -107,7 +107,7 @@ func TestJSONPointMarhsal(t *testing.T) {
 	kvs = kvs.Add("f8", MustNewAnyArray(1.0, 2, uint(3), "hello", []byte("world"), false, 3.14))
 	kvs = kvs.AddTag("t1", "some-tag-value")
 
-	pt := NewPointV2("json-point", kvs)
+	pt := NewPoint("json-point", kvs)
 
 	j, err := json.MarshalIndent(pt, "", "  ")
 	assert.NoError(t, err)

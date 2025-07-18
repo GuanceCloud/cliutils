@@ -92,7 +92,7 @@ func TestCheckPoints(t *T.T) {
 		kvs = kvs.Add("str", "hello")
 		kvs = kvs.Add("u64", uint64(math.MaxUint64))
 
-		pt := NewPointV2("m1", kvs, WithPrecheck(false))
+		pt := NewPoint("m1", kvs, WithPrecheck(false))
 		pts := CheckPoints([]*Point{pt}, WithStrField(false))
 		assert.Len(t, pts, 1)
 		assert.Nil(t, pts[0].Get("str"))
@@ -105,7 +105,7 @@ func TestCheckPoints(t *T.T) {
 		kvs = kvs.Add("str", "hello")
 		kvs = kvs.Add("u64", uint64(math.MaxUint64))
 
-		pt := NewPointV2("m1", kvs, WithPrecheck(false))
+		pt := NewPoint("m1", kvs, WithPrecheck(false))
 		pts := CheckPoints([]*Point{pt}, WithU64Field(false))
 		assert.Len(t, pts, 1)
 		assert.Nil(t, pts[0].Get("u64"))
@@ -117,7 +117,7 @@ func TestCheckPoints(t *T.T) {
 		kvs = kvs.Add("f.1", 1.23)
 		kvs = kvs.Add("u64", uint64(math.MaxUint64))
 
-		pt := NewPointV2("m1", kvs, WithPrecheck(false))
+		pt := NewPoint("m1", kvs, WithPrecheck(false))
 
 		pts := CheckPoints([]*Point{pt}, WithDotInKey(false))
 		assert.Len(t, pts, 1)
@@ -216,7 +216,7 @@ func TestCheckTags(t *T.T) {
 		kvs = kvs.Add("f.1", "some string", WithKVTagSet(true))
 		kvs = kvs.Add("f_1", 1.23)
 
-		pt := NewPointV2("m", kvs, WithDotInKey(false))
+		pt := NewPoint("m", kvs, WithDotInKey(false))
 
 		assert.Lenf(t, pt.pt.Fields, 1, "pt: %s", pt.Pretty())
 		// drop tag
@@ -229,7 +229,7 @@ func TestCheckTags(t *T.T) {
 		kvs = kvs[:0]
 		kvs = kvs.Add("f111", "some string", WithKVTagSet(true))
 		kvs = kvs.Add("f1", 1.23)
-		pt = NewPointV2("m", kvs, WithMaxTagKeyLen(2))
+		pt = NewPoint("m", kvs, WithMaxTagKeyLen(2))
 
 		assert.Len(t, pt.pt.Fields, 1)
 		// drop tag
@@ -241,7 +241,7 @@ func TestCheckTags(t *T.T) {
 		kvs = kvs[:0]
 		kvs = kvs.Add("f1", 1.23)
 		kvs = kvs.Add("f111", "some string")
-		pt = NewPointV2("m", kvs, WithMaxFieldKeyLen(2))
+		pt = NewPoint("m", kvs, WithMaxFieldKeyLen(2))
 
 		assert.Len(t, pt.pt.Fields, 1)
 		// drop field
@@ -253,7 +253,7 @@ func TestCheckTags(t *T.T) {
 		kvs = kvs[:0]
 		kvs = kvs.Add("f.1", 1.23)            // f.1 => f_1
 		kvs = kvs.Add("f_111", "some string") // f_111 => f_1: conflict
-		pt = NewPointV2("m", kvs, WithMaxFieldKeyLen(3), WithDotInKey(false))
+		pt = NewPoint("m", kvs, WithMaxFieldKeyLen(3), WithDotInKey(false))
 
 		assert.Len(t, pt.pt.Fields, 1)
 		// drop field
@@ -517,7 +517,7 @@ def`,
 
 func TestRequiredKV(t *T.T) {
 	t.Run(`add`, func(t *T.T) {
-		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123}),
+		pt := NewPoint(`abc`, NewKVs(map[string]any{"f1": 123}),
 			WithRequiredKeys(NewKey(`rk`, I, 1024)))
 		assert.Equal(t, int64(1024), pt.Get(`rk`))
 	})
@@ -619,7 +619,7 @@ func BenchmarkCheck(b *T.B) {
 	}
 
 	for _, tc := range cases {
-		pt, err := NewPoint(tc.m, tc.t, tc.f, tc.opts...)
+		pt, err := NewPointDeprecated(tc.m, tc.t, tc.f, tc.opts...)
 		assert.NoError(b, err)
 
 		cfg := GetCfg()

@@ -75,7 +75,7 @@ func TestLPFieldArray(t *T.T) {
 
 func TestTimeRound(t *T.T) {
 	t.Run(`decode-time`, func(t *T.T) {
-		pt := NewPointV2("some", nil, WithTime(time.Now()))
+		pt := NewPoint("some", nil, WithTime(time.Now()))
 		enc := GetEncoder(WithEncEncoding(Protobuf))
 		data, err := enc.Encode([]*Point{pt})
 		assert.NoError(t, err)
@@ -93,25 +93,25 @@ func TestDynamicPrecision(t *T.T) {
 		func() *Point {
 			var kvs KVs
 			kvs = kvs.Set("f1", 123)
-			return NewPointV2("p1", kvs, WithTimestamp(1716536956))
+			return NewPoint("p1", kvs, WithTimestamp(1716536956))
 		}(),
 
 		func() *Point {
 			var kvs KVs
 			kvs = kvs.Set("f1", 123)
-			return NewPointV2("p1", kvs, WithTimestamp(1716536956000))
+			return NewPoint("p1", kvs, WithTimestamp(1716536956000))
 		}(),
 
 		func() *Point {
 			var kvs KVs
 			kvs = kvs.Set("f1", 123)
-			return NewPointV2("p1", kvs, WithTimestamp(1716536956000000))
+			return NewPoint("p1", kvs, WithTimestamp(1716536956000000))
 		}(),
 
 		func() *Point {
 			var kvs KVs
 			kvs = kvs.Set("f1", 123)
-			return NewPointV2("p1", kvs, WithTimestamp(1716536956000000000))
+			return NewPoint("p1", kvs, WithTimestamp(1716536956000000000))
 		}(),
 	}
 
@@ -284,7 +284,7 @@ func TestDecode(t *T.T) {
 		{
 			name: "pb",
 			data: func() []byte {
-				pt, err := NewPoint("abc",
+				pt, err := NewPointDeprecated("abc",
 					map[string]string{"tag1": "v1", "tag2": "v2"},
 					map[string]interface{}{"f1": 1, "f2": 2.0},
 					WithTime(time.Unix(0, 123)))
@@ -307,7 +307,7 @@ func TestDecode(t *T.T) {
 			fail: true,
 			name: "invalid-pb",
 			data: func() []byte {
-				pt, err := NewPoint("abc",
+				pt, err := NewPointDeprecated("abc",
 					map[string]string{"tag1": "v1", "tag2": "v2"},
 					map[string]interface{}{"f1": 1, "f2": 2.0},
 					WithTime(time.Unix(0, 123)))
@@ -327,7 +327,7 @@ func TestDecode(t *T.T) {
 		{
 			name: "pb-with-fn",
 			data: func() []byte {
-				pt, err := NewPoint("abc",
+				pt, err := NewPointDeprecated("abc",
 					map[string]string{"tag1": "v1", "tag2": "v2"},
 					map[string]interface{}{"f1": 1, "f2": 2.0},
 					WithTime(time.Unix(0, 123)))
@@ -356,7 +356,7 @@ func TestDecode(t *T.T) {
 		{
 			name: "pb-with-fn-on-error",
 			data: func() []byte {
-				pt, err := NewPoint("abc",
+				pt, err := NewPointDeprecated("abc",
 					map[string]string{"tag1": "v1", "tag2": "v2"},
 					map[string]interface{}{"f1": 1, "f2": 2.0},
 					WithTime(time.Unix(0, 123)))
@@ -437,7 +437,7 @@ func TestDecode(t *T.T) {
 	t.Run("decode-bytes-array", func(t *T.T) {
 		var kvs KVs
 		kvs = kvs.Add("f_d_arr", MustNewAnyArray([]byte("hello"), []byte("world")))
-		pt := NewPointV2("m1", kvs)
+		pt := NewPoint("m1", kvs)
 		enc := GetEncoder(WithEncEncoding(LineProtocol))
 		defer PutEncoder(enc)
 		arr, err := enc.Encode([]*Point{pt})
@@ -460,7 +460,7 @@ func TestDecode(t *T.T) {
 		kvs = kvs.Add("f_1", 321)
 		kvs = kvs.AddTag("tag.1", "some-val")
 
-		pt := NewPointV2("m1", kvs, WithTime(time.Unix(0, 123)))
+		pt := NewPoint("m1", kvs, WithTime(time.Unix(0, 123)))
 
 		enc := GetEncoder(WithEncEncoding(Protobuf))
 		defer PutEncoder(enc)

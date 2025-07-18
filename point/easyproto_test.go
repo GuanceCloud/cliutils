@@ -95,7 +95,7 @@ func TestEasyproto(t *T.T) {
 		kvs = kvs.AddTag("tag-1", "value-1")
 
 		pts := []*Point{
-			NewPointV2("p1", kvs, WithTimestamp(123)),
+			NewPoint("p1", kvs, WithTimestamp(123)),
 		}
 
 		var dst []byte
@@ -127,7 +127,7 @@ func TestEasyproto(t *T.T) {
 		kvs = kvs.AddTag("tag-1", "value-1")
 
 		pts := []*Point{
-			NewPointV2("p1", kvs, WithTimestamp(123)),
+			NewPoint("p1", kvs, WithTimestamp(123)),
 		}
 		t.Logf("pt: %s", pts[0].Pretty())
 

@@ -260,7 +260,7 @@ func (r *ptRander) doRand() *Point {
 	}
 
 	kvs := append(r.randTags(), r.randFields()...)
-	pt := NewPointV2(ptName, kvs, WithTime(r.ts), WithKeySorted(r.kvSorted))
+	pt := NewPoint(ptName, kvs, WithTime(r.ts), WithKeySorted(r.kvSorted))
 
 	if r.pb {
 		pt.SetFlag(Ppb)

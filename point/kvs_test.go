@@ -448,7 +448,7 @@ func TestNewKVs(t *T.T) {
 	})
 
 	t.Run(`test-update-on-kvs`, func(t *T.T) {
-		pt := NewPointV2("ptname", nil)
+		pt := NewPoint("ptname", nil)
 
 		pt.pt.Fields = KVs(pt.pt.Fields).Add("f1", 1.23)
 
@@ -470,7 +470,7 @@ func TestNewKVs(t *T.T) {
 		assert.Equal(t, []any{[]byte("hello"), []byte("world")}, kvs.Get("f_arr").Raw())
 		t.Logf("kvs: %s", kvs.Pretty())
 
-		pt := NewPointV2("some", kvs)
+		pt := NewPoint("some", kvs)
 
 		t.Logf("pt pretty: %s", pt.Pretty())
 		t.Logf("pt lineproto: %s", pt.LineProto())
@@ -603,7 +603,7 @@ func Test_shuffle(t *T.T) {
 
 	kvs = kvs.shuffle()
 
-	p := NewPointV2(t.Name(), kvs)
+	p := NewPoint(t.Name(), kvs)
 
 	t.Logf(p.Pretty())
 }
@@ -618,7 +618,7 @@ func TestShuffleGzip(t *T.T) {
 		kvs = kvs.Add(`f4`, []byte("hello world"))
 		kvs = kvs.Add(`f5`, 3.14)
 		kvs = kvs.Add(`f6`, uint(8))
-		pts = append(pts, NewPointV2(t.Name(), kvs))
+		pts = append(pts, NewPoint(t.Name(), kvs))
 	}
 
 	enc := GetEncoder(WithEncEncoding(Protobuf))

@@ -209,11 +209,11 @@ func FromModelsLP(lp influxm.Point) *Point {
 		kvs = kvs.SetTag(string(t.Key), string(t.Value))
 	}
 
-	return NewPointV2(string(lp.Name()), kvs, WithTime(lp.Time()))
+	return NewPoint(string(lp.Name()), kvs, WithTime(lp.Time()))
 }
 
 func FromPB(pb *PBPoint) *Point {
-	pt := NewPointV2(pb.Name, pb.Fields, WithTime(time.Unix(0, pb.Time)))
+	pt := NewPoint(pb.Name, pb.Fields, WithTime(time.Unix(0, pb.Time)))
 	if len(pb.Warns) > 0 {
 		pt.pt.Warns = pb.Warns
 	}

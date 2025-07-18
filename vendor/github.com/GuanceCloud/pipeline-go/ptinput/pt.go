@@ -310,7 +310,7 @@ func NewPlPt(cat point.Category, name string,
 		opt = append(opt, point.WithTime(ptTime))
 	}
 
-	pt := point.NewPointV2(name, kvs, opt...)
+	pt := point.NewPoint(name, kvs, opt...)
 	return &Pt{
 		pt:       pt,
 		category: cat,
