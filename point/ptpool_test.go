@@ -444,7 +444,8 @@ func TestPoolEscape(t *T.T) {
 		dec := GetDecoder(WithDecEncoding(Protobuf), WithDecEasyproto(false))
 
 		r := NewRander()
-		pts := r.Rand(100)
+		npts := 100
+		pts := r.Rand(npts)
 
 		t.Cleanup(func() {
 			PutEncoder(enc)
@@ -476,8 +477,9 @@ func TestPoolEscape(t *T.T) {
 		mfs, err := metrics.Gather()
 		assert.NoError(t, err)
 
-		mf := metrics.GetMetric(mfs, "pointpool_escaped", 0)
-		assert.Equal(t, 100.0, mf.GetCounter().GetValue()) // decoded 100 points(not easyproto) not from point pool
+		mf := metrics.GetMetric(mfs, "pointpool_escaped_total", 0)
+		assert.NotNil(t, mf)
+		assert.Equal(t, float64(npts), mf.GetCounter().GetValue()) // decoded 100 points(not easyproto) not from point pool
 	})
 
 	t.Run("no-escape", func(t *T.T) {
@@ -522,7 +524,8 @@ func TestPoolEscape(t *T.T) {
 		mfs, err := metrics.Gather()
 		assert.NoError(t, err)
 
-		mf := metrics.GetMetric(mfs, "pointpool_escaped", 0)
+		mf := metrics.GetMetric(mfs, "pointpool_escaped_total", 0)
+		assert.NotNil(t, mf)
 		assert.Equal(t, 0.0, mf.GetCounter().GetValue()) // decoded 100 points(not easyproto) not from point pool
 	})
 }
