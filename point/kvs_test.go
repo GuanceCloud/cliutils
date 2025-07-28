@@ -460,14 +460,14 @@ func TestNewKVs(t *T.T) {
 	t.Run("array-int-value", func(t *T.T) {
 		var kvs KVs
 		kvs = kvs.Add("f_arr", MustNewAnyArray(1, 2, 3), false, false)
-		assert.Equal(t, []any{int64(1), int64(2), int64(3)}, kvs.Get("f_arr").Raw())
+		assert.Equal(t, []int64{int64(1), int64(2), int64(3)}, kvs.Get("f_arr").Raw())
 		t.Logf("kvs: %s", kvs.Pretty())
 	})
 
 	t.Run("array-bytes-value", func(t *T.T) {
 		var kvs KVs
 		kvs = kvs.Add("f_arr", MustNewAnyArray([]byte("hello"), []byte("world")), false, false)
-		assert.Equal(t, []any{[]byte("hello"), []byte("world")}, kvs.Get("f_arr").Raw())
+		assert.Equal(t, [][]byte{[]byte("hello"), []byte("world")}, kvs.Get("f_arr").Raw())
 		t.Logf("kvs: %s", kvs.Pretty())
 
 		pt := NewPointV2("some", kvs)
