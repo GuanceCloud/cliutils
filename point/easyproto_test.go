@@ -27,60 +27,40 @@ func BenchmarkEasyproto(b *T.B) {
 	b.ResetTimer()
 	b.Run("gogopb-encode", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
-			pbpts.Marshal()
+			_, err := pbpts.Marshal()
+			assert.NoError(b, err)
 		}
 	})
 
 	src, err := pbpts.Marshal()
 	assert.NoError(b, err)
+
 	b.ResetTimer()
 	b.Run("easyproto-decode", func(b *T.B) {
 		for i := 0; i < b.N; i++ {
-			unmarshalPoints(src)
+			_, err := unmarshalPoints(src)
+			assert.NoError(b, err)
 		}
 	})
 
+	b.ResetTimer()
 	b.Run("gogopb-decode", func(b *T.B) {
+		var pbpts PBPoints
 		for i := 0; i < b.N; i++ {
-			var pbpts PBPoints
-			pbpts.Unmarshal(src)
+			err := pbpts.Unmarshal(src)
+			assert.NoError(b, err)
 		}
 	})
 
-	b.Run("easyproto-decode-under-point-pool", func(b *T.B) {
-		pp := NewReservedCapPointPool(100)
-		SetPointPool(pp)
-
-		b.Cleanup(func() {
-			b.Logf("ptpool: %s", pp.(*ReservedCapPointPool).String())
-			ClearPointPool()
-		})
-
+	b.ResetTimer()
+	b.Run("easybatch-decode", func(b *T.B) {
+		bp := NewBatchPoints()
 		for i := 0; i < b.N; i++ {
-			pts, _ := unmarshalPoints(src)
-
-			for _, pt := range pts {
-				pp.Put(pt)
-			}
+			bp.Reset()
+			err := bp.Unmarshal(src)
+			assert.NoError(b, err)
 		}
 	})
-
-	/*
-		  goos: darwin
-			goarch: arm64
-			pkg: github.com/GuanceCloud/cliutils/point
-			BenchmarkEasyproto
-			BenchmarkEasyproto/easyproto-encode
-			BenchmarkEasyproto/easyproto-encode-10         	    1161	   1034532 ns/op	 1202131 B/op	       1 allocs/op
-			BenchmarkEasyproto/gogopb-encode
-			BenchmarkEasyproto/gogopb-encode-10            	    3010	    401256 ns/op	 1089548 B/op	       1 allocs/op
-			BenchmarkEasyproto/easyproto-decode
-			BenchmarkEasyproto/easyproto-decode-10         	     560	   2119419 ns/op	 2138183 B/op	   57014 allocs/op
-			BenchmarkEasyproto/easyproto-decode#01
-			BenchmarkEasyproto/easyproto-decode#01-10      	     601	   1958508 ns/op	 3013150 B/op	   69012 allocs/op
-			PASS
-			ok  	github.com/GuanceCloud/cliutils/point	6.254s
-	*/
 }
 
 func TestEasyproto(t *T.T) {
@@ -116,7 +96,7 @@ func TestEasyproto(t *T.T) {
 		t.Logf("pt: %s", pts[0].Pretty())
 	})
 
-	t.Run("unmarshal", func(t *T.T) {
+	t.Run("easyproto-unmarshal", func(t *T.T) {
 		var kvs KVs
 		kvs = kvs.Add("f1", 123, WithKVUnit("dollar"), WithKVType(GAUGE))
 		kvs = kvs.Add("f2", 1.23, WithKVUnit("byte"), WithKVType(COUNT))

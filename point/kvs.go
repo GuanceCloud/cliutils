@@ -31,14 +31,9 @@ func (kv *Field) Raw() any {
 		return kv.GetD()
 	case *Field_S:
 		return kv.GetS()
-
 	case *Field_A:
-
-		if v, err := AnyRaw(kv.GetA()); err != nil {
-			return nil
-		} else {
-			return v
-		}
+		v, _ := AnyRaw(kv.GetA())
+		return v
 	default:
 		return nil
 	}
