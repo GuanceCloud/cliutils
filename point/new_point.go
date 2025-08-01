@@ -24,7 +24,7 @@ func NewPoint(name string, kvs KVs, opts ...Option) *Point {
 // Values in fields only allowed for int/uint(8-bit/16-bit/32-bit/64-bit), string, bool,
 // float(32-bit/64-bit) and []byte, other types are ignored.
 //
-// Deprecated: use NewPointV2.
+// Deprecated: use NewPoint.
 func NewPointDeprecated(name string, tags map[string]string, fields map[string]any, opts ...Option) (*Point, error) {
 	if len(fields) == 0 {
 		return nil, ErrNoFields
