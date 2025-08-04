@@ -70,8 +70,8 @@ github.com/DataDog/sketches-go v1.2.1 h1:qTBzWLnZ3kM2kw39ymh6rMcnN+5VULwFs++lEYU
 github.com/DataDog/sketches-go v1.2.1/go.mod h1:1xYmPLY1So10AwxV6MJV0J53XVH+WL9Ad1KetxVivVI=
 github.com/GuanceCloud/grok v1.1.4 h1:+w/U5a54cgY0O+dvfcKc2qD3JuhmaS8Hi29BM4QMYts=
 github.com/GuanceCloud/grok v1.1.4/go.mod h1:AHkJZYf7Qbo1FTZT6htdyScpICpgnkQ5+Hc0EmA88vM=
-github.com/GuanceCloud/influxdb1-client v0.1.8 h1:7XNICWcW+NxAHFkzQ8mkOCKA/8U2WNH5m+Hm9g0vz4k=
-github.com/GuanceCloud/influxdb1-client v0.1.8/go.mod h1:4HC4b/O653/ezBiHMPBnHYnHCCfsNT2LvCr7wNLngw4=
+github.com/GuanceCloud/influxdb1-client v0.1.9 h1:7RyOYJMbj+NOPlKoq/Zwh4Lo/jbQgqgs+sKwo/5/6ao=
+github.com/GuanceCloud/influxdb1-client v0.1.9/go.mod h1:4HC4b/O653/ezBiHMPBnHYnHCCfsNT2LvCr7wNLngw4=
 github.com/GuanceCloud/pipeline-go v1.0.1 h1:f1fK2I6HZvvgYwMV54YNEoKMZY4qhOzlGHVys6N6+Fw=
 github.com/GuanceCloud/pipeline-go v1.0.1/go.mod h1:gZG7SQzQNHHss91WIb3mo4Xp+E+TmB+3nP4SBkUCTlM=
 github.com/GuanceCloud/platypus v0.3.1 h1:AL41baV38eL9daadQ3ZP17HnBRuu7m4cfJSNuIGaKP8=
