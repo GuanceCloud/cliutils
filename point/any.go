@@ -58,6 +58,9 @@ func AnyRaw(x *types.Any) (any, error) {
 			if len(arr.Arr) == 0 {
 				return nil, nil
 			}
+
+			// NOTE: detect element's type and return the same []<type>{} array.
+			// i.e., element in array are int64, then we get []int64{} array.
 			switch arr.Arr[0].GetX().(type) {
 			case *BasicTypes_I:
 				res := make([]int64, 0, len(arr.Arr))
@@ -99,6 +102,7 @@ func AnyRaw(x *types.Any) (any, error) {
 				return nil, fmt.Errorf("unknown type %q within array", reflect.TypeOf(arr.Arr[0].GetX()).String())
 			}
 		} else {
+			// for mix-typed element in array, we just return the []any{}.
 			var res []any
 			for _, v := range arr.Arr {
 				switch v.GetX().(type) {

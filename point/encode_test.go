@@ -100,17 +100,17 @@ func TestEncodeEqualty(t *T.T) {
 		randPts = r.Rand(nrand)
 
 		simplePts = []*Point{
-			NewPointV2(`abc`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
+			NewPoint(`abc`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
 				AddTag(`t1`, `tv1`).
 				AddTag(`t2`, `tv2`).
 				AddTag(`t3`, `tv3`), WithTime(time.Unix(0, 123))),
 
-			NewPointV2(`def`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
+			NewPoint(`def`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
 				AddTag(`t1`, `tv1`).
 				AddTag(`t2`, `tv2`).
 				AddTag(`t3`, `tv3`), WithTime(time.Unix(0, 123))),
 
-			NewPointV2(`xyz`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
+			NewPoint(`xyz`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
 				AddTag(`t1`, `tv1`).
 				AddTag(`t2`, `tv2`).
 				AddTag(`t3`, `tv3`), WithTime(time.Unix(0, 123))),
@@ -138,7 +138,7 @@ func TestEncodeEqualty(t *T.T) {
 			},
 
 			pts: func() []*Point {
-				x, err := NewPoint("abc", map[string]string{
+				x, err := NewPointDeprecated("abc", map[string]string{
 					"t1": "tv1",
 					"t2": "tv2",
 					"t3": "tv3",
@@ -274,25 +274,24 @@ func TestEncodeEqualty(t *T.T) {
 func TestEscapeEncode(t *T.T) {
 	t.Run("escaped-lineproto", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f1=2=3=", 3.14, false, false)
-		kvs = kvs.Add("f2\tnr", 2, false, false)
-		kvs = kvs.Add("f3,", "some-string\nanother-line", false, false)
-		kvs = kvs.Add("f4,", false, false, false)
+		kvs = kvs.Add("f1=2=3=", 3.14)
+		kvs = kvs.Add("f2\tnr", 2)
+		kvs = kvs.Add("f3,", "some-string\nanother-line")
+		kvs = kvs.Add("f4,", false)
+		kvs = kvs.Add("f\nnext-line,", []byte("hello"))
+		kvs = kvs.Add(`f\other`, []byte("hello")) // nolint:misspell
 
-		kvs = kvs.Add("f\nnext-line,", []byte("hello"), false, false)
-		kvs = kvs.Add(`f\other`, []byte("hello"), false, false) // nolint:misspell
-		kvs = kvs.Add("tag=1", "value", true, false)
-		kvs = kvs.Add("tag 2", "value", true, false)
-		kvs = kvs.Add("tag\t3", "value", true, false)
+		kvs = kvs.AddTag("tag=1", "value")
+		kvs = kvs.AddTag("tag 2", "value")
+		kvs = kvs.AddTag("tag\t3", "value")
+		kvs = kvs.AddTag("tag=1", "value=1")
+		kvs = kvs.AddTag("tag 2", "value 2")
+		kvs = kvs.AddTag("tag\t3", "value \t3")
+		kvs = kvs.AddTag("tag4", "value \n3")
+		kvs = kvs.AddTag("tag5", `value \`)         // tag-value got tail \
+		kvs = kvs.AddTag("tag\nnext-line", `value`) // tag key get \n
 
-		kvs = kvs.Add("tag=1", "value=1", true, false)
-		kvs = kvs.Add("tag 2", "value 2", true, false)
-		kvs = kvs.Add("tag\t3", "value \t3", true, false)
-		kvs = kvs.Add("tag4", "value \n3", true, false)
-		kvs = kvs.Add("tag5", `value \`, true, false)         // tag-value got tail \
-		kvs = kvs.Add("tag\nnext-line", `value`, true, false) // tag key get \n
-
-		pt := NewPointV2("some,=abc\"", kvs)
+		pt := NewPoint("some,=abc\"", kvs)
 
 		lp := pt.LineProto()
 		t.Logf("line-protocol: %s", lp)
@@ -314,9 +313,9 @@ func TestPBEncode(t *T.T) {
 
 		t.Logf("invalidUTF8: %s", invalidUTF8) // the printed invalid-utf8 seems equal to `abc'
 
-		kvs = kvs.Add("invalid-utf8", invalidUTF8, false, false)
+		kvs = kvs.Add("invalid-utf8", invalidUTF8)
 
-		pt := NewPointV2("p1", kvs)
+		pt := NewPoint("p1", kvs)
 
 		enc := GetEncoder(WithEncEncoding(Protobuf))
 		defer PutEncoder(enc)
@@ -338,9 +337,9 @@ func TestPBEncode(t *T.T) {
 		invalidUTF8Str := "a\xffb\xC0\xAFc\xff"
 
 		validUTF8Str := strings.ToValidUTF8(invalidUTF8Str, "0X")
-		kvs = kvs.Add("invalid-utf8", validUTF8Str, false, false)
+		kvs = kvs.Add("invalid-utf8", validUTF8Str)
 
-		pt := NewPointV2("p1", kvs)
+		pt := NewPoint("p1", kvs)
 
 		enc := GetEncoder(WithEncEncoding(Protobuf))
 		defer PutEncoder(enc)
@@ -355,9 +354,9 @@ func TestPBEncode(t *T.T) {
 
 		invalidUTF8Bytes := []byte("a\xffb\xC0\xAFc\xff")
 
-		kvs = kvs.Add("invalid-utf8", invalidUTF8Bytes, false, false)
+		kvs = kvs.Add("invalid-utf8", invalidUTF8Bytes)
 
-		pt := NewPointV2("p1", kvs)
+		pt := NewPoint("p1", kvs)
 
 		enc := GetEncoder(WithEncEncoding(Protobuf))
 		defer PutEncoder(enc)
@@ -404,7 +403,7 @@ func TestEncodeTags(t *T.T) {
 		defer PutEncoder(enc)
 
 		arr := func() []*Point {
-			x, err := NewPoint("abc", map[string]string{
+			x, err := NewPointDeprecated("abc", map[string]string{
 				"service": "/sf-webproxy/api/online_status",
 			}, map[string]interface{}{
 				"f3": "fv3",
@@ -682,12 +681,12 @@ func BenchmarkV2Encode(b *T.B) {
 func TestV2Encode(t *T.T) {
 	t.Run("skip-huge-tail-point", func(t *T.T) {
 		pts := []*Point{
-			NewPointV2("small", NewKVs(map[string]any{
+			NewPoint("small", NewKVs(map[string]any{
 				"f1":   123,
 				"str1": strings.Repeat("x", 100),
 			}), WithTimestamp(123)),
 
-			NewPointV2("huge", NewKVs(map[string]any{
+			NewPoint("huge", NewKVs(map[string]any{
 				"f1":   123,
 				"str1": strings.Repeat("x", 100),
 				"str2": strings.Repeat("y", 200),
@@ -747,14 +746,14 @@ func TestV2Encode(t *T.T) {
 
 	t.Run("encode-huge-tail-point", func(t *T.T) {
 		pts := []*Point{
-			NewPointV2("p1", NewKVs(map[string]any{
+			NewPoint("p1", NewKVs(map[string]any{
 				"f1":   123,
 				"str1": strings.Repeat("x", 100),
 				"str2": strings.Repeat("y", 200),
 				"str3": strings.Repeat("z", 400),
 			}), WithTimestamp(123)),
 
-			NewPointV2("p2", NewKVs(map[string]any{
+			NewPoint("p2", NewKVs(map[string]any{
 				"f1":   123,
 				"str1": strings.Repeat("x", 100),
 				"str2": strings.Repeat("y", 200),
@@ -1083,37 +1082,37 @@ func TestEncTrim(t *T.T) {
 	str128K := strings.Repeat("x", 128*(1<<10))
 
 	var kvsBasic KVs
-	kvsBasic = kvsBasic.AddV2("int8", int8(1), true)
-	kvsBasic = kvsBasic.AddV2("int16", int16(1), true)
-	kvsBasic = kvsBasic.AddV2("int32", int32(1), true)
-	kvsBasic = kvsBasic.AddV2("int64", int64(1), true)
-	kvsBasic = kvsBasic.AddV2("f32", float32(1.0), true)
-	kvsBasic = kvsBasic.AddV2("f64", float64(1.0), true)
+	kvsBasic = kvsBasic.Set("int8", int8(1))
+	kvsBasic = kvsBasic.Set("int16", int16(1))
+	kvsBasic = kvsBasic.Set("int32", int32(1))
+	kvsBasic = kvsBasic.Set("int64", int64(1))
+	kvsBasic = kvsBasic.Set("f32", float32(1.0))
+	kvsBasic = kvsBasic.Set("f64", float64(1.0))
 
 	var kvsStr KVs
-	kvsStr = kvsStr.AddV2("str-tiny", strTiny, true)
-	kvsStr = kvsStr.AddV2("str-small", strSmall, true)
-	kvsStr = kvsStr.AddV2("str-1m", str1M, true)
-	kvsStr = kvsStr.AddV2("str-1k", str1K, true)
-	kvsStr = kvsStr.AddV2("str-32k", str32K, true)
-	kvsStr = kvsStr.AddV2("str-128k", str128K, true)
+	kvsStr = kvsStr.Set("str-tiny", strTiny)
+	kvsStr = kvsStr.Set("str-small", strSmall)
+	kvsStr = kvsStr.Set("str-1m", str1M)
+	kvsStr = kvsStr.Set("str-1k", str1K)
+	kvsStr = kvsStr.Set("str-32k", str32K)
+	kvsStr = kvsStr.Set("str-128k", str128K)
 
 	var kvsBytes KVs
-	kvsBytes = kvsBytes.AddV2("bytes-tiny", []byte(strTiny), true)
-	kvsBytes = kvsBytes.AddV2("bytes-small", []byte(strSmall), true)
-	kvsBytes = kvsBytes.AddV2("bytes-1m", []byte(str1M), true)
-	kvsBytes = kvsBytes.AddV2("bytes-1k", []byte(str1K), true)
-	kvsBytes = kvsBytes.AddV2("bytes-32k", []byte(str32K), true)
-	kvsBytes = kvsBytes.AddV2("bytes-128k", []byte(str128K), true)
+	kvsBytes = kvsBytes.Set("bytes-tiny", []byte(strTiny))
+	kvsBytes = kvsBytes.Set("bytes-small", []byte(strSmall))
+	kvsBytes = kvsBytes.Set("bytes-1m", []byte(str1M))
+	kvsBytes = kvsBytes.Set("bytes-1k", []byte(str1K))
+	kvsBytes = kvsBytes.Set("bytes-32k", []byte(str32K))
+	kvsBytes = kvsBytes.Set("bytes-128k", []byte(str128K))
 
 	var kvsBool KVs
-	kvsBool = kvsBasic.AddV2("bool-yes", true, true)
-	kvsBool = kvsBasic.AddV2("bool-no", false, true)
+	kvsBool = kvsBasic.Set("bool-yes", true)
+	kvsBool = kvsBasic.Set("bool-no", false)
 
 	var kvsLargeNum KVs
-	kvsLargeNum = kvsLargeNum.AddV2("large-i64", int64(math.MaxInt64), true)
-	kvsLargeNum = kvsLargeNum.AddV2("large-u64", uint64(math.MaxUint64), true)
-	kvsLargeNum = kvsLargeNum.AddV2("large-f64", math.MaxFloat64, true)
+	kvsLargeNum = kvsLargeNum.Set("large-i64", int64(math.MaxInt64))
+	kvsLargeNum = kvsLargeNum.Set("large-u64", uint64(math.MaxUint64))
+	kvsLargeNum = kvsLargeNum.Set("large-f64", math.MaxFloat64)
 
 	type tcase struct {
 		name string
@@ -1148,7 +1147,7 @@ func TestEncTrim(t *T.T) {
 				ptkvs = append(ptkvs, kvsLargeNum...)
 			}
 
-			pt := NewPointV2(t.Name(), ptkvs, WithPrecheck(false), WithTime(time.Now()))
+			pt := NewPoint(t.Name(), ptkvs, WithPrecheck(false), WithTime(time.Now()))
 			pts = append(pts, pt)
 		}
 
@@ -1283,28 +1282,28 @@ func TestSkipLargePoint(t *T.T) {
 
 		var kvs1, kvs2, kvs3, kvs4 KVs
 
-		kvs1 = kvs1.Add("msg1", strings.Repeat("x", 70), false, false)
-		kvs1 = kvs1.Add("f1", 3.14, false, false)
-		kvs2 = kvs2.Add("msg2", strings.Repeat("y", 70), false, false) // small point
-		kvs2 = kvs2.Add("f1", 3.14, false, false)
-		kvs3 = kvs3.Add("msg3", strings.Repeat("z", 70), false, false)
-		kvs3 = kvs3.Add("f1", 3.14, false, false)
-		kvs4 = kvs3.Add("msg4", strings.Repeat("0", 700), false, false) // large point that should skip
+		kvs1 = kvs1.Add("msg1", strings.Repeat("x", 70))
+		kvs1 = kvs1.Add("f1", 3.14)
+		kvs2 = kvs2.Add("msg2", strings.Repeat("y", 70)) // small point
+		kvs2 = kvs2.Add("f1", 3.14)
+		kvs3 = kvs3.Add("msg3", strings.Repeat("z", 70))
+		kvs3 = kvs3.Add("f1", 3.14)
+		kvs4 = kvs3.Add("msg4", strings.Repeat("0", 700)) // large point that should skip
 
-		pt1 := NewPointV2("p1", kvs1, append(DefaultLoggingOptions(),
+		pt1 := NewPoint("p1", kvs1, append(DefaultLoggingOptions(),
 			WithTimestamp(123),
 			WithPrecheck(false))...)
 
-		pt2 := NewPointV2("p2", kvs2, append(DefaultLoggingOptions(),
+		pt2 := NewPoint("p2", kvs2, append(DefaultLoggingOptions(),
 			WithTimestamp(time.Now().Unix()),
 			WithPrecheck(false))...)
 
-		pt3 := NewPointV2("p3", kvs3, append(DefaultLoggingOptions(),
+		pt3 := NewPoint("p3", kvs3, append(DefaultLoggingOptions(),
 			WithTimestamp(time.Now().Unix()),
 			WithPrecheck(false))...)
 
 		// p3 larger than encode buf
-		pt4 := NewPointV2("p4", kvs4, append(DefaultLoggingOptions(), // small
+		pt4 := NewPoint("p4", kvs4, append(DefaultLoggingOptions(), // small
 			WithTimestamp(time.Now().Unix()),
 			WithPrecheck(false))...)
 
@@ -1350,18 +1349,18 @@ func TestSkipLargePoint(t *T.T) {
 			kvs3 KVs
 		)
 
-		kvs1 = kvs1.Add("msg1", strings.Repeat("x", 70), false, false)
-		kvs2 = kvs2.Add("msg2", strings.Repeat("y", 70), false, false)
-		kvs3 = kvs3.Add("msg3", strings.Repeat("z", 100), false, false)
-		pt1 := NewPointV2("p1", kvs1, append(DefaultLoggingOptions(),
+		kvs1 = kvs1.Add("msg1", strings.Repeat("x", 70))
+		kvs2 = kvs2.Add("msg2", strings.Repeat("y", 70))
+		kvs3 = kvs3.Add("msg3", strings.Repeat("z", 100))
+		pt1 := NewPoint("p1", kvs1, append(DefaultLoggingOptions(),
 			WithTimestamp(123),
 			WithPrecheck(false))...)
-		pt2 := NewPointV2("p2", kvs2, append(DefaultLoggingOptions(),
+		pt2 := NewPoint("p2", kvs2, append(DefaultLoggingOptions(),
 			WithTimestamp(123),
 			WithPrecheck(false))...)
 
 		// p3 larger than encode buf
-		pt3 := NewPointV2("p3", kvs3, append(DefaultLoggingOptions(),
+		pt3 := NewPoint("p3", kvs3, append(DefaultLoggingOptions(),
 			WithTimestamp(123),
 			WithPrecheck(false))...)
 
@@ -1406,22 +1405,22 @@ func TestSkipLargePoint(t *T.T) {
 			kvs3 KVs
 		)
 
-		kvs1 = kvs1.Add("msg1", strings.Repeat("x", 70), false, false)
-		kvs2 = kvs2.Add("msg2", strings.Repeat("y", 70), false, false)
-		kvs3 = kvs3.Add("msg3", strings.Repeat("z", 100), false, false)
-		pt1 := NewPointV2("p1", kvs1, append(DefaultLoggingOptions(),
+		kvs1 = kvs1.Add("msg1", strings.Repeat("x", 70))
+		kvs2 = kvs2.Add("msg2", strings.Repeat("y", 70))
+		kvs3 = kvs3.Add("msg3", strings.Repeat("z", 100))
+		pt1 := NewPoint("p1", kvs1, append(DefaultLoggingOptions(),
 			WithTimestamp(123),
 			WithPrecheck(false))...)
-		pt2 := NewPointV2("p2", kvs2, append(DefaultLoggingOptions(),
+		pt2 := NewPoint("p2", kvs2, append(DefaultLoggingOptions(),
 			WithTimestamp(123),
 			WithPrecheck(false))...)
 
 		// p3 larger than encode buf
-		pt3 := NewPointV2("p3", kvs3, append(DefaultLoggingOptions(),
+		pt3 := NewPoint("p3", kvs3, append(DefaultLoggingOptions(),
 			WithTimestamp(123),
 			WithPrecheck(false))...)
 
-		pt4 := NewPointV2("p4", kvs1, append(DefaultLoggingOptions(), // small
+		pt4 := NewPoint("p4", kvs1, append(DefaultLoggingOptions(), // small
 			WithTimestamp(123),
 			WithPrecheck(false))...)
 
@@ -1526,11 +1525,11 @@ func TestEncodePayloadSize(t *T.T) {
 
 func TestEncodeInfField(t *T.T) {
 	var kvs KVs
-	kvs = kvs.AddV2("f1", math.Inf(1), true)
-	kvs = kvs.AddV2("f2", math.Inf(-1), true)
-	kvs = kvs.AddV2("f3", 123, true)
+	kvs = kvs.Set("f1", math.Inf(1))
+	kvs = kvs.Set("f2", math.Inf(-1))
+	kvs = kvs.Set("f3", 123)
 
-	pt := NewPointV2("some", kvs)
+	pt := NewPoint("some", kvs)
 
 	t.Logf("point: %s", pt.Pretty())
 

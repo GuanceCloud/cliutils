@@ -160,7 +160,7 @@ func TestPBPointJSON(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			pt, err := NewPoint(tc.name, tc.tags, tc.fields, WithEncoding(Protobuf), WithTime(tc.time), WithKeySorted(true))
+			pt, err := NewPointDeprecated(tc.name, tc.tags, tc.fields, WithEncoding(Protobuf), WithTime(tc.time), WithKeySorted(true))
 
 			assert.NoError(t, err)
 
@@ -369,37 +369,37 @@ func TestPBPointPayloadSize(t *testing.T) {
 	str128K := strings.Repeat("x", 128*(1<<10))
 
 	var kvsBasic KVs
-	kvsBasic = kvsBasic.AddV2("int8", int8(1), true)
-	kvsBasic = kvsBasic.AddV2("int16", int16(1), true)
-	kvsBasic = kvsBasic.AddV2("int32", int32(1), true)
-	kvsBasic = kvsBasic.AddV2("int64", int64(1), true)
-	kvsBasic = kvsBasic.AddV2("f32", float32(1.0), true)
-	kvsBasic = kvsBasic.AddV2("f64", float64(1.0), true)
+	kvsBasic = kvsBasic.Set("int8", int8(1))
+	kvsBasic = kvsBasic.Set("int16", int16(1))
+	kvsBasic = kvsBasic.Set("int32", int32(1))
+	kvsBasic = kvsBasic.Set("int64", int64(1))
+	kvsBasic = kvsBasic.Set("f32", float32(1.0))
+	kvsBasic = kvsBasic.Set("f64", float64(1.0))
 
 	var kvsStr KVs
-	kvsStr = kvsStr.AddV2("str-tiny", strTiny, true)
-	kvsStr = kvsStr.AddV2("str-small", strSmall, true)
-	kvsStr = kvsStr.AddV2("str-1m", str1M, true)
-	kvsStr = kvsStr.AddV2("str-1k", str1K, true)
-	kvsStr = kvsStr.AddV2("str-32k", str32K, true)
-	kvsStr = kvsStr.AddV2("str-128k", str128K, true)
+	kvsStr = kvsStr.Set("str-tiny", strTiny)
+	kvsStr = kvsStr.Set("str-small", strSmall)
+	kvsStr = kvsStr.Set("str-1m", str1M)
+	kvsStr = kvsStr.Set("str-1k", str1K)
+	kvsStr = kvsStr.Set("str-32k", str32K)
+	kvsStr = kvsStr.Set("str-128k", str128K)
 
 	var kvsBytes KVs
-	kvsBytes = kvsBytes.AddV2("bytes-tiny", []byte(strTiny), true)
-	kvsBytes = kvsBytes.AddV2("bytes-small", []byte(strSmall), true)
-	kvsBytes = kvsBytes.AddV2("bytes-1m", []byte(str1M), true)
-	kvsBytes = kvsBytes.AddV2("bytes-1k", []byte(str1K), true)
-	kvsBytes = kvsBytes.AddV2("bytes-32k", []byte(str32K), true)
-	kvsBytes = kvsBytes.AddV2("bytes-128k", []byte(str128K), true)
+	kvsBytes = kvsBytes.Set("bytes-tiny", []byte(strTiny))
+	kvsBytes = kvsBytes.Set("bytes-small", []byte(strSmall))
+	kvsBytes = kvsBytes.Set("bytes-1m", []byte(str1M))
+	kvsBytes = kvsBytes.Set("bytes-1k", []byte(str1K))
+	kvsBytes = kvsBytes.Set("bytes-32k", []byte(str32K))
+	kvsBytes = kvsBytes.Set("bytes-128k", []byte(str128K))
 
 	var kvsBool KVs
-	kvsBool = kvsBasic.AddV2("bool-yes", true, true)
-	kvsBool = kvsBasic.AddV2("bool-no", false, true)
+	kvsBool = kvsBasic.Set("bool-yes", true)
+	kvsBool = kvsBasic.Set("bool-no", false)
 
 	var kvsLargeNum KVs
-	kvsLargeNum = kvsLargeNum.AddV2("large-i64", int64(math.MaxInt64), true)
-	kvsLargeNum = kvsLargeNum.AddV2("large-u64", uint64(math.MaxUint64), true)
-	kvsLargeNum = kvsLargeNum.AddV2("large-f64", math.MaxFloat64, true)
+	kvsLargeNum = kvsLargeNum.Set("large-i64", int64(math.MaxInt64))
+	kvsLargeNum = kvsLargeNum.Set("large-u64", uint64(math.MaxUint64))
+	kvsLargeNum = kvsLargeNum.Set("large-f64", math.MaxFloat64)
 
 	newPts := func(tc *tcase) (pbpts PBPoints) {
 		for i := 0; i < tc.n; i++ {
@@ -421,7 +421,7 @@ func TestPBPointPayloadSize(t *testing.T) {
 				ptkvs = append(ptkvs, kvsLargeNum...)
 			}
 
-			pbpts.Arr = append(pbpts.Arr, NewPointV2(t.Name(), ptkvs, WithPrecheck(false), WithTime(time.Now())).pt)
+			pbpts.Arr = append(pbpts.Arr, NewPoint(t.Name(), ptkvs, WithPrecheck(false), WithTime(time.Now())).pt)
 		}
 		return
 	}
@@ -439,14 +439,14 @@ func TestPBPointPayloadSize(t *testing.T) {
 
 	t.Run("timestamp", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.AddV2("f1", 123, false)
-		pt := NewPointV2(t.Name(), kvs, WithPrecheck(false), WithTimestamp(0))
+		kvs = kvs.Add("f1", 123)
+		pt := NewPoint(t.Name(), kvs, WithPrecheck(false), WithTimestamp(0))
 		t.Logf("ts = 0/size: %d", pt.pt.Size())
 
-		pt = NewPointV2(t.Name(), kvs, WithPrecheck(false), WithTimestamp(123))
+		pt = NewPoint(t.Name(), kvs, WithPrecheck(false), WithTimestamp(123))
 		t.Logf("ts = 123/size: %d", pt.pt.Size())
 
-		pt = NewPointV2(t.Name(), kvs, WithPrecheck(false), WithTimestamp(time.Now().UnixNano()))
+		pt = NewPoint(t.Name(), kvs, WithPrecheck(false), WithTimestamp(time.Now().UnixNano()))
 		t.Logf("ts = now/size: %d", pt.pt.Size())
 	})
 }

@@ -3,7 +3,7 @@ module github.com/GuanceCloud/cliutils
 go 1.19
 
 require (
-	github.com/GuanceCloud/pipeline-go v1.0.1
+	github.com/GuanceCloud/pipeline-go v1.0.9-0.20250804083758-0b4dd0f48771
 	github.com/VictoriaMetrics/easyproto v0.1.4
 	github.com/aliyun/aliyun-oss-go-sdk v2.1.2+incompatible
 	github.com/brianvoe/gofakeit/v6 v6.28.0
@@ -41,12 +41,13 @@ require (
 	github.com/DataDog/datadog-go v4.8.2+incompatible // indirect
 	github.com/DataDog/datadog-go/v5 v5.1.1 // indirect
 	github.com/DataDog/sketches-go v1.2.1 // indirect
-	github.com/GuanceCloud/grok v1.1.4 // indirect
-	github.com/GuanceCloud/platypus v0.3.1 // indirect
+	github.com/GuanceCloud/grok v1.1.5-0.20250416104424-34917bd63e69 // indirect
+	github.com/GuanceCloud/platypus v0.3.3-0.20250528074826-e3130ff5a05c // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/antchfx/xmlquery v1.3.18 // indirect
 	github.com/antchfx/xpath v1.2.4 // indirect
 	github.com/araddon/dateparse v0.0.0-20201001162425-8aadafed4dc4 // indirect
+	github.com/avast/retry-go v3.0.0+incompatible // indirect
 	github.com/baiyubin/aliyun-sts-go-sdk v0.0.0-20180326062324-cfa1a18b161f // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bytedance/sonic v1.8.0 // indirect
@@ -68,6 +69,7 @@ require (
 	github.com/grafana/regexp v0.0.0-20221122212121-6b5c0a4cb7fd // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.4 // indirect
+	github.com/ip2location/ip2location-go v8.3.0+incompatible // indirect
 	github.com/itchyny/timefmt-go v0.1.5 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
@@ -78,6 +80,8 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mssola/user_agent v0.6.0 // indirect
+	github.com/oschwald/geoip2-golang v1.9.0 // indirect
+	github.com/oschwald/maxminddb-golang v1.11.0 // indirect
 	github.com/outcaste-io/ristretto v0.2.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
 	github.com/philhofer/fwd v1.1.1 // indirect
@@ -116,4 +120,4 @@ require (
 	modernc.org/token v1.0.1 // indirect
 )
 
-replace github.com/influxdata/influxdb1-client => github.com/GuanceCloud/influxdb1-client v0.1.8
+replace github.com/influxdata/influxdb1-client => github.com/GuanceCloud/influxdb1-client v0.1.9

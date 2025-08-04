@@ -102,14 +102,14 @@ func TestLargeJSONTag(t *T.T) {
 
 		var kvs KVs
 		kvs = kvs.AddTag("T", string(dataj))
-		kvs = kvs.Add("value", 200, false, true)
-		pt := NewPointV2("test_lp", kvs)
+		kvs = kvs.Set("value", 200)
+		pt := NewPoint("test_lp", kvs)
 		t.Logf("lp-1 in %%s: %s", pt.LineProto())
 
 		var kvs2 KVs
-		kvs2 = kvs2.Add("value", 200, false, true)
-		kvs2 = kvs2.Add("F", string(dataj), false, true)
-		pt2 := NewPointV2("test_lp", kvs2)
+		kvs2 = kvs2.Set("value", 200)
+		kvs2 = kvs2.Set("F", string(dataj))
+		pt2 := NewPoint("test_lp", kvs2)
 		t.Logf("lp-2 in %%s: %s", pt2.LineProto())
 	})
 
@@ -598,7 +598,7 @@ func TestNewLPPoint(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.tname, func(t *testing.T) {
-			pt, err := NewPoint(tc.name, tc.tags, tc.fields, tc.opts...)
+			pt, err := NewPointDeprecated(tc.name, tc.tags, tc.fields, tc.opts...)
 
 			if tc.fail {
 				if pt != nil {

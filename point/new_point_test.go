@@ -51,7 +51,7 @@ func getNFields(n int) map[string]interface{} {
 
 func TestV2NewPoint(t *T.T) {
 	t.Run("valid-fields", func(t *T.T) {
-		pt := NewPointV2("abc", NewKVs(
+		pt := NewPoint("abc", NewKVs(
 			map[string]interface{}{
 				"[]byte":  []byte("abc"),
 				"[]uint8": []uint8("abc"),
@@ -101,14 +101,14 @@ func TestV2NewPoint(t *T.T) {
 			"u64-large": uint64(math.MaxInt64 + 1), // skipped in expect string
 			"u8":        uint8(1),
 		}
-		pt := NewPointV2(`abc`, NewKVs(kvs), WithTime(time.Unix(0, 123)), WithEncoding(Protobuf))
+		pt := NewPoint(`abc`, NewKVs(kvs), WithTime(time.Unix(0, 123)), WithEncoding(Protobuf))
 		expect := `abc []byte="YWJj"b,[]uint8="YWJj"b,b-false=false,b-true=true,float=1,float32=1,float64=1,float64-2=1.1,i=1i,i16=1i,i32=1i,i64=1i,i8=1i,u=1u,u16=1u,u32=1u,u64=1u,u64-large=9223372036854775808u,u8=1u 123`
 		assert.Equal(t, expect, pt.LineProto())
 	})
 
 	t.Run("basic", func(t *T.T) {
-		kvs := NewKVs(map[string]interface{}{"f1": 12}).MustAddTag(`t1`, `tval1`)
-		pt := NewPointV2(`abc`, kvs, WithTime(time.Unix(0, 123)))
+		kvs := NewKVs(map[string]interface{}{"f1": 12}).SetTag(`t1`, `tval1`)
+		pt := NewPoint(`abc`, kvs, WithTime(time.Unix(0, 123)))
 
 		assert.Equal(t, "abc,t1=tval1 f1=12i 123", pt.LineProto())
 	})
@@ -470,7 +470,7 @@ func TestNewPoint(t *T.T) {
 				}()
 			}
 
-			pt, err = NewPoint(tc.name, tc.t, tc.f, tc.opts...)
+			pt, err = NewPointDeprecated(tc.name, tc.t, tc.f, tc.opts...)
 
 			assert.NoError(t, err)
 
@@ -490,7 +490,7 @@ func TestNewPoint(t *T.T) {
 
 func TestPointKeySorted(t *testing.T) {
 	t.Run("sorted", func(t *testing.T) {
-		pt, err := NewPoint("basic",
+		pt, err := NewPointDeprecated("basic",
 			map[string]string{
 				"t1": "v1",
 				"t2": "v2",
@@ -523,7 +523,7 @@ func TestPointKeySorted(t *testing.T) {
 	})
 
 	t.Run("not-sorted", func(t *testing.T) {
-		pt, err := NewPoint("basic",
+		pt, err := NewPointDeprecated("basic",
 			map[string]string{
 				"t1": "v1",
 				"t2": "v2",
@@ -584,7 +584,7 @@ func BenchmarkV2NewPoint(b *T.B) {
 				"f10": false,
 			}
 
-			NewPointV2("abc", append(NewTags(tags), NewKVs(fields)...))
+			NewPoint("abc", append(NewTags(tags), NewKVs(fields)...))
 		}
 	})
 
@@ -602,18 +602,18 @@ func BenchmarkV2NewPoint(b *T.B) {
 			kvs = kvs.AddTag("t9", "val9")
 			kvs = kvs.AddTag("t0", "val0")
 
-			kvs = kvs.Add("f1", 123, false, false)
-			kvs = kvs.Add("f2", "abc", false, false)
-			kvs = kvs.Add("f3", 45.6, false, false)
-			kvs = kvs.Add("f4", 123, false, false)
-			kvs = kvs.Add("f5", "abc", false, false)
-			kvs = kvs.Add("f6", 45.6, false, false)
-			kvs = kvs.Add("f7", 123, false, false)
-			kvs = kvs.Add("f8", "abc", false, false)
-			kvs = kvs.Add("f9", 45.6, false, false)
-			kvs = kvs.Add("f10", false, false, false)
+			kvs = kvs.Add("f1", 123)
+			kvs = kvs.Add("f2", "abc")
+			kvs = kvs.Add("f3", 45.6)
+			kvs = kvs.Add("f4", 123)
+			kvs = kvs.Add("f5", "abc")
+			kvs = kvs.Add("f6", 45.6)
+			kvs = kvs.Add("f7", 123)
+			kvs = kvs.Add("f8", "abc")
+			kvs = kvs.Add("f9", 45.6)
+			kvs = kvs.Add("f10", false)
 
-			NewPointV2("abc", kvs)
+			NewPoint("abc", kvs)
 		}
 	})
 
@@ -631,47 +631,47 @@ func BenchmarkV2NewPoint(b *T.B) {
 			kvs = kvs.AddTag("t9", "val9")
 			kvs = kvs.AddTag("t0", "val0")
 
-			kvs = kvs.Add("f1", 123, false, false)
-			kvs = kvs.Add("f2", "abc", false, false)
-			kvs = kvs.Add("f3", 45.6, false, false)
-			kvs = kvs.Add("f4", 123, false, false)
-			kvs = kvs.Add("f5", "abc", false, false)
-			kvs = kvs.Add("f6", 45.6, false, false)
-			kvs = kvs.Add("f7", 123, false, false)
-			kvs = kvs.Add("f8", "abc", false, false)
-			kvs = kvs.Add("f9", 45.6, false, false)
-			kvs = kvs.Add("f10", false, false, false)
+			kvs = kvs.Add("f1", 123)
+			kvs = kvs.Add("f2", "abc")
+			kvs = kvs.Add("f3", 45.6)
+			kvs = kvs.Add("f4", 123)
+			kvs = kvs.Add("f5", "abc")
+			kvs = kvs.Add("f6", 45.6)
+			kvs = kvs.Add("f7", 123)
+			kvs = kvs.Add("f8", "abc")
+			kvs = kvs.Add("f9", 45.6)
+			kvs = kvs.Add("f10", false)
 
-			NewPointV2("abc", kvs)
+			NewPoint("abc", kvs)
 		}
 	})
 
 	b.Run(`without-map-with-prealloc-and-MUST`, func(b *T.B) {
 		for i := 0; i < b.N; i++ {
 			kvs := make(KVs, 0, 20)
-			kvs = kvs.MustAddTag("t1", "val1")
-			kvs = kvs.MustAddTag("t2", "val2")
-			kvs = kvs.MustAddTag("t3", "val3")
-			kvs = kvs.MustAddTag("t4", "val4")
-			kvs = kvs.MustAddTag("t5", "val5")
-			kvs = kvs.MustAddTag("t6", "val6")
-			kvs = kvs.MustAddTag("t7", "val7")
-			kvs = kvs.MustAddTag("t8", "val8")
-			kvs = kvs.MustAddTag("t9", "val9")
-			kvs = kvs.MustAddTag("t0", "val0")
+			kvs = kvs.SetTag("t1", "val1")
+			kvs = kvs.SetTag("t2", "val2")
+			kvs = kvs.SetTag("t3", "val3")
+			kvs = kvs.SetTag("t4", "val4")
+			kvs = kvs.SetTag("t5", "val5")
+			kvs = kvs.SetTag("t6", "val6")
+			kvs = kvs.SetTag("t7", "val7")
+			kvs = kvs.SetTag("t8", "val8")
+			kvs = kvs.SetTag("t9", "val9")
+			kvs = kvs.SetTag("t0", "val0")
 
-			kvs = kvs.Add("f1", 123, false, true)
-			kvs = kvs.Add("f2", "abc", false, true)
-			kvs = kvs.Add("f3", 45.6, false, true)
-			kvs = kvs.Add("f4", 123, false, true)
-			kvs = kvs.Add("f5", "abc", false, true)
-			kvs = kvs.Add("f6", 45.6, false, true)
-			kvs = kvs.Add("f7", 123, false, true)
-			kvs = kvs.Add("f8", "abc", false, true)
-			kvs = kvs.Add("f9", 45.6, false, true)
-			kvs = kvs.Add("f10", false, false, true)
+			kvs = kvs.Set("f1", 123)
+			kvs = kvs.Set("f2", "abc")
+			kvs = kvs.Set("f3", 45.6)
+			kvs = kvs.Set("f4", 123)
+			kvs = kvs.Set("f5", "abc")
+			kvs = kvs.Set("f6", 45.6)
+			kvs = kvs.Set("f7", 123)
+			kvs = kvs.Set("f8", "abc")
+			kvs = kvs.Set("f9", 45.6)
+			kvs = kvs.Set("f10", false)
 
-			NewPointV2("abc", kvs)
+			NewPoint("abc", kvs)
 		}
 	})
 
@@ -686,29 +686,29 @@ func BenchmarkV2NewPoint(b *T.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			kvs := make(KVs, 0, 20)
-			kvs = kvs.MustAddTag("t1", "val1")
-			kvs = kvs.MustAddTag("t2", "val2")
-			kvs = kvs.MustAddTag("t3", "val3")
-			kvs = kvs.MustAddTag("t4", "val4")
-			kvs = kvs.MustAddTag("t5", "val5")
-			kvs = kvs.MustAddTag("t6", "val6")
-			kvs = kvs.MustAddTag("t7", "val7")
-			kvs = kvs.MustAddTag("t8", "val8")
-			kvs = kvs.MustAddTag("t9", "val9")
-			kvs = kvs.MustAddTag("t0", "val0")
+			kvs = kvs.SetTag("t1", "val1")
+			kvs = kvs.SetTag("t2", "val2")
+			kvs = kvs.SetTag("t3", "val3")
+			kvs = kvs.SetTag("t4", "val4")
+			kvs = kvs.SetTag("t5", "val5")
+			kvs = kvs.SetTag("t6", "val6")
+			kvs = kvs.SetTag("t7", "val7")
+			kvs = kvs.SetTag("t8", "val8")
+			kvs = kvs.SetTag("t9", "val9")
+			kvs = kvs.SetTag("t0", "val0")
 
-			kvs = kvs.Add("f1", 123, false, true)
-			kvs = kvs.Add("f2", "abc", false, true)
-			kvs = kvs.Add("f3", 45.6, false, true)
-			kvs = kvs.Add("f4", 123, false, true)
-			kvs = kvs.Add("f5", "abc", false, true)
-			kvs = kvs.Add("f6", 45.6, false, true)
-			kvs = kvs.Add("f7", 123, false, true)
-			kvs = kvs.Add("f8", "abc", false, true)
-			kvs = kvs.Add("f9", 45.6, false, true)
-			kvs = kvs.Add("f10", false, false, true)
+			kvs = kvs.Set("f1", 123)
+			kvs = kvs.Set("f2", "abc")
+			kvs = kvs.Set("f3", 45.6)
+			kvs = kvs.Set("f4", 123)
+			kvs = kvs.Set("f5", "abc")
+			kvs = kvs.Set("f6", 45.6)
+			kvs = kvs.Set("f7", 123)
+			kvs = kvs.Set("f8", "abc")
+			kvs = kvs.Set("f9", 45.6)
+			kvs = kvs.Set("f10", false)
 
-			pt := NewPointV2("abc", kvs)
+			pt := NewPoint("abc", kvs)
 			pp.Put(pt)
 		}
 	})
@@ -730,7 +730,7 @@ func BenchmarkV2NewPoint(b *T.B) {
 		})
 
 		for i := 0; i < b.N; i++ {
-			NewPointV2(ptName, kvs, WithKeySorted(true))
+			NewPoint(ptName, kvs, WithKeySorted(true))
 		}
 	})
 
@@ -751,7 +751,7 @@ func BenchmarkV2NewPoint(b *T.B) {
 		})
 
 		for i := 0; i < b.N; i++ {
-			NewPointV2(ptName, kvs)
+			NewPoint(ptName, kvs)
 		}
 	})
 }
@@ -797,7 +797,7 @@ func FuzzPLPBEquality(f *testing.F) {
 			ts = 0
 		}
 
-		lppt, err := NewPoint(measurement,
+		lppt, err := NewPointDeprecated(measurement,
 			map[string]string{tagk: tagv},
 			map[string]interface{}{
 				"i64": i64,
@@ -812,7 +812,7 @@ func FuzzPLPBEquality(f *testing.F) {
 
 		assert.NoError(t, err)
 
-		pbpt, err := NewPoint(measurement,
+		pbpt, err := NewPointDeprecated(measurement,
 			map[string]string{tagk: tagv},
 			map[string]interface{}{
 				"i64": i64,
