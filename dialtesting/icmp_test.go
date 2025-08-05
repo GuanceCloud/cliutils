@@ -8,6 +8,9 @@ package dialtesting
 import (
 	"strings"
 	"testing"
+	"text/template"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var icmpCases = []struct {
@@ -96,4 +99,25 @@ func TestIcmp(t *testing.T) {
 				c.t.Name, strings.Join(reasons, "\n\t"))
 		}
 	}
+}
+
+func TestICMPRenderTemplate(t *testing.T) {
+	ct := &ICMPTask{
+		Host: "{{host}}",
+	}
+
+	fm := template.FuncMap{
+		"host": func() string {
+			return "localhost"
+		},
+	}
+
+	task, err := NewTask("", ct)
+	assert.NoError(t, err)
+
+	ct, ok := task.(*ICMPTask)
+	assert.True(t, ok)
+
+	assert.NoError(t, ct.renderTemplate(fm))
+	assert.Equal(t, "localhost", ct.Host)
 }

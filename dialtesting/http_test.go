@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
@@ -841,7 +842,7 @@ func TestPrepareTemplate(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, "http://localhost:8000/global", task.URL)
-	assert.Equal(t, "local", task.PostScript)
+	assert.Equal(t, "{{local}}", task.PostScript)
 }
 
 func TestPostScript(t *testing.T) {
@@ -849,7 +850,7 @@ func TestPostScript(t *testing.T) {
 		w.Write([]byte(`{"token": "tkn_123"}`))
 	}))
 
-	task := &HTTPTask{
+	ct := &HTTPTask{
 		Task: &Task{
 			Frequency: "1s",
 		},
@@ -869,7 +870,8 @@ func TestPostScript(t *testing.T) {
 	`,
 	}
 
-	task.SetChild(task)
+	task, err := NewTask("", ct)
+	assert.NoError(t, err)
 
 	vars := map[string]Variable{}
 	assert.NoError(t, task.RenderTemplateAndInit(vars))
@@ -877,7 +879,109 @@ func TestPostScript(t *testing.T) {
 
 	tags, fields := task.GetResults()
 
-	assert.Equal(t, "tkn_123", task.postScriptResult.Vars["token"])
+	assert.Equal(t, "tkn_123", ct.postScriptResult.Vars["token"])
 	assert.Equal(t, "OK", tags["status"])
 	assert.EqualValues(t, 1, fields["success"])
+}
+
+func TestRenderTemplate(t *testing.T) {
+	ct := &HTTPTask{
+		URL: "http://localhost:8000/{{path}}",
+		SuccessWhen: []*HTTPSuccess{
+			{
+				Body: []*SuccessOption{
+					{
+						Contains: "{{body}}",
+					},
+				},
+				Header: map[string][]*SuccessOption{
+					"Content-Type": {
+						{
+							Contains: "{{content_type}}",
+						},
+					},
+				},
+				ResponseTime: "{{response_time}}",
+			},
+		},
+		AdvanceOptions: &HTTPAdvanceOption{
+			RequestOptions: &HTTPOptRequest{
+				Headers: map[string]string{
+					"header": "{{header}}",
+				},
+				Cookies: "{{cookies}}",
+				Auth: &HTTPOptAuth{
+					Username: "{{username}}",
+					Password: "{{password}}",
+				},
+			},
+			RequestBody: &HTTPOptBody{
+				Body: "{{request_body}}",
+				Form: map[string]string{
+					"{{form_key}}": "{{form_value}}",
+				},
+			},
+		},
+	}
+
+	fm := template.FuncMap{
+		"request_body": func() string {
+			return "request_body"
+		},
+		"form_key": func() string {
+			return "form_key"
+		},
+		"form_value": func() string {
+			return "form_value"
+		},
+		"header": func() string {
+			return "header"
+		},
+		"cookies": func() string {
+			return "cookies"
+		},
+		"username": func() string {
+			return "username"
+		},
+		"password": func() string {
+			return "password"
+		},
+		"path": func() string {
+			return "test"
+		},
+		"response_time": func() string {
+			return "100ms"
+		},
+		"content_type": func() string {
+			return "application/json"
+		},
+		"body": func() string {
+			return "OK"
+		},
+	}
+
+	task, err := NewTask("", ct)
+	assert.NoError(t, err)
+
+	ct, ok := task.(*HTTPTask)
+	assert.True(t, ok)
+	assert.NoError(t, ct.renderTemplate(fm))
+	assert.Equal(t, "http://localhost:8000/test", ct.URL)
+
+	// success when
+	assert.Equal(t, "100ms", ct.SuccessWhen[0].ResponseTime)
+	assert.Equal(t, "application/json", ct.SuccessWhen[0].Header["Content-Type"][0].Contains)
+	assert.Equal(t, "OK", ct.SuccessWhen[0].Body[0].Contains)
+
+	// advance options
+	// request options
+	assert.Equal(t, "header", ct.AdvanceOptions.RequestOptions.Headers["header"])
+	assert.Equal(t, "cookies", ct.AdvanceOptions.RequestOptions.Cookies)
+	assert.Equal(t, "username", ct.AdvanceOptions.RequestOptions.Auth.Username)
+	assert.Equal(t, "password", ct.AdvanceOptions.RequestOptions.Auth.Password)
+
+	// request body
+	assert.Equal(t, "request_body", ct.AdvanceOptions.RequestBody.Body)
+	assert.Equal(t, "form_value", ct.AdvanceOptions.RequestBody.Form["form_key"])
+	assert.Equal(t, "", ct.AdvanceOptions.RequestBody.Form["{{form_key}}"])
 }

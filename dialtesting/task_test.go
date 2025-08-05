@@ -66,3 +66,29 @@ func TestCreateTaskChild(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, task)
 }
+
+func TestCustomFunc(t *testing.T) {
+	ct := &HTTPTask{
+		URL: `{{date "iso8601"}}`,
+		SuccessWhen: []*HTTPSuccess{
+			{
+				StatusCode: []*SuccessOption{
+					{
+						Is: "200",
+					},
+				},
+			},
+		},
+	}
+
+	task, err := NewTask("", ct)
+
+	assert.NoError(t, err)
+
+	err = task.RenderTemplateAndInit(nil)
+
+	assert.NoError(t, err)
+
+	assert.NotNil(t, ct.rawTask)
+	assert.NotEqual(t, ct.URL, ct.rawTask.URL)
+}
