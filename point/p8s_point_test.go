@@ -17,13 +17,13 @@ import (
 func TestMergePoint(t *T.T) {
 	t.Run(`basic`, func(t *T.T) {
 		pts := []*Point{
-			NewPointV2("m1",
+			NewPoint("m1",
 				append(NewTags(map[string]string{"t1": "v1", "t2": "v2"}),
 					NewKVs(map[string]any{"f1": 123})...),
 				DefaultLoggingOptions()...,
 			),
 
-			NewPointV2("m1",
+			NewPoint("m1",
 				append(NewTags(map[string]string{"t1": "v1", "t2": "v2"}),
 					NewKVs(map[string]any{"f2": "hello"})...),
 				DefaultLoggingOptions()...,
@@ -40,25 +40,25 @@ func TestMergePoint(t *T.T) {
 
 	t.Run(`merge-multiple-time-series`, func(t *T.T) {
 		pts := []*Point{
-			NewPointV2("m1",
+			NewPoint("m1",
 				append(NewTags(map[string]string{"t1": "v1", "t2": "v2"}),
 					NewKVs(map[string]any{"f1": 123})...),
 				DefaultLoggingOptions()...,
 			),
 
-			NewPointV2("m1",
+			NewPoint("m1",
 				append(NewTags(map[string]string{"t1": "v1", "t2": "v2"}),
 					NewKVs(map[string]any{"f2": "hello"})...),
 				DefaultLoggingOptions()...,
 			),
 
-			NewPointV2("m1",
+			NewPoint("m1",
 				append(NewTags(map[string]string{"tag1": "v1", "tag2": "v2"}),
 					NewKVs(map[string]any{"f1": 123})...),
 				DefaultLoggingOptions()...,
 			),
 
-			NewPointV2("m1",
+			NewPoint("m1",
 				append(NewTags(map[string]string{"tag1": "v1", "tag2": "v2"}),
 					NewKVs(map[string]any{"f2": "hello"})...),
 				DefaultLoggingOptions()...,

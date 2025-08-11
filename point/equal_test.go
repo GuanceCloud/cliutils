@@ -24,14 +24,14 @@ func TestEqual(t *T.T) {
 			name:        "basic",
 			expectEqual: true,
 			l: func() *Point {
-				x, err := NewPoint("abc", nil,
+				x, err := NewPointDeprecated("abc", nil,
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc", nil,
+				x, err := NewPointDeprecated("abc", nil,
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
@@ -43,14 +43,14 @@ func TestEqual(t *T.T) {
 			name:        "time-not-equal",
 			expectEqual: false,
 			l: func() *Point {
-				x, err := NewPoint("abc", nil,
+				x, err := NewPointDeprecated("abc", nil,
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc", nil,
+				x, err := NewPointDeprecated("abc", nil,
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(1, 0)))
 				assert.NoError(t, err)
@@ -62,7 +62,7 @@ func TestEqual(t *T.T) {
 			name:        "with-warns",
 			expectEqual: true,
 			l: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -70,7 +70,7 @@ func TestEqual(t *T.T) {
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{
 						"f1": 123.1,
@@ -86,7 +86,7 @@ func TestEqual(t *T.T) {
 			name:        "tags-not-equal",
 			expectEqual: false,
 			l: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -94,7 +94,7 @@ func TestEqual(t *T.T) {
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1", "t2": "v2"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -107,7 +107,7 @@ func TestEqual(t *T.T) {
 			name:        "measurement-name-not-equal",
 			expectEqual: false,
 			l: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -115,7 +115,7 @@ func TestEqual(t *T.T) {
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("def",
+				x, err := NewPointDeprecated("def",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -128,7 +128,7 @@ func TestEqual(t *T.T) {
 			name:        "field-value-type-not-match",
 			expectEqual: false,
 			l: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -136,7 +136,7 @@ func TestEqual(t *T.T) {
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": "foo"},
 					WithTime(time.Unix(0, 123)))
@@ -149,7 +149,7 @@ func TestEqual(t *T.T) {
 			name:        "field-key-not-match",
 			expectEqual: false,
 			l: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -157,7 +157,7 @@ func TestEqual(t *T.T) {
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f2": "foo"},
 					WithTime(time.Unix(0, 123)))
@@ -170,7 +170,7 @@ func TestEqual(t *T.T) {
 			name:        "field-count-not-match",
 			expectEqual: false,
 			l: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": 123.1, "f2": "haha"},
 					WithTime(time.Unix(0, 123)))
@@ -178,7 +178,7 @@ func TestEqual(t *T.T) {
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f2": "foo"},
 					WithTime(time.Unix(0, 123)))
@@ -191,7 +191,7 @@ func TestEqual(t *T.T) {
 			name:        "tag-count-not-match",
 			expectEqual: false,
 			l: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1", "t2": "v2"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -199,7 +199,7 @@ func TestEqual(t *T.T) {
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -212,7 +212,7 @@ func TestEqual(t *T.T) {
 			name:        "tag-key-not-match",
 			expectEqual: false,
 			l: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -220,7 +220,7 @@ func TestEqual(t *T.T) {
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t2": "v2"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -233,7 +233,7 @@ func TestEqual(t *T.T) {
 			name:        "tag-value-not-match",
 			expectEqual: false,
 			l: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -241,7 +241,7 @@ func TestEqual(t *T.T) {
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "vx"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -254,7 +254,7 @@ func TestEqual(t *T.T) {
 			name:        "field-value-match",
 			expectEqual: true,
 			l: func() *Point {
-				x, err := NewPoint("abc", nil,
+				x, err := NewPointDeprecated("abc", nil,
 					map[string]interface{}{
 						"f1":           int64(123),
 						"f2_f64":       123.01234567890123456789,
@@ -271,7 +271,7 @@ func TestEqual(t *T.T) {
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc", nil,
+				x, err := NewPointDeprecated("abc", nil,
 					map[string]interface{}{
 						"f1":           int64(123),
 						"f2_f64":       123.01234567890123456789,
@@ -319,7 +319,7 @@ func TestHash(t *T.T) {
 			name:        "diff-fields",
 			expectEqual: true,
 			l: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -327,7 +327,7 @@ func TestHash(t *T.T) {
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f2": 123},
 					WithTime(time.Unix(0, 123)))
@@ -340,7 +340,7 @@ func TestHash(t *T.T) {
 			name:        "diff-time",
 			expectEqual: true,
 			l: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -348,7 +348,7 @@ func TestHash(t *T.T) {
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f2": 123},
 					WithTime(time.Unix(0, 456)))
@@ -361,7 +361,7 @@ func TestHash(t *T.T) {
 			name:        "diff-measurement",
 			expectEqual: false,
 			l: func() *Point {
-				x, err := NewPoint("def",
+				x, err := NewPointDeprecated("def",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -369,7 +369,7 @@ func TestHash(t *T.T) {
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f2": 123},
 					WithTime(time.Unix(0, 456)))
@@ -382,7 +382,7 @@ func TestHash(t *T.T) {
 			name:        "diff-tags",
 			expectEqual: false,
 			l: func() *Point {
-				x, err := NewPoint("def",
+				x, err := NewPointDeprecated("def",
 					map[string]string{"t2": "v1"},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -390,7 +390,7 @@ func TestHash(t *T.T) {
 				return x
 			}(),
 			r: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f2": 123},
 					WithTime(time.Unix(0, 456)))
@@ -426,7 +426,7 @@ func TestTimeSeriesHash(t *T.T) {
 			name:        "zero tags and 1 fields",
 			expectCount: 1,
 			p: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{},
 					map[string]interface{}{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
@@ -438,7 +438,7 @@ func TestTimeSeriesHash(t *T.T) {
 			name:        "two fields",
 			expectCount: 2,
 			p: func() *Point {
-				x, err := NewPoint("abc",
+				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": 123.1, "f2": 123.2},
 					WithTime(time.Unix(0, 123)))
@@ -450,7 +450,7 @@ func TestTimeSeriesHash(t *T.T) {
 			name:        "no fields",
 			expectCount: 0,
 			p: func() *Point {
-				x := NewPointV2("abc",
+				x := NewPoint("abc",
 					NewTags(map[string]string{"t1": "v1"}),
 					WithTime(time.Unix(0, 123)))
 				return x

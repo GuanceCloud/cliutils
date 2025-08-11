@@ -23,8 +23,8 @@ import (
 func TestInfluxFields(t *T.T) {
 	t.Run("bytes-array", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f1", MustNewAnyArray([]byte("hello"), []byte("world")), false, false)
-		pt := NewPointV2("m1", kvs)
+		kvs = kvs.Add("f1", MustNewAnyArray([]byte("hello"), []byte("world")))
+		pt := NewPoint("m1", kvs)
 		fields := pt.InfluxFields()
 		t.Logf("fields: %+#v", fields)
 	})
@@ -33,12 +33,12 @@ func TestInfluxFields(t *T.T) {
 func TestSizeofPoint(t *T.T) {
 	t.Run("small-pt", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f1", 123, false, true)
-		kvs = kvs.Add("f2", 3.14, false, true)
-		kvs = kvs.MustAddTag("t1", "v1")
-		kvs = kvs.MustAddTag("t2", "v2")
+		kvs = kvs.Set("f1", 123)
+		kvs = kvs.Set("f2", 3.14)
+		kvs = kvs.SetTag("t1", "v1")
+		kvs = kvs.SetTag("t2", "v2")
 
-		pbpt := NewPointV2("some", kvs)
+		pbpt := NewPoint("some", kvs)
 		t.Logf("type  size(pbpt): %d", reflect.TypeOf(*pbpt).Size())
 		t.Logf("value size(pbpt): %d", pbpt.Size())
 	})
@@ -73,12 +73,12 @@ func BenchmarkLPPoint(b *T.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
-			kvs = kvs.Add("f1", 123, false, true)
-			kvs = kvs.Add("f2", 3.14, false, true)
-			kvs = kvs.MustAddTag("t1", "v1")
-			kvs = kvs.MustAddTag("t2", "v2")
+			kvs = kvs.Set("f1", 123)
+			kvs = kvs.Set("f2", 3.14)
+			kvs = kvs.SetTag("t1", "v1")
+			kvs = kvs.SetTag("t2", "v2")
 
-			NewPointV2("some", kvs, WithPrecheck(false), WithTime(now))
+			NewPoint("some", kvs, WithPrecheck(false), WithTime(now))
 		}
 	})
 
@@ -86,12 +86,12 @@ func BenchmarkLPPoint(b *T.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
-			kvs = kvs.Add("f1", 123, false, true)
-			kvs = kvs.Add("f2", 3.14, false, true)
-			kvs = kvs.MustAddTag("t1", "v1")
-			kvs = kvs.MustAddTag("t2", "v2")
+			kvs = kvs.Set("f1", 123)
+			kvs = kvs.Set("f2", 3.14)
+			kvs = kvs.SetTag("t1", "v1")
+			kvs = kvs.SetTag("t2", "v2")
 
-			NewPointV2("some", kvs, WithTime(now))
+			NewPoint("some", kvs, WithTime(now))
 		}
 	})
 }
@@ -146,13 +146,13 @@ func BenchmarkFromModelsLP(b *T.B) {
 
 func TestGet(t *T.T) {
 	t.Run(`get-tag`, func(t *T.T) {
-		pt := NewPointV2(`abc`, NewKVs(nil).MustAddTag(`t1`, `v1`))
+		pt := NewPoint(`abc`, NewKVs(nil).SetTag(`t1`, `v1`))
 
 		assert.Equal(t, `v1`, pt.GetTag(`t1`))
 		assert.Equal(t, "", pt.GetTag(`not-exist`))
 
 		// get non-tag key
-		pt.pt.Fields = KVs(pt.pt.Fields).MustAddKV(NewKV(`f1`, 1.23,
+		pt.pt.Fields = KVs(pt.pt.Fields).SetKV(NewKV(`f1`, 1.23,
 			WithKVUnit("bytes"),
 			WithKVTagSet(true), // set failed
 			WithKVType(COUNT)))
@@ -174,28 +174,24 @@ func TestGet(t *T.T) {
 			EnableMixedArrayField = false
 		}()
 
-		kvs = kvs.Add("si1", int8(1), false, true)
-		kvs = kvs.Add("si2", int16(1), false, true)
-		kvs = kvs.Add("si3", int32(1), false, true)
-		kvs = kvs.Add("si4", int(1), false, true)
-		kvs = kvs.Add("si5", int64(1), false, true)
+		kvs = kvs.Set("si1", int8(1))
+		kvs = kvs.Set("si2", int16(1))
+		kvs = kvs.Set("si3", int32(1))
+		kvs = kvs.Set("si4", int(1))
+		kvs = kvs.Set("si5", int64(1))
+		kvs = kvs.Set("ui1", uint8(1))
+		kvs = kvs.Set("ui2", uint16(1))
+		kvs = kvs.Set("ui3", uint32(1))
+		kvs = kvs.Set("ui4", uint(1))
+		kvs = kvs.Set("ui5", uint64(1))
+		kvs = kvs.Set("b1", false)
+		kvs = kvs.Set("b2", true)
+		kvs = kvs.Set("d", []byte(`hello`))
+		kvs = kvs.Set("s", `hello`)
+		kvs = kvs.Set("arr", MustNewAnyArray(1, 2.0, false))
+		kvs = kvs.Set("map", MustNewAny(MustNewMap(map[string]any{"i": 1, "f": 3.14, "s": "world"})))
 
-		kvs = kvs.Add("ui1", uint8(1), false, true)
-		kvs = kvs.Add("ui2", uint16(1), false, true)
-		kvs = kvs.Add("ui3", uint32(1), false, true)
-		kvs = kvs.Add("ui4", uint(1), false, true)
-		kvs = kvs.Add("ui5", uint64(1), false, true)
-
-		kvs = kvs.Add("b1", false, false, true)
-		kvs = kvs.Add("b2", true, false, true)
-
-		kvs = kvs.Add("d", []byte(`hello`), false, true)
-		kvs = kvs.Add("s", `hello`, false, true)
-
-		kvs = kvs.Add("arr", MustNewAnyArray(1, 2.0, false), false, true)
-		kvs = kvs.Add("map", MustNewAny(MustNewMap(map[string]any{"i": 1, "f": 3.14, "s": "world"})), false, true)
-
-		pt := NewPointV2("get", kvs)
+		pt := NewPoint("get", kvs)
 
 		t.Logf("pt: %s", pt.Pretty())
 
@@ -230,28 +226,24 @@ func TestGet(t *T.T) {
 			EnableMixedArrayField = false
 		}()
 
-		kvs = kvs.Add("si1", int8(1), false, true)
-		kvs = kvs.Add("si2", int16(1), false, true)
-		kvs = kvs.Add("si3", int32(1), false, true)
-		kvs = kvs.Add("si4", int(1), false, true)
-		kvs = kvs.Add("si5", int64(1), false, true)
+		kvs = kvs.Set("si1", int8(1))
+		kvs = kvs.Set("si2", int16(1))
+		kvs = kvs.Set("si3", int32(1))
+		kvs = kvs.Set("si4", int(1))
+		kvs = kvs.Set("si5", int64(1))
+		kvs = kvs.Set("ui1", uint8(1))
+		kvs = kvs.Set("ui2", uint16(1))
+		kvs = kvs.Set("ui3", uint32(1))
+		kvs = kvs.Set("ui4", uint(1))
+		kvs = kvs.Set("ui5", uint64(1))
+		kvs = kvs.Set("b1", false)
+		kvs = kvs.Set("b2", true)
+		kvs = kvs.Set("d", []byte(`hello`))
+		kvs = kvs.Set("s", `hello`)
+		kvs = kvs.Set("arr", MustNewAnyArray(1, 2.0, false))
+		kvs = kvs.Set("map", MustNewAny(MustNewMap(map[string]any{"i": 1, "f": 3.14, "s": "world"})))
 
-		kvs = kvs.Add("ui1", uint8(1), false, true)
-		kvs = kvs.Add("ui2", uint16(1), false, true)
-		kvs = kvs.Add("ui3", uint32(1), false, true)
-		kvs = kvs.Add("ui4", uint(1), false, true)
-		kvs = kvs.Add("ui5", uint64(1), false, true)
-
-		kvs = kvs.Add("b1", false, false, true)
-		kvs = kvs.Add("b2", true, false, true)
-
-		kvs = kvs.Add("d", []byte(`hello`), false, true)
-		kvs = kvs.Add("s", `hello`, false, true)
-
-		kvs = kvs.Add("arr", MustNewAnyArray(1, 2.0, false), false, true)
-		kvs = kvs.Add("map", MustNewAny(MustNewMap(map[string]any{"i": 1, "f": 3.14, "s": "world"})), false, true)
-
-		pt := NewPointV2("get", kvs)
+		pt := NewPoint("get", kvs)
 
 		t.Logf("pt: %s", pt.Pretty())
 
@@ -307,12 +299,12 @@ func TestFlags(t *T.T) {
 
 func TestPrettyPoint(t *T.T) {
 	t.Run(`basic`, func(t *T.T) {
-		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123}).AddTag("t1", "v1"))
+		pt := NewPoint(`abc`, NewKVs(map[string]any{"f1": 123}).AddTag("t1", "v1"))
 		t.Logf("%s", pt.Pretty())
 	})
 
 	t.Run(`with-warns`, func(t *T.T) {
-		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123}).
+		pt := NewPoint(`abc`, NewKVs(map[string]any{"f1": 123}).
 			AddTag("t1", "v1").
 			AddTag("t2", "v1"),
 			WithDisabledKeys(NewTagKey(`t2`, "")))
@@ -321,7 +313,7 @@ func TestPrettyPoint(t *T.T) {
 	})
 
 	t.Run(`with-all-types`, func(t *T.T) {
-		pt := NewPointV2(`abc`, NewKVs(map[string]any{
+		pt := NewPoint(`abc`, NewKVs(map[string]any{
 			"f1": 123,
 			"f2": uint64(321),
 			"f3": 3.14,
@@ -342,7 +334,7 @@ func TestPointString(t *T.T) {
 		{
 			name: "normal-lppt",
 			pt: func() *Point {
-				pt, err := NewPoint("abc",
+				pt, err := NewPointDeprecated("abc",
 					map[string]string{"tag1": "v1"},
 					map[string]interface{}{
 						"f1": 123, "f2": true,
@@ -357,7 +349,7 @@ func TestPointString(t *T.T) {
 		{
 			name: "normal-pbpt",
 			pt: func() *Point {
-				pt, err := NewPoint("abc",
+				pt, err := NewPointDeprecated("abc",
 					map[string]string{
 						"tag1": "v1",
 						"tag2": "v2",
@@ -401,7 +393,7 @@ func TestPointString(t *T.T) {
 
 func TestInfluxTags(t *T.T) {
 	t.Run("get-tags", func(t *T.T) {
-		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123}).AddTag(`t1`, `v1`))
+		pt := NewPoint(`abc`, NewKVs(map[string]any{"f1": 123}).AddTag(`t1`, `v1`))
 		tags := pt.InfluxTags()
 		assert.Equal(t,
 			influxm.Tags{influxm.Tag{Key: []byte("t1"), Value: []byte("v1")}},
@@ -411,7 +403,7 @@ func TestInfluxTags(t *T.T) {
 	})
 
 	t.Run("no-tags", func(t *T.T) {
-		pt := NewPointV2(`abc`,
+		pt := NewPoint(`abc`,
 			NewKVs(map[string]any{"v1": 123}).
 				AddTag(`v1`, `foo`)) // tag key exist, skipped
 
@@ -441,7 +433,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-ns-prec",
 			prec: PrecNS,
 			pt: func() *Point {
-				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(0, 123)))...)
 
 				assert.NoError(t, err)
@@ -456,7 +448,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-ms-prec",
 			prec: PrecMS,
 			pt: func() *Point {
-				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(0, 12345678)))...)
 
 				assert.NoError(t, err)
@@ -469,7 +461,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-us-prec",
 			prec: PrecUS, // only accept u
 			pt: func() *Point {
-				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(0, 12345678)))...)
 
 				assert.NoError(t, err)
@@ -482,7 +474,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-ns-prec",
 			prec: PrecNS, // only accept u
 			pt: func() *Point {
-				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(0, 12345678)))...)
 				assert.NoError(t, err)
 				return pt
@@ -494,7 +486,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-invalid-prec",
 			prec: -1,
 			pt: func() *Point {
-				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(0, 12345678)))...)
 				assert.NoError(t, err)
 				return pt
@@ -506,7 +498,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-second-prec",
 			prec: PrecS,
 			pt: func() *Point {
-				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(1, 123456789)))...)
 				assert.NoError(t, err)
 				return pt
@@ -518,7 +510,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-minute-prec",
 			prec: PrecM,
 			pt: func() *Point {
-				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(120, 123456789)))...)
 				assert.NoError(t, err)
 				return pt
@@ -530,7 +522,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-hour-prec",
 			prec: PrecH,
 			pt: func() *Point {
-				pt, err := NewPoint("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(7199, 123456789)))...)
 				assert.NoError(t, err)
 				return pt
@@ -543,7 +535,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "pb-point",
 			prec: PrecNS,
 			pt: func() *Point {
-				pt, err := NewPoint("abc",
+				pt, err := NewPointDeprecated("abc",
 					nil,
 					map[string]interface{}{"f1": int64(1)},
 					WithTime(time.Unix(0, 123)), WithEncoding(Protobuf))
@@ -560,7 +552,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "pb-point-with-binary-data",
 			prec: PrecNS,
 			pt: func() *Point {
-				pt, err := NewPoint("abc",
+				pt, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
 					map[string]interface{}{"f1": []byte("abc123")},
 					WithTime(time.Unix(0, 1)), WithEncoding(Protobuf))
@@ -577,7 +569,7 @@ func TestPointLineProtocol(t *T.T) {
 		{
 			name: `string-field-with-newline`,
 			prec: PrecNS,
-			pt: NewPointV2(`abc`, append(NewTags(map[string]string{"tag1": "v1"}),
+			pt: NewPoint(`abc`, append(NewTags(map[string]string{"tag1": "v1"}),
 				NewKVs(map[string]any{"f1": `message
 with
 new
@@ -593,10 +585,8 @@ line" 123`,
 			prec: PrecNS,
 			pt: func() *Point {
 				var kvs KVs
-				kvs = kvs.Add("arr",
-					MustNewAnyArray(1, 3.14, 1.414, "hello"),
-					false, true)
-				pt := NewPointV2("abc", kvs, WithTime(time.Unix(0, 123)))
+				kvs = kvs.Set("arr", MustNewAnyArray(1, 3.14, 1.414, "hello"))
+				pt := NewPoint("abc", kvs, WithTime(time.Unix(0, 123)))
 
 				return pt
 			}(),
@@ -624,7 +614,7 @@ func TestPBJSON(t *T.T) {
 			EnableMixedArrayField = false
 		}()
 
-		pt := NewPointV2(`abc`, NewKVs(map[string]any{
+		pt := NewPoint(`abc`, NewKVs(map[string]any{
 			"i":         1234567890,
 			"u":         uint64(1234567890),
 			"f":         3.14,
@@ -636,8 +626,8 @@ func TestPBJSON(t *T.T) {
 		}))
 
 		kvs := KVs(pt.pt.Fields)
-		kvs = kvs.MustAddTag(`t1`, `v1`).
-			MustAddKV(NewKV(`f2`, 3.14, WithKVUnit("kb"), WithKVType(COUNT)))
+		kvs = kvs.SetTag(`t1`, `v1`).
+			SetKV(NewKV(`f2`, 3.14, WithKVUnit("kb"), WithKVType(COUNT)))
 		pt.pt.Fields = kvs
 
 		j, _ := pt.PBJson()
@@ -657,7 +647,7 @@ func TestPBJSON(t *T.T) {
 
 func TestPointPB(t *T.T) {
 	t.Run(`valid-types`, func(t *T.T) {
-		pt := NewPointV2(`abc`, NewKVs(map[string]any{
+		pt := NewPoint(`abc`, NewKVs(map[string]any{
 			"f1":  uint64(123),
 			"f2":  uint64(math.MaxUint64),
 			"f3":  int64(123),
@@ -720,15 +710,15 @@ func TestPointPB(t *T.T) {
 
 func TestLPPoint(t *T.T) {
 	t.Run(`uint`, func(t *T.T) {
-		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": uint64(123)}), WithTime(time.Unix(0, 123)))
+		pt := NewPoint(`abc`, NewKVs(map[string]any{"f1": uint64(123)}), WithTime(time.Unix(0, 123)))
 		assert.Equal(t, `abc f1=123u 123`, pt.MustLPPoint().String())
 
 		// max-int64 is ok
-		pt = NewPointV2(`abc`, NewKVs(map[string]any{"f1": uint64(math.MaxInt64)}), WithTime(time.Unix(0, 123)))
+		pt = NewPoint(`abc`, NewKVs(map[string]any{"f1": uint64(math.MaxInt64)}), WithTime(time.Unix(0, 123)))
 		assert.Equal(t, fmt.Sprintf(`abc f1=%du 123`, math.MaxInt64), pt.MustLPPoint().String())
 
 		// max-int64 + 1 not ok
-		pt = NewPointV2(`abc`, NewKVs(map[string]any{
+		pt = NewPoint(`abc`, NewKVs(map[string]any{
 			"f1": uint64(math.MaxInt64 + 1),
 			"f2": "foo",
 		}), WithTime(time.Unix(0, 123)))
@@ -739,7 +729,7 @@ func TestLPPoint(t *T.T) {
 
 	t.Run(`nil`, func(t *T.T) {
 		// max-int64 + 1 not ok
-		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123, "f2": nil}), WithTime(time.Unix(0, 123)))
+		pt := NewPoint(`abc`, NewKVs(map[string]any{"f1": 123, "f2": nil}), WithTime(time.Unix(0, 123)))
 		assert.Equal(t, `abc f1=123i 123`, pt.MustLPPoint().String())
 
 		t.Logf("lp: %s", pt.MustLPPoint().String())
@@ -747,7 +737,7 @@ func TestLPPoint(t *T.T) {
 
 	t.Run(`struct`, func(t *T.T) {
 		// max-int64 + 1 not ok
-		pt := NewPointV2(`abc`, NewKVs(map[string]any{"f1": 123, "f2": struct{}{}}), WithTime(time.Unix(0, 123)))
+		pt := NewPoint(`abc`, NewKVs(map[string]any{"f1": 123, "f2": struct{}{}}), WithTime(time.Unix(0, 123)))
 		assert.Equal(t, `abc f1=123i 123`, pt.MustLPPoint().String())
 
 		t.Logf("lp: %s", pt.MustLPPoint().String())
@@ -764,7 +754,7 @@ func TestFields(t *T.T) {
 			name: "basic-lp-point",
 
 			pt: func() *Point {
-				x, err := NewPoint("abc", nil,
+				x, err := NewPointDeprecated("abc", nil,
 					map[string]interface{}{
 						"i8":     int8(1),
 						"u8":     uint8(1),
@@ -811,7 +801,7 @@ func TestFields(t *T.T) {
 			name: "basic-pb-point",
 
 			pt: func() *Point {
-				x, err := NewPoint("abc", nil,
+				x, err := NewPointDeprecated("abc", nil,
 					map[string]interface{}{
 						"bool_1": false,
 						"bool_2": true,
@@ -925,7 +915,7 @@ func FuzzPBPointString(f *T.F) {
 		d []byte,
 		ts int64,
 	) {
-		pt, err := NewPoint(measurement,
+		pt, err := NewPointDeprecated(measurement,
 			map[string]string{tagk: tagv},
 			map[string]interface{}{
 				"i64": i64,
@@ -950,63 +940,63 @@ func TestKey(t *T.T) {
 		{
 			"basic",
 			`f1`,
-			NewPointV2("abc", NewKVs(map[string]any{"f1": 123})),
+			NewPoint("abc", NewKVs(map[string]any{"f1": 123})),
 			int64(123),
 		},
 
 		{
 			"query-tag-no-field",
 			`t1`,
-			NewPointV2("abc", nil, WithExtraTags(map[string]string{"t1": "v1"})),
+			NewPoint("abc", nil, WithExtraTags(map[string]string{"t1": "v1"})),
 			"v1",
 		},
 
 		{
 			"no-field-query-field-not-found",
 			`f1`,
-			NewPointV2("abc", nil, nil),
+			NewPoint("abc", nil, nil),
 			nil,
 		},
 
 		{
 			"query-field-not-found",
 			`f1`,
-			NewPointV2("abc", NewKVs(map[string]any{"f2": 123})),
+			NewPoint("abc", NewKVs(map[string]any{"f2": 123})),
 			nil,
 		},
 
 		{
 			"query-f32",
 			`f1`,
-			NewPointV2("abc", NewKVs(map[string]any{"f1": float32(3.0)})),
+			NewPoint("abc", NewKVs(map[string]any{"f1": float32(3.0)})),
 			float64(3.0),
 		},
 
 		{
 			"query-f64",
 			`f1`,
-			NewPointV2("abc", NewKVs(map[string]any{"f1": float64(3.14)})),
+			NewPoint("abc", NewKVs(map[string]any{"f1": float64(3.14)})),
 			float64(3.14),
 		},
 
 		{
 			"query-u64",
 			`f1`,
-			NewPointV2("abc", NewKVs(map[string]any{"f1": uint64(3)})),
+			NewPoint("abc", NewKVs(map[string]any{"f1": uint64(3)})),
 			uint64(3),
 		},
 
 		{
 			"query-data",
 			`f1`,
-			NewPointV2("abc", NewKVs(map[string]any{"f1": []byte("hello")}), WithEncoding(Protobuf)),
+			NewPoint("abc", NewKVs(map[string]any{"f1": []byte("hello")}), WithEncoding(Protobuf)),
 			[]byte("hello"),
 		},
 
 		{
 			"query-bool",
 			`f1`,
-			NewPointV2("abc", NewKVs(map[string]any{"f1": false})),
+			NewPoint("abc", NewKVs(map[string]any{"f1": false})),
 			false,
 		},
 	}
@@ -1021,7 +1011,7 @@ func TestKey(t *T.T) {
 
 func TestPointKeys(t *T.T) {
 	t.Run("point-keys", func(t *T.T) {
-		p := NewPointV2("abc",
+		p := NewPoint("abc",
 			NewKVs(map[string]any{"f1": "123", "f2": false, "f3": float32(3.14)}),
 			WithExtraTags(map[string]string{"t1": "t2"}))
 		keys := p.Keys()
@@ -1049,14 +1039,14 @@ func TestPointKeys(t *T.T) {
 	})
 
 	t.Run("exist", func(t *T.T) {
-		p := NewPointV2("abc", NewKVs(map[string]any{"x1": "123"}))
+		p := NewPoint("abc", NewKVs(map[string]any{"x1": "123"}))
 		keys := p.Keys()
 
 		assert.True(t, keys.Has(NewKey(`x1`, D)), "keys:\n%s", keys.Pretty())
 	})
 
 	t.Run("add", func(t *T.T) {
-		p := NewPointV2("abc", NewKVs(map[string]any{"f1": "123"}))
+		p := NewPoint("abc", NewKVs(map[string]any{"f1": "123"}))
 		keys := p.Keys()
 
 		h1 := keys.Hash()
@@ -1069,7 +1059,7 @@ func TestPointKeys(t *T.T) {
 	})
 
 	t.Run("no-kvs", func(t *T.T) {
-		p := NewPointV2("abc", nil)
+		p := NewPoint("abc", nil)
 		keys := p.Keys()
 
 		t.Logf("keys:\n%s", keys.Pretty())
@@ -1098,7 +1088,7 @@ func TestPointKeys(t *T.T) {
 
 func TestPointAddKey(t *T.T) {
 	t.Run("add", func(t *T.T) {
-		pt := NewPointV2("abc", NewKVs(map[string]any{"f1": 123}))
+		pt := NewPoint("abc", NewKVs(map[string]any{"f1": 123}))
 		pt.Add("new-key", "hello")
 		kvs := KVs(pt.pt.Fields)
 		assert.True(t, kvs.Has(`new-key`), "fields: %s", kvs.Pretty())
@@ -1128,11 +1118,11 @@ func BenchmarkPointSize(b *T.B) {
 func TestPayloadSize(t *T.T) {
 	t.Run("sizes", func(t *T.T) {
 		// empty point
-		pt := NewPointV2(`abc`, nil)
+		pt := NewPoint(`abc`, nil)
 		t.Logf("pt size: %d, pb size: %d, lp size: %d", pt.Size(), pt.PBSize(), pt.LPSize())
 
 		// basic point
-		pt = NewPointV2(`abc`, NewKVs(map[string]any{
+		pt = NewPoint(`abc`, NewKVs(map[string]any{
 			"f1": 123,
 			"f2": uint64(123),
 			"f3": false,
@@ -1142,7 +1132,7 @@ func TestPayloadSize(t *T.T) {
 		t.Logf("pt size: %d, pb size: %d, lp size: %d", pt.Size(), pt.PBSize(), pt.LPSize())
 
 		// large numbers
-		pt = NewPointV2(`abc`, NewKVs(map[string]any{
+		pt = NewPoint(`abc`, NewKVs(map[string]any{
 			"f1": math.MaxInt64,
 			"f3": false,
 			"f5": []byte(strings.Repeat(`hello`, 100)),
@@ -1154,9 +1144,9 @@ func TestPayloadSize(t *T.T) {
 		t.Logf("pt size: %d, pb size: %d, lp size: %d", pt.Size(), pt.PBSize(), pt.LPSize())
 
 		// with kv unit/type
-		pt = NewPointV2(`abc`, NewKVs(nil).
-			MustAddKV(NewKV(`f1`, 123, WithKVUnit("MB"), WithKVType(COUNT))).
-			MustAddTag(`t1`, `v1`))
+		pt = NewPoint(`abc`, NewKVs(nil).
+			SetKV(NewKV(`f1`, 123, WithKVUnit("MB"), WithKVType(COUNT))).
+			SetTag(`t1`, `v1`))
 		t.Logf("pt size: %d, pb size: %d, lp size: %d", pt.Size(), pt.PBSize(), pt.LPSize())
 
 		// rand point
@@ -1168,7 +1158,7 @@ func TestPayloadSize(t *T.T) {
 	})
 
 	t.Run("size-of-anypb", func(t *T.T) {
-		pt := NewPointV2("some", nil)
+		pt := NewPoint("some", nil)
 
 		pt.MustAdd("arr", []string{
 			cliutils.CreateRandomString(100),
@@ -1176,17 +1166,17 @@ func TestPayloadSize(t *T.T) {
 		})
 		t.Logf("s-arr pt size: %d, pbsize: %d\npt: %s", pt.Size(), pt.PBSize(), pt.Pretty())
 
-		pt = NewPointV2("some", nil)
+		pt = NewPoint("some", nil)
 		pt.MustAdd("arr", []int{(1), (1)})
 		t.Logf("i-arr pt size: %d, pbsize: %d\npt: %s", pt.Size(), pt.PBSize(), pt.Pretty())
 
-		pt = NewPointV2("some", nil)
+		pt = NewPoint("some", nil)
 		pt.MustAdd("arr", []bool{false, true})
 		t.Logf("b-arr pt size: %d, pbsize: %d\npt: %s", pt.Size(), pt.PBSize(), pt.Pretty())
 	})
 
 	t.Run("size-of-large-string-point", func(t *T.T) {
-		pt := NewPointV2("some", nil)
+		pt := NewPoint("some", nil)
 
 		_32mstr := cliutils.CreateRandomString(1024 * 1024 * 32)
 		pt.MustAdd("large-string", _32mstr)

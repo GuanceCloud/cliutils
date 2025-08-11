@@ -73,13 +73,13 @@ func TestDel(t *T.T) {
 func TestTrim(t *T.T) {
 	t.Run("trim-field", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f0", 1.23, false, false)
 		kvs = kvs.AddTag("t1", "v1")
-		kvs = kvs.Add("f1", -123, false, false)
-		kvs = kvs.Add("f2", uint64(123), false, false)
-		kvs = kvs.Add("f3", "hello", false, false)
-		kvs = kvs.Add("f4", []byte("world"), false, false)
-		kvs = kvs.Add("f5", false, false, false)
+		kvs = kvs.Add("f0", 1.23)
+		kvs = kvs.Add("f1", -123)
+		kvs = kvs.Add("f2", uint64(123))
+		kvs = kvs.Add("f3", "hello")
+		kvs = kvs.Add("f4", []byte("world"))
+		kvs = kvs.Add("f5", false)
 
 		kvs = kvs.TrimFields(1)
 
@@ -96,7 +96,7 @@ func TestTrim(t *T.T) {
 		i := 0
 		var kvs KVs
 
-		kvs = kvs.Add("f0", 1.23, false, false)
+		kvs = kvs.Add("f0", 1.23)
 		kvs = kvs.AddTag("t1", "v1")
 
 		for {
@@ -104,7 +104,7 @@ func TestTrim(t *T.T) {
 
 			assert.Lenf(t, kvs, 1, "go kvs: %s", kvs.Pretty())
 
-			kvs = kvs.Add("f-1", 123, false, false)
+			kvs = kvs.Add("f-1", 123)
 
 			if pp.(*ReservedCapPointPool).chanGet() > 0 {
 				t.Logf("[%d] %s", i, pp)
@@ -121,13 +121,13 @@ func TestTrim(t *T.T) {
 
 		for loop := 0; loop < 2; loop++ {
 			var kvs KVs
-			kvs = kvs.Add("f0", 1.23, false, false)
 			kvs = kvs.AddTag("t1", "v1")
-			kvs = kvs.Add("f1", -123, false, false)
-			kvs = kvs.Add("f2", uint64(123), false, false)
-			kvs = kvs.Add("f3", "hello", false, false)
-			kvs = kvs.Add("f4", []byte("world"), false, false)
-			kvs = kvs.Add("f5", false, false, false)
+			kvs = kvs.Add("f0", 1.23)
+			kvs = kvs.Add("f1", -123)
+			kvs = kvs.Add("f2", uint64(123))
+			kvs = kvs.Add("f3", "hello")
+			kvs = kvs.Add("f4", []byte("world"))
+			kvs = kvs.Add("f5", false)
 
 			kvs = kvs.TrimFields(2)
 
@@ -136,10 +136,10 @@ func TestTrim(t *T.T) {
 			assert.NotNil(t, kvs.Get("f1"))
 			assert.NotNil(t, kvs.Get("t1"))
 
-			kvs = kvs.Add("f-2", 123, false, false)
-			kvs = kvs.Add("f-3", 123, false, false)
-			kvs = kvs.Add("f-4", 123, false, false)
-			_ = kvs.Add("f-5", 123, false, false)
+			kvs = kvs.Add("f-2", 123)
+			kvs = kvs.Add("f-3", 123)
+			kvs = kvs.Add("f-4", 123)
+			_ = kvs.Add("f-5", 123)
 		}
 
 		// XXX: why set loop to 1, the kvReused == 0?
@@ -150,11 +150,11 @@ func TestTrim(t *T.T) {
 
 	t.Run("trim-tag", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f0", 1.23, false, false)
+		kvs = kvs.Add("f0", 1.23)
 		kvs = kvs.AddTag("t1", "v1")
 		kvs = kvs.AddTag("t2", "v1")
 		kvs = kvs.AddTag("t3", "v1")
-		kvs = kvs.Add("f1", -123, false, false)
+		kvs = kvs.Add("f1", -123)
 
 		kvs = kvs.TrimTags(1)
 
@@ -170,10 +170,10 @@ func TestTrim(t *T.T) {
 		for loop := 0; loop < 2; loop++ {
 			var kvs KVs
 
-			kvs = kvs.Add("f0", 1.23, false, false)
+			kvs = kvs.Add("f0", 1.23)
 			kvs = kvs.AddTag("t1", "v1")
 			kvs = kvs.AddTag("t2", "v1")
-			kvs = kvs.Add("f1", -123, false, false)
+			kvs = kvs.Add("f1", -123)
 
 			kvs = kvs.TrimTags(1)
 
@@ -183,10 +183,10 @@ func TestTrim(t *T.T) {
 			assert.NotNil(t, kvs.Get("f1"))
 			assert.NotNil(t, kvs.Get("f1"))
 
-			kvs = kvs.Add("f-2", 123, false, false)
-			kvs = kvs.Add("f-3", 123, false, false)
-			kvs = kvs.Add("f-4", 123, false, false)
-			_ = kvs.Add("f-5", 123, false, false)
+			kvs = kvs.Add("f-2", 123)
+			kvs = kvs.Add("f-3", 123)
+			kvs = kvs.Add("f-4", 123)
+			_ = kvs.Add("f-5", 123)
 		}
 
 		// XXX: why set loop to 1, the kvReused == 0?
@@ -207,17 +207,17 @@ func BenchmarkKVsTrim(b *T.B) {
 
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
-			kvs = kvs.Add("f0", 1.23, false, false)
+			kvs = kvs.Add("f0", 1.23)
 			kvs = kvs.AddTag("t1", "v1")
-			kvs = kvs.Add("f1", -123, false, false)
-			kvs = kvs.Add("f2", uint64(123), false, false)
+			kvs = kvs.Add("f1", -123)
+			kvs = kvs.Add("f2", uint64(123))
 
 			kvs = kvs.TrimFields(1)
 
-			kvs = kvs.Add("f-2", 123, false, false)
-			kvs = kvs.Add("f-3", 123, false, false)
-			kvs = kvs.Add("f-4", 123, false, false)
-			_ = kvs.Add("f-5", 123, false, false)
+			kvs = kvs.Add("f-2", 123)
+			kvs = kvs.Add("f-3", 123)
+			kvs = kvs.Add("f-4", 123)
+			_ = kvs.Add("f-5", 123)
 		}
 	})
 
@@ -231,17 +231,17 @@ func BenchmarkKVsTrim(b *T.B) {
 
 		for i := 0; i < b.N; i++ {
 			var kvs KVs
-			kvs = kvs.Add("f0", 1.23, false, false)
+			kvs = kvs.Add("f0", 1.23)
 			kvs = kvs.AddTag("t1", "v1")
-			kvs = kvs.Add("f1", -123, false, false)
-			kvs = kvs.Add("f2", uint64(123), false, false)
+			kvs = kvs.Add("f1", -123)
+			kvs = kvs.Add("f2", uint64(123))
 
 			kvs = kvs.Del("f2")
 
-			kvs = kvs.Add("f-2", 123, false, false)
-			kvs = kvs.Add("f-3", 123, false, false)
-			kvs = kvs.Add("f-4", 123, false, false)
-			_ = kvs.Add("f-5", 123, false, false)
+			kvs = kvs.Add("f-2", 123)
+			kvs = kvs.Add("f-3", 123)
+			kvs = kvs.Add("f-4", 123)
+			_ = kvs.Add("f-5", 123)
 		}
 	})
 }
@@ -249,18 +249,18 @@ func BenchmarkKVsTrim(b *T.B) {
 func TestKVsAdd(t *T.T) {
 	t.Run("basic", func(t *T.T) {
 		var kvs KVs
-		kvs.Add("f1", 123, false, false)
+		kvs.Add("f1", 123)
 
 		assert.Len(t, kvs, 0)
 
-		kvs = kvs.Add("f1", 123, false, false)
+		kvs = kvs.Add("f1", 123)
 		assert.Len(t, kvs, 1)
 	})
 
 	t.Run("add-v2", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.AddV2("f1", 123, false, WithKVUnit("dollar"), WithKVType(GAUGE))
-		kvs = kvs.AddV2("cap", 123, false, WithKVUnit("bytes"), WithKVType(COUNT))
+		kvs = kvs.Add("f1", 123, WithKVUnit("dollar"), WithKVType(GAUGE))
+		kvs = kvs.Add("cap", 123, WithKVUnit("bytes"), WithKVType(COUNT))
 
 		t.Logf("kvs: %s", kvs.Pretty())
 	})
@@ -269,12 +269,12 @@ func TestKVsAdd(t *T.T) {
 func TestKVsReset(t *T.T) {
 	t.Run("reset", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f0", 1.23, false, false)
-		kvs = kvs.Add("f1", -123, false, false)
-		kvs = kvs.Add("f2", uint64(123), false, false)
-		kvs = kvs.Add("f3", "hello", false, false)
-		kvs = kvs.Add("f4", []byte("world"), false, false)
-		kvs = kvs.Add("f5", false, false, false)
+		kvs = kvs.Add("f0", 1.23)
+		kvs = kvs.Add("f1", -123)
+		kvs = kvs.Add("f2", uint64(123))
+		kvs = kvs.Add("f3", "hello")
+		kvs = kvs.Add("f4", []byte("world"))
+		kvs = kvs.Add("f5", false)
 
 		kvs.ResetFull()
 
@@ -298,22 +298,22 @@ func TestNewKVs(t *T.T) {
 		assert.Equal(t, 1, kvs.TagCount())
 
 		// add new tag t2
-		kvs = kvs.Add(`t2`, `v2`, true, true)
+		kvs = kvs.SetTag(`t2`, `v2`)
 		assert.Equal(t, `v2`, kvs.Get(`t2`).GetS())
 		assert.Equal(t, 2, kvs.TagCount())
 
 		// replace t2's value v3
-		kvs = kvs.Add(`t2`, `v3`, true, true)
+		kvs = kvs.SetTag(`t2`, `v3`)
 		assert.Equal(t, `v3`, kvs.Get(`t2`).GetS())
 		assert.Equal(t, 2, kvs.TagCount())
 
 		// invalid tag value(must be []byte/string), switch to field
-		kvs = kvs.Add(`tag-as-field`, 123, true, true)
+		kvs = kvs.Set(`tag-as-field`, 123, WithKVTagSet(true))
 		assert.Equal(t, int64(123), kvs.Get(`tag-as-field`).GetI())
 		assert.Equal(t, 2, kvs.TagCount())
 
 		// invalid tag override exist
-		kvs = kvs.Add(`t2`, false, true, true)
+		kvs = kvs.Set(`t2`, false, WithKVTagSet(true))
 		assert.Equal(t, false, kvs.Get(`t2`).GetB())
 		assert.Equal(t, 1, kvs.TagCount())
 	})
@@ -358,13 +358,13 @@ func TestNewKVs(t *T.T) {
 	t.Run(`add-kv`, func(t *T.T) {
 		kvs := NewKVs(nil)
 
-		kvs = kvs.MustAddKV(NewKV(`t1`, false, WithKVTagSet(true))) // set tag failed on bool value
-		kvs = kvs.MustAddKV(NewKV(`t2`, "v1", WithKVTagSet(true)))
-		kvs = kvs.MustAddKV(NewKV(`t3`, []byte("v2"), WithKVTagSet(true)))
+		kvs = kvs.SetKV(NewKV(`t1`, false, WithKVTagSet(true))) // set tag failed on bool value
+		kvs = kvs.SetKV(NewKV(`t2`, "v1", WithKVTagSet(true)))
+		kvs = kvs.SetKV(NewKV(`t3`, []byte("v2"), WithKVTagSet(true)))
 
-		kvs = kvs.MustAddKV(NewKV(`f1`, "foo"))
-		kvs = kvs.MustAddKV(NewKV(`f2`, 123, WithKVUnit("MB"), WithKVType(COUNT)))
-		kvs = kvs.MustAddKV(NewKV(`f3`, 3.14, WithKVUnit("some"), WithKVType(GAUGE)))
+		kvs = kvs.SetKV(NewKV(`f1`, "foo"))
+		kvs = kvs.SetKV(NewKV(`f2`, 123, WithKVUnit("MB"), WithKVType(COUNT)))
+		kvs = kvs.SetKV(NewKV(`f3`, 3.14, WithKVUnit("some"), WithKVType(GAUGE)))
 
 		assert.Equal(t, 6, len(kvs))
 
@@ -377,17 +377,17 @@ func TestNewKVs(t *T.T) {
 
 		assert.True(t, sort.IsSorted(kvs)) // empty kvs sorted
 
-		kvs = kvs.Add(`f2`, false, false, false)
-		kvs = kvs.Add(`f1`, 123, false, false)
-		kvs = kvs.Add(`f0`, 123, false, false)
-		kvs = kvs.MustAddTag(`t1`, "v1")
+		kvs = kvs.Add(`f2`, false)
+		kvs = kvs.Add(`f1`, 123)
+		kvs = kvs.Add(`f0`, 123)
+		kvs = kvs.SetTag(`t1`, "v1")
 
 		assert.False(t, sort.IsSorted(kvs))
 
 		kvs = kvs.Del(`f1`)
 		assert.False(t, sort.IsSorted(kvs))
 
-		kvs = kvs.MustAddKV(NewKV(`f3`, 3.14))
+		kvs = kvs.SetKV(NewKV(`f3`, 3.14))
 		assert.False(t, sort.IsSorted(kvs))
 
 		t.Logf("kvs:\n%s", kvs.Pretty())
@@ -411,9 +411,9 @@ func TestNewKVs(t *T.T) {
 			}
 		}()
 
-		kvs = kvs.Add(`f1`, false, false, false)
-		kvs = kvs.Add(`f2`, 123, false, false)
-		kvs = kvs.Add(`f3`, 123, false, false)
+		kvs = kvs.Add(`f1`, false)
+		kvs = kvs.Add(`f2`, 123)
+		kvs = kvs.Add(`f3`, 123)
 
 		t.Logf("kvs:\n%s", kvs.Pretty())
 		kvs = kvs.Del(`f1`)
@@ -436,9 +436,9 @@ func TestNewKVs(t *T.T) {
 			}
 		}()
 
-		kvs = kvs.Add(`f1`, false, false, false)
-		kvs = kvs.Add(`f2`, 123, false, false)
-		kvs = kvs.Add(`f3`, 123, false, false)
+		kvs = kvs.Add(`f1`, false)
+		kvs = kvs.Add(`f2`, 123)
+		kvs = kvs.Add(`f3`, 123)
 
 		t.Logf("kvs:\n%s", kvs.Pretty())
 		kvs = kvs.Del(`f1`)
@@ -448,9 +448,9 @@ func TestNewKVs(t *T.T) {
 	})
 
 	t.Run(`test-update-on-kvs`, func(t *T.T) {
-		pt := NewPointV2("ptname", nil)
+		pt := NewPoint("ptname", nil)
 
-		pt.pt.Fields = KVs(pt.pt.Fields).Add("f1", 1.23, false, false)
+		pt.pt.Fields = KVs(pt.pt.Fields).Add("f1", 1.23)
 
 		t.Logf("point: %s", pt.Pretty())
 
@@ -459,18 +459,21 @@ func TestNewKVs(t *T.T) {
 
 	t.Run("array-int-value", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f_arr", MustNewAnyArray(1, 2, 3), false, false)
+		kvs = kvs.Add("f_arr", MustNewAnyArray(1, 2, 3))
+
+		// NOTE: Raw() will detect element's type in array, and return the exact array type according
+		// to element's type.
 		assert.Equal(t, []int64{int64(1), int64(2), int64(3)}, kvs.Get("f_arr").Raw())
 		t.Logf("kvs: %s", kvs.Pretty())
 	})
 
 	t.Run("array-bytes-value", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f_arr", MustNewAnyArray([]byte("hello"), []byte("world")), false, false)
+		kvs = kvs.Add("f_arr", MustNewAnyArray([]byte("hello"), []byte("world")))
 		assert.Equal(t, [][]byte{[]byte("hello"), []byte("world")}, kvs.Get("f_arr").Raw())
 		t.Logf("kvs: %s", kvs.Pretty())
 
-		pt := NewPointV2("some", kvs)
+		pt := NewPoint("some", kvs)
 
 		t.Logf("pt pretty: %s", pt.Pretty())
 		t.Logf("pt lineproto: %s", pt.LineProto())
@@ -495,9 +498,9 @@ func TestKVsDel(t *T.T) {
 	t.Run("del", func(t *T.T) {
 		var kvs KVs
 
-		kvs = kvs.Add(`f1`, false, false, false)
-		kvs = kvs.Add(`f2`, 123, false, false)
-		kvs = kvs.Add(`f3`, 123, false, false)
+		kvs = kvs.Add(`f1`, false)
+		kvs = kvs.Add(`f2`, 123)
+		kvs = kvs.Add(`f3`, 123)
 
 		kvs = kvs.Del(`f1`)
 		assert.Len(t, kvs, 2)
@@ -515,9 +518,9 @@ func TestKVsDel(t *T.T) {
 			ClearPointPool()
 		}()
 
-		kvs = kvs.Add(`f1`, false, false, false)
-		kvs = kvs.Add(`f2`, 123, false, false)
-		kvs = kvs.Add(`f3`, 123, false, false)
+		kvs = kvs.Add(`f1`, false)
+		kvs = kvs.Add(`f2`, 123)
+		kvs = kvs.Add(`f3`, 123)
 
 		kvs = kvs.Del(`f1`)
 		assert.Len(t, kvs, 2)
@@ -526,7 +529,7 @@ func TestKVsDel(t *T.T) {
 		assert.Len(t, kvs, 1)
 		assert.NotNil(t, kvs.Get(`f2`))
 
-		_ = kvs.Add(`f-x`, 123, false, false)
+		_ = kvs.Add(`f-x`, 123)
 
 		assert.True(t, pp.(*ReservedCapPointPool).poolGet() > 0)
 		assert.True(t, pp.(*ReservedCapPointPool).poolPut() == 0) // chan is 1000, not put to pool
@@ -540,12 +543,12 @@ func TestKVsDel(t *T.T) {
 
 func BenchmarkKVsDel(b *T.B) {
 	addTestKVs := func(kvs KVs) KVs {
-		kvs = kvs.Add(`f1`, false, false, false)
-		kvs = kvs.Add(`f2`, 123, false, false)
-		kvs = kvs.Add(`f3`, "some string", false, false)
-		kvs = kvs.Add(`f4`, []byte("hello world"), false, false)
-		kvs = kvs.Add(`f5`, 3.14, false, false)
-		kvs = kvs.Add(`f6`, uint(8), false, false)
+		kvs = kvs.Add(`f1`, false)
+		kvs = kvs.Add(`f2`, 123)
+		kvs = kvs.Add(`f3`, "some string")
+		kvs = kvs.Add(`f4`, []byte("hello world"))
+		kvs = kvs.Add(`f5`, 3.14)
+		kvs = kvs.Add(`f6`, uint(8))
 
 		return kvs
 	}
@@ -594,16 +597,16 @@ func BenchmarkKVsDel(b *T.B) {
 
 func Test_shuffle(t *T.T) {
 	var kvs KVs
-	kvs = kvs.Add(`f1`, false, false, false)
-	kvs = kvs.Add(`f2`, 123, false, false)
-	kvs = kvs.Add(`f3`, "some string", false, false)
-	kvs = kvs.Add(`f4`, []byte("hello world"), false, false)
-	kvs = kvs.Add(`f5`, 3.14, false, false)
-	kvs = kvs.Add(`f6`, uint(8), false, false)
+	kvs = kvs.Add(`f1`, false)
+	kvs = kvs.Add(`f2`, 123)
+	kvs = kvs.Add(`f3`, "some string")
+	kvs = kvs.Add(`f4`, []byte("hello world"))
+	kvs = kvs.Add(`f5`, 3.14)
+	kvs = kvs.Add(`f6`, uint(8))
 
 	kvs = kvs.shuffle()
 
-	p := NewPointV2(t.Name(), kvs)
+	p := NewPoint(t.Name(), kvs)
 
 	t.Logf(p.Pretty())
 }
@@ -612,13 +615,13 @@ func TestShuffleGzip(t *T.T) {
 	var pts []*Point
 	for i := 0; i < 1000; i++ {
 		var kvs KVs
-		kvs = kvs.Add(`f1`, false, false, false)
-		kvs = kvs.Add(`f2`, 123, false, false)
-		kvs = kvs.Add(`f3`, "some string", false, false)
-		kvs = kvs.Add(`f4`, []byte("hello world"), false, false)
-		kvs = kvs.Add(`f5`, 3.14, false, false)
-		kvs = kvs.Add(`f6`, uint(8), false, false)
-		pts = append(pts, NewPointV2(t.Name(), kvs))
+		kvs = kvs.Add(`f1`, false)
+		kvs = kvs.Add(`f2`, 123)
+		kvs = kvs.Add(`f3`, "some string")
+		kvs = kvs.Add(`f4`, []byte("hello world"))
+		kvs = kvs.Add(`f5`, 3.14)
+		kvs = kvs.Add(`f6`, uint(8))
+		pts = append(pts, NewPoint(t.Name(), kvs))
 	}
 
 	enc := GetEncoder(WithEncEncoding(Protobuf))
@@ -667,12 +670,12 @@ func TestShuffleGzip(t *T.T) {
 func BenchmarkShuffle(b *T.B) {
 	b.Run(`basic`, func(b *T.B) {
 		var kvs KVs
-		kvs = kvs.Add(`f1`, false, false, false)
-		kvs = kvs.Add(`f2`, 123, false, false)
-		kvs = kvs.Add(`f3`, "some string", false, false)
-		kvs = kvs.Add(`f4`, []byte("hello world"), false, false)
-		kvs = kvs.Add(`f5`, 3.14, false, false)
-		kvs = kvs.Add(`f6`, uint(8), false, false)
+		kvs = kvs.Add(`f1`, false)
+		kvs = kvs.Add(`f2`, 123)
+		kvs = kvs.Add(`f3`, "some string")
+		kvs = kvs.Add(`f4`, []byte("hello world"))
+		kvs = kvs.Add(`f5`, 3.14)
+		kvs = kvs.Add(`f6`, uint(8))
 
 		for i := 0; i < b.N; i++ {
 			kvs = kvs.shuffle()
