@@ -12,8 +12,10 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/assert"
 )
 
 var cases = []struct {
@@ -127,4 +129,79 @@ func websocketServer() *httptest.Server {
 	}))
 
 	return ts
+}
+
+func TestWebsocketRenderTemplate(t *testing.T) {
+	ct := &WebsocketTask{
+		URL:     "{{url}}",
+		Message: "{{message}}",
+		SuccessWhen: []*WebsocketSuccess{
+			{
+				ResponseTime: []*WebsocketResponseTime{{
+					Target: "10s",
+				}},
+			},
+			{
+				ResponseMessage: []*SuccessOption{{
+					Is: "{{response_message}}",
+				}},
+			},
+			{
+				Header: map[string][]*SuccessOption{
+					"header": {{
+						Is: "{{header}}",
+					}},
+				},
+			},
+		},
+		AdvanceOptions: &WebsocketAdvanceOption{
+			RequestOptions: &WebsocketOptRequest{
+				Headers: map[string]string{
+					"header": "{{header}}",
+				},
+			},
+			Auth: &WebsocketOptAuth{
+				Username: "{{username}}",
+				Password: "{{password}}",
+			},
+		},
+	}
+
+	fm := template.FuncMap{
+		"url": func() string {
+			return "url"
+		},
+		"header": func() string {
+			return "header"
+		},
+		"username": func() string {
+			return "username"
+		},
+		"password": func() string {
+			return "password"
+		},
+		"port": func() string {
+			return "8080"
+		},
+		"message": func() string {
+			return "message"
+		},
+		"response_message": func() string {
+			return "response_message"
+		},
+	}
+
+	task, err := NewTask("", ct)
+	assert.NoError(t, err)
+
+	ct, ok := task.(*WebsocketTask)
+	assert.True(t, ok)
+
+	assert.NoError(t, ct.renderTemplate(fm))
+	assert.Equal(t, "header", ct.AdvanceOptions.RequestOptions.Headers["header"])
+	assert.Equal(t, "message", ct.Message)
+	assert.Equal(t, "response_message", ct.SuccessWhen[1].ResponseMessage[0].Is)
+	assert.Equal(t, "username", ct.AdvanceOptions.Auth.Username)
+	assert.Equal(t, "password", ct.AdvanceOptions.Auth.Password)
+	assert.Equal(t, "url", ct.URL)
 }
