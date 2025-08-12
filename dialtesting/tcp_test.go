@@ -9,7 +9,10 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var tcpCases = []struct {
@@ -112,7 +115,6 @@ func TestTcp(t *testing.T) {
 		}
 
 		err = c.t.Run()
-
 		if err != nil {
 			if c.fail == false {
 				t.Errorf("case %s failed: %s", c.t.Name, err)
@@ -165,4 +167,35 @@ func tcpServer() (server net.Listener, err error) {
 	}()
 
 	return
+}
+
+func TestTCPRenderTemplate(t *testing.T) {
+	ct := &TCPTask{
+		Host:    "{{host}}",
+		Port:    "{{port}}",
+		Message: "{{message}}",
+	}
+
+	fm := template.FuncMap{
+		"host": func() string {
+			return "localhost"
+		},
+		"port": func() string {
+			return "8080"
+		},
+		"message": func() string {
+			return "hello"
+		},
+	}
+
+	task, err := NewTask("", ct)
+	assert.NoError(t, err)
+
+	ct, ok := task.(*TCPTask)
+	assert.True(t, ok)
+
+	assert.NoError(t, ct.renderTemplate(fm))
+	assert.Equal(t, "localhost", ct.Host)
+	assert.Equal(t, "8080", ct.Port)
+	assert.Equal(t, "hello", ct.Message)
 }
