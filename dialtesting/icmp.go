@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -432,6 +433,7 @@ var (
 	icmpID            int
 	icmpSequence      uint16
 	icmpSequenceMutex sync.Mutex
+	icmpLockCount     atomic.Int64
 )
 
 func init() {
@@ -458,7 +460,13 @@ func getICMPSequence() uint16 {
 	return icmpSequence
 }
 
-func doPing(ctx context.Context, target string) (success bool, rtt time.Duration) {
+func doPing(timeout time.Duration, target string) (rtt time.Duration, err error) {
+	ICMPConcurrentCh <- struct{}{}
+	defer func() {
+		<-ICMPConcurrentCh
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 	var (
 		requestType icmp.Type
 		replyType   icmp.Type
@@ -475,7 +483,7 @@ func doPing(ctx context.Context, target string) (success bool, rtt time.Duration
 			break
 		}
 	} else {
-		return false, 0
+		return 0, fmt.Errorf("look up ip failed: %w", err)
 	}
 
 	var srcIP net.IP
@@ -493,7 +501,7 @@ func doPing(ctx context.Context, target string) (success bool, rtt time.Duration
 			// "udp" here means unprivileged -- not the protocol "udp".
 			icmpConn, err = icmp.ListenPacket("udp6", srcIP.String())
 			if err != nil {
-				return false, 0
+				return 0, fmt.Errorf("listen udp6 failed: %w", err)
 			} else {
 				privileged = false
 			}
@@ -502,13 +510,12 @@ func doPing(ctx context.Context, target string) (success bool, rtt time.Duration
 		if privileged {
 			icmpConn, err = icmp.ListenPacket("ip6:ipv6-icmp", srcIP.String())
 			if err != nil {
-				return false, 0
+				return 0, fmt.Errorf("listen ip6:ipv6-icmp failed: %w", err)
 			}
 		}
 		defer icmpConn.Close()
 
-		if err := icmpConn.IPv6PacketConn().SetControlMessage(ipv6.FlagHopLimit, true); err != nil {
-		}
+		_ = icmpConn.IPv6PacketConn().SetControlMessage(ipv6.FlagHopLimit, true)
 	} else {
 		requestType = ipv4.ICMPTypeEcho
 		replyType = ipv4.ICMPTypeEchoReply
@@ -517,8 +524,7 @@ func doPing(ctx context.Context, target string) (success bool, rtt time.Duration
 
 		if tryUnprivileged {
 			icmpConn, err = icmp.ListenPacket("udp4", srcIP.String())
-			if err != nil {
-			} else {
+			if err == nil {
 				privileged = false
 			}
 		}
@@ -526,14 +532,12 @@ func doPing(ctx context.Context, target string) (success bool, rtt time.Duration
 		if privileged {
 			icmpConn, err = icmp.ListenPacket("ip4:icmp", srcIP.String())
 			if err != nil {
-				return
+				return 0, fmt.Errorf("listen ip4:icmp failed: %w", err)
 			}
 		}
 		defer icmpConn.Close()
 
-		if err := icmpConn.IPv4PacketConn().SetControlMessage(ipv4.FlagTTL, true); err != nil {
-		}
-
+		_ = icmpConn.IPv4PacketConn().SetControlMessage(ipv4.FlagTTL, true)
 	}
 	var dst net.Addr = dstIPAddr
 	if !privileged {
@@ -555,18 +559,17 @@ func doPing(ctx context.Context, target string) (success bool, rtt time.Duration
 
 	wb, err := wm.Marshal(nil)
 	if err != nil {
-		return
+		return 0, fmt.Errorf("marshal message failed: %w", err)
 	}
 
 	rttStart := time.Now()
 
 	if icmpConn != nil {
-		_, err = icmpConn.WriteTo(wb, dst)
+		if _, err = icmpConn.WriteTo(wb, dst); err != nil {
+			return 0, fmt.Errorf("write to failed: %w", err)
+		}
 	} else {
-		return false, 0
-	}
-	if err != nil {
-		return false, 0
+		return 0, fmt.Errorf("conn is nil")
 	}
 
 	// Reply should be the same except for the message type and ID if
@@ -579,7 +582,7 @@ func doPing(ctx context.Context, target string) (success bool, rtt time.Duration
 	}
 	wb, err = wm.Marshal(nil)
 	if err != nil {
-		return
+		return 0, fmt.Errorf("marshal message failed: %w", err)
 	}
 
 	if idUnknown {
@@ -593,7 +596,7 @@ func doPing(ctx context.Context, target string) (success bool, rtt time.Duration
 	deadline, _ := ctx.Deadline()
 	err = icmpConn.SetReadDeadline(deadline)
 	if err != nil {
-		return false, 0
+		return 0, fmt.Errorf("set read deadline failed: %w", err)
 	}
 
 	for {
@@ -608,7 +611,7 @@ func doPing(ctx context.Context, target string) (success bool, rtt time.Duration
 		}
 		if err != nil {
 			if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
-				return false, 0
+				return 0, nil
 			}
 			continue
 		}
@@ -628,7 +631,7 @@ func doPing(ctx context.Context, target string) (success bool, rtt time.Duration
 		}
 		if bytes.Equal(rb[:n], wb) {
 			rtt = time.Since(rttStart)
-			return true, rtt
+			return rtt, nil
 		}
 	}
 }
@@ -659,18 +662,21 @@ func pingTarget(target string, count int, interval, timeout time.Duration) (stat
 
 	rtts := []time.Duration{}
 	for i := 0; i < count; i++ {
-		func() {
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
-			success, rtt := doPing(ctx, target)
+		err = func() error {
+			rtt, err := doPing(timeout, target)
 			stat.PacketsSent++
-			if success {
+			if err == nil && rtt > 0 {
 				stat.PacketsRecv++
 				rtts = append(rtts, rtt)
 			} else {
 				stat.PacketLoss++
 			}
+
+			return nil
 		}()
+		if err != nil {
+			return nil, err
+		}
 		time.Sleep(interval)
 	}
 
