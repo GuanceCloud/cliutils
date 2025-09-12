@@ -118,6 +118,8 @@ type ITask interface {
 	GetHostName() ([]string, error)
 	GetWorkspaceLanguage() string
 	GetDFLabel() string
+	GetScheduleType() string
+	GetCrontab() string
 
 	SetOption(map[string]string)
 	GetOption() map[string]string
@@ -159,6 +161,8 @@ type Task struct {
 	DFLabel           string            `json:"df_label,omitempty"`
 	UpdateTime        int64             `json:"update_time,omitempty"`
 	ConfigVars        []*ConfigVar      `json:"config_vars,omitempty"`
+	ScheduleType      string            `json:"schedule_type,omitempty"` // "frequency" or "crontab"
+	Crontab           string            `json:"crontab,omitempty"`       // crontab expression like "0 0 * * *"
 	ExtractedVars     []*ConfigVar
 	CustomVars        []*ConfigVar
 
@@ -685,4 +689,15 @@ func (t *Task) renderSuccessOption(v, dest *SuccessOption, fm template.FuncMap) 
 	}
 
 	return nil
+}
+
+func (t *Task) GetScheduleType() string {
+	if t.ScheduleType == "" {
+		return "frequency" // default to frequency for backward compatibility
+	}
+	return t.ScheduleType
+}
+
+func (t *Task) GetCrontab() string {
+	return t.Crontab
 }
