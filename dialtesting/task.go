@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
+	"github.com/robfig/cron/v3"
 )
 
 const (
@@ -30,6 +31,9 @@ const (
 	ClassOther     = "OTHER"
 	ClassWait      = "WAIT"
 	ClassMulti     = "MULTI"
+
+	ScheduleTypeCron      = "crontab"
+	ScheduleTypeFrequency = "frequency"
 
 	MaxMsgSize = 100 * 1024
 )
@@ -423,9 +427,23 @@ func (t *Task) Check() error {
 		return fmt.Errorf("external ID missing")
 	}
 
-	_, err := time.ParseDuration(t.Frequency)
-	if err != nil {
-		return err
+	if t.ScheduleType == "" {
+		t.ScheduleType = ScheduleTypeFrequency
+	}
+
+	if t.ScheduleType == ScheduleTypeCron {
+		if t.Crontab == "" {
+			return fmt.Errorf("crontab missing")
+		}
+		_, err := cron.ParseStandard(t.Crontab)
+		if err != nil {
+			return fmt.Errorf("invalid crontab: %w", err)
+		}
+	} else {
+		_, err := time.ParseDuration(t.Frequency)
+		if err != nil {
+			return fmt.Errorf("invalid frequency: %w", err)
+		}
 	}
 
 	return t.CheckTask()

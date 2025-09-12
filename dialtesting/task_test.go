@@ -92,3 +92,70 @@ func TestCustomFunc(t *testing.T) {
 	assert.NotNil(t, ct.rawTask)
 	assert.NotEqual(t, ct.URL, ct.rawTask.URL)
 }
+
+func TestScheduleType(t *testing.T) {
+	cases := []struct {
+		name         string
+		crontab      string
+		frequency    string
+		scheduleType string
+		isValid      bool
+	}{
+		{
+			name:         "cron task",
+			crontab:      "*/1 * * * *",
+			scheduleType: ScheduleTypeCron,
+			isValid:      true,
+		},
+		{
+			name:         "cron task with invalid crontab",
+			crontab:      "*/1 * * * * *",
+			scheduleType: ScheduleTypeCron,
+			isValid:      false,
+		},
+		{
+			name:         "frequency task",
+			frequency:    "1m",
+			scheduleType: ScheduleTypeFrequency,
+			isValid:      true,
+		},
+		{
+			name:         "frequency task with invalid frequency",
+			frequency:    "1ss",
+			scheduleType: ScheduleTypeFrequency,
+			isValid:      false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ct := &HTTPTask{
+				URL: `http://localhost:8000`,
+				SuccessWhen: []*HTTPSuccess{
+					{
+						StatusCode: []*SuccessOption{
+							{
+								Is: "200",
+							},
+						},
+					},
+				},
+				Task: &Task{
+					Crontab:      c.crontab,
+					Frequency:    c.frequency,
+					ExternalID:   "123",
+					ScheduleType: c.scheduleType,
+				},
+			}
+			task, err := NewTask("", ct)
+			assert.NoError(t, err)
+
+			err = task.Check()
+			if c.isValid {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+			}
+		})
+	}
+}
