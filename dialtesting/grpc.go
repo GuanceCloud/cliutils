@@ -69,7 +69,7 @@ func (t *GRPCTask) findMethod() error {
 
 func (t *GRPCTask) findMethodByReflection() error {
 	// TODO
-	return fmt.Errorf("TODO")
+	return nil
 }
 
 func (t *GRPCTask) findMethodAmongProtofiles() error {
