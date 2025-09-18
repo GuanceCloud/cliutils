@@ -19,6 +19,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/reflection"
 )
 
 type server struct {
@@ -46,12 +47,35 @@ func TestGRPCDial(t *T.T) {
 	healthSrv.SetServingStatus("greeter.Greeter", grpc_health_v1.HealthCheckResponse_SERVING)
 
 	grpc_health_v1.RegisterHealthServer(s, healthSrv)
+	reflection.Register(s)
 
 	go func() {
 		assert.NoError(t, s.Serve(lsn)) // start server
 	}()
 
 	time.Sleep(time.Second) // wait
+
+	t.Run(`dial-on-health-check(with-reflection)`, func(t *T.T) {
+		task := &GRPCTask{
+			Server:     lsn.Addr().String(),
+			FullMethod: "greeter.Greeter/SayHello",
+		}
+
+		assert.NoError(t, task.init())
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		cli := grpc_health_v1.NewHealthClient(task.conn)
+		req := &grpc_health_v1.HealthCheckRequest{
+			// set service name for specifi service
+			Service: "greeter.Greeter",
+		}
+
+		resp, err := cli.Check(ctx, req)
+		assert.NoError(t, err)
+		assert.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING, resp.GetStatus())
+	})
 
 	t.Run(`dial-on-health-check`, func(t *T.T) {
 		task := &GRPCTask{

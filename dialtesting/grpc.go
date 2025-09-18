@@ -16,8 +16,10 @@ import (
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/jhump/protoreflect/dynamic/grpcdynamic"
+	"github.com/jhump/protoreflect/grpcreflect"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 )
 
 type GRPCTask struct {
@@ -44,8 +46,10 @@ func (t *GRPCTask) init() error {
 	}
 	t.conn = conn
 
-	if err := t.findMethod(); err != nil {
-		return err
+	if t.FullMethod != "" {
+		if err := t.findMethod(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -68,7 +72,34 @@ func (t *GRPCTask) findMethod() error {
 }
 
 func (t *GRPCTask) findMethodByReflection() error {
-	// TODO
+	rc := grpcreflect.NewClient(context.Background(), rpb.NewServerReflectionClient(t.conn))
+
+	slash := strings.LastIndex(t.FullMethod, "/")
+	if slash == -1 {
+		fmt.Errorf("invalid full method name: %s", t.FullMethod)
+	}
+	serviceName := t.FullMethod[:slash]
+
+	// 使用 reflection client 解析服务
+	fd, err := rc.FileContainingSymbol(serviceName)
+	if err != nil {
+		return err
+	}
+
+	sd := fd.FindService(serviceName)
+	if sd == nil {
+		return fmt.Errorf("service %s not found", serviceName)
+	}
+
+	methodName := t.FullMethod[slash+1:]
+	md := sd.FindMethodByName(methodName)
+	if md == nil {
+		return fmt.Errorf("method %s not found in service %s", methodName, serviceName)
+	}
+
+	log.Printf("find method %q ok", t.FullMethod)
+
+	t.method = md
 	return nil
 }
 
