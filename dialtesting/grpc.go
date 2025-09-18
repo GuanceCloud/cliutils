@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 
 	pdesc "github.com/jhump/protoreflect/desc"
@@ -23,7 +24,7 @@ type GRPCTask struct {
 	*Task
 	Server      string            `json:"server"`
 	FullMethod  string            `json:"full_method"`
-	ProtoFiles  map[string][]byte `json:"protofiles"` // user's multiple .proto files
+	ProtoFiles  map[string]string `json:"protofiles"` // user's multiple .proto files
 	JSONRequest []byte            `json:"request"`    // user's gRPC request are JSON bytes
 
 	conn   *grpc.ClientConn
@@ -33,10 +34,7 @@ type GRPCTask struct {
 }
 
 func (t *GRPCTask) stop() {
-	if err := t.conn.Close(); err != nil {
-		return fmt.Errorf("gRPC connection close: %w", err)
-	}
-	return nil
+	t.conn.Close()
 }
 
 func (t *GRPCTask) init() error {
@@ -55,10 +53,12 @@ func (t *GRPCTask) init() error {
 
 func (t *GRPCTask) findMethod() error {
 	if len(t.ProtoFiles) == 0 {
-		return findMethodByReflection()
+		return t.findMethodByReflection()
 	}
 
 	if err := t.findMethodAmongProtofiles(); err != nil {
+		log.Printf("findMethodAmongProtofiles: %s", err.Error())
+
 		if err := t.findMethodByReflection(); err != nil {
 			return err
 		}
@@ -82,13 +82,15 @@ func (t *GRPCTask) findMethodAmongProtofiles() error {
 		return err
 	}
 
-	sepIdx := strings.LastIndex(t.FullMethod, ".")
+	sepIdx := strings.LastIndex(t.FullMethod, "/")
 	if sepIdx == -1 {
 		return fmt.Errorf("invalid FullMethod: %q", t.FullMethod)
 	}
 
 	service := t.FullMethod[:sepIdx]
 	method := t.FullMethod[sepIdx+1:]
+
+	log.Printf("service: %s, method: %s", service, method)
 
 	//reg := &protoregistry.Files{}
 	for _, fd := range desc {
@@ -102,9 +104,11 @@ func (t *GRPCTask) findMethodAmongProtofiles() error {
 	if t.method == nil {
 		return fmt.Errorf("method %s not found among proto files", method)
 	}
+
+	return nil
 }
 
-func getFileNames(files map[string][]byte) []string {
+func getFileNames(files map[string]string) []string {
 	arr := make([]string, 0, len(files))
 	for k := range files {
 		arr = append(arr, k)
@@ -120,7 +124,7 @@ func (t *GRPCTask) run() error {
 	}
 
 	stub := grpcdynamic.NewStub(t.conn)
-	resp, err := stub.InvokeRpc(context.Background(), t.method, req)
+	resp, err := stub.InvokeRpc(context.Background(), t.method, msg)
 	if err != nil {
 		// dialtest failed
 		return err
