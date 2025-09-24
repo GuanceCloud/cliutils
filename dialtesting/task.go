@@ -18,6 +18,7 @@ import (
 
 	"github.com/GuanceCloud/cliutils"
 	log "github.com/GuanceCloud/cliutils/logger"
+	"github.com/robfig/cron/v3"
 )
 
 const (
@@ -32,6 +33,9 @@ const (
 	ClassOther     = "OTHER"
 	ClassWait      = "WAIT"
 	ClassMulti     = "MULTI"
+
+	ScheduleTypeCron      = "crontab"
+	ScheduleTypeFrequency = "frequency"
 )
 
 var logger = log.DefaultSLogger("icmp")
@@ -126,6 +130,8 @@ type ITask interface {
 	GetHostName() ([]string, error)
 	GetWorkspaceLanguage() string
 	GetDFLabel() string
+	GetScheduleType() string
+	GetCrontab() string
 
 	SetOption(map[string]string)
 	GetOption() map[string]string
@@ -167,6 +173,8 @@ type Task struct {
 	DFLabel           string            `json:"df_label,omitempty"`
 	UpdateTime        int64             `json:"update_time,omitempty"`
 	ConfigVars        []*ConfigVar      `json:"config_vars,omitempty"`
+	ScheduleType      string            `json:"schedule_type,omitempty"` // "frequency" or "crontab"
+	Crontab           string            `json:"crontab,omitempty"`       // crontab expression like "0 0 * * *"
 	ExtractedVars     []*ConfigVar
 	CustomVars        []*ConfigVar
 
@@ -450,9 +458,23 @@ func (t *Task) Check() error {
 		return fmt.Errorf("external ID missing")
 	}
 
-	_, err := time.ParseDuration(t.Frequency)
-	if err != nil {
-		return err
+	if t.ScheduleType == "" {
+		t.ScheduleType = ScheduleTypeFrequency
+	}
+
+	if t.ScheduleType == ScheduleTypeCron {
+		if t.Crontab == "" {
+			return fmt.Errorf("crontab missing")
+		}
+		_, err := cron.ParseStandard(t.Crontab)
+		if err != nil {
+			return fmt.Errorf("invalid crontab: %w", err)
+		}
+	} else {
+		_, err := time.ParseDuration(t.Frequency)
+		if err != nil {
+			return fmt.Errorf("invalid frequency: %w", err)
+		}
 	}
 
 	return t.CheckTask()
@@ -716,4 +738,15 @@ func (t *Task) renderSuccessOption(v, dest *SuccessOption, fm template.FuncMap) 
 	}
 
 	return nil
+}
+
+func (t *Task) GetScheduleType() string {
+	if t.ScheduleType == "" {
+		return "frequency" // default to frequency for backward compatibility
+	}
+	return t.ScheduleType
+}
+
+func (t *Task) GetCrontab() string {
+	return t.Crontab
 }
