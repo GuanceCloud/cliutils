@@ -463,7 +463,7 @@ func doPing(timeout time.Duration, target string) (rtt time.Duration, err error)
 	// limit icmp concurrent
 	isReturnCh := false
 	if ICMPConcurrentCh != nil {
-		waitCtx, waitCancel := context.WithTimeout(context.Background(), MaxICMPWaitTime)
+		waitCtx, waitCancel := context.WithTimeout(context.Background(), timeout)
 		defer waitCancel()
 		select {
 		case ICMPConcurrentCh <- struct{}{}:

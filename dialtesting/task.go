@@ -39,7 +39,6 @@ var logger = log.DefaultSLogger("icmp")
 var (
 	setupLock        sync.Mutex // setup global variable
 	MaxMsgSize       = 100 * 1024
-	MaxICMPWaitTime  = 30 * time.Second // max time to wait to send icmp packet
 	ICMPConcurrentCh chan struct{}
 )
 
