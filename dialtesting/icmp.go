@@ -322,8 +322,7 @@ func (t *ICMPTask) run() error {
 	}
 
 	interval := 3 * time.Second
-	timeout := time.Duration(count) * interval
-	if stats, err := pingTarget(t.Host, count, interval, timeout); err != nil {
+	if stats, err := pingTarget(t.Host, count, interval, t.timeout); err != nil {
 		t.reqError = err.Error()
 	} else {
 		t.packetLossPercent = stats.PacketLoss
