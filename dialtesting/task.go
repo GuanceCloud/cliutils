@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
+	log "github.com/GuanceCloud/cliutils/logger"
 	"github.com/robfig/cron/v3"
 )
 
@@ -37,17 +38,13 @@ const (
 	ScheduleTypeFrequency = "frequency"
 )
 
-var (
-	setupLock         sync.Mutex // setup global variable
-	MaxMsgSize        = 100 * 1024
-	MaxICMPConcurrent = 1000             // max icmp concurrent, to avoid too many icmp packets at the same time
-	MaxICMPWaitTime   = 60 * time.Second // max time to wait to send icmp packet
-	ICMPConcurrentCh  chan struct{}
-)
+var logger = log.DefaultSLogger("icmp")
 
-func init() {
-	ICMPConcurrentCh = make(chan struct{}, MaxICMPConcurrent)
-}
+var (
+	setupLock        sync.Mutex // setup global variable
+	MaxMsgSize       = 100 * 1024
+	ICMPConcurrentCh chan struct{}
+)
 
 type ConfigVar struct {
 	ID      string `json:"id,omitempty"`
@@ -194,6 +191,7 @@ type Task struct {
 type TaskConfig struct {
 	MaxMsgSize        int `json:"max_msg_size,omitempty"`
 	MaxICMPConcurrent int `json:"max_icmp_concurrent,omitempty"`
+	Logger            *log.Logger
 }
 
 func Setup(c *TaskConfig) {
@@ -204,8 +202,13 @@ func Setup(c *TaskConfig) {
 	}
 
 	if c.MaxICMPConcurrent > 0 {
-		MaxICMPConcurrent = c.MaxICMPConcurrent
-		ICMPConcurrentCh = make(chan struct{}, MaxICMPConcurrent)
+		ICMPConcurrentCh = make(chan struct{}, c.MaxICMPConcurrent)
+	}
+
+	if c.Logger != nil {
+		logger = c.Logger
+	} else {
+		logger = log.SLogger("dialtesting")
 	}
 }
 
