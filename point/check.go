@@ -7,6 +7,7 @@ package point
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"reflect"
 	"strings"
@@ -77,17 +78,22 @@ func (c *checker) checkKVs(kvs KVs) KVs {
 
 	// check each kv valid
 	idx := 0
-	for _, kv := range kvs {
+	for i, kv := range kvs {
 		if x, ok := c.checkKV(kv, kvs); ok {
+			log.Printf("set %d kv to %d", i, idx)
 			kvs[idx] = x
 			idx++
 		} else if defaultPTPool != nil {
 			// When point-pool enabled, on drop f, we should put-back to pool.
 			defaultPTPool.PutKV(x)
+		} else {
+			log.Printf("kv at %d removed", i)
 		}
 	}
 
+	log.Printf("trim at %d", idx)
 	for j := idx; j < len(kvs); j++ { // remove deleted elems
+		log.Printf("set %d kv to nil", j)
 		kvs[j] = nil
 	}
 
