@@ -7,6 +7,7 @@ package dialtesting
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -157,5 +158,28 @@ func TestScheduleType(t *testing.T) {
 				assert.Error(t, err)
 			}
 		})
+	}
+}
+
+func TestSetBeforeRun(t *testing.T) {
+	for _, ct := range []TaskChild{
+		&TCPTask{},
+		&HTTPTask{},
+		&ICMPTask{},
+		&WebsocketTask{},
+	} {
+		task, err := NewTask("", ct)
+		assert.NoError(t, err)
+
+		errString := "before run error"
+		task.SetBeforeRun(func() error {
+			return errors.New(errString)
+		})
+
+		err = task.Run()
+		assert.NoError(t, err)
+		tags, fields := task.GetResults()
+		assert.Equal(t, "FAIL", tags["status"])
+		assert.Contains(t, fields["message"], errString)
 	}
 }

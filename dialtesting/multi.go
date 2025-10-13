@@ -400,3 +400,7 @@ func (t *MultiTask) initTask() {
 		t.Task = &Task{}
 	}
 }
+
+func (t *MultiTask) setReqError(err string) {
+	// do nothing
+}

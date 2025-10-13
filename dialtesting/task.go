@@ -90,6 +90,7 @@ type TaskChild interface {
 	getRawTask(string) (string, error)
 	renderTemplate(fm template.FuncMap) error
 	initTask()
+	setReqError(string)
 }
 
 func getHostName(host string) (string, error) {
@@ -152,6 +153,7 @@ type ITask interface {
 	GetPostScriptVars() Vars
 	GetIsTemplate() bool
 	SetIsTemplate(bool)
+	SetBeforeRun(func() error)
 
 	String() string
 }
@@ -186,6 +188,7 @@ type Task struct {
 	globalVars map[string]Variable
 	option     map[string]string
 	fm         template.FuncMap
+	beforeRun  func() error
 }
 
 type TaskConfig struct {
@@ -487,7 +490,19 @@ func (t *Task) Run() error {
 			return fmt.Errorf("render template failed: %w", err)
 		}
 	}
+	// before run
+	if t.beforeRun != nil {
+		if err := t.beforeRun(); err != nil {
+			t.child.setReqError(err.Error())
+			return nil
+		}
+	}
+
 	return t.child.run()
+}
+
+func (t *Task) SetBeforeRun(beforeRun func() error) {
+	t.beforeRun = beforeRun
 }
 
 func (t *Task) init() error {
