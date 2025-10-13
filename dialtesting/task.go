@@ -491,7 +491,7 @@ func (t *Task) Run() error {
 		}
 	}
 	// before run
-	if t.beforeRun != nil {
+	if t.beforeRun != nil && t.Class() != ClassMulti {
 		if err := t.beforeRun(t); err != nil {
 			t.child.setReqError(err.Error())
 			return nil
