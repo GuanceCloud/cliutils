@@ -172,7 +172,7 @@ func TestSetBeforeRun(t *testing.T) {
 		assert.NoError(t, err)
 
 		errString := "before run error"
-		task.SetBeforeRun(func() error {
+		task.SetBeforeRun(func(t *Task) error {
 			return errors.New(errString)
 		})
 

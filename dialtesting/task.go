@@ -153,7 +153,7 @@ type ITask interface {
 	GetPostScriptVars() Vars
 	GetIsTemplate() bool
 	SetIsTemplate(bool)
-	SetBeforeRun(func() error)
+	SetBeforeRun(func(*Task) error)
 
 	String() string
 }
@@ -188,7 +188,7 @@ type Task struct {
 	globalVars map[string]Variable
 	option     map[string]string
 	fm         template.FuncMap
-	beforeRun  func() error
+	beforeRun  func(*Task) error
 }
 
 type TaskConfig struct {
@@ -492,7 +492,7 @@ func (t *Task) Run() error {
 	}
 	// before run
 	if t.beforeRun != nil {
-		if err := t.beforeRun(); err != nil {
+		if err := t.beforeRun(t); err != nil {
 			t.child.setReqError(err.Error())
 			return nil
 		}
@@ -501,7 +501,7 @@ func (t *Task) Run() error {
 	return t.child.run()
 }
 
-func (t *Task) SetBeforeRun(beforeRun func() error) {
+func (t *Task) SetBeforeRun(beforeRun func(*Task) error) {
 	t.beforeRun = beforeRun
 }
 
