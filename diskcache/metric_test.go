@@ -122,6 +122,9 @@ func TestMetric(t *T.T) {
 
 		assert.NoError(t, c.Put(smallBytes))
 
+		// rotate to make it readble, and trigger put metric updated
+		assert.NoError(t, c.Rotate())
+
 		mfs, err := reg.Gather()
 
 		assert.NoError(t, err)
@@ -129,12 +132,12 @@ func TestMetric(t *T.T) {
 		m := metrics.GetMetricOnLabels(mfs, "diskcache_put_bytes", c.path)
 		require.NotNilf(t, m, "metrics:\n%s", c.path, metrics.MetricFamily2Text(mfs))
 		assert.Equal(t, uint64(1), m.GetSummary().GetSampleCount())
-		assert.Equal(t, float64(100), /* dataHeaderLen not counted in put_bytes */
+		assert.Equal(t, float64(108), //100 + size(4B) + eof(4B)
 			m.GetSummary().GetSampleSum())
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
 		require.NotNil(t, m)
-		assert.Equal(t, float64(104), /* dataHeaderLen counted in size */
+		assert.Equal(t, float64(108),
 			m.GetGauge().GetValue())
 
 		// these fileds all zero
@@ -153,21 +156,22 @@ func TestMetric(t *T.T) {
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_rotate", c.path)
 		require.Nil(t, m)
 
-		// rotate to make it readble
-		assert.NoError(t, c.rotate())
 		assert.NoError(t, c.Get(nil))
+		assert.Error(t, c.Get(nil)) //error: no data, trigger switch, and update get metrics
 
 		mfs, err = reg.Gather()
 		assert.NoError(t, err)
 
+		t.Logf("metrics:\n%s", metrics.MetricFamily2Text(mfs))
+
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_bytes", c.path)
-		require.NotNil(t, m, "metrics:\n%s", c.path, metrics.MetricFamily2Text(mfs))
+		require.NotNil(t, m)
 		assert.Equal(t, uint64(1), m.GetSummary().GetSampleCount())
-		assert.Equal(t, float64(100), m.GetSummary().GetSampleSum())
+		assert.Equal(t, float64(108), m.GetSummary().GetSampleSum())
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
 		require.NotNil(t, m)
-		assert.Equal(t, float64(100+dataHeaderLen /*EOFHint*/), m.GetGauge().GetValue())
+		assert.Equal(t, 0.0, m.GetGauge().GetValue())
 
 		assert.NoError(t, c.Close())
 
