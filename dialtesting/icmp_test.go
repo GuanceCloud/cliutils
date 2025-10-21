@@ -68,8 +68,8 @@ func TestIcmp(t *testing.T) {
 	for _, c := range icmpCases {
 		c.t.SetChild(c.t)
 		if err := c.t.Check(); err != nil {
-			if c.fail == false {
-				t.Errorf("case: %s, failed: %s", c.t.Name, err)
+			if !c.fail {
+				assert.NoError(t, err)
 			} else {
 				t.Logf("expected: %s", err.Error())
 			}
@@ -78,8 +78,8 @@ func TestIcmp(t *testing.T) {
 
 		err := c.t.Run()
 		if err != nil {
-			if c.fail == false {
-				t.Errorf("case %s failed: %s", c.t.Name, err)
+			if !c.fail {
+				assert.NoError(t, err)
 			} else {
 				t.Logf("expected: %s", err.Error())
 			}
@@ -91,13 +91,12 @@ func TestIcmp(t *testing.T) {
 		t.Logf("ts: %+#v \n fs: %+#v \n ", tags, fields)
 
 		reasons, _ := c.t.CheckResult()
-		if len(reasons) != c.reasonCnt {
-			t.Errorf("case %s expect %d reasons, but got %d reasons:\n\t%s",
-				c.t.Name, c.reasonCnt, len(reasons), strings.Join(reasons, "\n\t"))
-		} else if len(reasons) > 0 {
-			t.Logf("case %s reasons:\n\t%s",
-				c.t.Name, strings.Join(reasons, "\n\t"))
-		}
+
+		assert.Lenf(t, reasons, c.reasonCnt, "case %s expect %d reasons, but got %d reasons:\n\t%s",
+			c.t.Name, c.reasonCnt, len(reasons), strings.Join(reasons, "\n\t"))
+
+		t.Logf("case %s reasons:\n\t%s",
+			c.t.Name, strings.Join(reasons, "\n\t"))
 	}
 }
 
