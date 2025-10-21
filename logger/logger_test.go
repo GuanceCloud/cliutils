@@ -96,30 +96,26 @@ func TestLoggerSideEffect(t *testing.T) {
 
 func TestJsonLogging(t *testing.T) {
 	opt := &Option{
-		Path:  "abc.json",
+		Path:  "log.json",
 		Level: DEBUG,
 		Flags: OPT_SHORT_CALLER | OPT_ROTATE,
 	}
 
-	if err := InitRoot(opt); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, InitRoot(opt))
 
 	l := SLogger("json")
-	l.Debug("this is the json message with short path")
-	showLog(opt.Path)
+
+	l.Info("this is the json message with short path")
+
+	showLog(t, opt.Path)
 
 	// check json elements
 	j, err := os.ReadFile(opt.Path)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 
 	var logdata map[string]string
 
-	if err := json.Unmarshal(j, &logdata); err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, json.Unmarshal(j, &logdata))
 
 	for _, k := range []string{
 		NameKeyMod,
@@ -146,7 +142,7 @@ func TestJsonLogging(t *testing.T) {
 
 	l2 := SLogger("log")
 	l2.Debug("this is the raw message with full path")
-	showLog(opt1.Path)
+	showLog(t, opt1.Path)
 
 	os.Remove(opt.Path)
 	os.Remove(opt1.Path)
@@ -226,7 +222,7 @@ func TestLogAppend(t *testing.T) {
 	Close()
 
 	assert.Equal(t, 2, logLines(opt.Path))
-	showLog(opt.Path)
+	showLog(t, opt.Path)
 }
 
 func TestTotalSLoggers(t *testing.T) {
@@ -387,7 +383,7 @@ func TestInitRoot(t *testing.T) {
 				t.Logf("case %d on file: %s", idx, c.opt.Path)
 				assert.Equal(t, len(c.logs), logLines(c.opt.Path))
 				assert.Equal(t, c.color, colorExits(c.opt.Path))
-				showLog(c.opt.Path)
+				showLog(t, c.opt.Path)
 				os.Remove(c.opt.Path)
 			}
 		})
@@ -510,11 +506,10 @@ func TestTrace(t *testing.T) {
 }
 
 //nolint:forbidigo
-func showLog(f string) {
+func showLog(t *testing.T, f string) {
+	t.Helper()
 	logdata, err := os.ReadFile(f)
-	if err != nil {
-		panic(err)
-	}
+	assert.NoError(t, err)
 
 	fmt.Printf("---------- %s ----------\n", f)
 	fmt.Println(string(logdata))

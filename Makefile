@@ -1,3 +1,5 @@
+.PHONY: test
+
 GOLINT_BINARY ?= golangci-lint
 LINT_FIX      ?= true
 
