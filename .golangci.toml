@@ -78,10 +78,7 @@ tab-width = 2
 enable-all = true
 disable = [
   # 权且放开他们
-	"musttag",
-	"mnd",
 	"nakedret",
-	"testifylint",
   "testpackage",      # Too strict
   "wrapcheck",        # 不便于错误处理
   "tagliatelle",      # 跟现有 json tag 命名方式
