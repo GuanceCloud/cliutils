@@ -116,15 +116,13 @@ func TestWSServer(t *testing.T) {
 				if _, resp, err := c.cli.ReadMessage(); err != nil {
 					_ = resp
 					t.Log(err)
-				} else if total%(ncli/2) == 0 {
-					l.Debugf("%s", string(resp))
 				}
 
 				time.Sleep(time.Millisecond)
 				select {
 				case <-ch:
 					c.cli.Close()
-					l.Debugf("cli %d exit", i)
+					t.Logf("cli %d exit", i)
 					return
 				default:
 				}
