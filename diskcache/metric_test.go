@@ -248,7 +248,7 @@ func TestMetric(t *T.T) {
 	})
 }
 
-func TestConcurrentPutGetPerf(t *T.T) {
+func TestPerfConcurrentPutGet(t *T.T) {
 	p := t.TempDir()
 	capacity := int64(1024 * 1024 * 1024)
 	data := make([]byte, 1024*1024)
