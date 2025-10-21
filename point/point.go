@@ -418,9 +418,7 @@ func (p *Point) Size() int {
 		n += len(kv.Unit)
 
 		switch kv.Val.(type) {
-		case *Field_I,
-			*Field_F,
-			*Field_U:
+		case *Field_I, *Field_F, *Field_U:
 			n += 8
 
 		case *Field_B:

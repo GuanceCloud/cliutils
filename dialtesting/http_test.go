@@ -702,7 +702,7 @@ func addTestingRoutes(t *testing.T, r *gin.Engine, proxyServer *httptest.Server,
 	})
 
 	r.GET("/_test_header_checking", func(c *gin.Context) {
-		c.DataFromReader(http.StatusOK, 0, "", bytes.NewBuffer([]byte("")),
+		c.DataFromReader(http.StatusOK, 0, "", bytes.NewBufferString(""),
 			map[string]string{
 				"Cache-Control": "max-age=1024",
 				"Server":        "dialtesting-server",

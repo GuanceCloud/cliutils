@@ -363,7 +363,6 @@ func (t *Traceroute) sendICMP(ip net.IP, ttl int) error {
 	t.packetCh <- &Packet{ID: echoBody.ID, Dst: ipHeader.Dst, startTime: time.Now()}
 
 	_, err = conn.WriteToIP(buf, &net.IPAddr{IP: dst})
-
 	if err != nil {
 		return err
 	}
@@ -395,7 +394,6 @@ func TracerouteIP(ip string, opt *TracerouteOption) (routes []*Route, err error)
 	}
 
 	err = traceroute.Run()
-
 	if err != nil {
 		return
 	}
