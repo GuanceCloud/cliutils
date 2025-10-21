@@ -357,7 +357,7 @@ func (p *Point) Add(k string, v any) {
 	p.pt.Fields = kvs.Add(k, v)
 }
 
-// Add add specific key value to fields, if k exist, do nothing.
+// Set add specific key value to fields, if k exist, do nothing.
 func (p *Point) Set(k string, v any) {
 	kvs := KVs(p.pt.Fields)
 	p.pt.Fields = kvs.Set(k, v)

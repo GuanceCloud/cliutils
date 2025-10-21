@@ -528,7 +528,6 @@ func (t *WebsocketTask) renderSuccessWhen(task *WebsocketTask, fm template.FuncM
 			if err := t.renderSuccessOption(msg, t.SuccessWhen[index].ResponseMessage[msgIndex], fm); err != nil {
 				return fmt.Errorf("render success when failed: %w", err)
 			}
-
 		}
 
 		// header

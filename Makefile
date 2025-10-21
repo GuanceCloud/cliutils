@@ -2,7 +2,11 @@ GOLINT_BINARY         ?= golangci-lint
 
 lint: lint_deps
 	@$(GOLINT_BINARY) --version
-	@$(GOLINT_BINARY) run --fix | tee lint.err # https://golangci-lint.run/usage/install/#local-installation
+	@$(GOLINT_BINARY) run --fix # https://golangci-lint.run/usage/install/#local-installation
+	if [ $$? != 0 ]; then
+		printf "lint failed\n";
+		exit -1;
+	fi
 
 lint_deps: gofmt vet
 

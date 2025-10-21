@@ -7,6 +7,7 @@ package diskcache
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -131,11 +132,11 @@ func (c *DiskCache) StreamPut(r io.Reader, size int) error {
 	}
 
 	total, err = io.CopyN(c.wfd, r, int64(size))
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
 
-	c.curBatchSize += int64(total + dataHeaderLen)
+	c.curBatchSize += (total + dataHeaderLen)
 
 	if c.curBatchSize >= c.batchSize {
 		if err := c.rotate(); err != nil {

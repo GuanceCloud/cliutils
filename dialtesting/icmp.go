@@ -570,7 +570,7 @@ func doPing(timeout time.Duration, target string) (rtt time.Duration, err error)
 
 		wb, err = wm.Marshal(nil)
 		if err != nil {
-			return 0, fmt.Errorf("error marshalling packet: %w", err)
+			return 0, fmt.Errorf("error marshaling packet: %w", err)
 		}
 
 		rttStart = time.Now()
@@ -590,7 +590,7 @@ func doPing(timeout time.Duration, target string) (rtt time.Duration, err error)
 		}
 		wb, err = wm.Marshal(nil)
 		if err != nil {
-			return 0, fmt.Errorf("error marshalling packet: %w", err)
+			return 0, fmt.Errorf("error marshaling packet: %w", err)
 		}
 
 		if idUnknown {
@@ -606,7 +606,6 @@ func doPing(timeout time.Duration, target string) (rtt time.Duration, err error)
 		if err != nil {
 			return 0, fmt.Errorf("error setting socket deadline: %w", err)
 		}
-
 	}
 
 	for {
