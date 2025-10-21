@@ -81,21 +81,6 @@ func (c *DiskCache) Put(data []byte) error {
 	return nil
 }
 
-func (c *DiskCache) putPart(part []byte) error {
-	if _, err := c.wfd.Write(part); err != nil {
-		return err
-	}
-
-	if !c.noSync {
-		if err := c.wfd.Sync(); err != nil {
-			return err
-		}
-	}
-
-	// TODO: try rotate here?
-	return nil
-}
-
 // StreamPut read from r for bytes and write to storage.
 //
 // If we read the data from some network stream(such as HTTP response body),
