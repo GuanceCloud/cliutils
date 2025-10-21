@@ -132,7 +132,7 @@ func TestMetric(t *T.T) {
 		m := metrics.GetMetricOnLabels(mfs, "diskcache_put_bytes", c.path)
 		require.NotNilf(t, m, "metrics:\n%s", c.path, metrics.MetricFamily2Text(mfs))
 		assert.Equal(t, uint64(1), m.GetSummary().GetSampleCount())
-		assert.Equal(t, float64(108), //100 + size(4B) + eof(4B)
+		assert.Equal(t, float64(108), // 100 + size(4B) + eof(4B)
 			m.GetSummary().GetSampleSum())
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
@@ -157,7 +157,7 @@ func TestMetric(t *T.T) {
 		require.Nil(t, m)
 
 		assert.NoError(t, c.Get(nil))
-		assert.Error(t, c.Get(nil)) //error: no data, trigger switch, and update get metrics
+		assert.Error(t, c.Get(nil)) // error: no data, trigger switch, and update get metrics
 
 		mfs, err = reg.Gather()
 		assert.NoError(t, err)
