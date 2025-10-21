@@ -160,31 +160,33 @@ type ITask interface {
 }
 
 type Task struct {
-	ExternalID        string            `json:"external_id"`
-	Name              string            `json:"name"`
-	AK                string            `json:"access_key"`
-	PostURL           string            `json:"post_url"`
-	CurStatus         string            `json:"status"`
-	Disabled          uint8             `json:"disabled"`
-	Frequency         string            `json:"frequency"`
-	Region            string            `json:"region"`
-	OwnerExternalID   string            `json:"owner_external_id"`
-	Tags              map[string]string `json:"tags,omitempty"`
-	Labels            []string          `json:"labels,omitempty"`
-	WorkspaceLanguage string            `json:"workspace_language,omitempty"`
-	TagsInfo          string            `json:"tags_info,omitempty"` // deprecated
-	DFLabel           string            `json:"df_label,omitempty"`
-	UpdateTime        int64             `json:"update_time,omitempty"`
-	ConfigVars        []*ConfigVar      `json:"config_vars,omitempty"`
-	ScheduleType      string            `json:"schedule_type,omitempty"` // "frequency" or "crontab"
-	Crontab           string            `json:"crontab,omitempty"`       // crontab expression like "0 0 * * *"
-	ExtractedVars     []*ConfigVar
-	CustomVars        []*ConfigVar
+	ExternalID        string `json:"external_id"`
+	Name              string `json:"name"`
+	AK                string `json:"access_key"`
+	PostURL           string `json:"post_url"`
+	CurStatus         string `json:"status"`
+	Frequency         string `json:"frequency"`
+	Region            string `json:"region"`
+	OwnerExternalID   string `json:"owner_external_id"`
+	WorkspaceLanguage string `json:"workspace_language,omitempty"`
+	TagsInfo          string `json:"tags_info,omitempty"` // deprecated
+	DFLabel           string `json:"df_label,omitempty"`
+	ScheduleType      string `json:"schedule_type,omitempty"` // "frequency" or "crontab"
+	Crontab           string `json:"crontab,omitempty"`       // crontab expression like "0 0 * * *"
+
+	Tags          map[string]string `json:"tags,omitempty"`
+	Labels        []string          `json:"labels,omitempty"`
+	UpdateTime    int64             `json:"update_time,omitempty"`
+	ConfigVars    []*ConfigVar      `json:"config_vars,omitempty"`
+	ExtractedVars []*ConfigVar
+	CustomVars    []*ConfigVar
 
 	taskJSONString string
+	rawTask        string
 	child          TaskChild
 
-	rawTask    string
+	Disabled uint8 `json:"disabled"`
+
 	isTemplate bool
 	globalVars map[string]Variable
 	option     map[string]string
@@ -587,9 +589,7 @@ func getDefaultFunc() template.FuncMap {
 			return time.Now().Format(format)
 		},
 
-		"urlencode": func(s string) string {
-			return url.QueryEscape(s)
-		},
+		"urlencode": url.QueryEscape,
 	}
 }
 

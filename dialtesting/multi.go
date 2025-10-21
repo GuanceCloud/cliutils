@@ -30,6 +30,11 @@ type MultiExtractedVar struct {
 	Value  string `json:"value,omitempty"`
 }
 
+const (
+	stepTypeHTTP = "http"
+	stepTypeWait = "wait"
+)
+
 type MultiStep struct {
 	Type          string              `json:"type"` // http or wait
 	Name          string              `json:"name"` // name
@@ -254,7 +259,7 @@ func (t *MultiTask) run() error {
 
 		// run step
 		switch step.Type {
-		case "http":
+		case stepTypeHTTP:
 			if isLastStepFailed {
 				httpTask := &HTTPTask{}
 				_, err := NewTask(step.TaskString, httpTask)
@@ -285,7 +290,7 @@ func (t *MultiTask) run() error {
 				}
 			}
 
-		case "wait":
+		case stepTypeWait:
 			step.result["value"] = step.Value
 			if !isLastStepFailed {
 				time.Sleep(time.Duration(step.Value) * time.Second)
