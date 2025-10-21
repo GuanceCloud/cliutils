@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"time"
 )
 
@@ -110,7 +109,7 @@ func (c *DiskCache) StreamPut(r io.Reader, size int) error {
 		return ErrTooLargeData
 	}
 
-	if startOffset, err = c.wfd.Seek(0, os.SEEK_CUR); err != nil {
+	if startOffset, err = c.wfd.Seek(0, io.SeekCurrent); err != nil {
 		return fmt.Errorf("Seek(0, SEEK_CUR): %w", err)
 	}
 

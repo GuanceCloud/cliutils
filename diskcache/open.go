@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -31,10 +32,10 @@ func Open(opts ...CacheOption) (*DiskCache, error) {
 
 	defer func() {
 		c.labels = append(c.labels,
-			fmt.Sprintf("%v", c.noFallbackOnError),
-			fmt.Sprintf("%v", c.noLock),
-			fmt.Sprintf("%v", c.noPos),
-			fmt.Sprintf("%v", c.noSync),
+			strconv.FormatBool(c.noFallbackOnError),
+			strconv.FormatBool(c.noLock),
+			strconv.FormatBool(c.noPos),
+			strconv.FormatBool(c.noSync),
 			c.path,
 		)
 

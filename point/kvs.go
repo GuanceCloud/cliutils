@@ -462,7 +462,7 @@ func (x KVs) Keys() *Keys {
 }
 
 func (x KVs) shuffle() KVs {
-	rand.Seed(time.Now().UnixNano())
+	rand.Seed(time.Now().UnixNano()) // nolint: staticcheck
 	n := len(x)
 	for i := 0; i < n; i++ {
 		j := rand.Intn(n) // nolint:gosec

@@ -177,11 +177,7 @@ func TestEnvLogPath(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			Reset()
-			os.Clearenv()
-
-			if err := os.Setenv("LOGGER_PATH", tc.envPath); err != nil {
-				t.Fatal(err)
-			}
+			t.Setenv("LOGGER_PATH", tc.envPath)
 
 			opt := &Option{Path: "" /* path not set, use env only */}
 

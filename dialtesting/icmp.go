@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -96,7 +97,7 @@ func (t *ICMPTask) init() error {
 	}
 
 	if len(t.SuccessWhen) == 0 {
-		return fmt.Errorf(`no any check rule`)
+		return errors.New(`no any check rule`)
 	}
 
 	if t.PacketCount <= 0 {
@@ -129,7 +130,7 @@ func (t *ICMPTask) init() error {
 
 func (t *ICMPTask) check() error {
 	if len(t.Host) == 0 {
-		return fmt.Errorf("host should not be empty")
+		return errors.New("host should not be empty")
 	}
 
 	return nil
@@ -170,7 +171,7 @@ func (t *ICMPTask) checkResult() (reasons []string, succFlag bool) {
 		// check packet loss
 		for _, v := range chk.PacketLossPercent {
 			if err := v.check(t.packetLossPercent); err != nil {
-				reasons = append(reasons, fmt.Sprintf("packet_loss_percent check failed: %s", err.Error()))
+				reasons = append(reasons, "packet_loss_percent check failed: "+err.Error())
 			} else {
 				succFlag = true
 			}
@@ -179,7 +180,7 @@ func (t *ICMPTask) checkResult() (reasons []string, succFlag bool) {
 		// check packets received
 		for _, v := range chk.Packets {
 			if err := v.check(float64(t.recvPackets)); err != nil {
-				reasons = append(reasons, fmt.Sprintf("packets received check failed: %s", err.Error()))
+				reasons = append(reasons, "packets received check failed: "+err.Error())
 			} else {
 				succFlag = true
 			}
@@ -193,7 +194,7 @@ func (t *ICMPTask) checkResult() (reasons []string, succFlag bool) {
 			} else {
 				for _, v := range chk.Hops {
 					if err := v.check(hops); err != nil {
-						reasons = append(reasons, fmt.Sprintf("traceroute hops check failed: %s", err.Error()))
+						reasons = append(reasons, "traceroute hops check failed: "+err.Error())
 					} else {
 						succFlag = true
 					}
@@ -379,7 +380,7 @@ func (t *ICMPTask) getHostName() ([]string, error) {
 }
 
 func (t *ICMPTask) getVariableValue(variable Variable) (string, error) {
-	return "", fmt.Errorf("not support")
+	return "", errors.New("not support")
 }
 
 func (t *ICMPTask) getRawTask(taskString string) (string, error) {
@@ -412,7 +413,7 @@ func (t *ICMPTask) renderTemplate(fm template.FuncMap) error {
 
 	task := t.rawTask
 	if task == nil {
-		return fmt.Errorf("raw task is nil")
+		return errors.New("raw task is nil")
 	}
 
 	// host

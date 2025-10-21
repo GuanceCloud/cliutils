@@ -7,6 +7,7 @@ package dialtesting
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"text/template"
 	"time"
@@ -145,7 +146,7 @@ func (t *MultiTask) runHTTPStep(step *MultiStep) (map[string]interface{}, error)
 
 	result := map[string]interface{}{}
 	if step == nil {
-		return nil, fmt.Errorf("step should not be nil")
+		return nil, errors.New("step should not be nil")
 	}
 
 	if step.Retry != nil {
@@ -232,7 +233,7 @@ func (t *MultiTask) runHTTPStep(step *MultiStep) (map[string]interface{}, error)
 
 func (t *MultiTask) run() error {
 	if len(t.Steps) == 0 {
-		return fmt.Errorf("no steps found")
+		return errors.New("no steps found")
 	}
 	now := time.Now()
 	lastStep := -1     // last step which is run
@@ -290,7 +291,7 @@ func (t *MultiTask) run() error {
 				time.Sleep(time.Duration(step.Value) * time.Second)
 			}
 		default:
-			return fmt.Errorf("step type should be wait or http")
+			return errors.New("step type should be wait or http")
 		}
 	}
 
@@ -305,22 +306,22 @@ func (t *MultiTask) check() error {
 	for _, step := range t.Steps {
 		if step.Retry != nil {
 			if step.Retry.Retry < 0 || step.Retry.Retry > 5 {
-				return fmt.Errorf("retry should be in 0 ~ 5")
+				return errors.New("retry should be in 0 ~ 5")
 			}
 
 			if step.Retry.Interval < 0 || step.Retry.Interval > 5000 {
-				return fmt.Errorf("retry interval should be in 0 ~ 5000")
+				return errors.New("retry interval should be in 0 ~ 5000")
 			}
 		}
 		switch step.Type {
 		case "wait":
 			if step.Value <= 0 || step.Value > 180 {
-				return fmt.Errorf("wait step value should be in 1 ~ 180")
+				return errors.New("wait step value should be in 1 ~ 180")
 			}
 
 		case "http":
 			if step.TaskString == "" {
-				return fmt.Errorf("http step task should not be empty")
+				return errors.New("http step task should not be empty")
 			}
 
 			task, err := NewTask(step.TaskString, &HTTPTask{})
@@ -339,7 +340,7 @@ func (t *MultiTask) check() error {
 			}
 
 		default:
-			return fmt.Errorf("step type should be wait or http")
+			return errors.New("step type should be wait or http")
 		}
 	}
 

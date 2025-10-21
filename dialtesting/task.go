@@ -8,6 +8,7 @@ package dialtesting
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -225,7 +226,7 @@ func CreateTaskChild(taskType string) (TaskChild, error) {
 		ct = &MultiTask{}
 
 	case "headless", "browser", ClassHeadless:
-		return nil, fmt.Errorf("headless task deprecated")
+		return nil, errors.New("headless task deprecated")
 
 	case "tcp", ClassTCP:
 		ct = &TCPTask{}
@@ -245,7 +246,7 @@ func CreateTaskChild(taskType string) (TaskChild, error) {
 
 func NewTask(taskString string, task TaskChild) (ITask, error) {
 	if task == nil {
-		return nil, fmt.Errorf("invalid task")
+		return nil, errors.New("invalid task")
 	}
 
 	if taskString != "" {
@@ -260,7 +261,7 @@ func NewTask(taskString string, task TaskChild) (ITask, error) {
 	task.initTask()
 
 	if t, ok := task.(ITask); !ok {
-		return nil, fmt.Errorf("invalid task, not ITask")
+		return nil, errors.New("invalid task, not ITask")
 	} else {
 		t.SetTaskJSONString(taskString)
 		t.SetChild(task)
@@ -276,7 +277,7 @@ func (t *Task) String() string {
 
 func (t *Task) NewRawTask(child TaskChild) error {
 	if t.taskJSONString == "" {
-		return fmt.Errorf("task json string is empty")
+		return errors.New("task json string is empty")
 	}
 
 	if err := json.Unmarshal([]byte(t.taskJSONString), &child); err != nil {

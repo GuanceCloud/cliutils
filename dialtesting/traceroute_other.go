@@ -76,8 +76,8 @@ func (t *Traceroute) init() {
 
 // getRandomID generate random id, max 60000.
 func (t *Traceroute) getRandomID() uint32 {
-	rand.Seed(time.Now().UnixNano())
-	return uint32(rand.Intn(60000)) //nolint:gosec
+	rand.Seed(time.Now().UnixNano()) // nolint:staticcheck
+	return uint32(rand.Intn(60000))  // nolint:gosec
 }
 
 func (t *Traceroute) Run() error {
