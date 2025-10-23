@@ -6,6 +6,8 @@
 package dialtesting
 
 import (
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"text/template"
@@ -65,6 +67,12 @@ var icmpCases = []struct {
 }
 
 func TestIcmp(t *testing.T) {
+	if v := os.Getenv("WITHIN_GITHUB_WORKFLOW"); v != "" {
+		if b, err := strconv.ParseBool(v); b && err == nil {
+			t.Skip("within github workflow, test on localhost not working(socket: operation not permitted).")
+		}
+	}
+
 	for _, c := range icmpCases {
 		c.t.SetChild(c.t)
 		if err := c.t.Check(); err != nil {

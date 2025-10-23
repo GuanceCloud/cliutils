@@ -10,9 +10,12 @@ on:
     branches: [ "main" ]
 
 jobs:
-
   CI:
     runs-on: ubuntu-latest
+
+    env:
+      WITHIN_GITHUB_WORKFLOW: "yes"
+
     steps:
     - uses: actions/checkout@v3
 
