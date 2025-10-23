@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      WITHIN_GITHUB_WORKFLOW: "yes"
+      WITHIN_GITHUB_WORKFLOW: "true"
 
     steps:
     - uses: actions/checkout@v3
