@@ -29,7 +29,6 @@ func (c *DiskCache) Put(data []byte) error {
 
 	defer func() {
 		putLatencyVec.WithLabelValues(c.path).Observe(time.Since(start).Seconds())
-		sizeVec.WithLabelValues(c.path).Set(float64(c.size.Load()))
 	}()
 
 	if c.IsFull(data) {

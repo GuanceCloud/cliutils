@@ -131,10 +131,14 @@ func (c *DiskCache) doOpen() error {
 
 			switch filepath.Base(path) {
 			case ".lock", ".pos": // ignore them
-			case "data": // count on size
+			case "data": // not rotated writing file, do not count on sizeVec.
 				c.size.Add(fi.Size())
+				// NOTE: c.size not always equal to sizeVec. c.size used to limit
+				// total bytes used for Put(), but sizeVec used to count size that
+				// waiting to be Get().
 			default:
 				c.size.Add(fi.Size())
+				sizeVec.WithLabelValues(c.path).Add(float64(fi.Size()))
 				c.dataFiles = append(c.dataFiles, path)
 			}
 
