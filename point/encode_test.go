@@ -1570,8 +1570,8 @@ func TestEncodeInfField(t *T.T) {
 
 				t.Logf("decode point: %s", pts[0].Pretty())
 
-				assert.Equal(t, uint64(math.MaxUint64), uint64(pts[0].Get("f1").(float64)))
-				assert.Equal(t, int64(math.MinInt64), int64(pts[0].Get("f2").(float64)))
+				assert.Equal(t, uint64(math.MaxUint64), safeFloat64ToUint64(pts[0].Get("f1").(float64)))
+				assert.Equal(t, int64(math.MinInt64), safeFloat64ToInt64(pts[0].Get("f2").(float64)))
 				assert.Equal(t, int64(123), pts[0].Get("f3"))
 			} else {
 				break
@@ -1592,4 +1592,36 @@ func TestEncodeInfField(t *T.T) {
 
 		t.Logf("res: %s", string(arr[0]))
 	})
+}
+
+// safeFloat64ToUint64 converts a float64 to uint64, handling out-of-range values
+// by saturating to the min or max of uint64.
+func safeFloat64ToUint64(f float64) uint64 {
+	// Handle NaN and negative numbers
+	if math.IsNaN(f) || f <= 0 {
+		return 0
+	}
+	// Handle values larger than MaxUint64
+	if f >= float64(math.MaxUint64) {
+		return math.MaxUint64
+	}
+	return uint64(f)
+}
+
+// safeFloat64ToInt64 converts a float64 to int64, handling out-of-range values
+// by saturating to the min or max of int64.
+func safeFloat64ToInt64(f float64) int64 {
+	// Handle NaN
+	if math.IsNaN(f) {
+		return 0
+	}
+	// Handle values larger than MaxInt64
+	if f >= float64(math.MaxInt64) {
+		return math.MaxInt64
+	}
+	// Handle values smaller than MinInt64
+	if f <= float64(math.MinInt64) {
+		return math.MinInt64
+	}
+	return int64(f)
 }

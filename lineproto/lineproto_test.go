@@ -769,7 +769,6 @@ func TestMakeLineProtoPointWithWarnings(t *testing.T) {
 				testutil.Equals(t, tc.expect, x)
 				_, err := parseLineProto(t, []byte(x), "n")
 				testutil.Equals(t, err, nil)
-				fmt.Printf("\n[%d]%s\n", i, x)
 			}
 		})
 	}

@@ -80,7 +80,7 @@ func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struc
 					Frequency:  "1s",
 				},
 				Method: "GET",
-				URL:    fmt.Sprintf("%s/_test_with_cert", httpsServer.URL),
+				URL:    httpsServer.URL + "/_test_with_cert",
 				AdvanceOptions: &HTTPAdvanceOption{
 					Certificate: &HTTPOptCertificate{
 						IgnoreServerCertificateError: true,
@@ -702,7 +702,7 @@ func addTestingRoutes(t *testing.T, r *gin.Engine, proxyServer *httptest.Server,
 	})
 
 	r.GET("/_test_header_checking", func(c *gin.Context) {
-		c.DataFromReader(http.StatusOK, 0, "", bytes.NewBuffer([]byte("")),
+		c.DataFromReader(http.StatusOK, 0, "", bytes.NewBufferString(""),
 			map[string]string{
 				"Cache-Control": "max-age=1024",
 				"Server":        "dialtesting-server",

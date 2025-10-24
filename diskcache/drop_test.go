@@ -27,10 +27,7 @@ func TestDropBatch(t *T.T) {
 	c, err := Open(WithPath(p),
 		WithBatchSize(4*1024*1024),
 		WithCapacity(capacity))
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NoError(t, err)
 
 	sample := bytes.Repeat([]byte("hello"), 7351)
 	n := 0
@@ -42,6 +39,8 @@ func TestDropBatch(t *T.T) {
 		n++
 
 		if int64(n*len(sample)) > capacity {
+			assert.NoError(t, c.Rotate())    // shift the data file, and the c.size updated
+			assert.NoError(t, c.Put(sample)) // make this write dropped
 			break
 		}
 	}

@@ -5,7 +5,9 @@
 
 package diskcache
 
-import "os"
+import (
+	"os"
+)
 
 const (
 	reasonExceedCapacity     = "exceed-max-capacity"

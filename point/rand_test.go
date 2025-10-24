@@ -99,8 +99,6 @@ func TestPointRander(t *T.T) {
 		pts := r.Rand(1)
 
 		require.Equal(t, 100, len(pts[0].Tags()))
-
-		t.Logf("point: %s", pts[0].Pretty())
 	})
 
 	t.Run("with-fields", func(t *T.T) {
