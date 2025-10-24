@@ -78,7 +78,7 @@ func (c *DiskCache) doGet(buf []byte, fn Fn) error {
 		}
 	}
 
-	if c.rfd == nil {
+	if c.rfd == nil { // no file reading, reading on the first file
 		if err = c.switchNextFile(); err != nil {
 			return err
 		}
