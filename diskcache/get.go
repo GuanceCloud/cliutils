@@ -45,7 +45,7 @@ func (c *DiskCache) Get(fn Fn) error {
 type BufFunc func() []byte
 
 // BufCallbackGet fetch new data from disk cache, and read into buffer that returned by bfn.
-// If there is nothing to read, the bfn will not be called
+// If there is nothing to read, the bfn will not be called.
 func (c *DiskCache) BufCallbackGet(bfn BufFunc, fn Fn) error {
 	return c.doGet(nil, fn, bfn)
 }
