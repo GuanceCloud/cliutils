@@ -25,6 +25,7 @@ const (
 	ClassTCP       = "TCP"
 	ClassWebsocket = "WEBSOCKET"
 	ClassICMP      = "ICMP"
+	ClassGRPC      = "GRPC"
 	ClassDNS       = "DNS"
 	ClassHeadless  = "BROWSER"
 	ClassOther     = "OTHER"
@@ -190,6 +191,9 @@ func CreateTaskChild(taskType string) (TaskChild, error) {
 
 	case "icmp", ClassICMP:
 		ct = &ICMPTask{}
+
+	case "grpc", ClassGRPC:
+		ct = &GRPCTask{}
 
 	default:
 		return nil, fmt.Errorf("unknown task type %s", taskType)
