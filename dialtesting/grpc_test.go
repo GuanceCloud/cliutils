@@ -538,3 +538,126 @@ func TestGRPCTask_Timeout(t *T.T) {
 		defer task.stop()
 	})
 }
+
+func TestBuildExtendedProtoMap(t *T.T) {
+	t.Run("with import path matching", func(t *T.T) {
+		greeterProto := `syntax = "proto3";
+package greeter;
+import "greeter/user.proto";
+service Greeter {
+  rpc SayHello (HelloRequest) returns (HelloReply) {}
+}`
+
+		userProto := `syntax = "proto3";
+package user;
+message GetUserRequest {
+  int32 user_id = 1;
+}`
+
+		protoFiles := map[string]string{
+			"greeter.proto": greeterProto,
+			"user.proto":    userProto,
+		}
+
+		extendedMap := buildExtendedProtoMap(protoFiles)
+
+		// Check original files are preserved
+		assert.Equal(t, greeterProto, extendedMap["greeter.proto"])
+		assert.Equal(t, userProto, extendedMap["user.proto"])
+
+		// Check base names are added
+		assert.Equal(t, greeterProto, extendedMap["greeter.proto"])
+		assert.Equal(t, userProto, extendedMap["user.proto"])
+
+		// Check import path is mapped
+		assert.Equal(t, userProto, extendedMap["greeter/user.proto"], "import path should be mapped to user.proto content")
+	})
+
+	t.Run("with full path already in map", func(t *T.T) {
+		greeterProto := `syntax = "proto3";
+package greeter;
+import "greeter/user.proto";
+service Greeter {}
+`
+
+		userProto := `syntax = "proto3";
+package user;
+message GetUserRequest {}
+`
+
+		protoFiles := map[string]string{
+			"greeter/greeter.proto": greeterProto,
+			"greeter/user.proto":    userProto,
+		}
+
+		extendedMap := buildExtendedProtoMap(protoFiles)
+
+		// Check original paths are preserved
+		assert.Equal(t, greeterProto, extendedMap["greeter/greeter.proto"])
+		assert.Equal(t, userProto, extendedMap["greeter/user.proto"])
+
+		// Check base names are added
+		assert.Equal(t, greeterProto, extendedMap["greeter.proto"])
+		assert.Equal(t, userProto, extendedMap["user.proto"])
+
+		// Import path should already exist (no need to match)
+		assert.Equal(t, userProto, extendedMap["greeter/user.proto"])
+	})
+
+	t.Run("with multiple imports", func(t *T.T) {
+		mainProto := `syntax = "proto3";
+package main;
+import "greeter/user.proto";
+import "greeter/common.proto";
+service Main {}
+`
+
+		userProto := `syntax = "proto3";
+package user;
+message User {}
+`
+
+		commonProto := `syntax = "proto3";
+package common;
+message Common {}
+`
+
+		protoFiles := map[string]string{
+			"main.proto":   mainProto,
+			"user.proto":   userProto,
+			"common.proto": commonProto,
+		}
+
+		extendedMap := buildExtendedProtoMap(protoFiles)
+
+		// Check all imports are mapped
+		assert.Equal(t, userProto, extendedMap["greeter/user.proto"])
+		assert.Equal(t, commonProto, extendedMap["greeter/common.proto"])
+	})
+
+	t.Run("with no imports", func(t *T.T) {
+		protoFiles := map[string]string{
+			"simple.proto": `syntax = "proto3"; package simple;`,
+		}
+
+		extendedMap := buildExtendedProtoMap(protoFiles)
+
+		// If original key is already just filename, filepath.Base returns same value
+		// So map will have 1 entry (same key set twice)
+		assert.Equal(t, 1, len(extendedMap))
+		assert.NotEmpty(t, extendedMap["simple.proto"])
+	})
+
+	t.Run("with path in filename", func(t *T.T) {
+		protoFiles := map[string]string{
+			"path/to/simple.proto": `syntax = "proto3"; package simple;`,
+		}
+
+		extendedMap := buildExtendedProtoMap(protoFiles)
+
+		// Should have 2 entries: original path and base name
+		assert.Equal(t, 2, len(extendedMap))
+		assert.NotEmpty(t, extendedMap["path/to/simple.proto"])
+		assert.NotEmpty(t, extendedMap["simple.proto"])
+	})
+}

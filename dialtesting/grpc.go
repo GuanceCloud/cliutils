@@ -131,28 +131,7 @@ func (t *GRPCTask) findMethodByReflection(ctx context.Context) error {
 }
 
 func (t *GRPCTask) findMethodAmongProtofiles() error {
-	// Extend map to match import paths with file names
-	extendedMap := make(map[string]string)
-
-	for k, v := range t.ProtoFiles {
-		extendedMap[k] = v
-		extendedMap[filepath.Base(k)] = v
-	}
-
-	// Parse imports and build mappings: for each import, find matching file by base name
-	for _, content := range t.ProtoFiles {
-		for _, imp := range extractImports(content) {
-			if extendedMap[imp] == "" {
-				importBase := filepath.Base(imp)
-				for filename, fileContent := range t.ProtoFiles {
-					if filepath.Base(filename) == importBase {
-						extendedMap[imp] = fileContent
-						break
-					}
-				}
-			}
-		}
-	}
+	extendedMap := buildExtendedProtoMap(t.ProtoFiles)
 
 	p := protoparse.Parser{
 		Accessor:         protoparse.FileContentsFromMap(extendedMap),
@@ -181,6 +160,33 @@ func (t *GRPCTask) findMethodAmongProtofiles() error {
 	}
 
 	return fmt.Errorf("method %s not found in service %s", t.FullMethod, service)
+}
+
+func buildExtendedProtoMap(protoFiles map[string]string) map[string]string {
+	extendedMap := make(map[string]string)
+
+	// Add original files and their base names
+	for k, v := range protoFiles {
+		extendedMap[k] = v
+		extendedMap[filepath.Base(k)] = v
+	}
+
+	// Parse imports and build mappings: for each import, find matching file by base name
+	for _, content := range protoFiles {
+		for _, imp := range extractImports(content) {
+			if extendedMap[imp] == "" {
+				importBase := filepath.Base(imp)
+				for filename, fileContent := range protoFiles {
+					if filepath.Base(filename) == importBase {
+						extendedMap[imp] = fileContent
+						break
+					}
+				}
+			}
+		}
+	}
+
+	return extendedMap
 }
 
 // extractImports extracts all import statements from proto file content
