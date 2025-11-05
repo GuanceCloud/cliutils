@@ -117,21 +117,18 @@ func BenchmarkPutGet(b *T.B) {
 
 func TestConcurrentPutGet(t *T.T) {
 	var (
-		p      = t.TempDir()
-		mb     = int64(1024 * 1024)
-		sample = make([]byte, 5*7351)
+		mb     = int64(1 << 20)
+		sample = make([]byte, 32*1024) // 32KB
 		eof    = 0
+		reg    = prometheus.NewRegistry()
 	)
 
-	c, err := Open(WithPath(p), WithBatchSize(4*mb), WithCapacity(128*mb))
-	assert.NoError(t, err)
-
-	defer c.Close()
+	reg.MustRegister(Metrics()...)
 
 	wg := sync.WaitGroup{}
 	concurrency := 4
 
-	fnPut := func(idx int) {
+	fnPut := func(c *DiskCache, idx int) {
 		defer wg.Done()
 		nput := 0
 		exceed100ms := 0
@@ -146,20 +143,17 @@ func TestConcurrentPutGet(t *T.T) {
 			}
 
 			nput++
-
 			if nput > 1000 {
 				t.Logf("[%d] Put exit", idx)
-				return
+				break
 			}
 		}
+
+		t.Logf("worker #%d exceed100ms: %d", idx, exceed100ms)
+		t.Logf("worker #%d nget: %d", idx, nput)
 	}
 
-	wg.Add(concurrency)
-	for i := 0; i < concurrency; i++ {
-		go fnPut(i)
-	}
-
-	fnGet := func(idx int) {
+	fnGet := func(c *DiskCache, idx int) {
 		defer wg.Done()
 		nget := 0
 		readBytes := 0
@@ -193,18 +187,94 @@ func TestConcurrentPutGet(t *T.T) {
 				eof = 0 // reset eof if Get ok
 			}
 		}
+
+		t.Logf("worker #%d exceed100ms: %d", idx, exceed100ms)
+		t.Logf("worker #%d nget: %d", idx, nget)
 	}
 
-	wg.Add(concurrency)
-	for i := 0; i < concurrency; i++ {
-		go fnGet(i)
-	}
+	t.Run("same-time-put-get", func(t *T.T) {
+		p := t.TempDir()
+		c, err := Open(WithPath(p), WithBatchSize(mb), WithCapacity(32*mb))
+		assert.NoError(t, err)
 
-	wg.Wait()
+		wg.Add(concurrency * 2)
+		for i := 0; i < concurrency; i++ {
+			go fnPut(c, i)
+			go fnGet(c, i)
+		}
 
-	t.Cleanup(func() {
-		assert.NoError(t, c.Close())
-		ResetMetrics()
+		wg.Wait()
+
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+		t.Logf("got metrics:\n%s", metrics.MetricFamily2Text(mfs))
+
+		m := metrics.GetMetricOnLabels(mfs,
+			"diskcache_size",
+			c.path)
+
+		require.NotNil(t, m)
+		assert.InDelta(t, 0, m.GetGauge().GetValue(), 0.1)
+
+		t.Cleanup(func() {
+			ResetMetrics()
+			t.Logf("c: %s", c.Pretty())
+			assert.NoError(t, c.Close())
+		})
+	})
+
+	t.Run("get-delayed", func(t *T.T) {
+		p := t.TempDir()
+		c, err := Open(WithPath(p), WithBatchSize(mb), WithCapacity(32*mb))
+		assert.NoError(t, err)
+
+		wg.Add(concurrency)
+		for i := 0; i < concurrency; i++ {
+			go fnPut(c, i)
+		}
+		wg.Wait() // wait Put done: there should be drop(4*32K*1000) > 32M
+
+		wg.Add(concurrency)
+		for i := 0; i < concurrency; i++ {
+			go fnGet(c, i)
+		}
+		wg.Wait()
+
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+
+		t.Logf("got metrics:\n%s", metrics.MetricFamily2Text(mfs))
+
+		mSize := metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
+
+		require.NotNil(t, mSize)
+		assert.InDelta(t, 0, mSize.GetGauge().GetValue(), 0.1) // all bytes get done.
+
+		mDrop := metrics.GetMetricOnLabels(mfs,
+			"diskcache_dropped_data",
+			c.path, reasonExceedCapacity)
+
+		require.NotNil(t, mDrop)
+		assert.True(t, mDrop.GetSummary().GetSampleSum() > 0.0) // part of cache drop due to delayed get.
+
+		mGet := metrics.GetMetricOnLabels(mfs,
+			"diskcache_get_bytes",
+			c.path)
+		mPut := metrics.GetMetricOnLabels(mfs,
+			"diskcache_put_bytes",
+			c.path)
+
+		require.NotNil(t, mGet)
+		require.NotNil(t, mPut)
+		assert.Equal(t, // put == get + drop
+			mPut.GetCounter().GetValue(),
+			mGet.GetCounter().GetValue()+mDrop.GetCounter().GetValue())
+
+		t.Cleanup(func() {
+			ResetMetrics()
+			t.Logf("c: %s", c.Pretty())
+			assert.NoError(t, c.Close())
+		})
 	})
 }
 
@@ -395,7 +465,7 @@ func TestStreamPut(t *T.T) {
 
 		t.Logf("path: %s", p)
 
-		c, err := Open(WithPath(p), WithStreamSize(2))
+		c, err := Open(WithPath(p))
 		assert.NoError(t, err)
 
 		assert.NoError(t, c.StreamPut(r, len(raw)))

@@ -72,7 +72,7 @@ func TestConcurrentAdd(t *T.T) {
 		var (
 			nwrk = 10
 			wg   sync.WaitGroup
-			max  = 10
+			maxN = 10
 		)
 
 		wg.Add(nwrk)
@@ -84,7 +84,7 @@ func TestConcurrentAdd(t *T.T) {
 				for {
 					vec.WithLabelValues("/v1/write/abc", "ok").Add(1.0)
 					n++
-					if n >= max {
+					if n >= maxN {
 						return
 					}
 				}
@@ -97,7 +97,7 @@ func TestConcurrentAdd(t *T.T) {
 
 		m := GetMetricOnLabels(mfs, filepath.Base(t.Name()), `/v1/write/abc`, `ok`)
 		assert.NotNil(t, m)
-		assert.Equal(t, float64(nwrk*max), m.GetCounter().GetValue())
+		assert.Equal(t, float64(nwrk*maxN), m.GetCounter().GetValue())
 	})
 }
 

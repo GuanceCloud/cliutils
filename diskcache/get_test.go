@@ -7,7 +7,6 @@ package diskcache
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	T "testing"
 	"time"
@@ -269,7 +268,7 @@ func TestFallbackOnError(t *T.T) {
 
 		// should get error when callback fail
 		require.Error(t, c.Get(func(_ []byte) error {
-			return fmt.Errorf("get error")
+			return errors.New("get error")
 		}))
 
 		assert.Equal(t, int64(0), c.pos.Seek)
@@ -297,7 +296,7 @@ func TestFallbackOnError(t *T.T) {
 
 		// while on EOF, Fn error ignored
 		assert.ErrorIs(t, c.Get(func(_ []byte) error {
-			return fmt.Errorf("get error")
+			return errors.New("get error")
 		}), ErrNoData)
 
 		// still got EOF
@@ -317,7 +316,7 @@ func TestFallbackOnError(t *T.T) {
 		assert.NoError(t, c.rotate())
 
 		c.Get(func(_ []byte) error {
-			return fmt.Errorf("get error")
+			return errors.New("get error")
 		})
 
 		assert.ErrorIs(t, c.Get(func(x []byte) error {

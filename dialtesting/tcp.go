@@ -8,9 +8,11 @@ package dialtesting
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
+	"text/template"
 	"time"
 )
 
@@ -52,6 +54,8 @@ type TCPTask struct {
 	responseMessage string
 	timeout         time.Duration
 	traceroute      []*Route
+
+	rawTask *TCPTask
 }
 
 func (t *TCPTask) init() error {
@@ -66,7 +70,7 @@ func (t *TCPTask) init() error {
 	}
 
 	if len(t.SuccessWhen) == 0 {
-		return fmt.Errorf(`no any check rule`)
+		return errors.New(`no any check rule`)
 	}
 
 	for _, checker := range t.SuccessWhen {
@@ -100,11 +104,11 @@ func (t *TCPTask) init() error {
 
 func (t *TCPTask) check() error {
 	if len(t.Host) == 0 {
-		return fmt.Errorf("host should not be empty")
+		return errors.New("host should not be empty")
 	}
 
 	if len(t.Port) == 0 {
-		return fmt.Errorf("port should not be empty")
+		return errors.New("port should not be empty")
 	}
 
 	return nil
@@ -334,11 +338,8 @@ func (t *TCPTask) getHostName() ([]string, error) {
 	return []string{t.Host}, nil
 }
 
-func (t *TCPTask) beforeFirstRender() {
-}
-
 func (t *TCPTask) getVariableValue(variable Variable) (string, error) {
-	return "", fmt.Errorf("not support")
+	return "", errors.New("not support")
 }
 
 func (t *TCPTask) getRawTask(taskString string) (string, error) {
@@ -358,4 +359,46 @@ func (t *TCPTask) initTask() {
 	if t.Task == nil {
 		t.Task = &Task{}
 	}
+}
+
+func (t *TCPTask) setReqError(err string) {
+	t.reqError = err
+}
+
+func (t *TCPTask) renderTemplate(fm template.FuncMap) error {
+	if t.rawTask == nil {
+		task := &TCPTask{}
+		if err := t.NewRawTask(task); err != nil {
+			return fmt.Errorf("new raw task failed: %w", err)
+		}
+		t.rawTask = task
+	}
+
+	task := t.rawTask
+	if task == nil {
+		return errors.New("raw task is nil")
+	}
+
+	// host
+	if text, err := t.GetParsedString(task.Host, fm); err != nil {
+		return fmt.Errorf("render host failed: %w", err)
+	} else {
+		t.Host = text
+	}
+
+	// port
+	if text, err := t.GetParsedString(task.Port, fm); err != nil {
+		return fmt.Errorf("render port failed: %w", err)
+	} else {
+		t.Port = text
+	}
+
+	// message
+	if text, err := t.GetParsedString(task.Message, fm); err != nil {
+		return fmt.Errorf("render message failed: %w", err)
+	} else {
+		t.Message = text
+	}
+
+	return nil
 }

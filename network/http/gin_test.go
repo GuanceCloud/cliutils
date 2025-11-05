@@ -103,7 +103,7 @@ func BenchmarkAllMiddlewares(b *testing.B) {
 						resp.Body.Close()
 					}
 				} else {
-					req, err := http.NewRequest("GET", "http://localhost:1234/v1/get", nil)
+					req, err := http.NewRequest(http.MethodGet, "http://localhost:1234/v1/get", nil)
 					if err != nil {
 						b.Error(err)
 					}

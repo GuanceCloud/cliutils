@@ -8,14 +8,18 @@ package dialtesting
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
+	log "github.com/GuanceCloud/cliutils/logger"
+	"github.com/robfig/cron/v3"
 )
 
 const (
@@ -32,7 +36,16 @@ const (
 	ClassWait      = "WAIT"
 	ClassMulti     = "MULTI"
 
-	MaxMsgSize = 100 * 1024
+	ScheduleTypeCron      = "crontab"
+	ScheduleTypeFrequency = "frequency"
+)
+
+var logger = log.DefaultSLogger("icmp")
+
+var (
+	setupLock        sync.Mutex // setup global variable
+	MaxMsgSize       = 100 * 1024
+	ICMPConcurrentCh chan struct{}
 )
 
 type ConfigVar struct {
@@ -65,7 +78,6 @@ type Variable struct {
 }
 type TaskChild interface {
 	ITask
-	beforeFirstRender()
 	run() error
 	init() error
 	checkResult() ([]string, bool)
@@ -78,7 +90,9 @@ type TaskChild interface {
 	metricName() string
 	getHostName() ([]string, error)
 	getRawTask(string) (string, error)
+	renderTemplate(fm template.FuncMap) error
 	initTask()
+	setReqError(string)
 }
 
 func getHostName(host string) (string, error) {
@@ -119,6 +133,8 @@ type ITask interface {
 	GetHostName() ([]string, error)
 	GetWorkspaceLanguage() string
 	GetDFLabel() string
+	GetScheduleType() string
+	GetCrontab() string
 
 	SetOption(map[string]string)
 	GetOption() map[string]string
@@ -137,38 +153,70 @@ type ITask interface {
 	AddExtractedVar(*ConfigVar)
 	SetCustomVars([]*ConfigVar)
 	GetPostScriptVars() Vars
+	GetIsTemplate() bool
+	SetIsTemplate(bool)
+	SetBeforeRun(func(*Task) error)
 
 	String() string
 }
 
 type Task struct {
-	ExternalID        string            `json:"external_id"`
-	Name              string            `json:"name"`
-	AK                string            `json:"access_key"`
-	PostURL           string            `json:"post_url"`
-	CurStatus         string            `json:"status"`
-	Disabled          uint8             `json:"disabled"`
-	Frequency         string            `json:"frequency"`
-	Region            string            `json:"region"`
-	OwnerExternalID   string            `json:"owner_external_id"`
-	Tags              map[string]string `json:"tags,omitempty"`
-	Labels            []string          `json:"labels,omitempty"`
-	WorkspaceLanguage string            `json:"workspace_language,omitempty"`
-	TagsInfo          string            `json:"tags_info,omitempty"` // deprecated
-	DFLabel           string            `json:"df_label,omitempty"`
-	UpdateTime        int64             `json:"update_time,omitempty"`
-	ConfigVars        []*ConfigVar      `json:"config_vars,omitempty"`
-	ExtractedVars     []*ConfigVar
-	CustomVars        []*ConfigVar
+	ExternalID        string `json:"external_id"`
+	Name              string `json:"name"`
+	AK                string `json:"access_key"`
+	PostURL           string `json:"post_url"`
+	CurStatus         string `json:"status"`
+	Frequency         string `json:"frequency"`
+	Region            string `json:"region"`
+	OwnerExternalID   string `json:"owner_external_id"`
+	WorkspaceLanguage string `json:"workspace_language,omitempty"`
+	TagsInfo          string `json:"tags_info,omitempty"` // deprecated
+	DFLabel           string `json:"df_label,omitempty"`
+	ScheduleType      string `json:"schedule_type,omitempty"` // "frequency" or "crontab"
+	Crontab           string `json:"crontab,omitempty"`       // crontab expression like "0 0 * * *"
 
-	taskJSONString       string
-	parsedTaskJSONString string
-	child                TaskChild
+	Tags          map[string]string `json:"tags,omitempty"`
+	Labels        []string          `json:"labels,omitempty"`
+	UpdateTime    int64             `json:"update_time,omitempty"`
+	ConfigVars    []*ConfigVar      `json:"config_vars,omitempty"`
+	ExtractedVars []*ConfigVar
+	CustomVars    []*ConfigVar
 
-	rawTask    string
-	inited     bool
+	taskJSONString string
+	rawTask        string
+	child          TaskChild
+
+	Disabled uint8 `json:"disabled"`
+
+	isTemplate bool
 	globalVars map[string]Variable
 	option     map[string]string
+	fm         template.FuncMap
+	beforeRun  func(*Task) error
+}
+
+type TaskConfig struct {
+	MaxMsgSize        int `json:"max_msg_size,omitempty"`
+	MaxICMPConcurrent int `json:"max_icmp_concurrent,omitempty"`
+	Logger            *log.Logger
+}
+
+func Setup(c *TaskConfig) {
+	setupLock.Lock()
+	defer setupLock.Unlock()
+	if c.MaxMsgSize > 0 {
+		MaxMsgSize = c.MaxMsgSize
+	}
+
+	if c.MaxICMPConcurrent > 0 {
+		ICMPConcurrentCh = make(chan struct{}, c.MaxICMPConcurrent)
+	}
+
+	if c.Logger != nil {
+		logger = c.Logger
+	} else {
+		logger = log.SLogger("dialtesting")
+	}
 }
 
 func CreateTaskChild(taskType string) (TaskChild, error) {
@@ -181,7 +229,7 @@ func CreateTaskChild(taskType string) (TaskChild, error) {
 		ct = &MultiTask{}
 
 	case "headless", "browser", ClassHeadless:
-		return nil, fmt.Errorf("headless task deprecated")
+		return nil, errors.New("headless task deprecated")
 
 	case "tcp", ClassTCP:
 		ct = &TCPTask{}
@@ -204,7 +252,7 @@ func CreateTaskChild(taskType string) (TaskChild, error) {
 
 func NewTask(taskString string, task TaskChild) (ITask, error) {
 	if task == nil {
-		return nil, fmt.Errorf("invalid task")
+		return nil, errors.New("invalid task")
 	}
 
 	if taskString != "" {
@@ -219,10 +267,11 @@ func NewTask(taskString string, task TaskChild) (ITask, error) {
 	task.initTask()
 
 	if t, ok := task.(ITask); !ok {
-		return nil, fmt.Errorf("invalid task, not ITask")
+		return nil, errors.New("invalid task, not ITask")
 	} else {
 		t.SetTaskJSONString(taskString)
 		t.SetChild(task)
+		t.SetIsTemplate(hasTemplateTags(taskString))
 		return t, nil
 	}
 }
@@ -230,6 +279,18 @@ func NewTask(taskString string, task TaskChild) (ITask, error) {
 func (t *Task) String() string {
 	b, _ := json.Marshal(t.child)
 	return string(b)
+}
+
+func (t *Task) NewRawTask(child TaskChild) error {
+	if t.taskJSONString == "" {
+		return errors.New("task json string is empty")
+	}
+
+	if err := json.Unmarshal([]byte(t.taskJSONString), &child); err != nil {
+		return fmt.Errorf("json.Unmarshal failed: %w, task json: %s", err, t.taskJSONString)
+	}
+
+	return nil
 }
 
 func (t *Task) SetChild(child TaskChild) {
@@ -325,6 +386,14 @@ func (t *Task) GetLineData() string {
 	return ""
 }
 
+func (t *Task) GetIsTemplate() bool {
+	return t.isTemplate
+}
+
+func (t *Task) SetIsTemplate(isTemplate bool) {
+	t.isTemplate = isTemplate
+}
+
 func (t *Task) GetResults() (tags map[string]string, fields map[string]interface{}) {
 	tags, fields = t.child.getResults()
 
@@ -399,9 +468,23 @@ func (t *Task) Check() error {
 		return fmt.Errorf("external ID missing")
 	}
 
-	_, err := time.ParseDuration(t.Frequency)
-	if err != nil {
-		return err
+	if t.ScheduleType == "" {
+		t.ScheduleType = ScheduleTypeFrequency
+	}
+
+	if t.ScheduleType == ScheduleTypeCron {
+		if t.Crontab == "" {
+			return fmt.Errorf("crontab missing")
+		}
+		_, err := cron.ParseStandard(t.Crontab)
+		if err != nil {
+			return fmt.Errorf("invalid crontab: %w", err)
+		}
+	} else {
+		_, err := time.ParseDuration(t.Frequency)
+		if err != nil {
+			return fmt.Errorf("invalid frequency: %w", err)
+		}
 	}
 
 	return t.CheckTask()
@@ -409,14 +492,27 @@ func (t *Task) Check() error {
 
 func (t *Task) Run() error {
 	t.Clear()
+	if t.fm != nil {
+		if err := t.child.renderTemplate(t.fm); err != nil {
+			return fmt.Errorf("render template failed: %w", err)
+		}
+	}
+	// before run
+	if t.beforeRun != nil && t.Class() != ClassMulti {
+		if err := t.beforeRun(t); err != nil {
+			t.child.setReqError(err.Error())
+			return nil
+		}
+	}
+
 	return t.child.run()
 }
 
-func (t *Task) init() error {
-	defer func() {
-		t.inited = true
-	}()
+func (t *Task) SetBeforeRun(beforeRun func(*Task) error) {
+	t.beforeRun = beforeRun
+}
 
+func (t *Task) init() error {
 	if strings.EqualFold(t.CurStatus, StatusStop) {
 		return nil
 	}
@@ -468,20 +564,48 @@ func (t *Task) GetGlobalVars() []string {
 	return vars
 }
 
+func getDefaultFunc() template.FuncMap {
+	return template.FuncMap{
+		"timestamp": func(unit string) int64 {
+			utcTime := time.Now().UTC()
+			switch unit {
+			case "s":
+				return utcTime.Unix()
+			case "ms":
+				return utcTime.UnixMilli()
+			case "us":
+				return utcTime.UnixMicro()
+			case "ns":
+				return utcTime.UnixNano()
+			default:
+				return 0
+			}
+		},
+
+		"date": func(format string) string {
+			switch format {
+			case "rfc3339":
+				format = time.RFC3339
+			case "iso8601":
+				format = "2006-01-02T15:04:05Z"
+			}
+
+			return time.Now().Format(format)
+		},
+
+		"urlencode": url.QueryEscape,
+	}
+}
+
 // RenderTemplateAndInit render template and init task.
 func (t *Task) RenderTemplateAndInit(globalVariables map[string]Variable) error {
-	// first render
-	if !t.inited {
-		t.child.beforeFirstRender()
-	}
-
 	if globalVariables == nil {
 		globalVariables = make(map[string]Variable)
 	}
 
 	t.globalVars = globalVariables
 
-	fm := template.FuncMap{}
+	fm := getDefaultFunc()
 
 	allVars := append(t.ConfigVars, t.ExtractedVars...) // nolint:gocritic
 	allVars = append(allVars, t.CustomVars...)
@@ -502,29 +626,16 @@ func (t *Task) RenderTemplateAndInit(globalVariables map[string]Variable) error 
 		v.Value = value
 	}
 
+	t.fm = fm
+
 	// multi task does not need to render template
 	// render template only for its child task
 	if t.Class() == ClassMulti {
 		return nil
 	}
 
-	tmpl, err := template.New("task").Funcs(fm).Option("missingkey=zero").Parse(t.taskJSONString)
-	if err != nil {
-		return fmt.Errorf("parse template error: %w", getTemplateError(err))
-	}
-	var buf strings.Builder
-	if err := tmpl.Execute(&buf, nil); err != nil {
-		return fmt.Errorf("execute template error: %w", err)
-	}
-
-	parsedString := buf.String()
-
-	// no need to re-parse
-	if parsedString != t.parsedTaskJSONString {
-		t.parsedTaskJSONString = parsedString
-		if err := json.Unmarshal([]byte(parsedString), t.child); err != nil {
-			return fmt.Errorf("unmarshal parsed template error: %w", err)
-		}
+	if err := t.child.renderTemplate(fm); err != nil {
+		return fmt.Errorf("render template error: %w", err)
 	}
 
 	return t.init()
@@ -585,4 +696,77 @@ func getTemplateError(err error) error {
 	}
 
 	return err
+}
+
+func (t *Task) GetParsedString(text string, fm template.FuncMap) (string, error) {
+	if text == "" {
+		return "", nil
+	}
+
+	tmpl, err := template.New("text").Funcs(fm).Option("missingkey=zero").Parse(text)
+	if err != nil {
+		return "", fmt.Errorf("parse template error: %w", getTemplateError(err))
+	}
+	var buf strings.Builder
+	if err := tmpl.Execute(&buf, nil); err != nil {
+		return "", fmt.Errorf("execute template error: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+func hasTemplateTags(s string) bool {
+	re := regexp.MustCompile(`{{.*}}`)
+	return re.MatchString(s)
+}
+
+func (t *Task) renderSuccessOption(v, dest *SuccessOption, fm template.FuncMap) error {
+	if text, err := t.GetParsedString(v.Is, fm); err != nil {
+		return fmt.Errorf("render body is failed: %w", err)
+	} else {
+		dest.Is = text
+	}
+
+	if text, err := t.GetParsedString(v.IsNot, fm); err != nil {
+		return fmt.Errorf("render body is not failed: %w", err)
+	} else {
+		dest.IsNot = text
+	}
+
+	if text, err := t.GetParsedString(v.Contains, fm); err != nil {
+		return fmt.Errorf("render body contains failed: %w", err)
+	} else {
+		dest.Contains = text
+	}
+
+	if text, err := t.GetParsedString(v.NotContains, fm); err != nil {
+		return fmt.Errorf("render body not contains failed: %w", err)
+	} else {
+		dest.NotContains = text
+	}
+
+	if text, err := t.GetParsedString(v.MatchRegex, fm); err != nil {
+		return fmt.Errorf("render body match regex failed: %w", err)
+	} else {
+		dest.MatchRegex = text
+	}
+
+	if text, err := t.GetParsedString(v.NotMatchRegex, fm); err != nil {
+		return fmt.Errorf("render body not match regex failed: %w", err)
+	} else {
+		dest.NotMatchRegex = text
+	}
+
+	return nil
+}
+
+func (t *Task) GetScheduleType() string {
+	if t.ScheduleType == "" {
+		return "frequency" // default to frequency for backward compatibility
+	}
+	return t.ScheduleType
+}
+
+func (t *Task) GetCrontab() string {
+	return t.Crontab
 }

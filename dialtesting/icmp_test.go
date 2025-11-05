@@ -6,8 +6,13 @@
 package dialtesting
 
 import (
+	"os"
+	"strconv"
 	"strings"
 	"testing"
+	"text/template"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var icmpCases = []struct {
@@ -62,11 +67,17 @@ var icmpCases = []struct {
 }
 
 func TestIcmp(t *testing.T) {
+	if v := os.Getenv("WITHIN_GITHUB_WORKFLOW"); v != "" {
+		if b, err := strconv.ParseBool(v); b && err == nil {
+			t.Skip("within github workflow, test on localhost not working(socket: operation not permitted).")
+		}
+	}
+
 	for _, c := range icmpCases {
 		c.t.SetChild(c.t)
 		if err := c.t.Check(); err != nil {
-			if c.fail == false {
-				t.Errorf("case: %s, failed: %s", c.t.Name, err)
+			if !c.fail {
+				assert.NoError(t, err)
 			} else {
 				t.Logf("expected: %s", err.Error())
 			}
@@ -75,8 +86,8 @@ func TestIcmp(t *testing.T) {
 
 		err := c.t.Run()
 		if err != nil {
-			if c.fail == false {
-				t.Errorf("case %s failed: %s", c.t.Name, err)
+			if !c.fail {
+				assert.NoError(t, err)
 			} else {
 				t.Logf("expected: %s", err.Error())
 			}
@@ -88,12 +99,32 @@ func TestIcmp(t *testing.T) {
 		t.Logf("ts: %+#v \n fs: %+#v \n ", tags, fields)
 
 		reasons, _ := c.t.CheckResult()
-		if len(reasons) != c.reasonCnt {
-			t.Errorf("case %s expect %d reasons, but got %d reasons:\n\t%s",
-				c.t.Name, c.reasonCnt, len(reasons), strings.Join(reasons, "\n\t"))
-		} else if len(reasons) > 0 {
-			t.Logf("case %s reasons:\n\t%s",
-				c.t.Name, strings.Join(reasons, "\n\t"))
-		}
+
+		assert.Lenf(t, reasons, c.reasonCnt, "case %s expect %d reasons, but got %d reasons:\n\t%s",
+			c.t.Name, c.reasonCnt, len(reasons), strings.Join(reasons, "\n\t"))
+
+		t.Logf("case %s reasons:\n\t%s",
+			c.t.Name, strings.Join(reasons, "\n\t"))
 	}
+}
+
+func TestICMPRenderTemplate(t *testing.T) {
+	ct := &ICMPTask{
+		Host: "{{host}}",
+	}
+
+	fm := template.FuncMap{
+		"host": func() string {
+			return "localhost"
+		},
+	}
+
+	task, err := NewTask("", ct)
+	assert.NoError(t, err)
+
+	ct, ok := task.(*ICMPTask)
+	assert.True(t, ok)
+
+	assert.NoError(t, ct.renderTemplate(fm))
+	assert.Equal(t, "localhost", ct.Host)
 }
