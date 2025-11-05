@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -65,18 +65,36 @@ func Descriptors(file protoreflect.FileDescriptor, fn func(protoreflect.Descript
 // The exit function is called using a post-order traversal, where the function
 // is called for a descriptor only after it is called for any descendants.
 func DescriptorsEnterAndExit(file protoreflect.FileDescriptor, enter, exit func(protoreflect.Descriptor) error) error {
-	if err := walkContainer(file, enter, exit); err != nil {
-		return err
+	for i := 0; i < file.Messages().Len(); i++ {
+		msg := file.Messages().Get(i)
+		if err := messageDescriptor(msg, enter, exit); err != nil {
+			return err
+		}
 	}
-	services := file.Services()
-	for i, length := 0, services.Len(); i < length; i++ {
-		svc := services.Get(i)
+	for i := 0; i < file.Enums().Len(); i++ {
+		en := file.Enums().Get(i)
+		if err := enumDescriptor(en, enter, exit); err != nil {
+			return err
+		}
+	}
+	for i := 0; i < file.Extensions().Len(); i++ {
+		ext := file.Extensions().Get(i)
+		if err := enter(ext); err != nil {
+			return err
+		}
+		if exit != nil {
+			if err := exit(ext); err != nil {
+				return err
+			}
+		}
+	}
+	for i := 0; i < file.Services().Len(); i++ {
+		svc := file.Services().Get(i)
 		if err := enter(svc); err != nil {
 			return err
 		}
-		methods := svc.Methods()
-		for i, length := 0, methods.Len(); i < length; i++ {
-			mtd := methods.Get(i)
+		for i := 0; i < svc.Methods().Len(); i++ {
+			mtd := svc.Methods().Get(i)
 			if err := enter(mtd); err != nil {
 				return err
 			}
@@ -95,49 +113,12 @@ func DescriptorsEnterAndExit(file protoreflect.FileDescriptor, enter, exit func(
 	return nil
 }
 
-type container interface {
-	Messages() protoreflect.MessageDescriptors
-	Enums() protoreflect.EnumDescriptors
-	Extensions() protoreflect.ExtensionDescriptors
-}
-
-func walkContainer(container container, enter, exit func(protoreflect.Descriptor) error) error {
-	messages := container.Messages()
-	for i, length := 0, messages.Len(); i < length; i++ {
-		msg := messages.Get(i)
-		if err := messageDescriptor(msg, enter, exit); err != nil {
-			return err
-		}
-	}
-	enums := container.Enums()
-	for i, length := 0, enums.Len(); i < length; i++ {
-		en := enums.Get(i)
-		if err := enumDescriptor(en, enter, exit); err != nil {
-			return err
-		}
-	}
-	exts := container.Extensions()
-	for i, length := 0, exts.Len(); i < length; i++ {
-		ext := exts.Get(i)
-		if err := enter(ext); err != nil {
-			return err
-		}
-		if exit != nil {
-			if err := exit(ext); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 func messageDescriptor(msg protoreflect.MessageDescriptor, enter, exit func(protoreflect.Descriptor) error) error {
 	if err := enter(msg); err != nil {
 		return err
 	}
-	fields := msg.Fields()
-	for i, length := 0, fields.Len(); i < length; i++ {
-		fld := fields.Get(i)
+	for i := 0; i < msg.Fields().Len(); i++ {
+		fld := msg.Fields().Get(i)
 		if err := enter(fld); err != nil {
 			return err
 		}
@@ -147,9 +128,8 @@ func messageDescriptor(msg protoreflect.MessageDescriptor, enter, exit func(prot
 			}
 		}
 	}
-	oneofs := msg.Oneofs()
-	for i, length := 0, oneofs.Len(); i < length; i++ {
-		oo := oneofs.Get(i)
+	for i := 0; i < msg.Oneofs().Len(); i++ {
+		oo := msg.Oneofs().Get(i)
 		if err := enter(oo); err != nil {
 			return err
 		}
@@ -159,8 +139,28 @@ func messageDescriptor(msg protoreflect.MessageDescriptor, enter, exit func(prot
 			}
 		}
 	}
-	if err := walkContainer(msg, enter, exit); err != nil {
-		return err
+	for i := 0; i < msg.Messages().Len(); i++ {
+		nested := msg.Messages().Get(i)
+		if err := messageDescriptor(nested, enter, exit); err != nil {
+			return err
+		}
+	}
+	for i := 0; i < msg.Enums().Len(); i++ {
+		en := msg.Enums().Get(i)
+		if err := enumDescriptor(en, enter, exit); err != nil {
+			return err
+		}
+	}
+	for i := 0; i < msg.Extensions().Len(); i++ {
+		ext := msg.Extensions().Get(i)
+		if err := enter(ext); err != nil {
+			return err
+		}
+		if exit != nil {
+			if err := exit(ext); err != nil {
+				return err
+			}
+		}
 	}
 	if exit != nil {
 		if err := exit(msg); err != nil {
@@ -174,9 +174,8 @@ func enumDescriptor(en protoreflect.EnumDescriptor, enter, exit func(protoreflec
 	if err := enter(en); err != nil {
 		return err
 	}
-	vals := en.Values()
-	for i, length := 0, vals.Len(); i < length; i++ {
-		enVal := vals.Get(i)
+	for i := 0; i < en.Values().Len(); i++ {
+		enVal := en.Values().Get(i)
 		if err := enter(enVal); err != nil {
 			return err
 		}
@@ -236,12 +235,12 @@ func DescriptorProtos(file *descriptorpb.FileDescriptorProto, fn func(protorefle
 // the function is called for a descriptor proto only after it is called for any
 // descendants.
 func DescriptorProtosEnterAndExit(file *descriptorpb.FileDescriptorProto, enter, exit func(protoreflect.FullName, proto.Message) error) error {
-	enterWithPath := func(n protoreflect.FullName, _ protoreflect.SourcePath, m proto.Message) error {
+	enterWithPath := func(n protoreflect.FullName, p protoreflect.SourcePath, m proto.Message) error {
 		return enter(n, m)
 	}
-	var exitWithPath func(protoreflect.FullName, protoreflect.SourcePath, proto.Message) error
+	var exitWithPath func(n protoreflect.FullName, p protoreflect.SourcePath, m proto.Message) error
 	if exit != nil {
-		exitWithPath = func(n protoreflect.FullName, _ protoreflect.SourcePath, m proto.Message) error {
+		exitWithPath = func(n protoreflect.FullName, p protoreflect.SourcePath, m proto.Message) error {
 			return exit(n, m)
 		}
 	}
@@ -360,7 +359,7 @@ func (w *protoWalker) walkDescriptorProto(prefix string, path protoreflect.Sourc
 		var p protoreflect.SourcePath
 		if w.usePath {
 			p = path
-			p = append(p, internal.MessageOneofsTag, int32(i))
+			p = append(p, internal.MessageOneOfsTag, int32(i))
 		}
 		fqn := prefix + oo.GetName()
 		if err := w.enter(protoreflect.FullName(fqn), p, oo); err != nil {

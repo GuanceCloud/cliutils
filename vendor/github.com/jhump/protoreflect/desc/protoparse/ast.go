@@ -148,7 +148,7 @@ func convertASTMessageElement(f *ast.FileNode, el ast.MessageElement) ast2.Messa
 		return convertASTField(f, el)
 	case *ast.MapFieldNode:
 		return convertASTMapField(f, el)
-	case *ast.OneofNode:
+	case *ast.OneOfNode:
 		return convertASTOneOf(f, el)
 	case *ast.GroupNode:
 		return convertASTGroup(f, el)
@@ -241,7 +241,7 @@ func convertASTGroup(f *ast.FileNode, g *ast.GroupNode) *ast2.GroupNode {
 	)
 }
 
-func convertASTOneOf(f *ast.FileNode, oo *ast.OneofNode) *ast2.OneOfNode {
+func convertASTOneOf(f *ast.FileNode, oo *ast.OneOfNode) *ast2.OneOfNode {
 	decls := make([]ast2.OneOfElement, len(oo.Decls))
 	for i := range oo.Decls {
 		decls[i] = convertASTOneOfElement(f, oo.Decls[i])
@@ -255,7 +255,7 @@ func convertASTOneOf(f *ast.FileNode, oo *ast.OneofNode) *ast2.OneOfNode {
 	)
 }
 
-func convertASTOneOfElement(f *ast.FileNode, el ast.OneofElement) ast2.OneOfElement {
+func convertASTOneOfElement(f *ast.FileNode, el ast.OneOfElement) ast2.OneOfElement {
 	switch el := el.(type) {
 	case *ast.OptionNode:
 		return convertASTOption(f, el)
@@ -515,6 +515,8 @@ func convertASTValue(f *ast.FileNode, v ast.ValueNode) ast2.ValueNode {
 		return convertASTCompoundStringLiteral(f, v)
 	case *ast.UintLiteralNode:
 		return convertASTUintLiteral(f, v)
+	case *ast.PositiveUintLiteralNode:
+		return convertASTPositiveUintLiteral(f, v)
 	case *ast.NegativeIntLiteralNode:
 		return convertASTNegativeIntLiteral(f, v)
 	case *ast.FloatLiteralNode:
@@ -591,6 +593,8 @@ func convertASTInt(f *ast.FileNode, n ast.IntValueNode) ast2.IntValueNode {
 	switch n := n.(type) {
 	case *ast.UintLiteralNode:
 		return convertASTUintLiteral(f, n)
+	case *ast.PositiveUintLiteralNode:
+		return convertASTPositiveUintLiteral(f, n)
 	case *ast.NegativeIntLiteralNode:
 		return convertASTNegativeIntLiteral(f, n)
 	default:
@@ -600,6 +604,10 @@ func convertASTInt(f *ast.FileNode, n ast.IntValueNode) ast2.IntValueNode {
 
 func convertASTUintLiteral(f *ast.FileNode, n *ast.UintLiteralNode) *ast2.UintLiteralNode {
 	return ast2.NewUintLiteralNode(n.Val, convertASTTokenInfo(f, n.Token()))
+}
+
+func convertASTPositiveUintLiteral(f *ast.FileNode, n *ast.PositiveUintLiteralNode) *ast2.PositiveUintLiteralNode {
+	return ast2.NewPositiveUintLiteralNode(convertASTRune(f, n.Plus), convertASTUintLiteral(f, n.Uint))
 }
 
 func convertASTNegativeIntLiteral(f *ast.FileNode, n *ast.NegativeIntLiteralNode) *ast2.NegativeIntLiteralNode {

@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/bufbuild/protocompile/ast"
 	"github.com/bufbuild/protocompile/parser"
@@ -59,7 +60,6 @@ func Link(parsed parser.Result, dependencies Files, symbols *Symbols, handler *r
 	}
 
 	r := &result{
-		FileDescriptor:       noOpFile,
 		Result:               parsed,
 		deps:                 dependencies,
 		descriptors:          map[string]protoreflect.Descriptor{},
@@ -67,10 +67,8 @@ func Link(parsed parser.Result, dependencies Files, symbols *Symbols, handler *r
 		prefix:               prefix,
 		optionQualifiedNames: map[ast.IdentValueNode]string{},
 	}
-	// First, we create the hierarchy of descendant descriptors.
-	r.createDescendants()
 
-	// Then we can put all symbols into a single pool, which lets us ensure there
+	// First, we put all symbols into a single pool, which lets us ensure there
 	// are no duplicate symbols and will also let us resolve and revise all type
 	// references in next step.
 	if err := symbols.importResult(r, handler); err != nil {
@@ -108,7 +106,24 @@ func Link(parsed parser.Result, dependencies Files, symbols *Symbols, handler *r
 type Result interface {
 	File
 	parser.Result
-
+	// ResolveEnumType returns an enum descriptor for the given named enum that
+	// is available in this file. If no such element is available or if the
+	// named element is not an enum, nil is returned.
+	ResolveEnumType(protoreflect.FullName) protoreflect.EnumDescriptor
+	// ResolveMessageType returns a message descriptor for the given named
+	// message that is available in this file. If no such element is available
+	// or if the named element is not a message, nil is returned.
+	ResolveMessageType(protoreflect.FullName) protoreflect.MessageDescriptor
+	// ResolveOptionsType returns a message descriptor for the given options
+	// type. This is like ResolveMessageType but searches the result's entire
+	// set of transitive dependencies without regard for visibility. If no
+	// such element is available or if the named element is not a message, nil
+	// is returned.
+	ResolveOptionsType(protoreflect.FullName) protoreflect.MessageDescriptor
+	// ResolveExtension returns an extension descriptor for the given named
+	// extension that is available in this file. If no such element is available
+	// or if the named element is not an extension, nil is returned.
+	ResolveExtension(protoreflect.FullName) protoreflect.ExtensionTypeDescriptor
 	// ResolveMessageLiteralExtensionName returns the fully qualified name for
 	// an identifier for extension field names in message literals.
 	ResolveMessageLiteralExtensionName(ast.IdentValueNode) string
@@ -116,7 +131,7 @@ type Result interface {
 	// be done after options are interpreted. Any errors or warnings encountered
 	// will be reported via the given handler. If any error is reported, this
 	// function returns a non-nil error.
-	ValidateOptions(handler *reporter.Handler, symbols *Symbols) error
+	ValidateOptions(handler *reporter.Handler) error
 	// CheckForUnusedImports is used to report warnings for unused imports. This
 	// should be called after options have been interpreted. Otherwise, the logic
 	// could incorrectly report imports as unused if the only symbol used were a
@@ -128,6 +143,21 @@ type Result interface {
 	// step separate from linking, because computing source code info requires
 	// interpreting options (which is done after linking).
 	PopulateSourceCodeInfo()
+
+	// CanonicalProto returns the file descriptor proto in a form that
+	// will be serialized in a canonical way. The "canonical" way matches
+	// the way that "protoc" emits option values, which is a way that
+	// mostly matches the way options are defined in source, including
+	// ordering and de-structuring. Unlike the FileDescriptorProto() method, this
+	// method is more expensive and results in a new descriptor proto
+	// being constructed with each call.
+	//
+	// The returned value will have all options (fields of the various
+	// descriptorpb.*Options message types) represented via unrecognized
+	// fields. So the returned value will serialize as desired, but it
+	// is otherwise not useful since all option values are treated as
+	// unknown.
+	CanonicalProto() *descriptorpb.FileDescriptorProto
 
 	// RemoveAST drops the AST information from this result.
 	RemoveAST()

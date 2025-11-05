@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,11 +18,12 @@ import (
 	"strings"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/bufbuild/protocompile/ast"
 	"github.com/bufbuild/protocompile/internal"
-	"github.com/bufbuild/protocompile/protoutil"
 	"github.com/bufbuild/protocompile/reporter"
 	"github.com/bufbuild/protocompile/walk"
 )
@@ -37,14 +38,6 @@ const unknownFilePath = "<unknown file>"
 // This type is thread-safe.
 type Symbols struct {
 	pkgTrie packageSymbols
-
-	// We don't know the packages for these symbols, so we can't
-	// keep them in the pkgTrie. In vast majority of cases, this
-	// will always be empty/unused. When used, it ensures that
-	// multiple extension declarations don't refer to the same
-	// extension.
-	extDeclsMu sync.Mutex
-	extDecls   map[protoreflect.FullName]extDecl
 }
 
 type packageSymbols struct {
@@ -52,7 +45,7 @@ type packageSymbols struct {
 	children map[protoreflect.FullName]*packageSymbols
 	files    map[protoreflect.FileDescriptor]struct{}
 	symbols  map[protoreflect.FullName]symbolEntry
-	exts     map[extNumber]ast.SourceSpan
+	exts     map[extNumber]ast.SourcePos
 }
 
 type extNumber struct {
@@ -61,15 +54,9 @@ type extNumber struct {
 }
 
 type symbolEntry struct {
-	span        ast.SourceSpan
+	pos         ast.SourcePos
 	isEnumValue bool
 	isPackage   bool
-}
-
-type extDecl struct {
-	span     ast.SourceSpan
-	extendee protoreflect.FullName
-	tag      protoreflect.FieldNumber
 }
 
 // Import populates the symbol table with all symbols/elements and extension
@@ -82,22 +69,18 @@ func (s *Symbols) Import(fd protoreflect.FileDescriptor, handler *reporter.Handl
 		return nil
 	}
 
-	if f, ok := fd.(protoreflect.FileImport); ok {
-		// unwrap any import instance
-		fd = f.FileDescriptor
-	}
 	if f, ok := fd.(*file); ok {
 		// unwrap any file instance
 		fd = f.FileDescriptor
 	}
 
-	var pkgSpan ast.SourceSpan
+	var pkgPos ast.SourcePos
 	if res, ok := fd.(*result); ok {
-		pkgSpan = packageNameSpan(res)
+		pkgPos = packageNameStart(res)
 	} else {
-		pkgSpan = sourceSpanForPackage(fd)
+		pkgPos = sourcePositionForPackage(fd)
 	}
-	pkg, err := s.importPackages(pkgSpan, fd.Package(), handler)
+	pkg, err := s.importPackages(pkgPos, fd.Package(), handler)
 	if err != nil || pkg == nil {
 		return err
 	}
@@ -138,9 +121,12 @@ func (s *Symbols) importFileWithExtensions(pkg *packageSymbols, fd protoreflect.
 		if !ok || !fld.IsExtension() {
 			return nil
 		}
-		span := sourceSpanForNumber(fld)
+		pos := sourcePositionForNumber(fld)
 		extendee := fld.ContainingMessage()
-		return s.AddExtension(packageFor(extendee), extendee.FullName(), fld.Number(), span, handler)
+		if err := s.AddExtension(packageFor(extendee), extendee.FullName(), fld.Number(), pos, handler); err != nil {
+			return err
+		}
+		return nil
 	})
 }
 
@@ -168,20 +154,20 @@ func (s *packageSymbols) importFile(fd protoreflect.FileDescriptor, handler *rep
 	return true, nil
 }
 
-func (s *Symbols) importPackages(pkgSpan ast.SourceSpan, pkg protoreflect.FullName, handler *reporter.Handler) (*packageSymbols, error) {
+func (s *Symbols) importPackages(pkgPos ast.SourcePos, pkg protoreflect.FullName, handler *reporter.Handler) (*packageSymbols, error) {
 	if pkg == "" {
 		return &s.pkgTrie, nil
 	}
 
+	parts := strings.Split(string(pkg), ".")
+	for i := 1; i < len(parts); i++ {
+		parts[i] = parts[i-1] + "." + parts[i]
+	}
+
 	cur := &s.pkgTrie
-	enumerator := nameEnumerator{name: pkg}
-	for {
-		p, ok := enumerator.next()
-		if !ok {
-			return cur, nil
-		}
+	for _, p := range parts {
 		var err error
-		cur, err = cur.importPackage(pkgSpan, p, handler)
+		cur, err = cur.importPackage(pkgPos, protoreflect.FullName(p), handler)
 		if err != nil {
 			return nil, err
 		}
@@ -189,9 +175,11 @@ func (s *Symbols) importPackages(pkgSpan ast.SourceSpan, pkg protoreflect.FullNa
 			return nil, nil
 		}
 	}
+
+	return cur, nil
 }
 
-func (s *packageSymbols) importPackage(pkgSpan ast.SourceSpan, pkg protoreflect.FullName, handler *reporter.Handler) (*packageSymbols, error) {
+func (s *packageSymbols) importPackage(pkgPos ast.SourcePos, pkg protoreflect.FullName, handler *reporter.Handler) (*packageSymbols, error) {
 	s.mu.RLock()
 	existing, ok := s.symbols[pkg]
 	var child *packageSymbols
@@ -204,7 +192,7 @@ func (s *packageSymbols) importPackage(pkgSpan ast.SourceSpan, pkg protoreflect.
 		// package already exists
 		return child, nil
 	} else if ok {
-		return nil, reportSymbolCollision(pkgSpan, pkg, false, existing, handler)
+		return nil, reportSymbolCollision(pkgPos, pkg, false, existing, handler)
 	}
 
 	s.mu.Lock()
@@ -215,12 +203,12 @@ func (s *packageSymbols) importPackage(pkgSpan ast.SourceSpan, pkg protoreflect.
 		// package already exists
 		return s.children[pkg], nil
 	} else if ok {
-		return nil, reportSymbolCollision(pkgSpan, pkg, false, existing, handler)
+		return nil, reportSymbolCollision(pkgPos, pkg, false, existing, handler)
 	}
 	if s.symbols == nil {
 		s.symbols = map[protoreflect.FullName]symbolEntry{}
 	}
-	s.symbols[pkg] = symbolEntry{span: pkgSpan, isPackage: true}
+	s.symbols[pkg] = symbolEntry{pos: pkgPos, isPackage: true}
 	child = &packageSymbols{}
 	if s.children == nil {
 		s.children = map[protoreflect.FullName]*packageSymbols{}
@@ -229,32 +217,32 @@ func (s *packageSymbols) importPackage(pkgSpan ast.SourceSpan, pkg protoreflect.
 	return child, nil
 }
 
-func (s *Symbols) getPackage(pkg protoreflect.FullName, exact bool) *packageSymbols {
+func (s *Symbols) getPackage(pkg protoreflect.FullName) *packageSymbols {
 	if pkg == "" {
 		return &s.pkgTrie
 	}
+
+	parts := strings.Split(string(pkg), ".")
+	for i := 1; i < len(parts); i++ {
+		parts[i] = parts[i-1] + "." + parts[i]
+	}
+
 	cur := &s.pkgTrie
-	enumerator := nameEnumerator{name: pkg}
-	for {
-		p, ok := enumerator.next()
-		if !ok {
-			return cur
-		}
+	for _, p := range parts {
 		cur.mu.RLock()
-		next := cur.children[p]
+		next := cur.children[protoreflect.FullName(p)]
 		cur.mu.RUnlock()
 
 		if next == nil {
-			if exact {
-				return nil
-			}
-			return cur
+			return nil
 		}
 		cur = next
 	}
+
+	return cur
 }
 
-func reportSymbolCollision(span ast.SourceSpan, fqn protoreflect.FullName, additionIsEnumVal bool, existing symbolEntry, handler *reporter.Handler) error {
+func reportSymbolCollision(pos ast.SourcePos, fqn protoreflect.FullName, additionIsEnumVal bool, existing symbolEntry, handler *reporter.Handler) error {
 	// because of weird scoping for enum values, provide more context in error message
 	// if this conflict is with an enum value
 	var isPkg, suffix string
@@ -264,12 +252,12 @@ func reportSymbolCollision(span ast.SourceSpan, fqn protoreflect.FullName, addit
 	if existing.isPackage {
 		isPkg = " as a package"
 	}
-	orig := existing.span
-	conflict := span
-	if posLess(conflict.Start(), orig.Start()) {
+	orig := existing.pos
+	conflict := pos
+	if posLess(conflict, orig) {
 		orig, conflict = conflict, orig
 	}
-	return handler.HandleErrorf(conflict, "symbol %q already defined%s at %v%s", fqn, isPkg, orig.Start(), suffix)
+	return handler.HandleErrorf(conflict, "symbol %q already defined%s at %v%s", fqn, isPkg, orig, suffix)
 }
 
 func posLess(a, b ast.SourcePos) bool {
@@ -284,10 +272,10 @@ func posLess(a, b ast.SourcePos) bool {
 
 func (s *packageSymbols) checkFileLocked(f protoreflect.FileDescriptor, handler *reporter.Handler) error {
 	return walk.Descriptors(f, func(d protoreflect.Descriptor) error {
-		span := sourceSpanFor(d)
+		pos := sourcePositionFor(d)
 		if existing, ok := s.symbols[d.FullName()]; ok {
 			_, isEnumVal := d.(protoreflect.EnumValueDescriptor)
-			if err := reportSymbolCollision(span, d.FullName(), isEnumVal, existing, handler); err != nil {
+			if err := reportSymbolCollision(pos, d.FullName(), isEnumVal, existing, handler); err != nil {
 				return err
 			}
 		}
@@ -295,36 +283,26 @@ func (s *packageSymbols) checkFileLocked(f protoreflect.FileDescriptor, handler 
 	})
 }
 
-func sourceSpanForPackage(fd protoreflect.FileDescriptor) ast.SourceSpan {
+func sourcePositionForPackage(fd protoreflect.FileDescriptor) ast.SourcePos {
 	loc := fd.SourceLocations().ByPath([]int32{internal.FilePackageTag})
-	if internal.IsZeroLocation(loc) {
-		return ast.UnknownSpan(fd.Path())
+	if isZeroLoc(loc) {
+		return ast.UnknownPos(fd.Path())
 	}
-	return ast.NewSourceSpan(
-		ast.SourcePos{
-			Filename: fd.Path(),
-			Line:     loc.StartLine,
-			Col:      loc.StartColumn,
-		},
-		ast.SourcePos{
-			Filename: fd.Path(),
-			Line:     loc.EndLine,
-			Col:      loc.EndColumn,
-		},
-	)
+	return ast.SourcePos{
+		Filename: fd.Path(),
+		Line:     loc.StartLine,
+		Col:      loc.StartColumn,
+	}
 }
 
-func sourceSpanFor(d protoreflect.Descriptor) ast.SourceSpan {
+func sourcePositionFor(d protoreflect.Descriptor) ast.SourcePos {
 	file := d.ParentFile()
 	if file == nil {
-		return ast.UnknownSpan(unknownFilePath)
+		return ast.UnknownPos(unknownFilePath)
 	}
-	if result, ok := file.(*result); ok {
-		return nameSpan(result.FileNode(), result.Node(protoutil.ProtoFromDescriptor(d)))
-	}
-	path, ok := internal.ComputePath(d)
+	path, ok := computePath(d)
 	if !ok {
-		return ast.UnknownSpan(file.Path())
+		return ast.UnknownPos(file.Path())
 	}
 	namePath := path
 	switch d.(type) {
@@ -333,7 +311,7 @@ func sourceSpanFor(d protoreflect.Descriptor) ast.SourceSpan {
 	case protoreflect.MessageDescriptor:
 		namePath = append(namePath, internal.MessageNameTag)
 	case protoreflect.OneofDescriptor:
-		namePath = append(namePath, internal.OneofNameTag)
+		namePath = append(namePath, internal.OneOfNameTag)
 	case protoreflect.EnumDescriptor:
 		namePath = append(namePath, internal.EnumNameTag)
 	case protoreflect.EnumValueDescriptor:
@@ -347,57 +325,50 @@ func sourceSpanFor(d protoreflect.Descriptor) ast.SourceSpan {
 		// descriptor, sans name field
 	}
 	loc := file.SourceLocations().ByPath(namePath)
-	if internal.IsZeroLocation(loc) {
+	if isZeroLoc(loc) {
 		loc = file.SourceLocations().ByPath(path)
-		if internal.IsZeroLocation(loc) {
-			return ast.UnknownSpan(file.Path())
+		if isZeroLoc(loc) {
+			return ast.UnknownPos(file.Path())
 		}
 	}
-
-	return ast.NewSourceSpan(
-		ast.SourcePos{
-			Filename: file.Path(),
-			Line:     loc.StartLine,
-			Col:      loc.StartColumn,
-		},
-		ast.SourcePos{
-			Filename: file.Path(),
-			Line:     loc.EndLine,
-			Col:      loc.EndColumn,
-		},
-	)
+	return ast.SourcePos{
+		Filename: file.Path(),
+		Line:     loc.StartLine,
+		Col:      loc.StartColumn,
+	}
 }
 
-func sourceSpanForNumber(fd protoreflect.FieldDescriptor) ast.SourceSpan {
+func sourcePositionForNumber(fd protoreflect.FieldDescriptor) ast.SourcePos {
 	file := fd.ParentFile()
 	if file == nil {
-		return ast.UnknownSpan(unknownFilePath)
+		return ast.UnknownPos(unknownFilePath)
 	}
-	path, ok := internal.ComputePath(fd)
+	path, ok := computePath(fd)
 	if !ok {
-		return ast.UnknownSpan(file.Path())
+		return ast.UnknownPos(file.Path())
 	}
 	numberPath := path
 	numberPath = append(numberPath, internal.FieldNumberTag)
 	loc := file.SourceLocations().ByPath(numberPath)
-	if internal.IsZeroLocation(loc) {
+	if isZeroLoc(loc) {
 		loc = file.SourceLocations().ByPath(path)
-		if internal.IsZeroLocation(loc) {
-			return ast.UnknownSpan(file.Path())
+		if isZeroLoc(loc) {
+			return ast.UnknownPos(file.Path())
 		}
 	}
-	return ast.NewSourceSpan(
-		ast.SourcePos{
-			Filename: file.Path(),
-			Line:     loc.StartLine,
-			Col:      loc.StartColumn,
-		},
-		ast.SourcePos{
-			Filename: file.Path(),
-			Line:     loc.EndLine,
-			Col:      loc.EndColumn,
-		},
-	)
+	return ast.SourcePos{
+		Filename: file.Path(),
+		Line:     loc.StartLine,
+		Col:      loc.StartColumn,
+	}
+}
+
+func isZeroLoc(loc protoreflect.SourceLocation) bool {
+	return loc.Path == nil &&
+		loc.StartLine == 0 &&
+		loc.StartColumn == 0 &&
+		loc.EndLine == 0 &&
+		loc.EndColumn == 0
 }
 
 func (s *packageSymbols) commitFileLocked(f protoreflect.FileDescriptor) {
@@ -405,13 +376,13 @@ func (s *packageSymbols) commitFileLocked(f protoreflect.FileDescriptor) {
 		s.symbols = map[protoreflect.FullName]symbolEntry{}
 	}
 	if s.exts == nil {
-		s.exts = map[extNumber]ast.SourceSpan{}
+		s.exts = map[extNumber]ast.SourcePos{}
 	}
 	_ = walk.Descriptors(f, func(d protoreflect.Descriptor) error {
-		span := sourceSpanFor(d)
+		pos := sourcePositionFor(d)
 		name := d.FullName()
 		_, isEnumValue := d.(protoreflect.EnumValueDescriptor)
-		s.symbols[name] = symbolEntry{span: span, isEnumValue: isEnumValue}
+		s.symbols[name] = symbolEntry{pos: pos, isEnumValue: isEnumValue}
 		return nil
 	})
 
@@ -438,14 +409,18 @@ func (s *Symbols) importResultWithExtensions(pkg *packageSymbols, r *result, han
 		}
 		file := r.FileNode()
 		node := r.FieldNode(fd.FieldDescriptorProto())
-		info := file.NodeInfo(node.FieldTag())
+		pos := file.NodeInfo(node.FieldTag()).Start()
 		extendee := fd.ContainingMessage()
-		return s.AddExtension(packageFor(extendee), extendee.FullName(), fd.Number(), info, handler)
+		if err := s.AddExtension(packageFor(extendee), extendee.FullName(), fd.Number(), pos, handler); err != nil {
+			return err
+		}
+
+		return nil
 	})
 }
 
 func (s *Symbols) importResult(r *result, handler *reporter.Handler) error {
-	pkg, err := s.importPackages(packageNameSpan(r), r.Package(), handler)
+	pkg, err := s.importPackages(packageNameStart(r), r.Package(), handler)
 	if err != nil || pkg == nil {
 		return err
 	}
@@ -471,34 +446,33 @@ func (s *packageSymbols) importResult(r *result, handler *reporter.Handler) (boo
 	}
 
 	// second pass: commit all symbols
-	s.commitFileLocked(r)
+	s.commitResultLocked(r)
 
 	return true, nil
 }
 
 func (s *packageSymbols) checkResultLocked(r *result, handler *reporter.Handler) error {
 	resultSyms := map[protoreflect.FullName]symbolEntry{}
-	return walk.Descriptors(r, func(d protoreflect.Descriptor) error {
-		_, isEnumVal := d.(protoreflect.EnumValueDescriptor)
+	return walk.DescriptorProtos(r.FileDescriptorProto(), func(fqn protoreflect.FullName, d proto.Message) error {
+		_, isEnumVal := d.(*descriptorpb.EnumValueDescriptorProto)
 		file := r.FileNode()
-		name := d.FullName()
-		node := r.Node(protoutil.ProtoFromDescriptor(d))
-		span := nameSpan(file, node)
+		node := r.Node(d)
+		pos := nameStart(file, node)
 		// check symbols already in this symbol table
-		if existing, ok := s.symbols[name]; ok {
-			if err := reportSymbolCollision(span, name, isEnumVal, existing, handler); err != nil {
+		if existing, ok := s.symbols[fqn]; ok {
+			if err := reportSymbolCollision(pos, fqn, isEnumVal, existing, handler); err != nil {
 				return err
 			}
 		}
 
 		// also check symbols from this result (that are not yet in symbol table)
-		if existing, ok := resultSyms[name]; ok {
-			if err := reportSymbolCollision(span, name, isEnumVal, existing, handler); err != nil {
+		if existing, ok := resultSyms[fqn]; ok {
+			if err := reportSymbolCollision(pos, fqn, isEnumVal, existing, handler); err != nil {
 				return err
 			}
 		}
-		resultSyms[name] = symbolEntry{
-			span:        span,
+		resultSyms[fqn] = symbolEntry{
+			pos:         pos,
 			isEnumValue: isEnumVal,
 		}
 
@@ -506,130 +480,88 @@ func (s *packageSymbols) checkResultLocked(r *result, handler *reporter.Handler)
 	})
 }
 
-func packageNameSpan(r *result) ast.SourceSpan {
+func packageNameStart(r *result) ast.SourcePos {
 	if node, ok := r.FileNode().(*ast.FileNode); ok {
 		for _, decl := range node.Decls {
 			if pkgNode, ok := decl.(*ast.PackageNode); ok {
-				return r.FileNode().NodeInfo(pkgNode.Name)
+				return r.FileNode().NodeInfo(pkgNode.Name).Start()
 			}
 		}
 	}
-	return ast.UnknownSpan(r.Path())
+	return ast.UnknownPos(r.Path())
 }
 
-func nameSpan(file ast.FileDeclNode, n ast.Node) ast.SourceSpan {
+func nameStart(file ast.FileDeclNode, n ast.Node) ast.SourcePos {
 	// TODO: maybe ast package needs a NamedNode interface to simplify this?
 	switch n := n.(type) {
 	case ast.FieldDeclNode:
-		return file.NodeInfo(n.FieldName())
+		return file.NodeInfo(n.FieldName()).Start()
 	case ast.MessageDeclNode:
-		return file.NodeInfo(n.MessageName())
-	case ast.OneofDeclNode:
-		return file.NodeInfo(n.OneofName())
+		return file.NodeInfo(n.MessageName()).Start()
+	case ast.OneOfDeclNode:
+		return file.NodeInfo(n.OneOfName()).Start()
 	case ast.EnumValueDeclNode:
-		return file.NodeInfo(n.GetName())
+		return file.NodeInfo(n.GetName()).Start()
 	case *ast.EnumNode:
-		return file.NodeInfo(n.Name)
+		return file.NodeInfo(n.Name).Start()
 	case *ast.ServiceNode:
-		return file.NodeInfo(n.Name)
+		return file.NodeInfo(n.Name).Start()
 	case ast.RPCDeclNode:
-		return file.NodeInfo(n.GetName())
+		return file.NodeInfo(n.GetName()).Start()
 	default:
-		return file.NodeInfo(n)
+		return file.NodeInfo(n).Start()
 	}
 }
 
-// AddExtension records the given extension, which is used to ensure that no two files
-// attempt to extend the same message using the same tag. The given pkg should be the
-// package that defines extendee.
-func (s *Symbols) AddExtension(pkg, extendee protoreflect.FullName, tag protoreflect.FieldNumber, span ast.SourceSpan, handler *reporter.Handler) error {
+func (s *packageSymbols) commitResultLocked(r *result) {
+	if s.symbols == nil {
+		s.symbols = map[protoreflect.FullName]symbolEntry{}
+	}
+	if s.exts == nil {
+		s.exts = map[extNumber]ast.SourcePos{}
+	}
+	_ = walk.DescriptorProtos(r.FileDescriptorProto(), func(fqn protoreflect.FullName, d proto.Message) error {
+		pos := nameStart(r.FileNode(), r.Node(d))
+		_, isEnumValue := d.(protoreflect.EnumValueDescriptor)
+		s.symbols[fqn] = symbolEntry{pos: pos, isEnumValue: isEnumValue}
+		return nil
+	})
+
+	if s.files == nil {
+		s.files = map[protoreflect.FileDescriptor]struct{}{}
+	}
+	s.files[r] = struct{}{}
+}
+
+func (s *Symbols) AddExtension(pkg, extendee protoreflect.FullName, tag protoreflect.FieldNumber, pos ast.SourcePos, handler *reporter.Handler) error {
 	if pkg != "" {
 		if !strings.HasPrefix(string(extendee), string(pkg)+".") {
-			return handler.HandleErrorf(span, "could not register extension: extendee %q does not match package %q", extendee, pkg)
+			return handler.HandleErrorf(pos, "could not register extension: extendee %q does not match package %q", extendee, pkg)
 		}
 	}
-	pkgSyms := s.getPackage(pkg, true)
+	pkgSyms := s.getPackage(pkg)
 	if pkgSyms == nil {
 		// should never happen
-		return handler.HandleErrorf(span, "could not register extension: missing package symbols for %q", pkg)
+		return handler.HandleErrorf(pos, "could not register extension: missing package symbols for %q", pkg)
 	}
-	return pkgSyms.addExtension(extendee, tag, span, handler)
+	return pkgSyms.addExtension(extendee, tag, pos, handler)
 }
 
-func (s *packageSymbols) addExtension(extendee protoreflect.FullName, tag protoreflect.FieldNumber, span ast.SourceSpan, handler *reporter.Handler) error {
+func (s *packageSymbols) addExtension(extendee protoreflect.FullName, tag protoreflect.FieldNumber, pos ast.SourcePos, handler *reporter.Handler) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if s.exts == nil {
+		s.exts = map[extNumber]ast.SourcePos{}
+	}
+
 	extNum := extNumber{extendee: extendee, tag: tag}
 	if existing, ok := s.exts[extNum]; ok {
-		return handler.HandleErrorf(span, "extension with tag %d for message %s already defined at %v", tag, extendee, existing.Start())
-	}
-
-	if s.exts == nil {
-		s.exts = map[extNumber]ast.SourceSpan{}
-	}
-	s.exts[extNum] = span
-	return nil
-}
-
-// AddExtensionDeclaration records the given extension declaration, which is used to
-// ensure that no two declarations refer to the same extension.
-func (s *Symbols) AddExtensionDeclaration(extension, extendee protoreflect.FullName, tag protoreflect.FieldNumber, span ast.SourceSpan, handler *reporter.Handler) error {
-	s.extDeclsMu.Lock()
-	defer s.extDeclsMu.Unlock()
-	existing, ok := s.extDecls[extension]
-	if ok {
-		if existing.extendee == extendee && existing.tag == tag {
-			// This is a declaration that has already been added. Ignore.
-			return nil
+		if err := handler.HandleErrorf(pos, "extension with tag %d for message %s already defined at %v", tag, extendee, existing); err != nil {
+			return err
 		}
-		return handler.HandleErrorf(span, "extension %s already declared as extending %s with tag %d at %v", extension, existing.extendee, existing.tag, existing.span.Start())
-	}
-	if s.extDecls == nil {
-		s.extDecls = map[protoreflect.FullName]extDecl{}
-	}
-	s.extDecls[extension] = extDecl{
-		span:     span,
-		extendee: extendee,
-		tag:      tag,
+	} else {
+		s.exts[extNum] = pos
 	}
 	return nil
-}
-
-// Lookup finds the registered location of the given name. If the given name has
-// not been seen/registered, nil is returned.
-func (s *Symbols) Lookup(name protoreflect.FullName) ast.SourceSpan {
-	// note: getPackage never returns nil when exact=false
-	pkgSyms := s.getPackage(name, false)
-	if entry, ok := pkgSyms.symbols[name]; ok {
-		return entry.span
-	}
-	return nil
-}
-
-// LookupExtension finds the registered location of the given extension. If the given
-// extension has not been seen/registered, nil is returned.
-func (s *Symbols) LookupExtension(messageName protoreflect.FullName, extensionNumber protoreflect.FieldNumber) ast.SourceSpan {
-	// note: getPackage never returns nil when exact=false
-	pkgSyms := s.getPackage(messageName, false)
-	return pkgSyms.exts[extNumber{messageName, extensionNumber}]
-}
-
-type nameEnumerator struct {
-	name  protoreflect.FullName
-	start int
-}
-
-func (e *nameEnumerator) next() (protoreflect.FullName, bool) {
-	if e.start < 0 {
-		return "", false
-	}
-	pos := strings.IndexByte(string(e.name[e.start:]), '.')
-	if pos == -1 {
-		e.start = -1
-		return e.name, true
-	}
-	pos += e.start
-	e.start = pos + 1
-	return e.name[:pos], true
 }

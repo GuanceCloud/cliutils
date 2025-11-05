@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -152,8 +152,14 @@ func (h *Handler) HandleError(err error) error {
 // If the handler has already aborted (by returning a non-nil error from a prior
 // call to HandleError or HandleErrorf), that same error is returned and the
 // given error is not reported.
-func (h *Handler) HandleErrorWithPos(span ast.SourceSpan, err error) error {
-	return h.HandleError(Error(span, err))
+func (h *Handler) HandleErrorWithPos(pos ast.SourcePos, err error) error {
+	if ewp, ok := err.(ErrorWithPos); ok {
+		// replace existing position with given one
+		err = errorWithSourcePos{pos: pos, underlying: ewp.Unwrap()}
+	} else {
+		err = errorWithSourcePos{pos: pos, underlying: err}
+	}
+	return h.HandleError(err)
 }
 
 // HandleErrorf handles an error with the given source position, creating the
@@ -162,8 +168,8 @@ func (h *Handler) HandleErrorWithPos(span ast.SourceSpan, err error) error {
 // If the handler has already aborted (by returning a non-nil error from a call
 // to HandleError or HandleErrorf), that same error is returned and the given
 // error is not reported.
-func (h *Handler) HandleErrorf(span ast.SourceSpan, format string, args ...interface{}) error {
-	return h.HandleError(Errorf(span, format, args...))
+func (h *Handler) HandleErrorf(pos ast.SourcePos, format string, args ...interface{}) error {
+	return h.HandleError(Errorf(pos, format, args...))
 }
 
 // HandleWarning handles the given warning. This will delegate to the handler's
@@ -184,14 +190,21 @@ func (h *Handler) HandleWarning(err ErrorWithPos) {
 
 // HandleWarningWithPos handles a warning with the given source position. This will
 // delegate to the handler's configured reporter.
-func (h *Handler) HandleWarningWithPos(span ast.SourceSpan, err error) {
-	h.HandleWarning(Error(span, err))
+func (h *Handler) HandleWarningWithPos(pos ast.SourcePos, err error) {
+	ewp, ok := err.(ErrorWithPos)
+	if ok {
+		// replace existing position with given one
+		ewp = errorWithSourcePos{pos: pos, underlying: ewp.Unwrap()}
+	} else {
+		ewp = errorWithSourcePos{pos: pos, underlying: err}
+	}
+	h.HandleWarning(ewp)
 }
 
 // HandleWarningf handles a warning with the given source position, creating the
 // actual error value using the given message format and arguments.
-func (h *Handler) HandleWarningf(span ast.SourceSpan, format string, args ...interface{}) {
-	h.HandleWarning(Errorf(span, format, args...))
+func (h *Handler) HandleWarningf(pos ast.SourcePos, format string, args ...interface{}) {
+	h.HandleWarning(Errorf(pos, format, args...))
 }
 
 // Error returns the handler result. If any errors have been reported then this

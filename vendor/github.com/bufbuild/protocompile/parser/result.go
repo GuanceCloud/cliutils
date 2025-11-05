@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,19 +16,15 @@ package parser
 
 import (
 	"bytes"
-	"fmt"
 	"math"
-	"sort"
 	"strings"
 	"unicode"
 
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/bufbuild/protocompile/ast"
 	"github.com/bufbuild/protocompile/internal"
-	"github.com/bufbuild/protocompile/internal/editions"
 	"github.com/bufbuild/protocompile/reporter"
 )
 
@@ -36,15 +32,14 @@ type result struct {
 	file  *ast.FileNode
 	proto *descriptorpb.FileDescriptorProto
 
-	nodes   map[proto.Message]ast.Node
-	ifNoAST *ast.NoSourceNode
+	nodes map[proto.Message]ast.Node
 }
 
 // ResultWithoutAST returns a parse result that has no AST. All methods for
 // looking up AST nodes return a placeholder node that contains only the filename
 // in position information.
 func ResultWithoutAST(proto *descriptorpb.FileDescriptorProto) Result {
-	return &result{proto: proto, ifNoAST: ast.NewNoSourceNode(proto.GetName())}
+	return &result{proto: proto}
 }
 
 // ResultFromAST constructs a descriptor proto from the given AST. The returned
@@ -89,47 +84,24 @@ func (r *result) createFileDescriptor(filename string, file *ast.FileNode, handl
 
 	r.putFileNode(fd, file)
 
-	var syntax protoreflect.Syntax
-	switch {
-	case file.Syntax != nil:
-		switch file.Syntax.Syntax.AsString() {
-		case "proto3":
-			syntax = protoreflect.Proto3
-		case "proto2":
-			syntax = protoreflect.Proto2
-		default:
+	isProto3 := false
+	if file.Syntax != nil {
+		if file.Syntax.Syntax.AsString() == "proto3" {
+			isProto3 = true
+		} else if file.Syntax.Syntax.AsString() != "proto2" {
 			nodeInfo := file.NodeInfo(file.Syntax.Syntax)
-			if handler.HandleErrorf(nodeInfo, `syntax value must be "proto2" or "proto3"`) != nil {
+			if handler.HandleErrorf(nodeInfo.Start(), `syntax value must be "proto2" or "proto3"`) != nil {
 				return
 			}
 		}
 
-		// proto2 is the default, so no need to set for that value
-		if syntax != protoreflect.Proto2 {
+		// proto2 is the default, so no need to set unless proto3
+		if isProto3 {
 			fd.Syntax = proto.String(file.Syntax.Syntax.AsString())
 		}
-	case file.Edition != nil:
-		edition := file.Edition.Edition.AsString()
-		syntax = protoreflect.Editions
-
-		fd.Syntax = proto.String("editions")
-		editionEnum, ok := editions.SupportedEditions[edition]
-		if !ok {
-			nodeInfo := file.NodeInfo(file.Edition.Edition)
-			editionStrs := make([]string, 0, len(editions.SupportedEditions))
-			for supportedEdition := range editions.SupportedEditions {
-				editionStrs = append(editionStrs, fmt.Sprintf("%q", supportedEdition))
-			}
-			sort.Strings(editionStrs)
-			if handler.HandleErrorf(nodeInfo, `edition value %q not recognized; should be one of [%s]`, edition, strings.Join(editionStrs, ",")) != nil {
-				return
-			}
-		}
-		fd.Edition = editionEnum.Enum()
-	default:
-		syntax = protoreflect.Proto2
+	} else {
 		nodeInfo := file.NodeInfo(file)
-		handler.HandleWarningWithPos(nodeInfo, ErrNoSyntax)
+		handler.HandleWarningWithPos(nodeInfo.Start(), ErrNoSyntax)
 	}
 
 	for _, decl := range file.Decls {
@@ -138,9 +110,9 @@ func (r *result) createFileDescriptor(filename string, file *ast.FileNode, handl
 		}
 		switch decl := decl.(type) {
 		case *ast.EnumNode:
-			fd.EnumType = append(fd.EnumType, r.asEnumDescriptor(decl, syntax, handler))
+			fd.EnumType = append(fd.EnumType, r.asEnumDescriptor(decl, handler))
 		case *ast.ExtendNode:
-			r.addExtensions(decl, &fd.Extension, &fd.MessageType, syntax, handler, 0)
+			r.addExtensions(decl, &fd.Extension, &fd.MessageType, isProto3, handler, 0)
 		case *ast.ImportNode:
 			index := len(fd.Dependency)
 			fd.Dependency = append(fd.Dependency, decl.Name.AsString())
@@ -150,7 +122,7 @@ func (r *result) createFileDescriptor(filename string, file *ast.FileNode, handl
 				fd.WeakDependency = append(fd.WeakDependency, int32(index))
 			}
 		case *ast.MessageNode:
-			fd.MessageType = append(fd.MessageType, r.asMessageDescriptor(decl, syntax, handler, 1))
+			fd.MessageType = append(fd.MessageType, r.asMessageDescriptor(decl, isProto3, handler, 1))
 		case *ast.OptionNode:
 			if fd.Options == nil {
 				fd.Options = &descriptorpb.FileOptions{}
@@ -161,20 +133,20 @@ func (r *result) createFileDescriptor(filename string, file *ast.FileNode, handl
 		case *ast.PackageNode:
 			if fd.Package != nil {
 				nodeInfo := file.NodeInfo(decl)
-				if handler.HandleErrorf(nodeInfo, "files should have only one package declaration") != nil {
+				if handler.HandleErrorf(nodeInfo.Start(), "files should have only one package declaration") != nil {
 					return
 				}
 			}
 			pkgName := string(decl.Name.AsIdentifier())
 			if len(pkgName) >= 512 {
 				nodeInfo := file.NodeInfo(decl.Name)
-				if handler.HandleErrorf(nodeInfo, "package name (with whitespace removed) must be less than 512 characters long") != nil {
+				if handler.HandleErrorf(nodeInfo.Start(), "package name (with whitespace removed) must be less than 512 characters long") != nil {
 					return
 				}
 			}
 			if strings.Count(pkgName, ".") > 100 {
 				nodeInfo := file.NodeInfo(decl.Name)
-				if handler.HandleErrorf(nodeInfo, "package name may not contain more than 100 periods") != nil {
+				if handler.HandleErrorf(nodeInfo.Start(), "package name may not contain more than 100 periods") != nil {
 					return
 				}
 			}
@@ -263,7 +235,7 @@ func (r *result) asUninterpretedOptionName(parts []*ast.FieldReferenceNode) []*d
 	return ret
 }
 
-func (r *result) addExtensions(ext *ast.ExtendNode, flds *[]*descriptorpb.FieldDescriptorProto, msgs *[]*descriptorpb.DescriptorProto, syntax protoreflect.Syntax, handler *reporter.Handler, depth int) {
+func (r *result) addExtensions(ext *ast.ExtendNode, flds *[]*descriptorpb.FieldDescriptorProto, msgs *[]*descriptorpb.DescriptorProto, isProto3 bool, handler *reporter.Handler, depth int) {
 	extendee := string(ext.Extendee.AsIdentifier())
 	count := 0
 	for _, decl := range ext.Decls {
@@ -271,13 +243,13 @@ func (r *result) addExtensions(ext *ast.ExtendNode, flds *[]*descriptorpb.FieldD
 		case *ast.FieldNode:
 			count++
 			// use higher limit since we don't know yet whether extendee is messageset wire format
-			fd := r.asFieldDescriptor(decl, internal.MaxTag, syntax, handler)
+			fd := r.asFieldDescriptor(decl, internal.MaxTag, isProto3, handler)
 			fd.Extendee = proto.String(extendee)
 			*flds = append(*flds, fd)
 		case *ast.GroupNode:
 			count++
 			// ditto: use higher limit right now
-			fd, md := r.asGroupDescriptors(decl, syntax, internal.MaxTag, handler, depth+1)
+			fd, md := r.asGroupDescriptors(decl, isProto3, internal.MaxTag, handler, depth+1)
 			fd.Extendee = proto.String(extendee)
 			*flds = append(*flds, fd)
 			*msgs = append(*msgs, md)
@@ -285,7 +257,7 @@ func (r *result) addExtensions(ext *ast.ExtendNode, flds *[]*descriptorpb.FieldD
 	}
 	if count == 0 {
 		nodeInfo := r.file.NodeInfo(ext)
-		_ = handler.HandleErrorf(nodeInfo, "extend sections must define at least one extension")
+		_ = handler.HandleErrorf(nodeInfo.Start(), "extend sections must define at least one extension")
 	}
 }
 
@@ -303,20 +275,17 @@ func asLabel(lbl *ast.FieldLabel) *descriptorpb.FieldDescriptorProto_Label {
 	}
 }
 
-func (r *result) asFieldDescriptor(node *ast.FieldNode, maxTag int32, syntax protoreflect.Syntax, handler *reporter.Handler) *descriptorpb.FieldDescriptorProto {
-	var tag *int32
-	if node.Tag != nil {
-		if err := r.checkTag(node.Tag, node.Tag.Val, maxTag); err != nil {
-			_ = handler.HandleError(err)
-		}
-		tag = proto.Int32(int32(node.Tag.Val))
+func (r *result) asFieldDescriptor(node *ast.FieldNode, maxTag int32, isProto3 bool, handler *reporter.Handler) *descriptorpb.FieldDescriptorProto {
+	tag := node.Tag.Val
+	if err := r.checkTag(node.Tag, tag, maxTag); err != nil {
+		_ = handler.HandleError(err)
 	}
-	fd := newFieldDescriptor(node.Name.Val, string(node.FldType.AsIdentifier()), tag, asLabel(&node.Label))
+	fd := newFieldDescriptor(node.Name.Val, string(node.FldType.AsIdentifier()), int32(tag), asLabel(&node.Label))
 	r.putFieldNode(fd, node)
 	if opts := node.Options.GetElements(); len(opts) > 0 {
 		fd.Options = &descriptorpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
-	if syntax == protoreflect.Proto3 && fd.Label != nil && fd.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL {
+	if isProto3 && fd.Label != nil && fd.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL {
 		fd.Proto3Optional = proto.Bool(true)
 	}
 	return fd
@@ -340,11 +309,11 @@ var fieldTypes = map[string]descriptorpb.FieldDescriptorProto_Type{
 	"bytes":    descriptorpb.FieldDescriptorProto_TYPE_BYTES,
 }
 
-func newFieldDescriptor(name string, fieldType string, tag *int32, lbl *descriptorpb.FieldDescriptorProto_Label) *descriptorpb.FieldDescriptorProto {
+func newFieldDescriptor(name string, fieldType string, tag int32, lbl *descriptorpb.FieldDescriptorProto_Label) *descriptorpb.FieldDescriptorProto {
 	fd := &descriptorpb.FieldDescriptorProto{
 		Name:     proto.String(name),
 		JsonName: proto.String(internal.JSONName(name)),
-		Number:   tag,
+		Number:   proto.Int32(tag),
 		Label:    lbl,
 	}
 	t, ok := fieldTypes[fieldType]
@@ -359,23 +328,20 @@ func newFieldDescriptor(name string, fieldType string, tag *int32, lbl *descript
 	return fd
 }
 
-func (r *result) asGroupDescriptors(group *ast.GroupNode, syntax protoreflect.Syntax, maxTag int32, handler *reporter.Handler, depth int) (*descriptorpb.FieldDescriptorProto, *descriptorpb.DescriptorProto) {
-	var tag *int32
-	if group.Tag != nil {
-		if err := r.checkTag(group.Tag, group.Tag.Val, maxTag); err != nil {
-			_ = handler.HandleError(err)
-		}
-		tag = proto.Int32(int32(group.Tag.Val))
+func (r *result) asGroupDescriptors(group *ast.GroupNode, isProto3 bool, maxTag int32, handler *reporter.Handler, depth int) (*descriptorpb.FieldDescriptorProto, *descriptorpb.DescriptorProto) {
+	tag := group.Tag.Val
+	if err := r.checkTag(group.Tag, tag, maxTag); err != nil {
+		_ = handler.HandleError(err)
 	}
 	if !unicode.IsUpper(rune(group.Name.Val[0])) {
 		nameNodeInfo := r.file.NodeInfo(group.Name)
-		_ = handler.HandleErrorf(nameNodeInfo, "group %s should have a name that starts with a capital letter", group.Name.Val)
+		_ = handler.HandleErrorf(nameNodeInfo.Start(), "group %s should have a name that starts with a capital letter", group.Name.Val)
 	}
 	fieldName := strings.ToLower(group.Name.Val)
 	fd := &descriptorpb.FieldDescriptorProto{
 		Name:     proto.String(fieldName),
 		JsonName: proto.String(internal.JSONName(fieldName)),
-		Number:   tag,
+		Number:   proto.Int32(int32(tag)),
 		Label:    asLabel(&group.Label),
 		Type:     descriptorpb.FieldDescriptorProto_TYPE_GROUP.Enum(),
 		TypeName: proto.String(group.Name.Val),
@@ -385,35 +351,30 @@ func (r *result) asGroupDescriptors(group *ast.GroupNode, syntax protoreflect.Sy
 		fd.Options = &descriptorpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	md := &descriptorpb.DescriptorProto{Name: proto.String(group.Name.Val)}
-	groupMsg := group.AsMessage()
-	r.putMessageNode(md, groupMsg)
+	r.putMessageNode(md, group)
 	// don't bother processing body if we've exceeded depth
-	if r.checkDepth(depth, groupMsg, handler) {
-		r.addMessageBody(md, &group.MessageBody, syntax, handler, depth)
+	if r.checkDepth(depth, group, handler) {
+		r.addMessageBody(md, &group.MessageBody, isProto3, handler, depth)
 	}
 	return fd, md
 }
 
-func (r *result) asMapDescriptors(mapField *ast.MapFieldNode, syntax protoreflect.Syntax, maxTag int32, handler *reporter.Handler, depth int) (*descriptorpb.FieldDescriptorProto, *descriptorpb.DescriptorProto) {
-	var tag *int32
-	if mapField.Tag != nil {
-		if err := r.checkTag(mapField.Tag, mapField.Tag.Val, maxTag); err != nil {
-			_ = handler.HandleError(err)
-		}
-		tag = proto.Int32(int32(mapField.Tag.Val))
+func (r *result) asMapDescriptors(mapField *ast.MapFieldNode, isProto3 bool, maxTag int32, handler *reporter.Handler, depth int) (*descriptorpb.FieldDescriptorProto, *descriptorpb.DescriptorProto) {
+	tag := mapField.Tag.Val
+	if err := r.checkTag(mapField.Tag, tag, maxTag); err != nil {
+		_ = handler.HandleError(err)
 	}
-	mapEntry := mapField.AsMessage()
-	r.checkDepth(depth, mapEntry, handler)
+	r.checkDepth(depth, mapField, handler)
 	var lbl *descriptorpb.FieldDescriptorProto_Label
-	if syntax == protoreflect.Proto2 {
+	if !isProto3 {
 		lbl = descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
 	}
-	keyFd := newFieldDescriptor("key", mapField.MapType.KeyType.Val, proto.Int32(1), lbl)
+	keyFd := newFieldDescriptor("key", mapField.MapType.KeyType.Val, 1, lbl)
 	r.putFieldNode(keyFd, mapField.KeyField())
-	valFd := newFieldDescriptor("value", string(mapField.MapType.ValueType.AsIdentifier()), proto.Int32(2), lbl)
+	valFd := newFieldDescriptor("value", string(mapField.MapType.ValueType.AsIdentifier()), 2, lbl)
 	r.putFieldNode(valFd, mapField.ValueField())
 	entryName := internal.InitCap(internal.JSONName(mapField.Name.Val)) + "Entry"
-	fd := newFieldDescriptor(mapField.Name.Val, entryName, tag, descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum())
+	fd := newFieldDescriptor(mapField.Name.Val, entryName, int32(tag), descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum())
 	if opts := mapField.Options.GetElements(); len(opts) > 0 {
 		fd.Options = &descriptorpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
@@ -423,7 +384,7 @@ func (r *result) asMapDescriptors(mapField *ast.MapFieldNode, syntax protoreflec
 		Options: &descriptorpb.MessageOptions{MapEntry: proto.Bool(true)},
 		Field:   []*descriptorpb.FieldDescriptorProto{keyFd, valFd},
 	}
-	r.putMessageNode(md, mapEntry)
+	r.putMessageNode(md, mapField)
 	return fd, md
 }
 
@@ -439,7 +400,7 @@ func (r *result) asExtensionRanges(node *ast.ExtensionRangeNode, maxTag int32, h
 		if len(opts) > 0 {
 			er.Options = &descriptorpb.ExtensionRangeOptions{UninterpretedOption: opts}
 		}
-		r.putExtensionRangeNode(er, node, rng)
+		r.putExtensionRangeNode(er, rng)
 		ers[i] = er
 	}
 	return ers
@@ -449,7 +410,7 @@ func (r *result) asEnumValue(ev *ast.EnumValueNode, handler *reporter.Handler) *
 	num, ok := ast.AsInt32(ev.Number, math.MinInt32, math.MaxInt32)
 	if !ok {
 		numberNodeInfo := r.file.NodeInfo(ev.Number)
-		_ = handler.HandleErrorf(numberNodeInfo, "value %d is out of range: should be between %d and %d", ev.Number.Value(), math.MinInt32, math.MaxInt32)
+		_ = handler.HandleErrorf(numberNodeInfo.Start(), "value %d is out of range: should be between %d and %d", ev.Number.Value(), math.MinInt32, math.MaxInt32)
 	}
 	evd := &descriptorpb.EnumValueDescriptorProto{Name: proto.String(ev.Name.Val), Number: proto.Int32(num)}
 	r.putEnumValueNode(evd, ev)
@@ -486,10 +447,9 @@ func (r *result) asMethodDescriptor(node *ast.RPCNode) *descriptorpb.MethodDescr
 	return md
 }
 
-func (r *result) asEnumDescriptor(en *ast.EnumNode, syntax protoreflect.Syntax, handler *reporter.Handler) *descriptorpb.EnumDescriptorProto {
+func (r *result) asEnumDescriptor(en *ast.EnumNode, handler *reporter.Handler) *descriptorpb.EnumDescriptorProto {
 	ed := &descriptorpb.EnumDescriptorProto{Name: proto.String(en.Name.Val)}
 	r.putEnumNode(ed, en)
-	rsvdNames := map[string]ast.SourcePos{}
 	for _, decl := range en.Decls {
 		switch decl := decl.(type) {
 		case *ast.OptionNode:
@@ -500,7 +460,9 @@ func (r *result) asEnumDescriptor(en *ast.EnumNode, syntax protoreflect.Syntax, 
 		case *ast.EnumValueNode:
 			ed.Value = append(ed.Value, r.asEnumValue(decl, handler))
 		case *ast.ReservedNode:
-			r.addReservedNames(&ed.ReservedName, decl, syntax, handler, rsvdNames)
+			for _, n := range decl.Names {
+				ed.ReservedName = append(ed.ReservedName, n.AsString())
+			}
 			for _, rng := range decl.Ranges {
 				ed.ReservedRange = append(ed.ReservedRange, r.asEnumReservedRange(rng, handler))
 			}
@@ -519,49 +481,14 @@ func (r *result) asEnumReservedRange(rng *ast.RangeNode, handler *reporter.Handl
 	return rr
 }
 
-func (r *result) asMessageDescriptor(node *ast.MessageNode, syntax protoreflect.Syntax, handler *reporter.Handler, depth int) *descriptorpb.DescriptorProto {
+func (r *result) asMessageDescriptor(node *ast.MessageNode, isProto3 bool, handler *reporter.Handler, depth int) *descriptorpb.DescriptorProto {
 	msgd := &descriptorpb.DescriptorProto{Name: proto.String(node.Name.Val)}
 	r.putMessageNode(msgd, node)
 	// don't bother processing body if we've exceeded depth
 	if r.checkDepth(depth, node, handler) {
-		r.addMessageBody(msgd, &node.MessageBody, syntax, handler, depth)
+		r.addMessageBody(msgd, &node.MessageBody, isProto3, handler, depth)
 	}
 	return msgd
-}
-
-func (r *result) addReservedNames(names *[]string, node *ast.ReservedNode, syntax protoreflect.Syntax, handler *reporter.Handler, alreadyReserved map[string]ast.SourcePos) {
-	if syntax == protoreflect.Editions {
-		if len(node.Names) > 0 {
-			nameNodeInfo := r.file.NodeInfo(node.Names[0])
-			_ = handler.HandleErrorf(nameNodeInfo, `must use identifiers, not string literals, to reserved names with editions`)
-		}
-		for _, n := range node.Identifiers {
-			name := string(n.AsIdentifier())
-			nameNodeInfo := r.file.NodeInfo(n)
-			if existing, ok := alreadyReserved[name]; ok {
-				_ = handler.HandleErrorf(nameNodeInfo, "name %q is already reserved at %s", name, existing)
-				continue
-			}
-			alreadyReserved[name] = nameNodeInfo.Start()
-			*names = append(*names, name)
-		}
-		return
-	}
-
-	if len(node.Identifiers) > 0 {
-		nameNodeInfo := r.file.NodeInfo(node.Identifiers[0])
-		_ = handler.HandleErrorf(nameNodeInfo, `must use string literals, not identifiers, to reserved names with proto2 and proto3`)
-	}
-	for _, n := range node.Names {
-		name := n.AsString()
-		nameNodeInfo := r.file.NodeInfo(n)
-		if existing, ok := alreadyReserved[name]; ok {
-			_ = handler.HandleErrorf(nameNodeInfo, "name %q is already reserved at %s", name, existing)
-			continue
-		}
-		alreadyReserved[name] = nameNodeInfo.Start()
-		*names = append(*names, name)
-	}
 }
 
 func (r *result) checkDepth(depth int, node ast.MessageDeclNode, handler *reporter.Handler) bool {
@@ -569,15 +496,15 @@ func (r *result) checkDepth(depth int, node ast.MessageDeclNode, handler *report
 		return true
 	}
 	n := ast.Node(node)
-	if grp, ok := n.(*ast.SyntheticGroupMessageNode); ok {
+	if grp, ok := n.(*ast.GroupNode); ok {
 		// pinpoint the group keyword if the source is a group
 		n = grp.Keyword
 	}
-	_ = handler.HandleErrorf(r.file.NodeInfo(n), "message nesting depth must be less than 32")
+	_ = handler.HandleErrorf(r.file.NodeInfo(n).Start(), "message nesting depth must be less than 32")
 	return false
 }
 
-func (r *result) addMessageBody(msgd *descriptorpb.DescriptorProto, body *ast.MessageBody, syntax protoreflect.Syntax, handler *reporter.Handler, depth int) {
+func (r *result) addMessageBody(msgd *descriptorpb.DescriptorProto, body *ast.MessageBody, isProto3 bool, handler *reporter.Handler, depth int) {
 	// first process any options
 	for _, decl := range body.Decls {
 		if opt, ok := decl.(*ast.OptionNode); ok {
@@ -595,40 +522,40 @@ func (r *result) addMessageBody(msgd *descriptorpb.DescriptorProto, body *ast.Me
 	if err != nil {
 		return
 	} else if messageSetOpt != nil {
-		if syntax == protoreflect.Proto3 {
+		if isProto3 {
 			node := r.OptionNode(messageSetOpt)
 			nodeInfo := r.file.NodeInfo(node)
-			_ = handler.HandleErrorf(nodeInfo, "messages with message-set wire format are not allowed with proto3 syntax")
+			_ = handler.HandleErrorf(nodeInfo.Start(), "messages with message-set wire format are not allowed with proto3 syntax")
 		}
 		maxTag = internal.MaxTag // higher limit for messageset wire format
 	}
 
-	rsvdNames := map[string]ast.SourcePos{}
+	rsvdNames := map[string]int{}
 
 	// now we can process the rest
 	for _, decl := range body.Decls {
 		switch decl := decl.(type) {
 		case *ast.EnumNode:
-			msgd.EnumType = append(msgd.EnumType, r.asEnumDescriptor(decl, syntax, handler))
+			msgd.EnumType = append(msgd.EnumType, r.asEnumDescriptor(decl, handler))
 		case *ast.ExtendNode:
-			r.addExtensions(decl, &msgd.Extension, &msgd.NestedType, syntax, handler, depth)
+			r.addExtensions(decl, &msgd.Extension, &msgd.NestedType, isProto3, handler, depth)
 		case *ast.ExtensionRangeNode:
 			msgd.ExtensionRange = append(msgd.ExtensionRange, r.asExtensionRanges(decl, maxTag, handler)...)
 		case *ast.FieldNode:
-			fd := r.asFieldDescriptor(decl, maxTag, syntax, handler)
+			fd := r.asFieldDescriptor(decl, maxTag, isProto3, handler)
 			msgd.Field = append(msgd.Field, fd)
 		case *ast.MapFieldNode:
-			fd, md := r.asMapDescriptors(decl, syntax, maxTag, handler, depth+1)
+			fd, md := r.asMapDescriptors(decl, isProto3, maxTag, handler, depth+1)
 			msgd.Field = append(msgd.Field, fd)
 			msgd.NestedType = append(msgd.NestedType, md)
 		case *ast.GroupNode:
-			fd, md := r.asGroupDescriptors(decl, syntax, maxTag, handler, depth+1)
+			fd, md := r.asGroupDescriptors(decl, isProto3, maxTag, handler, depth+1)
 			msgd.Field = append(msgd.Field, fd)
 			msgd.NestedType = append(msgd.NestedType, md)
-		case *ast.OneofNode:
+		case *ast.OneOfNode:
 			oodIndex := len(msgd.OneofDecl)
 			ood := &descriptorpb.OneofDescriptorProto{Name: proto.String(decl.Name.Val)}
-			r.putOneofNode(ood, decl)
+			r.putOneOfNode(ood, decl)
 			msgd.OneofDecl = append(msgd.OneofDecl, ood)
 			ooFields := 0
 			for _, oodecl := range decl.Decls {
@@ -639,12 +566,12 @@ func (r *result) addMessageBody(msgd *descriptorpb.DescriptorProto, body *ast.Me
 					}
 					ood.Options.UninterpretedOption = append(ood.Options.UninterpretedOption, r.asUninterpretedOption(oodecl))
 				case *ast.FieldNode:
-					fd := r.asFieldDescriptor(oodecl, maxTag, syntax, handler)
+					fd := r.asFieldDescriptor(oodecl, maxTag, isProto3, handler)
 					fd.OneofIndex = proto.Int32(int32(oodIndex))
 					msgd.Field = append(msgd.Field, fd)
 					ooFields++
 				case *ast.GroupNode:
-					fd, md := r.asGroupDescriptors(oodecl, syntax, maxTag, handler, depth+1)
+					fd, md := r.asGroupDescriptors(oodecl, isProto3, maxTag, handler, depth+1)
 					fd.OneofIndex = proto.Int32(int32(oodIndex))
 					msgd.Field = append(msgd.Field, fd)
 					msgd.NestedType = append(msgd.NestedType, md)
@@ -653,12 +580,20 @@ func (r *result) addMessageBody(msgd *descriptorpb.DescriptorProto, body *ast.Me
 			}
 			if ooFields == 0 {
 				declNodeInfo := r.file.NodeInfo(decl)
-				_ = handler.HandleErrorf(declNodeInfo, "oneof must contain at least one field")
+				_ = handler.HandleErrorf(declNodeInfo.Start(), "oneof must contain at least one field")
 			}
 		case *ast.MessageNode:
-			msgd.NestedType = append(msgd.NestedType, r.asMessageDescriptor(decl, syntax, handler, depth+1))
+			msgd.NestedType = append(msgd.NestedType, r.asMessageDescriptor(decl, isProto3, handler, depth+1))
 		case *ast.ReservedNode:
-			r.addReservedNames(&msgd.ReservedName, decl, syntax, handler, rsvdNames)
+			for _, n := range decl.Names {
+				count := rsvdNames[n.AsString()]
+				if count == 1 { // already seen
+					nameNodeInfo := r.file.NodeInfo(n)
+					_ = handler.HandleErrorf(nameNodeInfo.Start(), "name %q is reserved multiple times", n.AsString())
+				}
+				rsvdNames[n.AsString()] = count + 1
+				msgd.ReservedName = append(msgd.ReservedName, n.AsString())
+			}
 			for _, rng := range decl.Ranges {
 				msgd.ReservedRange = append(msgd.ReservedRange, r.asMessageReservedRange(rng, maxTag, handler))
 			}
@@ -669,24 +604,24 @@ func (r *result) addMessageBody(msgd *descriptorpb.DescriptorProto, body *ast.Me
 		if len(msgd.Field) > 0 {
 			node := r.FieldNode(msgd.Field[0])
 			nodeInfo := r.file.NodeInfo(node)
-			_ = handler.HandleErrorf(nodeInfo, "messages with message-set wire format cannot contain non-extension fields")
+			_ = handler.HandleErrorf(nodeInfo.Start(), "messages with message-set wire format cannot contain non-extension fields")
 		}
 		if len(msgd.ExtensionRange) == 0 {
 			node := r.OptionNode(messageSetOpt)
 			nodeInfo := r.file.NodeInfo(node)
-			_ = handler.HandleErrorf(nodeInfo, "messages with message-set wire format must contain at least one extension range")
+			_ = handler.HandleErrorf(nodeInfo.Start(), "messages with message-set wire format must contain at least one extension range")
 		}
 	}
 
 	// process any proto3_optional fields
-	if syntax == protoreflect.Proto3 {
+	if isProto3 {
 		r.processProto3OptionalFields(msgd)
 	}
 }
 
 func (r *result) isMessageSetWireFormat(scope string, md *descriptorpb.DescriptorProto, handler *reporter.Handler) (*descriptorpb.UninterpretedOption, error) {
 	uo := md.GetOptions().GetUninterpretedOption()
-	index, err := internal.FindOption(r, handler.HandleErrorf, scope, uo, "message_set_wire_format")
+	index, err := internal.FindOption(r, handler, scope, uo, "message_set_wire_format")
 	if err != nil {
 		return nil, err
 	}
@@ -705,7 +640,7 @@ func (r *result) isMessageSetWireFormat(scope string, md *descriptorpb.Descripto
 	default:
 		optNode := r.OptionNode(opt)
 		optNodeInfo := r.file.NodeInfo(optNode.GetValue())
-		return nil, handler.HandleErrorf(optNodeInfo, "%s: expecting bool value for message_set_wire_format option", scope)
+		return nil, handler.HandleErrorf(optNodeInfo.Start(), "%s: expecting bool value for message_set_wire_format option", scope)
 	}
 }
 
@@ -725,7 +660,7 @@ func (r *result) getRangeBounds(rng *ast.RangeNode, minVal, maxVal int32, handle
 	if !ok {
 		checkOrder = false
 		startValNodeInfo := r.file.NodeInfo(rng.StartVal)
-		_ = handler.HandleErrorf(startValNodeInfo, "range start %d is out of range: should be between %d and %d", rng.StartValue(), minVal, maxVal)
+		_ = handler.HandleErrorf(startValNodeInfo.Start(), "range start %d is out of range: should be between %d and %d", rng.StartValue(), minVal, maxVal)
 	}
 
 	end, ok := rng.EndValueAsInt32(minVal, maxVal)
@@ -733,13 +668,13 @@ func (r *result) getRangeBounds(rng *ast.RangeNode, minVal, maxVal int32, handle
 		checkOrder = false
 		if rng.EndVal != nil {
 			endValNodeInfo := r.file.NodeInfo(rng.EndVal)
-			_ = handler.HandleErrorf(endValNodeInfo, "range end %d is out of range: should be between %d and %d", rng.EndValue(), minVal, maxVal)
+			_ = handler.HandleErrorf(endValNodeInfo.Start(), "range end %d is out of range: should be between %d and %d", rng.EndValue(), minVal, maxVal)
 		}
 	}
 
 	if checkOrder && start > end {
 		rangeStartNodeInfo := r.file.NodeInfo(rng.RangeStart())
-		_ = handler.HandleErrorf(rangeStartNodeInfo, "range, %d to %d, is invalid: start must be <= end", start, end)
+		_ = handler.HandleErrorf(rangeStartNodeInfo.Start(), "range, %d to %d, is invalid: start must be <= end", start, end)
 	}
 
 	return start, end
@@ -765,11 +700,11 @@ func (r *result) asServiceDescriptor(svc *ast.ServiceNode) *descriptorpb.Service
 func (r *result) checkTag(n ast.Node, v uint64, maxTag int32) error {
 	switch {
 	case v < 1:
-		return reporter.Errorf(r.file.NodeInfo(n), "tag number %d must be greater than zero", v)
+		return reporter.Errorf(r.file.NodeInfo(n).Start(), "tag number %d must be greater than zero", v)
 	case v > uint64(maxTag):
-		return reporter.Errorf(r.file.NodeInfo(n), "tag number %d is higher than max allowed tag number (%d)", v, maxTag)
+		return reporter.Errorf(r.file.NodeInfo(n).Start(), "tag number %d is higher than max allowed tag number (%d)", v, maxTag)
 	case v >= internal.SpecialReservedStart && v <= internal.SpecialReservedEnd:
-		return reporter.Errorf(r.file.NodeInfo(n), "tag number %d is in disallowed reserved range %d-%d", v, internal.SpecialReservedStart, internal.SpecialReservedEnd)
+		return reporter.Errorf(r.file.NodeInfo(n).Start(), "tag number %d is in disallowed reserved range %d-%d", v, internal.SpecialReservedStart, internal.SpecialReservedEnd)
 	default:
 		return nil
 	}
@@ -834,112 +769,105 @@ func (r *result) processProto3OptionalFields(msgd *descriptorpb.DescriptorProto)
 			ood := &descriptorpb.OneofDescriptorProto{Name: proto.String(ooName)}
 			msgd.OneofDecl = append(msgd.OneofDecl, ood)
 			ooident := r.FieldNode(fd).(*ast.FieldNode) //nolint:errcheck
-			r.putOneofNode(ood, ast.NewSyntheticOneof(ooident))
+			r.putOneOfNode(ood, ast.NewSyntheticOneOf(ooident))
 		}
 	}
 }
 
 func (r *result) Node(m proto.Message) ast.Node {
 	if r.nodes == nil {
-		return r.ifNoAST
+		return ast.NewNoSourceNode(r.proto.GetName())
 	}
 	return r.nodes[m]
 }
 
 func (r *result) FileNode() ast.FileDeclNode {
 	if r.nodes == nil {
-		return r.ifNoAST
+		return ast.NewNoSourceNode(r.proto.GetName())
 	}
 	return r.nodes[r.proto].(ast.FileDeclNode)
 }
 
 func (r *result) OptionNode(o *descriptorpb.UninterpretedOption) ast.OptionDeclNode {
 	if r.nodes == nil {
-		return r.ifNoAST
+		return ast.NewNoSourceNode(r.proto.GetName())
 	}
 	return r.nodes[o].(ast.OptionDeclNode)
 }
 
 func (r *result) OptionNamePartNode(o *descriptorpb.UninterpretedOption_NamePart) ast.Node {
 	if r.nodes == nil {
-		return r.ifNoAST
+		return ast.NewNoSourceNode(r.proto.GetName())
 	}
 	return r.nodes[o]
 }
 
 func (r *result) MessageNode(m *descriptorpb.DescriptorProto) ast.MessageDeclNode {
 	if r.nodes == nil {
-		return r.ifNoAST
+		return ast.NewNoSourceNode(r.proto.GetName())
 	}
 	return r.nodes[m].(ast.MessageDeclNode)
 }
 
 func (r *result) FieldNode(f *descriptorpb.FieldDescriptorProto) ast.FieldDeclNode {
 	if r.nodes == nil {
-		return r.ifNoAST
+		return ast.NewNoSourceNode(r.proto.GetName())
 	}
 	return r.nodes[f].(ast.FieldDeclNode)
 }
 
-func (r *result) OneofNode(o *descriptorpb.OneofDescriptorProto) ast.OneofDeclNode {
+func (r *result) OneOfNode(o *descriptorpb.OneofDescriptorProto) ast.Node {
 	if r.nodes == nil {
-		return r.ifNoAST
+		return ast.NewNoSourceNode(r.proto.GetName())
 	}
-	return r.nodes[o].(ast.OneofDeclNode)
-}
-
-func (r *result) ExtensionsNode(e *descriptorpb.DescriptorProto_ExtensionRange) ast.NodeWithOptions {
-	if r.nodes == nil {
-		return r.ifNoAST
-	}
-	return r.nodes[asExtsNode(e)].(ast.NodeWithOptions)
+	return r.nodes[o]
 }
 
 func (r *result) ExtensionRangeNode(e *descriptorpb.DescriptorProto_ExtensionRange) ast.RangeDeclNode {
 	if r.nodes == nil {
-		return r.ifNoAST
+		return ast.NewNoSourceNode(r.proto.GetName())
 	}
 	return r.nodes[e].(ast.RangeDeclNode)
 }
 
 func (r *result) MessageReservedRangeNode(rr *descriptorpb.DescriptorProto_ReservedRange) ast.RangeDeclNode {
 	if r.nodes == nil {
-		return r.ifNoAST
+		return ast.NewNoSourceNode(r.proto.GetName())
 	}
 	return r.nodes[rr].(ast.RangeDeclNode)
 }
 
-func (r *result) EnumNode(e *descriptorpb.EnumDescriptorProto) ast.NodeWithOptions {
+func (r *result) EnumNode(e *descriptorpb.EnumDescriptorProto) ast.Node {
 	if r.nodes == nil {
-		return r.ifNoAST
+		return ast.NewNoSourceNode(r.proto.GetName())
 	}
-	return r.nodes[e].(ast.NodeWithOptions)
+	return r.nodes[e]
 }
 
 func (r *result) EnumValueNode(e *descriptorpb.EnumValueDescriptorProto) ast.EnumValueDeclNode {
 	if r.nodes == nil {
-		return r.ifNoAST
+		return ast.NewNoSourceNode(r.proto.GetName())
 	}
 	return r.nodes[e].(ast.EnumValueDeclNode)
 }
 
 func (r *result) EnumReservedRangeNode(rr *descriptorpb.EnumDescriptorProto_EnumReservedRange) ast.RangeDeclNode {
 	if r.nodes == nil {
-		return r.ifNoAST
+		return ast.NewNoSourceNode(r.proto.GetName())
 	}
 	return r.nodes[rr].(ast.RangeDeclNode)
 }
 
-func (r *result) ServiceNode(s *descriptorpb.ServiceDescriptorProto) ast.NodeWithOptions {
+func (r *result) ServiceNode(s *descriptorpb.ServiceDescriptorProto) ast.Node {
 	if r.nodes == nil {
-		return r.ifNoAST
+		return ast.NewNoSourceNode(r.proto.GetName())
 	}
-	return r.nodes[s].(ast.NodeWithOptions)
+	return r.nodes[s]
 }
 
 func (r *result) MethodNode(m *descriptorpb.MethodDescriptorProto) ast.RPCDeclNode {
 	if r.nodes == nil {
-		return r.ifNoAST
+		return ast.NewNoSourceNode(r.proto.GetName())
 	}
 	return r.nodes[m].(ast.RPCDeclNode)
 }
@@ -964,12 +892,11 @@ func (r *result) putFieldNode(f *descriptorpb.FieldDescriptorProto, n ast.FieldD
 	r.nodes[f] = n
 }
 
-func (r *result) putOneofNode(o *descriptorpb.OneofDescriptorProto, n ast.OneofDeclNode) {
+func (r *result) putOneOfNode(o *descriptorpb.OneofDescriptorProto, n ast.OneOfDeclNode) {
 	r.nodes[o] = n
 }
 
-func (r *result) putExtensionRangeNode(e *descriptorpb.DescriptorProto_ExtensionRange, er *ast.ExtensionRangeNode, n *ast.RangeNode) {
-	r.nodes[asExtsNode(e)] = er
+func (r *result) putExtensionRangeNode(e *descriptorpb.DescriptorProto_ExtensionRange, n *ast.RangeNode) {
 	r.nodes[e] = n
 }
 
@@ -999,14 +926,3 @@ func (r *result) putMethodNode(m *descriptorpb.MethodDescriptorProto, n *ast.RPC
 
 // NB: If we ever add other put*Node methods, to index other kinds of elements in the descriptor
 //     proto hierarchy, we need to update the index recreation logic in clone.go, too.
-
-func asExtsNode(er *descriptorpb.DescriptorProto_ExtensionRange) proto.Message {
-	return extsParent{er}
-}
-
-// a simple marker type that allows us to have two distinct keys in a map for
-// the same ExtensionRange proto -- one for the range itself and another to
-// associate with the enclosing/parent AST node.
-type extsParent struct {
-	*descriptorpb.DescriptorProto_ExtensionRange
-}

@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,129 +15,22 @@
 package linker
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/bufbuild/protocompile/ast"
 	"github.com/bufbuild/protocompile/internal"
-	"github.com/bufbuild/protocompile/internal/editions"
 	"github.com/bufbuild/protocompile/parser"
 	"github.com/bufbuild/protocompile/protoutil"
 )
-
-var (
-	// These "noOp*" values are all descriptors. The protoreflect.Descriptor
-	// interface and its sub-interfaces are all marked with an unexported
-	// method so that they cannot be implemented outside of the google.golang.org/protobuf
-	// module. So, to provide implementations from this package, we must embed
-	// them. If we simply left the embedded interface field nil, then if/when
-	// new methods are added to the interfaces, it could induce panics in this
-	// package or users of this module (since trying to invoke one of these new
-	// methods would end up trying to call a method on a nil interface value).
-	//
-	// So instead of leaving the embedded interface fields nil, we embed an actual
-	// value. While new methods are unlikely to return the correct value (since
-	// the calls will be delegated to these no-op instances), it is a less
-	// dangerous latent bug than inducing a nil-dereference panic.
-
-	noOpFile      protoreflect.FileDescriptor
-	noOpMessage   protoreflect.MessageDescriptor
-	noOpOneof     protoreflect.OneofDescriptor
-	noOpField     protoreflect.FieldDescriptor
-	noOpEnum      protoreflect.EnumDescriptor
-	noOpEnumValue protoreflect.EnumValueDescriptor
-	noOpExtension protoreflect.ExtensionDescriptor
-	noOpService   protoreflect.ServiceDescriptor
-	noOpMethod    protoreflect.MethodDescriptor
-)
-
-var (
-	fieldPresenceField         = editions.FeatureSetDescriptor.Fields().ByName("field_presence")
-	repeatedFieldEncodingField = editions.FeatureSetDescriptor.Fields().ByName("repeated_field_encoding")
-	messageEncodingField       = editions.FeatureSetDescriptor.Fields().ByName("message_encoding")
-	enumTypeField              = editions.FeatureSetDescriptor.Fields().ByName("enum_type")
-	jsonFormatField            = editions.FeatureSetDescriptor.Fields().ByName("json_format")
-)
-
-func init() {
-	noOpFile, _ = protodesc.NewFile(
-		&descriptorpb.FileDescriptorProto{
-			Name:       proto.String("no-op.proto"),
-			Syntax:     proto.String("proto2"),
-			Dependency: []string{"google/protobuf/descriptor.proto"},
-			MessageType: []*descriptorpb.DescriptorProto{
-				{
-					Name: proto.String("NoOpMsg"),
-					Field: []*descriptorpb.FieldDescriptorProto{
-						{
-							Name:       proto.String("no_op"),
-							Type:       descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
-							Label:      descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-							Number:     proto.Int32(1),
-							JsonName:   proto.String("noOp"),
-							OneofIndex: proto.Int32(0),
-						},
-					},
-					OneofDecl: []*descriptorpb.OneofDescriptorProto{
-						{
-							Name: proto.String("no_op_oneof"),
-						},
-					},
-				},
-			},
-			EnumType: []*descriptorpb.EnumDescriptorProto{
-				{
-					Name: proto.String("NoOpEnum"),
-					Value: []*descriptorpb.EnumValueDescriptorProto{
-						{
-							Name:   proto.String("NO_OP"),
-							Number: proto.Int32(0),
-						},
-					},
-				},
-			},
-			Extension: []*descriptorpb.FieldDescriptorProto{
-				{
-					Extendee: proto.String(".google.protobuf.FileOptions"),
-					Name:     proto.String("no_op"),
-					Type:     descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
-					Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-					Number:   proto.Int32(50000),
-				},
-			},
-			Service: []*descriptorpb.ServiceDescriptorProto{
-				{
-					Name: proto.String("NoOpService"),
-					Method: []*descriptorpb.MethodDescriptorProto{
-						{
-							Name:       proto.String("NoOp"),
-							InputType:  proto.String(".NoOpMsg"),
-							OutputType: proto.String(".NoOpMsg"),
-						},
-					},
-				},
-			},
-		},
-		protoregistry.GlobalFiles,
-	)
-	noOpMessage = noOpFile.Messages().Get(0)
-	noOpOneof = noOpMessage.Oneofs().Get(0)
-	noOpField = noOpMessage.Fields().Get(0)
-	noOpEnum = noOpFile.Enums().Get(0)
-	noOpEnumValue = noOpEnum.Values().Get(0)
-	noOpExtension = noOpFile.Extensions().Get(0)
-	noOpService = noOpFile.Services().Get(0)
-	noOpMethod = noOpService.Methods().Get(0)
-}
 
 // This file contains implementations of protoreflect.Descriptor. Note that
 // this is a hack since those interfaces have a "doNotImplement" tag
@@ -160,6 +53,11 @@ type result struct {
 	// interpreting options.
 	usedImports map[string]struct{}
 
+	// A map of descriptor options messages to their pre-serialized bytes (using
+	// a canonical serialization format based on how protoc renders options to
+	// bytes).
+	optionBytes map[proto.Message][]byte
+
 	// A map of AST nodes that represent identifiers in ast.FieldReferenceNodes
 	// to their fully-qualified name. The identifiers are for field names in
 	// message literals (in option values) that are extension fields. These names
@@ -177,7 +75,6 @@ type result struct {
 var _ protoreflect.FileDescriptor = (*result)(nil)
 var _ Result = (*result)(nil)
 var _ protoutil.DescriptorProtoWrapper = (*result)(nil)
-var _ editions.HasEdition = (*result)(nil)
 
 func (r *result) RemoveAST() {
 	r.Result = parser.ResultWithoutAST(r.FileDescriptorProto())
@@ -206,23 +103,8 @@ func (r *result) Syntax() protoreflect.Syntax {
 		return protoreflect.Proto2
 	case "proto3":
 		return protoreflect.Proto3
-	case "editions":
-		return protoreflect.Editions
 	default:
 		return 0 // ???
-	}
-}
-
-func (r *result) Edition() int32 {
-	switch r.Syntax() {
-	case protoreflect.Proto2:
-		return int32(descriptorpb.Edition_EDITION_PROTO2)
-	case protoreflect.Proto3:
-		return int32(descriptorpb.Edition_EDITION_PROTO3)
-	case protoreflect.Editions:
-		return int32(r.FileDescriptorProto().GetEdition())
-	default:
-		return int32(descriptorpb.Edition_EDITION_UNKNOWN) // ???
 	}
 }
 
@@ -292,7 +174,7 @@ func computeSourceLocIndex(locs []protoreflect.SourceLocation) map[interface{}]i
 
 func asSourceLocations(srcInfoProtos []*descriptorpb.SourceCodeInfo_Location) []protoreflect.SourceLocation {
 	locs := make([]protoreflect.SourceLocation, len(srcInfoProtos))
-	prev := map[any]*protoreflect.SourceLocation{}
+	prev := map[string]*protoreflect.SourceLocation{}
 	for i, loc := range srcInfoProtos {
 		var stLin, stCol, enLin, enCol int
 		if len(loc.Span) == 3 {
@@ -311,7 +193,7 @@ func asSourceLocations(srcInfoProtos []*descriptorpb.SourceCodeInfo_Location) []
 			EndLine:                 enLin,
 			EndColumn:               enCol,
 		}
-		str := pathKey(loc.Path)
+		str := pathStr(loc.Path)
 		pr := prev[str]
 		if pr != nil {
 			pr.Next = i
@@ -319,6 +201,148 @@ func asSourceLocations(srcInfoProtos []*descriptorpb.SourceCodeInfo_Location) []
 		prev[str] = &locs[i]
 	}
 	return locs
+}
+
+func pathStr(p protoreflect.SourcePath) string {
+	var buf bytes.Buffer
+	for _, v := range p {
+		fmt.Fprintf(&buf, "%x:", v)
+	}
+	return buf.String()
+}
+
+// AddOptionBytes associates the given opts (an options message encoded in the
+// binary format) with the given options protobuf message. The protobuf message
+// should exist in the hierarchy of this result's FileDescriptorProto. This
+// allows the FileDescriptorProto to be marshaled to bytes in a way that
+// preserves the way options are defined in source (just as is done by protoc,
+// but not possible when only using the generated Go types and standard
+// marshaling APIs in the protobuf runtime).
+func (r *result) AddOptionBytes(pm proto.Message, opts []byte) {
+	if r.optionBytes == nil {
+		r.optionBytes = map[proto.Message][]byte{}
+	}
+	r.optionBytes[pm] = append(r.optionBytes[pm], opts...)
+}
+
+func (r *result) CanonicalProto() *descriptorpb.FileDescriptorProto {
+	origFd := r.FileDescriptorProto()
+	// make a copy that we can mutate
+	fd := proto.Clone(origFd).(*descriptorpb.FileDescriptorProto) //nolint:errcheck
+
+	r.storeOptionBytesInFile(fd, origFd)
+
+	return fd
+}
+
+func (r *result) storeOptionBytesInFile(fd, origFd *descriptorpb.FileDescriptorProto) {
+	if fd.Options != nil {
+		fd.Options.Reset()
+		fd.Options.ProtoReflect().SetUnknown(r.optionBytes[origFd.Options])
+	}
+
+	for i, md := range fd.MessageType {
+		origMd := origFd.MessageType[i]
+		r.storeOptionBytesInMessage(md, origMd)
+	}
+
+	for i, ed := range fd.EnumType {
+		origEd := origFd.EnumType[i]
+		r.storeOptionBytesInEnum(ed, origEd)
+	}
+
+	for i, exd := range fd.Extension {
+		origExd := origFd.Extension[i]
+		r.storeOptionBytesInField(exd, origExd)
+	}
+
+	for i, sd := range fd.Service {
+		origSd := origFd.Service[i]
+		if sd.Options != nil {
+			sd.Options.Reset()
+			sd.Options.ProtoReflect().SetUnknown(r.optionBytes[origSd.Options])
+		}
+
+		for j, mtd := range sd.Method {
+			origMtd := origSd.Method[j]
+			if mtd.Options != nil {
+				mtd.Options.Reset()
+				mtd.Options.ProtoReflect().SetUnknown(r.optionBytes[origMtd.Options])
+			}
+		}
+	}
+}
+
+func (r *result) storeOptionBytesInMessage(md, origMd *descriptorpb.DescriptorProto) {
+	if md.GetOptions().GetMapEntry() {
+		// Map entry messages are synthesized. They won't have any option bytes
+		// since they don't actually appear in the source and thus have any option
+		// declarations in the source.
+		return
+	}
+
+	if md.Options != nil {
+		md.Options.Reset()
+		md.Options.ProtoReflect().SetUnknown(r.optionBytes[origMd.Options])
+	}
+
+	for i, fld := range md.Field {
+		origFld := origMd.Field[i]
+		r.storeOptionBytesInField(fld, origFld)
+	}
+
+	for i, ood := range md.OneofDecl {
+		origOod := origMd.OneofDecl[i]
+		if ood.Options != nil {
+			ood.Options.Reset()
+			ood.Options.ProtoReflect().SetUnknown(r.optionBytes[origOod.Options])
+		}
+	}
+
+	for i, exr := range md.ExtensionRange {
+		origExr := origMd.ExtensionRange[i]
+		if exr.Options != nil {
+			exr.Options.Reset()
+			exr.Options.ProtoReflect().SetUnknown(r.optionBytes[origExr.Options])
+		}
+	}
+
+	for i, nmd := range md.NestedType {
+		origNmd := origMd.NestedType[i]
+		r.storeOptionBytesInMessage(nmd, origNmd)
+	}
+
+	for i, ed := range md.EnumType {
+		origEd := origMd.EnumType[i]
+		r.storeOptionBytesInEnum(ed, origEd)
+	}
+
+	for i, exd := range md.Extension {
+		origExd := origMd.Extension[i]
+		r.storeOptionBytesInField(exd, origExd)
+	}
+}
+
+func (r *result) storeOptionBytesInEnum(ed, origEd *descriptorpb.EnumDescriptorProto) {
+	if ed.Options != nil {
+		ed.Options.Reset()
+		ed.Options.ProtoReflect().SetUnknown(r.optionBytes[origEd.Options])
+	}
+
+	for i, evd := range ed.Value {
+		origEvd := origEd.Value[i]
+		if evd.Options != nil {
+			evd.Options.Reset()
+			evd.Options.ProtoReflect().SetUnknown(r.optionBytes[origEvd.Options])
+		}
+	}
+}
+
+func (r *result) storeOptionBytesInField(fld, origFld *descriptorpb.FieldDescriptorProto) {
+	if fld.Options != nil {
+		fld.Options.Reset()
+		fld.Options.ProtoReflect().SetUnknown(r.optionBytes[origFld.Options])
+	}
 }
 
 type fileImports struct {
@@ -331,7 +355,7 @@ func (r *result) createImports() fileImports {
 	imps := make([]protoreflect.FileImport, len(fd.Dependency))
 	for i, dep := range fd.Dependency {
 		desc := r.deps.FindFileByPath(dep)
-		imps[i] = protoreflect.FileImport{FileDescriptor: unwrap(desc)}
+		imps[i] = protoreflect.FileImport{FileDescriptor: desc}
 	}
 	for _, publicIndex := range fd.PublicDependency {
 		imps[int(publicIndex)].IsPublic = true
@@ -340,20 +364,6 @@ func (r *result) createImports() fileImports {
 		imps[int(weakIndex)].IsWeak = true
 	}
 	return fileImports{files: imps}
-}
-
-func unwrap(descriptor protoreflect.FileDescriptor) protoreflect.FileDescriptor {
-	wrapped, ok := descriptor.(interface {
-		Unwrap() protoreflect.FileDescriptor
-	})
-	if !ok {
-		return descriptor
-	}
-	unwrapped := wrapped.Unwrap()
-	if unwrapped == nil {
-		return descriptor // shouldn't ever happen
-	}
-	return unwrapped
 }
 
 func (f *fileImports) Len() int {
@@ -391,22 +401,111 @@ func (s *srcLocs) ByDescriptor(d protoreflect.Descriptor) protoreflect.SourceLoc
 	if d.ParentFile() != s.file {
 		return protoreflect.SourceLocation{}
 	}
-	path, ok := internal.ComputePath(d)
+	path, ok := computePath(d)
 	if !ok {
 		return protoreflect.SourceLocation{}
 	}
 	return s.ByPath(path)
 }
 
-type msgDescriptors struct {
-	protoreflect.MessageDescriptors
-	msgs []msgDescriptor
+func computePath(d protoreflect.Descriptor) (protoreflect.SourcePath, bool) {
+	_, ok := d.(protoreflect.FileDescriptor)
+	if ok {
+		return nil, true
+	}
+	var path protoreflect.SourcePath
+	for {
+		p := d.Parent()
+		switch d := d.(type) {
+		case protoreflect.FileDescriptor:
+			return reverse(path), true
+		case protoreflect.MessageDescriptor:
+			path = append(path, int32(d.Index()))
+			switch p.(type) {
+			case protoreflect.FileDescriptor:
+				path = append(path, internal.FileMessagesTag)
+			case protoreflect.MessageDescriptor:
+				path = append(path, internal.MessageNestedMessagesTag)
+			default:
+				return nil, false
+			}
+		case protoreflect.FieldDescriptor:
+			path = append(path, int32(d.Index()))
+			switch p.(type) {
+			case protoreflect.FileDescriptor:
+				if d.IsExtension() {
+					path = append(path, internal.FileExtensionsTag)
+				} else {
+					return nil, false
+				}
+			case protoreflect.MessageDescriptor:
+				if d.IsExtension() {
+					path = append(path, internal.MessageExtensionsTag)
+				} else {
+					path = append(path, internal.MessageFieldsTag)
+				}
+			default:
+				return nil, false
+			}
+		case protoreflect.OneofDescriptor:
+			path = append(path, int32(d.Index()))
+			if _, ok := p.(protoreflect.MessageDescriptor); ok {
+				path = append(path, internal.MessageOneOfsTag)
+			} else {
+				return nil, false
+			}
+		case protoreflect.EnumDescriptor:
+			path = append(path, int32(d.Index()))
+			switch p.(type) {
+			case protoreflect.FileDescriptor:
+				path = append(path, internal.FileEnumsTag)
+			case protoreflect.MessageDescriptor:
+				path = append(path, internal.MessageEnumsTag)
+			default:
+				return nil, false
+			}
+		case protoreflect.EnumValueDescriptor:
+			path = append(path, int32(d.Index()))
+			if _, ok := p.(protoreflect.EnumDescriptor); ok {
+				path = append(path, internal.EnumValuesTag)
+			} else {
+				return nil, false
+			}
+		case protoreflect.ServiceDescriptor:
+			path = append(path, int32(d.Index()))
+			if _, ok := p.(protoreflect.FileDescriptor); ok {
+				path = append(path, internal.FileServicesTag)
+			} else {
+				return nil, false
+			}
+		case protoreflect.MethodDescriptor:
+			path = append(path, int32(d.Index()))
+			if _, ok := p.(protoreflect.ServiceDescriptor); ok {
+				path = append(path, internal.ServiceMethodsTag)
+			} else {
+				return nil, false
+			}
+		}
+		d = p
+	}
 }
 
-func (r *result) createMessages(prefix string, parent protoreflect.Descriptor, msgProtos []*descriptorpb.DescriptorProto, pool *allocPool) msgDescriptors {
-	msgs := pool.getMessages(len(msgProtos))
+func reverse(p protoreflect.SourcePath) protoreflect.SourcePath {
+	for i, j := 0, len(p)-1; i < j; i, j = i+1, j-1 {
+		p[i], p[j] = p[j], p[i]
+	}
+	return p
+}
+
+type msgDescriptors struct {
+	protoreflect.MessageDescriptors
+	msgs []*msgDescriptor
+}
+
+func (r *result) createMessages(prefix string, parent protoreflect.Descriptor, msgProtos []*descriptorpb.DescriptorProto) msgDescriptors {
+	msgs := make([]*msgDescriptor, len(msgProtos))
 	for i, msgProto := range msgProtos {
-		r.createMessageDescriptor(&msgs[i], msgProto, parent, i, prefix+msgProto.GetName(), pool)
+		msgs[i] = r.createMessageDescriptor(msgProto, parent, i, prefix+msgProto.GetName())
 	}
 	return msgDescriptors{msgs: msgs}
 }
@@ -416,12 +515,11 @@ func (m *msgDescriptors) Len() int {
 }
 
 func (m *msgDescriptors) Get(i int) protoreflect.MessageDescriptor {
-	return &m.msgs[i]
+	return m.msgs[i]
 }
 
 func (m *msgDescriptors) ByName(s protoreflect.Name) protoreflect.MessageDescriptor {
-	for i := range m.msgs {
-		msg := &m.msgs[i]
+	for _, msg := range m.msgs {
 		if msg.Name() == s {
 			return msg
 		}
@@ -451,27 +549,23 @@ type msgDescriptor struct {
 var _ protoreflect.MessageDescriptor = (*msgDescriptor)(nil)
 var _ protoutil.DescriptorProtoWrapper = (*msgDescriptor)(nil)
 
-func (r *result) createMessageDescriptor(ret *msgDescriptor, md *descriptorpb.DescriptorProto, parent protoreflect.Descriptor, index int, fqn string, pool *allocPool) {
+func (r *result) createMessageDescriptor(md *descriptorpb.DescriptorProto, parent protoreflect.Descriptor, index int, fqn string) *msgDescriptor {
+	ret := &msgDescriptor{file: r, parent: parent, index: index, proto: md, fqn: fqn}
 	r.descriptors[fqn] = ret
-
-	ret.MessageDescriptor = noOpMessage
-	ret.file = r
-	ret.parent = parent
-	ret.index = index
-	ret.proto = md
-	ret.fqn = fqn
 
 	prefix := fqn + "."
 	// NB: We MUST create fields before oneofs so that we can populate the
 	//  set of fields that belong to the oneof
-	ret.fields = r.createFields(prefix, ret, md.Field, pool)
-	ret.oneofs = r.createOneofs(prefix, ret, md.OneofDecl, pool)
-	ret.nestedMessages = r.createMessages(prefix, ret, md.NestedType, pool)
-	ret.nestedEnums = r.createEnums(prefix, ret, md.EnumType, pool)
-	ret.nestedExtensions = r.createExtensions(prefix, ret, md.Extension, pool)
+	ret.fields = r.createFields(prefix, ret, md.Field)
+	ret.oneofs = r.createOneOfs(prefix, ret, md.OneofDecl)
+	ret.nestedMessages = r.createMessages(prefix, ret, md.NestedType)
+	ret.nestedEnums = r.createEnums(prefix, ret, md.EnumType)
+	ret.nestedExtensions = r.createExtensions(prefix, ret, md.Extension)
 	ret.extRanges = createFieldRanges(md.ExtensionRange)
 	ret.rsvdRanges = createFieldRanges(md.ReservedRange)
 	ret.rsvdNames = names{s: md.ReservedName}
+
+	return ret
 }
 
 func (m *msgDescriptor) MessageDescriptorProto() *descriptorpb.DescriptorProto {
@@ -648,13 +742,13 @@ func (f fieldRanges) Has(n protoreflect.FieldNumber) bool {
 
 type enumDescriptors struct {
 	protoreflect.EnumDescriptors
-	enums []enumDescriptor
+	enums []*enumDescriptor
 }
 
-func (r *result) createEnums(prefix string, parent protoreflect.Descriptor, enumProtos []*descriptorpb.EnumDescriptorProto, pool *allocPool) enumDescriptors {
-	enums := pool.getEnums(len(enumProtos))
+func (r *result) createEnums(prefix string, parent protoreflect.Descriptor, enumProtos []*descriptorpb.EnumDescriptorProto) enumDescriptors {
+	enums := make([]*enumDescriptor, len(enumProtos))
 	for i, enumProto := range enumProtos {
-		r.createEnumDescriptor(&enums[i], enumProto, parent, i, prefix+enumProto.GetName(), pool)
+		enums[i] = r.createEnumDescriptor(enumProto, parent, i, prefix+enumProto.GetName())
 	}
 	return enumDescriptors{enums: enums}
 }
@@ -664,14 +758,13 @@ func (e *enumDescriptors) Len() int {
 }
 
 func (e *enumDescriptors) Get(i int) protoreflect.EnumDescriptor {
-	return &e.enums[i]
+	return e.enums[i]
 }
 
 func (e *enumDescriptors) ByName(s protoreflect.Name) protoreflect.EnumDescriptor {
-	for i := range e.enums {
-		enum := &e.enums[i]
-		if enum.Name() == s {
-			return enum
+	for _, en := range e.enums {
+		if en.Name() == s {
+			return en
 		}
 	}
 	return nil
@@ -694,24 +787,19 @@ type enumDescriptor struct {
 var _ protoreflect.EnumDescriptor = (*enumDescriptor)(nil)
 var _ protoutil.DescriptorProtoWrapper = (*enumDescriptor)(nil)
 
-func (r *result) createEnumDescriptor(ret *enumDescriptor, ed *descriptorpb.EnumDescriptorProto, parent protoreflect.Descriptor, index int, fqn string, pool *allocPool) {
+func (r *result) createEnumDescriptor(ed *descriptorpb.EnumDescriptorProto, parent protoreflect.Descriptor, index int, fqn string) *enumDescriptor {
+	ret := &enumDescriptor{file: r, parent: parent, index: index, proto: ed, fqn: fqn}
 	r.descriptors[fqn] = ret
 
-	ret.EnumDescriptor = noOpEnum
-	ret.file = r
-	ret.parent = parent
-	ret.index = index
-	ret.proto = ed
-	ret.fqn = fqn
-
-	// Unlike all other elements, the fully-qualified names of enum values
-	// are NOT scoped to their parent element (the enum), but rather to
+	// Unlike all other elements, the fully-qualified name of enum values
+	// is NOT scoped to their parent element (the enum), but rather to
 	// the enum's parent element. This follows C++ scoping rules for
 	// enum values.
 	prefix := strings.TrimSuffix(fqn, ed.GetName())
-	ret.values = r.createEnumValues(prefix, ret, ed.Value, pool)
+	ret.values = r.createEnumValues(prefix, ret, ed.Value)
 	ret.rsvdRanges = createEnumRanges(ed.ReservedRange)
 	ret.rsvdNames = names{s: ed.ReservedName}
+	return ret
 }
 
 func (e *enumDescriptor) EnumDescriptorProto() *descriptorpb.EnumDescriptorProto {
@@ -766,11 +854,6 @@ func (e *enumDescriptor) ReservedRanges() protoreflect.EnumRanges {
 	return e.rsvdRanges
 }
 
-func (e *enumDescriptor) IsClosed() bool {
-	enumType := resolveFeature(e, enumTypeField)
-	return descriptorpb.FeatureSet_EnumType(enumType.Enum()) == descriptorpb.FeatureSet_CLOSED
-}
-
 type enumRanges struct {
 	protoreflect.EnumRanges
 	ranges [][2]protoreflect.EnumNumber
@@ -806,13 +889,13 @@ func (e enumRanges) Has(n protoreflect.EnumNumber) bool {
 
 type enValDescriptors struct {
 	protoreflect.EnumValueDescriptors
-	vals []enValDescriptor
+	vals []*enValDescriptor
 }
 
-func (r *result) createEnumValues(prefix string, parent *enumDescriptor, enValProtos []*descriptorpb.EnumValueDescriptorProto, pool *allocPool) enValDescriptors {
-	vals := pool.getEnumValues(len(enValProtos))
+func (r *result) createEnumValues(prefix string, parent *enumDescriptor, enValProtos []*descriptorpb.EnumValueDescriptorProto) enValDescriptors {
+	vals := make([]*enValDescriptor, len(enValProtos))
 	for i, enValProto := range enValProtos {
-		r.createEnumValueDescriptor(&vals[i], enValProto, parent, i, prefix+enValProto.GetName())
+		vals[i] = r.createEnumValueDescriptor(enValProto, parent, i, prefix+enValProto.GetName())
 	}
 	return enValDescriptors{vals: vals}
 }
@@ -822,12 +905,11 @@ func (e *enValDescriptors) Len() int {
 }
 
 func (e *enValDescriptors) Get(i int) protoreflect.EnumValueDescriptor {
-	return &e.vals[i]
+	return e.vals[i]
 }
 
 func (e *enValDescriptors) ByName(s protoreflect.Name) protoreflect.EnumValueDescriptor {
-	for i := range e.vals {
-		val := &e.vals[i]
+	for _, val := range e.vals {
 		if val.Name() == s {
 			return val
 		}
@@ -836,8 +918,7 @@ func (e *enValDescriptors) ByName(s protoreflect.Name) protoreflect.EnumValueDes
 }
 
 func (e *enValDescriptors) ByNumber(n protoreflect.EnumNumber) protoreflect.EnumValueDescriptor {
-	for i := range e.vals {
-		val := &e.vals[i]
+	for _, val := range e.vals {
 		if val.Number() == n {
 			return val
 		}
@@ -857,14 +938,10 @@ type enValDescriptor struct {
 var _ protoreflect.EnumValueDescriptor = (*enValDescriptor)(nil)
 var _ protoutil.DescriptorProtoWrapper = (*enValDescriptor)(nil)
 
-func (r *result) createEnumValueDescriptor(ret *enValDescriptor, ed *descriptorpb.EnumValueDescriptorProto, parent *enumDescriptor, index int, fqn string) {
+func (r *result) createEnumValueDescriptor(ed *descriptorpb.EnumValueDescriptorProto, parent *enumDescriptor, index int, fqn string) *enValDescriptor {
+	ret := &enValDescriptor{file: r, parent: parent, index: index, proto: ed, fqn: fqn}
 	r.descriptors[fqn] = ret
-	ret.EnumValueDescriptor = noOpEnumValue
-	ret.file = r
-	ret.parent = parent
-	ret.index = index
-	ret.proto = ed
-	ret.fqn = fqn
+	return ret
 }
 
 func (e *enValDescriptor) EnumValueDescriptorProto() *descriptorpb.EnumValueDescriptorProto {
@@ -913,13 +990,13 @@ func (e *enValDescriptor) Number() protoreflect.EnumNumber {
 
 type extDescriptors struct {
 	protoreflect.ExtensionDescriptors
-	exts []extTypeDescriptor
+	exts []*extTypeDescriptor
 }
 
-func (r *result) createExtensions(prefix string, parent protoreflect.Descriptor, extProtos []*descriptorpb.FieldDescriptorProto, pool *allocPool) extDescriptors {
-	exts := pool.getExtensions(len(extProtos))
+func (r *result) createExtensions(prefix string, parent protoreflect.Descriptor, extProtos []*descriptorpb.FieldDescriptorProto) extDescriptors {
+	exts := make([]*extTypeDescriptor, len(extProtos))
 	for i, extProto := range extProtos {
-		r.createExtTypeDescriptor(&exts[i], extProto, parent, i, prefix+extProto.GetName())
+		exts[i] = r.createExtTypeDescriptor(extProto, parent, i, prefix+extProto.GetName())
 	}
 	return extDescriptors{exts: exts}
 }
@@ -929,12 +1006,11 @@ func (e *extDescriptors) Len() int {
 }
 
 func (e *extDescriptors) Get(i int) protoreflect.ExtensionDescriptor {
-	return &e.exts[i]
+	return e.exts[i]
 }
 
 func (e *extDescriptors) ByName(s protoreflect.Name) protoreflect.ExtensionDescriptor {
-	for i := range e.exts {
-		ext := &e.exts[i]
+	for _, ext := range e.exts {
 		if ext.Name() == s {
 			return ext
 		}
@@ -944,15 +1020,15 @@ func (e *extDescriptors) ByName(s protoreflect.Name) protoreflect.ExtensionDescr
 
 type extTypeDescriptor struct {
 	protoreflect.ExtensionTypeDescriptor
-	field fldDescriptor
+	field *fldDescriptor
 }
 
 var _ protoutil.DescriptorProtoWrapper = &extTypeDescriptor{}
 
-func (r *result) createExtTypeDescriptor(ret *extTypeDescriptor, fd *descriptorpb.FieldDescriptorProto, parent protoreflect.Descriptor, index int, fqn string) {
+func (r *result) createExtTypeDescriptor(fd *descriptorpb.FieldDescriptorProto, parent protoreflect.Descriptor, index int, fqn string) *extTypeDescriptor {
+	ret := &fldDescriptor{file: r, parent: parent, index: index, proto: fd, fqn: fqn}
 	r.descriptors[fqn] = ret
-	ret.field = fldDescriptor{FieldDescriptor: noOpExtension, file: r, parent: parent, index: index, proto: fd, fqn: fqn}
-	ret.ExtensionTypeDescriptor = dynamicpb.NewExtensionType(&ret.field).TypeDescriptor()
+	return &extTypeDescriptor{ExtensionTypeDescriptor: dynamicpb.NewExtensionType(ret).TypeDescriptor(), field: ret}
 }
 
 func (e *extTypeDescriptor) FieldDescriptorProto() *descriptorpb.FieldDescriptorProto {
@@ -965,23 +1041,15 @@ func (e *extTypeDescriptor) AsProto() proto.Message {
 
 type fldDescriptors struct {
 	protoreflect.FieldDescriptors
-	// We use pointers here, instead of flattened slice, because oneofs
-	// also have fields, but need to point to values in the parent
-	// message's fields. Even though they are pointers, in the containing
-	// message, we always allocate a flattened slice and then point into
-	// that, so we're still doing fewer allocations (2 per set of fields
-	// instead of 1 per each field).
 	fields []*fldDescriptor
 }
 
-func (r *result) createFields(prefix string, parent *msgDescriptor, fldProtos []*descriptorpb.FieldDescriptorProto, pool *allocPool) fldDescriptors {
-	fields := pool.getFields(len(fldProtos))
-	fieldPtrs := make([]*fldDescriptor, len(fldProtos))
+func (r *result) createFields(prefix string, parent *msgDescriptor, fldProtos []*descriptorpb.FieldDescriptorProto) fldDescriptors {
+	fields := make([]*fldDescriptor, len(fldProtos))
 	for i, fldProto := range fldProtos {
-		r.createFieldDescriptor(&fields[i], fldProto, parent, i, prefix+fldProto.GetName())
-		fieldPtrs[i] = &fields[i]
+		fields[i] = r.createFieldDescriptor(fldProto, parent, i, prefix+fldProto.GetName())
 	}
-	return fldDescriptors{fields: fieldPtrs}
+	return fldDescriptors{fields: fields}
 }
 
 func (f *fldDescriptors) Len() int {
@@ -1011,17 +1079,7 @@ func (f *fldDescriptors) ByJSONName(s string) protoreflect.FieldDescriptor {
 }
 
 func (f *fldDescriptors) ByTextName(s string) protoreflect.FieldDescriptor {
-	fld := f.ByName(protoreflect.Name(s))
-	if fld != nil {
-		return fld
-	}
-	// Groups use type name instead, so we fallback to slow search
-	for _, fld := range f.fields {
-		if fld.TextName() == s {
-			return fld
-		}
-	}
-	return nil
+	return f.ByName(protoreflect.Name(s))
 }
 
 func (f *fldDescriptors) ByNumber(n protoreflect.FieldNumber) protoreflect.FieldDescriptor {
@@ -1050,14 +1108,10 @@ type fldDescriptor struct {
 var _ protoreflect.FieldDescriptor = (*fldDescriptor)(nil)
 var _ protoutil.DescriptorProtoWrapper = (*fldDescriptor)(nil)
 
-func (r *result) createFieldDescriptor(ret *fldDescriptor, fd *descriptorpb.FieldDescriptorProto, parent *msgDescriptor, index int, fqn string) {
+func (r *result) createFieldDescriptor(fd *descriptorpb.FieldDescriptorProto, parent *msgDescriptor, index int, fqn string) *fldDescriptor {
+	ret := &fldDescriptor{file: r, parent: parent, index: index, proto: fd, fqn: fqn}
 	r.descriptors[fqn] = ret
-	ret.FieldDescriptor = noOpField
-	ret.file = r
-	ret.parent = parent
-	ret.index = index
-	ret.proto = fd
-	ret.fqn = fqn
+	return ret
 }
 
 func (f *fldDescriptor) FieldDescriptorProto() *descriptorpb.FieldDescriptorProto {
@@ -1111,14 +1165,6 @@ func (f *fldDescriptor) Cardinality() protoreflect.Cardinality {
 	case descriptorpb.FieldDescriptorProto_LABEL_REQUIRED:
 		return protoreflect.Required
 	case descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL:
-		if f.Syntax() == protoreflect.Editions {
-			// Editions does not use label to indicate required. It instead
-			// uses a feature, and label is always optional.
-			fieldPresence := descriptorpb.FeatureSet_FieldPresence(resolveFeature(f, fieldPresenceField).Enum())
-			if fieldPresence == descriptorpb.FeatureSet_LEGACY_REQUIRED {
-				return protoreflect.Required
-			}
-		}
 		return protoreflect.Optional
 	default:
 		return 0
@@ -1126,15 +1172,6 @@ func (f *fldDescriptor) Cardinality() protoreflect.Cardinality {
 }
 
 func (f *fldDescriptor) Kind() protoreflect.Kind {
-	if f.proto.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE && f.Syntax() == protoreflect.Editions &&
-		!f.IsMap() && !f.parentIsMap() {
-		// In editions, "group encoding" (aka "delimited encoding") is toggled
-		// via a feature. So we report group kind when that feature is enabled.
-		messageEncoding := resolveFeature(f, messageEncodingField)
-		if descriptorpb.FeatureSet_MessageEncoding(messageEncoding.Enum()) == descriptorpb.FeatureSet_DELIMITED {
-			return protoreflect.GroupKind
-		}
-	}
 	return protoreflect.Kind(f.proto.GetType())
 }
 
@@ -1153,32 +1190,17 @@ func (f *fldDescriptor) TextName() string {
 	if f.IsExtension() {
 		return fmt.Sprintf("[%s]", f.FullName())
 	}
-	if f.looksLikeGroup() {
-		// groups use the type name
-		return string(protoreflect.FullName(f.proto.GetTypeName()).Name())
-	}
 	return string(f.Name())
-}
-
-func (f *fldDescriptor) looksLikeGroup() bool {
-	// It looks like a group if it uses group/delimited encoding (checked via f.Kind)
-	// and the message type is a sibling whose name is a mixed-case version of the field name.
-	return f.Kind() == protoreflect.GroupKind &&
-		f.Message().FullName().Parent() == f.FullName().Parent() &&
-		string(f.Name()) == strings.ToLower(string(f.Message().Name()))
 }
 
 func (f *fldDescriptor) HasPresence() bool {
 	if f.proto.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
 		return false
 	}
-	if f.IsExtension() ||
+	return f.IsExtension() ||
+		f.Syntax() == protoreflect.Proto2 ||
 		f.Kind() == protoreflect.MessageKind || f.Kind() == protoreflect.GroupKind ||
-		f.proto.OneofIndex != nil {
-		return true
-	}
-	fieldPresence := descriptorpb.FeatureSet_FieldPresence(resolveFeature(f, fieldPresenceField).Enum())
-	return fieldPresence == descriptorpb.FeatureSet_EXPLICIT || fieldPresence == descriptorpb.FeatureSet_LEGACY_REQUIRED
+		f.proto.OneofIndex != nil
 }
 
 func (f *fldDescriptor) IsExtension() bool {
@@ -1205,16 +1227,30 @@ func (f *fldDescriptor) IsWeak() bool {
 }
 
 func (f *fldDescriptor) IsPacked() bool {
-	if f.Cardinality() != protoreflect.Repeated || !internal.CanPack(f.Kind()) {
+	opts := f.proto.GetOptions()
+	if opts.GetPacked() {
+		return true
+	}
+	if opts != nil && opts.Packed != nil {
+		// explicitly not packed
 		return false
 	}
-	opts := f.proto.GetOptions()
-	if opts != nil && opts.Packed != nil {
-		// packed option is set explicitly
-		return *opts.Packed
+
+	// proto3 defaults to packed for repeated scalar numeric fields
+	if f.file.Syntax() != protoreflect.Proto3 {
+		return false
 	}
-	fieldEncoding := resolveFeature(f, repeatedFieldEncodingField)
-	return descriptorpb.FeatureSet_RepeatedFieldEncoding(fieldEncoding.Enum()) == descriptorpb.FeatureSet_PACKED
+	if f.proto.GetLabel() != descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
+		return false
+	}
+	switch f.proto.GetType() {
+	case descriptorpb.FieldDescriptorProto_TYPE_GROUP, descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
+		descriptorpb.FieldDescriptorProto_TYPE_BYTES, descriptorpb.FieldDescriptorProto_TYPE_STRING:
+		return false
+	default:
+		// all others can be packed
+		return true
+	}
 }
 
 func (f *fldDescriptor) IsList() bool {
@@ -1239,11 +1275,6 @@ func (f *fldDescriptor) isMapEntry() bool {
 		return false
 	}
 	return f.Message().IsMapEntry()
-}
-
-func (f *fldDescriptor) parentIsMap() bool {
-	parent, ok := f.parent.(protoreflect.MessageDescriptor)
-	return ok && parent.IsMapEntry()
 }
 
 func (f *fldDescriptor) MapKey() protoreflect.FieldDescriptor {
@@ -1512,13 +1543,13 @@ func (f *fldDescriptor) Message() protoreflect.MessageDescriptor {
 
 type oneofDescriptors struct {
 	protoreflect.OneofDescriptors
-	oneofs []oneofDescriptor
+	oneofs []*oneofDescriptor
 }
 
-func (r *result) createOneofs(prefix string, parent *msgDescriptor, ooProtos []*descriptorpb.OneofDescriptorProto, pool *allocPool) oneofDescriptors {
-	oos := pool.getOneofs(len(ooProtos))
+func (r *result) createOneOfs(prefix string, parent *msgDescriptor, ooProtos []*descriptorpb.OneofDescriptorProto) oneofDescriptors {
+	oos := make([]*oneofDescriptor, len(ooProtos))
 	for i, fldProto := range ooProtos {
-		r.createOneofDescriptor(&oos[i], fldProto, parent, i, prefix+fldProto.GetName())
+		oos[i] = r.createOneOfDescriptor(fldProto, parent, i, prefix+fldProto.GetName())
 	}
 	return oneofDescriptors{oneofs: oos}
 }
@@ -1528,12 +1559,11 @@ func (o *oneofDescriptors) Len() int {
 }
 
 func (o *oneofDescriptors) Get(i int) protoreflect.OneofDescriptor {
-	return &o.oneofs[i]
+	return o.oneofs[i]
 }
 
 func (o *oneofDescriptors) ByName(s protoreflect.Name) protoreflect.OneofDescriptor {
-	for i := range o.oneofs {
-		oo := &o.oneofs[i]
+	for _, oo := range o.oneofs {
 		if oo.Name() == s {
 			return oo
 		}
@@ -1555,14 +1585,9 @@ type oneofDescriptor struct {
 var _ protoreflect.OneofDescriptor = (*oneofDescriptor)(nil)
 var _ protoutil.DescriptorProtoWrapper = (*oneofDescriptor)(nil)
 
-func (r *result) createOneofDescriptor(ret *oneofDescriptor, ood *descriptorpb.OneofDescriptorProto, parent *msgDescriptor, index int, fqn string) {
+func (r *result) createOneOfDescriptor(ood *descriptorpb.OneofDescriptorProto, parent *msgDescriptor, index int, fqn string) *oneofDescriptor {
+	ret := &oneofDescriptor{file: r, parent: parent, index: index, proto: ood, fqn: fqn}
 	r.descriptors[fqn] = ret
-	ret.OneofDescriptor = noOpOneof
-	ret.file = r
-	ret.parent = parent
-	ret.index = index
-	ret.proto = ood
-	ret.fqn = fqn
 
 	var fields []*fldDescriptor
 	for _, fld := range parent.fields.fields {
@@ -1571,9 +1596,11 @@ func (r *result) createOneofDescriptor(ret *oneofDescriptor, ood *descriptorpb.O
 		}
 	}
 	ret.fields = fldDescriptors{fields: fields}
+
+	return ret
 }
 
-func (o *oneofDescriptor) OneofDescriptorProto() *descriptorpb.OneofDescriptorProto {
+func (o *oneofDescriptor) OneOfDescriptorProto() *descriptorpb.OneofDescriptorProto {
 	return o.proto
 }
 
@@ -1628,13 +1655,13 @@ func (o *oneofDescriptor) Fields() protoreflect.FieldDescriptors {
 
 type svcDescriptors struct {
 	protoreflect.ServiceDescriptors
-	svcs []svcDescriptor
+	svcs []*svcDescriptor
 }
 
-func (r *result) createServices(prefix string, svcProtos []*descriptorpb.ServiceDescriptorProto, pool *allocPool) svcDescriptors {
-	svcs := pool.getServices(len(svcProtos))
+func (r *result) createServices(prefix string, svcProtos []*descriptorpb.ServiceDescriptorProto) svcDescriptors {
+	svcs := make([]*svcDescriptor, len(svcProtos))
 	for i, svcProto := range svcProtos {
-		r.createServiceDescriptor(&svcs[i], svcProto, i, prefix+svcProto.GetName(), pool)
+		svcs[i] = r.createServiceDescriptor(svcProto, i, prefix+svcProto.GetName())
 	}
 	return svcDescriptors{svcs: svcs}
 }
@@ -1644,12 +1671,11 @@ func (s *svcDescriptors) Len() int {
 }
 
 func (s *svcDescriptors) Get(i int) protoreflect.ServiceDescriptor {
-	return &s.svcs[i]
+	return s.svcs[i]
 }
 
 func (s *svcDescriptors) ByName(n protoreflect.Name) protoreflect.ServiceDescriptor {
-	for i := range s.svcs {
-		svc := &s.svcs[i]
+	for _, svc := range s.svcs {
 		if svc.Name() == n {
 			return svc
 		}
@@ -1670,16 +1696,14 @@ type svcDescriptor struct {
 var _ protoreflect.ServiceDescriptor = (*svcDescriptor)(nil)
 var _ protoutil.DescriptorProtoWrapper = (*svcDescriptor)(nil)
 
-func (r *result) createServiceDescriptor(ret *svcDescriptor, sd *descriptorpb.ServiceDescriptorProto, index int, fqn string, pool *allocPool) {
+func (r *result) createServiceDescriptor(sd *descriptorpb.ServiceDescriptorProto, index int, fqn string) *svcDescriptor {
+	ret := &svcDescriptor{file: r, index: index, proto: sd, fqn: fqn}
 	r.descriptors[fqn] = ret
-	ret.ServiceDescriptor = noOpService
-	ret.file = r
-	ret.index = index
-	ret.proto = sd
-	ret.fqn = fqn
 
 	prefix := fqn + "."
-	ret.methods = r.createMethods(prefix, ret, sd.Method, pool)
+	ret.methods = r.createMethods(prefix, ret, sd.Method)
+
+	return ret
 }
 
 func (s *svcDescriptor) ServiceDescriptorProto() *descriptorpb.ServiceDescriptorProto {
@@ -1728,13 +1752,13 @@ func (s *svcDescriptor) Methods() protoreflect.MethodDescriptors {
 
 type mtdDescriptors struct {
 	protoreflect.MethodDescriptors
-	mtds []mtdDescriptor
+	mtds []*mtdDescriptor
 }
 
-func (r *result) createMethods(prefix string, parent *svcDescriptor, mtdProtos []*descriptorpb.MethodDescriptorProto, pool *allocPool) mtdDescriptors {
-	mtds := pool.getMethods(len(mtdProtos))
+func (r *result) createMethods(prefix string, parent *svcDescriptor, mtdProtos []*descriptorpb.MethodDescriptorProto) mtdDescriptors {
+	mtds := make([]*mtdDescriptor, len(mtdProtos))
 	for i, mtdProto := range mtdProtos {
-		r.createMethodDescriptor(&mtds[i], mtdProto, parent, i, prefix+mtdProto.GetName())
+		mtds[i] = r.createMethodDescriptor(mtdProto, parent, i, prefix+mtdProto.GetName())
 	}
 	return mtdDescriptors{mtds: mtds}
 }
@@ -1744,12 +1768,11 @@ func (m *mtdDescriptors) Len() int {
 }
 
 func (m *mtdDescriptors) Get(i int) protoreflect.MethodDescriptor {
-	return &m.mtds[i]
+	return m.mtds[i]
 }
 
 func (m *mtdDescriptors) ByName(n protoreflect.Name) protoreflect.MethodDescriptor {
-	for i := range m.mtds {
-		mtd := &m.mtds[i]
+	for _, mtd := range m.mtds {
 		if mtd.Name() == n {
 			return mtd
 		}
@@ -1771,14 +1794,10 @@ type mtdDescriptor struct {
 var _ protoreflect.MethodDescriptor = (*mtdDescriptor)(nil)
 var _ protoutil.DescriptorProtoWrapper = (*mtdDescriptor)(nil)
 
-func (r *result) createMethodDescriptor(ret *mtdDescriptor, mtd *descriptorpb.MethodDescriptorProto, parent *svcDescriptor, index int, fqn string) {
+func (r *result) createMethodDescriptor(mtd *descriptorpb.MethodDescriptorProto, parent *svcDescriptor, index int, fqn string) *mtdDescriptor {
+	ret := &mtdDescriptor{file: r, parent: parent, index: index, proto: mtd, fqn: fqn}
 	r.descriptors[fqn] = ret
-	ret.MethodDescriptor = noOpMethod
-	ret.file = r
-	ret.parent = parent
-	ret.index = index
-	ret.proto = mtd
-	ret.fqn = fqn
+	return ret
 }
 
 func (m *mtdDescriptor) MethodDescriptorProto() *descriptorpb.MethodDescriptorProto {
@@ -1850,35 +1869,12 @@ func (r *result) FindDescriptorByName(name protoreflect.FullName) protoreflect.D
 	return r.descriptors[fqn]
 }
 
+func (r *result) importsAsFiles() Files {
+	return r.deps
+}
+
 func (r *result) hasSource() bool {
 	n := r.FileNode()
 	_, ok := n.(*ast.FileNode)
 	return ok
-}
-
-// resolveFeature resolves a feature for the given descriptor. If the given element
-// is in a proto2 or proto3 syntax file, this skips resolution and just returns the
-// relevant default (since such files are not allowed to override features).
-//
-// If neither the given element nor any of its ancestors override the given feature,
-// the relevant default is returned.
-func resolveFeature(element protoreflect.Descriptor, feature protoreflect.FieldDescriptor) protoreflect.Value {
-	edition := editions.GetEdition(element)
-	if edition == descriptorpb.Edition_EDITION_PROTO2 || edition == descriptorpb.Edition_EDITION_PROTO3 {
-		// these syntax levels can't specify features, so we can short-circuit the search
-		// through the descriptor hierarchy for feature overrides
-		defaults := editions.GetEditionDefaults(edition)
-		return defaults.ProtoReflect().Get(feature) // returns default value if field is not present
-	}
-	val, err := editions.ResolveFeature(element, feature)
-	if err == nil && val.IsValid() {
-		return val
-	}
-	defaults := editions.GetEditionDefaults(edition)
-	return defaults.ProtoReflect().Get(feature)
-}
-
-func isJSONCompliant(d protoreflect.Descriptor) bool {
-	jsonFormat := resolveFeature(d, jsonFormatField)
-	return descriptorpb.FeatureSet_JsonFormat(jsonFormat.Enum()) == descriptorpb.FeatureSet_ALLOW
 }

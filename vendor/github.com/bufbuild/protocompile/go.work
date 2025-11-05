@@ -1,6 +1,7 @@
-go 1.21
+go 1.19
 
 use (
 	.
 	./internal/benchmarks
+	./internal/tools
 )

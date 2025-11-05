@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ type OptionDeclNode interface {
 }
 
 var _ OptionDeclNode = (*OptionNode)(nil)
-var _ OptionDeclNode = (*NoSourceNode)(nil)
+var _ OptionDeclNode = NoSourceNode{}
 
 // OptionNode represents the declaration of a single option for an element.
 // It is used both for normal option declarations (start with "option" keyword
@@ -43,12 +43,12 @@ type OptionNode struct {
 	Semicolon *RuneNode // absent for compact options
 }
 
-func (*OptionNode) fileElement()    {}
-func (*OptionNode) msgElement()     {}
-func (*OptionNode) oneofElement()   {}
-func (*OptionNode) enumElement()    {}
-func (*OptionNode) serviceElement() {}
-func (*OptionNode) methodElement()  {}
+func (n *OptionNode) fileElement()    {}
+func (n *OptionNode) msgElement()     {}
+func (n *OptionNode) oneOfElement()   {}
+func (n *OptionNode) enumElement()    {}
+func (n *OptionNode) serviceElement() {}
+func (n *OptionNode) methodElement()  {}
 
 // NewOptionNode creates a new *OptionNode for a full option declaration (as
 // used in files, messages, oneofs, enums, services, and methods). All arguments
@@ -71,13 +71,10 @@ func NewOptionNode(keyword *KeywordNode, name *OptionNameNode, equals *RuneNode,
 	if val == nil {
 		panic("val is nil")
 	}
-	var children []Node
 	if semicolon == nil {
-		children = []Node{keyword, name, equals, val}
-	} else {
-		children = []Node{keyword, name, equals, val, semicolon}
+		panic("semicolon is nil")
 	}
-
+	children := []Node{keyword, name, equals, val, semicolon}
 	return &OptionNode{
 		compositeNode: compositeNode{
 			children: children,
@@ -100,18 +97,13 @@ func NewCompactOptionNode(name *OptionNameNode, equals *RuneNode, val ValueNode)
 	if name == nil {
 		panic("name is nil")
 	}
-	if equals == nil && val != nil {
-		panic("equals is nil but val is not")
+	if equals == nil {
+		panic("equals is nil")
 	}
-	if val == nil && equals != nil {
-		panic("val is nil but equals is not")
+	if val == nil {
+		panic("val is nil")
 	}
-	var children []Node
-	if equals == nil && val == nil {
-		children = []Node{name}
-	} else {
-		children = []Node{name, equals, val}
-	}
+	children := []Node{name, equals, val}
 	return &OptionNode{
 		compositeNode: compositeNode{
 			children: children,
@@ -159,10 +151,10 @@ func NewOptionNameNode(parts []*FieldReferenceNode, dots []*RuneNode) *OptionNam
 	if len(parts) == 0 {
 		panic("must have at least one part")
 	}
-	if len(dots) != len(parts)-1 && len(dots) != len(parts) {
+	if len(dots) != len(parts)-1 {
 		panic(fmt.Sprintf("%d parts requires %d dots, not %d", len(parts), len(parts)-1, len(dots)))
 	}
-	children := make([]Node, 0, len(parts)+len(dots))
+	children := make([]Node, 0, len(parts)*2-1)
 	for i, part := range parts {
 		if part == nil {
 			panic(fmt.Sprintf("parts[%d] is nil", i))
@@ -174,12 +166,6 @@ func NewOptionNameNode(parts []*FieldReferenceNode, dots []*RuneNode) *OptionNam
 			children = append(children, dots[i-1])
 		}
 		children = append(children, part)
-	}
-	if len(dots) == len(parts) { // Add the erroneous, but tolerated trailing dot.
-		if dots[len(dots)-1] == nil {
-			panic(fmt.Sprintf("dots[%d] is nil", len(dots)-1))
-		}
-		children = append(children, dots[len(dots)-1])
 	}
 	return &OptionNameNode{
 		compositeNode: compositeNode{
@@ -346,33 +332,25 @@ func NewCompactOptionsNode(openBracket *RuneNode, opts []*OptionNode, commas []*
 	if closeBracket == nil {
 		panic("closeBracket is nil")
 	}
-	if len(opts) == 0 && len(commas) != 0 {
-		panic("opts is empty but commas is not")
+	if len(opts) == 0 {
+		panic("must have at least one part")
 	}
-	if len(opts) != len(commas) && len(opts) != len(commas)+1 {
+	if len(commas) != len(opts)-1 {
 		panic(fmt.Sprintf("%d opts requires %d commas, not %d", len(opts), len(opts)-1, len(commas)))
 	}
-	children := make([]Node, 0, len(opts)+len(commas)+2)
+	children := make([]Node, 0, len(opts)*2+1)
 	children = append(children, openBracket)
-	if len(opts) > 0 {
-		for i, opt := range opts {
-			if i > 0 {
-				if commas[i-1] == nil {
-					panic(fmt.Sprintf("commas[%d] is nil", i-1))
-				}
-				children = append(children, commas[i-1])
+	for i, opt := range opts {
+		if i > 0 {
+			if commas[i-1] == nil {
+				panic(fmt.Sprintf("commas[%d] is nil", i-1))
 			}
-			if opt == nil {
-				panic(fmt.Sprintf("opts[%d] is nil", i))
-			}
-			children = append(children, opt)
+			children = append(children, commas[i-1])
 		}
-		if len(opts) == len(commas) { // Add the erroneous, but tolerated trailing comma.
-			if commas[len(commas)-1] == nil {
-				panic(fmt.Sprintf("commas[%d] is nil", len(commas)-1))
-			}
-			children = append(children, commas[len(commas)-1])
+		if opt == nil {
+			panic(fmt.Sprintf("opts[%d] is nil", i))
 		}
+		children = append(children, opt)
 	}
 	children = append(children, closeBracket)
 
@@ -393,21 +371,3 @@ func (e *CompactOptionsNode) GetElements() []*OptionNode {
 	}
 	return e.Options
 }
-
-// NodeWithOptions represents a node in the AST that contains
-// option statements.
-type NodeWithOptions interface {
-	Node
-	RangeOptions(func(*OptionNode) bool)
-}
-
-var _ NodeWithOptions = FileDeclNode(nil)
-var _ NodeWithOptions = MessageDeclNode(nil)
-var _ NodeWithOptions = OneofDeclNode(nil)
-var _ NodeWithOptions = (*EnumNode)(nil)
-var _ NodeWithOptions = (*ServiceNode)(nil)
-var _ NodeWithOptions = RPCDeclNode(nil)
-var _ NodeWithOptions = FieldDeclNode(nil)
-var _ NodeWithOptions = EnumValueDeclNode(nil)
-var _ NodeWithOptions = (*ExtensionRangeNode)(nil)
-var _ NodeWithOptions = (*NoSourceNode)(nil)

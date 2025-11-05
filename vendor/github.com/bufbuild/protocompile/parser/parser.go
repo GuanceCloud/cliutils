@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,8 +25,7 @@ import (
 	"github.com/bufbuild/protocompile/reporter"
 )
 
-// The path ../.tmp/bin/goyacc is built when using `make generate` from repo root.
-//go:generate ../.tmp/bin/goyacc -o proto.y.go -l -p proto proto.y
+//go:generate goyacc -o proto.y.go -l -p proto proto.y
 
 func init() {
 	protoErrorVerbose = true
@@ -151,23 +150,16 @@ type Result interface {
 	// FileDescriptorProto hierarchy. If this result has no AST, this returns a
 	// placeholder node.
 	FieldNode(*descriptorpb.FieldDescriptorProto) ast.FieldDeclNode
-	// OneofNode returns the AST node corresponding to the given oneof. This can
+	// OneOfNode returns the AST node corresponding to the given oneof. This can
 	// return nil, such as if the given oneof is not part of the
 	// FileDescriptorProto hierarchy. If this result has no AST, this returns a
 	// placeholder node.
-	OneofNode(*descriptorpb.OneofDescriptorProto) ast.OneofDeclNode
+	OneOfNode(*descriptorpb.OneofDescriptorProto) ast.Node
 	// ExtensionRangeNode returns the AST node corresponding to the given
 	// extension range. This can return nil, such as if the given range is not
 	// part of the FileDescriptorProto hierarchy. If this result has no AST,
 	// this returns a placeholder node.
 	ExtensionRangeNode(*descriptorpb.DescriptorProto_ExtensionRange) ast.RangeDeclNode
-
-	// ExtensionsNode returns the AST node corresponding to the "extensions"
-	// statement in a message that corresponds to the given range. This will be
-	// the parent of the node returned by ExtensionRangeNode, which contains the
-	// options that apply to all child ranges.
-	ExtensionsNode(*descriptorpb.DescriptorProto_ExtensionRange) ast.NodeWithOptions
-
 	// MessageReservedRangeNode returns the AST node corresponding to the given
 	// reserved range. This can return nil, such as if the given range is not
 	// part of the FileDescriptorProto hierarchy. If this result has no AST,
@@ -177,7 +169,7 @@ type Result interface {
 	// return nil, such as if the given enum is not part of the
 	// FileDescriptorProto hierarchy. If this result has no AST, this returns a
 	// placeholder node.
-	EnumNode(*descriptorpb.EnumDescriptorProto) ast.NodeWithOptions
+	EnumNode(*descriptorpb.EnumDescriptorProto) ast.Node
 	// EnumValueNode returns the AST node corresponding to the given enum. This
 	// can return nil, such as if the given enum value is not part of the
 	// FileDescriptorProto hierarchy. If this result has no AST, this returns a
@@ -192,7 +184,7 @@ type Result interface {
 	// can return nil, such as if the given service is not part of the
 	// FileDescriptorProto hierarchy. If this result has no AST, this returns a
 	// placeholder node.
-	ServiceNode(*descriptorpb.ServiceDescriptorProto) ast.NodeWithOptions
+	ServiceNode(*descriptorpb.ServiceDescriptorProto) ast.Node
 	// MethodNode returns the AST node corresponding to the given method. This
 	// can return nil, such as if the given method is not part of the
 	// FileDescriptorProto hierarchy. If this result has no AST, this returns a

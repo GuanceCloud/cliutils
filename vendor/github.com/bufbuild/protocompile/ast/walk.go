@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -103,8 +103,6 @@ func Visit(n Node, v Visitor) error {
 		return v.VisitFileNode(n)
 	case *SyntaxNode:
 		return v.VisitSyntaxNode(n)
-	case *EditionNode:
-		return v.VisitEditionNode(n)
 	case *PackageNode:
 		return v.VisitPackageNode(n)
 	case *ImportNode:
@@ -135,8 +133,8 @@ func Visit(n Node, v Visitor) error {
 		return v.VisitMapFieldNode(n)
 	case *MapTypeNode:
 		return v.VisitMapTypeNode(n)
-	case *OneofNode:
-		return v.VisitOneofNode(n)
+	case *OneOfNode:
+		return v.VisitOneOfNode(n)
 	case *EnumNode:
 		return v.VisitEnumNode(n)
 	case *EnumValueNode:
@@ -157,6 +155,8 @@ func Visit(n Node, v Visitor) error {
 		return v.VisitCompoundStringLiteralNode(n)
 	case *UintLiteralNode:
 		return v.VisitUintLiteralNode(n)
+	case *PositiveUintLiteralNode:
+		return v.VisitPositiveUintLiteralNode(n)
 	case *NegativeIntLiteralNode:
 		return v.VisitNegativeIntLiteralNode(n)
 	case *FloatLiteralNode:
@@ -197,7 +197,7 @@ func (t *AncestorTracker) AsWalkOptions() []WalkOption {
 			t.ancestors = append(t.ancestors, n)
 			return nil
 		}),
-		WithAfter(func(_ Node) error {
+		WithAfter(func(n Node) error {
 			t.ancestors = t.ancestors[:len(t.ancestors)-1]
 			return nil
 		}),
@@ -242,33 +242,17 @@ func VisitChildren(n CompositeNode, v Visitor) error {
 // It consists of a number of functions, each of which matches a
 // concrete Node type.
 //
-// NOTE: As the language evolves, new methods may be added to this
-// interface to correspond to new grammar elements. That is why it
-// cannot be directly implemented outside this package. Visitor
-// implementations must embed NoOpVisitor and then implement the
-// subset of methods of interest. If such an implementation is used
-// with an AST that has newer elements, the visitor will not do
-// anything in response to the new node types.
-//
-// An alternative to embedding NoOpVisitor is to use an instance of
-// SimpleVisitor.
+// Most visitor implementations will either embed NoOpVisitor (so as
+// not to have to implement *all* of the methods) or will be instances
+// of SimpleVisitor.
 //
 // Visitors can be supplied to a Walk operation or passed to a call
 // to Visit or VisitChildren.
-//
-// Note that there are some AST node types defined in this package
-// that do not have corresponding visit methods. These are synthetic
-// node types, that have specialized use from the parser, but never
-// appear in an actual AST (which is always rooted at FileNode).
-// These include SyntheticMapField, SyntheticOneof,
-// SyntheticGroupMessageNode, and SyntheticMapEntryNode.
 type Visitor interface {
 	// VisitFileNode is invoked when visiting a *FileNode in the AST.
 	VisitFileNode(*FileNode) error
 	// VisitSyntaxNode is invoked when visiting a *SyntaxNode in the AST.
 	VisitSyntaxNode(*SyntaxNode) error
-	// VisitEditionNode is invoked when visiting an *EditionNode in the AST.
-	VisitEditionNode(*EditionNode) error
 	// VisitPackageNode is invoked when visiting a *PackageNode in the AST.
 	VisitPackageNode(*PackageNode) error
 	// VisitImportNode is invoked when visiting an *ImportNode in the AST.
@@ -299,8 +283,8 @@ type Visitor interface {
 	VisitMapFieldNode(*MapFieldNode) error
 	// VisitMapTypeNode is invoked when visiting a *MapTypeNode in the AST.
 	VisitMapTypeNode(*MapTypeNode) error
-	// VisitOneofNode is invoked when visiting a *OneofNode in the AST.
-	VisitOneofNode(*OneofNode) error
+	// VisitOneOfNode is invoked when visiting a *OneOfNode in the AST.
+	VisitOneOfNode(*OneOfNode) error
 	// VisitEnumNode is invoked when visiting an *EnumNode in the AST.
 	VisitEnumNode(*EnumNode) error
 	// VisitEnumValueNode is invoked when visiting an *EnumValueNode in the AST.
@@ -321,6 +305,8 @@ type Visitor interface {
 	VisitCompoundStringLiteralNode(*CompoundStringLiteralNode) error
 	// VisitUintLiteralNode is invoked when visiting a *UintLiteralNode in the AST.
 	VisitUintLiteralNode(*UintLiteralNode) error
+	// VisitPositiveUintLiteralNode is invoked when visiting a *PositiveUintLiteralNode in the AST.
+	VisitPositiveUintLiteralNode(*PositiveUintLiteralNode) error
 	// VisitNegativeIntLiteralNode is invoked when visiting a *NegativeIntLiteralNode in the AST.
 	VisitNegativeIntLiteralNode(*NegativeIntLiteralNode) error
 	// VisitFloatLiteralNode is invoked when visiting a *FloatLiteralNode in the AST.
@@ -341,9 +327,6 @@ type Visitor interface {
 	VisitRuneNode(*RuneNode) error
 	// VisitEmptyDeclNode is invoked when visiting a *EmptyDeclNode in the AST.
 	VisitEmptyDeclNode(*EmptyDeclNode) error
-
-	// Unexported method prevents callers from directly implementing.
-	isVisitor()
 }
 
 // NoOpVisitor is a visitor implementation that does nothing. All methods
@@ -354,17 +337,11 @@ type NoOpVisitor struct{}
 
 var _ Visitor = NoOpVisitor{}
 
-func (n NoOpVisitor) isVisitor() {}
-
 func (n NoOpVisitor) VisitFileNode(_ *FileNode) error {
 	return nil
 }
 
 func (n NoOpVisitor) VisitSyntaxNode(_ *SyntaxNode) error {
-	return nil
-}
-
-func (n NoOpVisitor) VisitEditionNode(_ *EditionNode) error {
 	return nil
 }
 
@@ -428,7 +405,7 @@ func (n NoOpVisitor) VisitMapTypeNode(_ *MapTypeNode) error {
 	return nil
 }
 
-func (n NoOpVisitor) VisitOneofNode(_ *OneofNode) error {
+func (n NoOpVisitor) VisitOneOfNode(_ *OneOfNode) error {
 	return nil
 }
 
@@ -469,6 +446,10 @@ func (n NoOpVisitor) VisitCompoundStringLiteralNode(_ *CompoundStringLiteralNode
 }
 
 func (n NoOpVisitor) VisitUintLiteralNode(_ *UintLiteralNode) error {
+	return nil
+}
+
+func (n NoOpVisitor) VisitPositiveUintLiteralNode(_ *PositiveUintLiteralNode) error {
 	return nil
 }
 
@@ -541,7 +522,6 @@ func (n NoOpVisitor) VisitEmptyDeclNode(_ *EmptyDeclNode) error {
 type SimpleVisitor struct {
 	DoVisitFileNode                  func(*FileNode) error
 	DoVisitSyntaxNode                func(*SyntaxNode) error
-	DoVisitEditionNode               func(*EditionNode) error
 	DoVisitPackageNode               func(*PackageNode) error
 	DoVisitImportNode                func(*ImportNode) error
 	DoVisitOptionNode                func(*OptionNode) error
@@ -557,7 +537,7 @@ type SimpleVisitor struct {
 	DoVisitGroupNode                 func(*GroupNode) error
 	DoVisitMapFieldNode              func(*MapFieldNode) error
 	DoVisitMapTypeNode               func(*MapTypeNode) error
-	DoVisitOneofNode                 func(*OneofNode) error
+	DoVisitOneOfNode                 func(*OneOfNode) error
 	DoVisitEnumNode                  func(*EnumNode) error
 	DoVisitEnumValueNode             func(*EnumValueNode) error
 	DoVisitServiceNode               func(*ServiceNode) error
@@ -568,6 +548,7 @@ type SimpleVisitor struct {
 	DoVisitStringLiteralNode         func(*StringLiteralNode) error
 	DoVisitCompoundStringLiteralNode func(*CompoundStringLiteralNode) error
 	DoVisitUintLiteralNode           func(*UintLiteralNode) error
+	DoVisitPositiveUintLiteralNode   func(*PositiveUintLiteralNode) error
 	DoVisitNegativeIntLiteralNode    func(*NegativeIntLiteralNode) error
 	DoVisitFloatLiteralNode          func(*FloatLiteralNode) error
 	DoVisitSpecialFloatLiteralNode   func(*SpecialFloatLiteralNode) error
@@ -595,337 +576,335 @@ type SimpleVisitor struct {
 
 var _ Visitor = (*SimpleVisitor)(nil)
 
-func (v *SimpleVisitor) isVisitor() {}
-
-func (v *SimpleVisitor) visitInterface(node Node) error {
+func (b *SimpleVisitor) visitInterface(node Node) error {
 	switch n := node.(type) {
 	case FieldDeclNode:
-		if v.DoVisitFieldDeclNode != nil {
-			return v.DoVisitFieldDeclNode(n)
+		if b.DoVisitFieldDeclNode != nil {
+			return b.DoVisitFieldDeclNode(n)
 		}
 		// *MapFieldNode and *GroupNode both implement both FieldDeclNode and
 		// MessageDeclNode, so handle other case here
-		if fn, ok := n.(MessageDeclNode); ok && v.DoVisitMessageDeclNode != nil {
-			return v.DoVisitMessageDeclNode(fn)
+		if fn, ok := n.(MessageDeclNode); ok && b.DoVisitMessageDeclNode != nil {
+			return b.DoVisitMessageDeclNode(fn)
 		}
 	case MessageDeclNode:
-		if v.DoVisitMessageDeclNode != nil {
-			return v.DoVisitMessageDeclNode(n)
+		if b.DoVisitMessageDeclNode != nil {
+			return b.DoVisitMessageDeclNode(n)
 		}
 	case IdentValueNode:
-		if v.DoVisitIdentValueNode != nil {
-			return v.DoVisitIdentValueNode(n)
+		if b.DoVisitIdentValueNode != nil {
+			return b.DoVisitIdentValueNode(n)
 		}
 	case StringValueNode:
-		if v.DoVisitStringValueNode != nil {
-			return v.DoVisitStringValueNode(n)
+		if b.DoVisitStringValueNode != nil {
+			return b.DoVisitStringValueNode(n)
 		}
 	case IntValueNode:
-		if v.DoVisitIntValueNode != nil {
-			return v.DoVisitIntValueNode(n)
+		if b.DoVisitIntValueNode != nil {
+			return b.DoVisitIntValueNode(n)
 		}
 		// *UintLiteralNode implements both IntValueNode and FloatValueNode,
 		// so handle other case here
-		if fn, ok := n.(FloatValueNode); ok && v.DoVisitFloatValueNode != nil {
-			return v.DoVisitFloatValueNode(fn)
+		if fn, ok := n.(FloatValueNode); ok && b.DoVisitFloatValueNode != nil {
+			return b.DoVisitFloatValueNode(fn)
 		}
 	case FloatValueNode:
-		if v.DoVisitFloatValueNode != nil {
-			return v.DoVisitFloatValueNode(n)
+		if b.DoVisitFloatValueNode != nil {
+			return b.DoVisitFloatValueNode(n)
 		}
 	}
 
-	if n, ok := node.(ValueNode); ok && v.DoVisitValueNode != nil {
-		return v.DoVisitValueNode(n)
+	if n, ok := node.(ValueNode); ok && b.DoVisitValueNode != nil {
+		return b.DoVisitValueNode(n)
 	}
 
 	switch n := node.(type) {
 	case TerminalNode:
-		if v.DoVisitTerminalNode != nil {
-			return v.DoVisitTerminalNode(n)
+		if b.DoVisitTerminalNode != nil {
+			return b.DoVisitTerminalNode(n)
 		}
 	case CompositeNode:
-		if v.DoVisitCompositeNode != nil {
-			return v.DoVisitCompositeNode(n)
+		if b.DoVisitCompositeNode != nil {
+			return b.DoVisitCompositeNode(n)
 		}
 	}
 
-	if v.DoVisitNode != nil {
-		return v.DoVisitNode(node)
+	if b.DoVisitNode != nil {
+		return b.DoVisitNode(node)
 	}
 
 	return nil
 }
 
-func (v *SimpleVisitor) VisitFileNode(node *FileNode) error {
-	if v.DoVisitFileNode != nil {
-		return v.DoVisitFileNode(node)
+func (b *SimpleVisitor) VisitFileNode(node *FileNode) error {
+	if b.DoVisitFileNode != nil {
+		return b.DoVisitFileNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitSyntaxNode(node *SyntaxNode) error {
-	if v.DoVisitSyntaxNode != nil {
-		return v.DoVisitSyntaxNode(node)
+func (b *SimpleVisitor) VisitSyntaxNode(node *SyntaxNode) error {
+	if b.DoVisitSyntaxNode != nil {
+		return b.DoVisitSyntaxNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitEditionNode(node *EditionNode) error {
-	if v.DoVisitEditionNode != nil {
-		return v.DoVisitEditionNode(node)
+func (b *SimpleVisitor) VisitPackageNode(node *PackageNode) error {
+	if b.DoVisitPackageNode != nil {
+		return b.DoVisitPackageNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitPackageNode(node *PackageNode) error {
-	if v.DoVisitPackageNode != nil {
-		return v.DoVisitPackageNode(node)
+func (b *SimpleVisitor) VisitImportNode(node *ImportNode) error {
+	if b.DoVisitImportNode != nil {
+		return b.DoVisitImportNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitImportNode(node *ImportNode) error {
-	if v.DoVisitImportNode != nil {
-		return v.DoVisitImportNode(node)
+func (b *SimpleVisitor) VisitOptionNode(node *OptionNode) error {
+	if b.DoVisitOptionNode != nil {
+		return b.DoVisitOptionNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitOptionNode(node *OptionNode) error {
-	if v.DoVisitOptionNode != nil {
-		return v.DoVisitOptionNode(node)
+func (b *SimpleVisitor) VisitOptionNameNode(node *OptionNameNode) error {
+	if b.DoVisitOptionNameNode != nil {
+		return b.DoVisitOptionNameNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitOptionNameNode(node *OptionNameNode) error {
-	if v.DoVisitOptionNameNode != nil {
-		return v.DoVisitOptionNameNode(node)
+func (b *SimpleVisitor) VisitFieldReferenceNode(node *FieldReferenceNode) error {
+	if b.DoVisitFieldReferenceNode != nil {
+		return b.DoVisitFieldReferenceNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitFieldReferenceNode(node *FieldReferenceNode) error {
-	if v.DoVisitFieldReferenceNode != nil {
-		return v.DoVisitFieldReferenceNode(node)
+func (b *SimpleVisitor) VisitCompactOptionsNode(node *CompactOptionsNode) error {
+	if b.DoVisitCompactOptionsNode != nil {
+		return b.DoVisitCompactOptionsNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitCompactOptionsNode(node *CompactOptionsNode) error {
-	if v.DoVisitCompactOptionsNode != nil {
-		return v.DoVisitCompactOptionsNode(node)
+func (b *SimpleVisitor) VisitMessageNode(node *MessageNode) error {
+	if b.DoVisitMessageNode != nil {
+		return b.DoVisitMessageNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitMessageNode(node *MessageNode) error {
-	if v.DoVisitMessageNode != nil {
-		return v.DoVisitMessageNode(node)
+func (b *SimpleVisitor) VisitExtendNode(node *ExtendNode) error {
+	if b.DoVisitExtendNode != nil {
+		return b.DoVisitExtendNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitExtendNode(node *ExtendNode) error {
-	if v.DoVisitExtendNode != nil {
-		return v.DoVisitExtendNode(node)
+func (b *SimpleVisitor) VisitExtensionRangeNode(node *ExtensionRangeNode) error {
+	if b.DoVisitExtensionRangeNode != nil {
+		return b.DoVisitExtensionRangeNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitExtensionRangeNode(node *ExtensionRangeNode) error {
-	if v.DoVisitExtensionRangeNode != nil {
-		return v.DoVisitExtensionRangeNode(node)
+func (b *SimpleVisitor) VisitReservedNode(node *ReservedNode) error {
+	if b.DoVisitReservedNode != nil {
+		return b.DoVisitReservedNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitReservedNode(node *ReservedNode) error {
-	if v.DoVisitReservedNode != nil {
-		return v.DoVisitReservedNode(node)
+func (b *SimpleVisitor) VisitRangeNode(node *RangeNode) error {
+	if b.DoVisitRangeNode != nil {
+		return b.DoVisitRangeNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitRangeNode(node *RangeNode) error {
-	if v.DoVisitRangeNode != nil {
-		return v.DoVisitRangeNode(node)
+func (b *SimpleVisitor) VisitFieldNode(node *FieldNode) error {
+	if b.DoVisitFieldNode != nil {
+		return b.DoVisitFieldNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitFieldNode(node *FieldNode) error {
-	if v.DoVisitFieldNode != nil {
-		return v.DoVisitFieldNode(node)
+func (b *SimpleVisitor) VisitGroupNode(node *GroupNode) error {
+	if b.DoVisitGroupNode != nil {
+		return b.DoVisitGroupNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitGroupNode(node *GroupNode) error {
-	if v.DoVisitGroupNode != nil {
-		return v.DoVisitGroupNode(node)
+func (b *SimpleVisitor) VisitMapFieldNode(node *MapFieldNode) error {
+	if b.DoVisitMapFieldNode != nil {
+		return b.DoVisitMapFieldNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitMapFieldNode(node *MapFieldNode) error {
-	if v.DoVisitMapFieldNode != nil {
-		return v.DoVisitMapFieldNode(node)
+func (b *SimpleVisitor) VisitMapTypeNode(node *MapTypeNode) error {
+	if b.DoVisitMapTypeNode != nil {
+		return b.DoVisitMapTypeNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitMapTypeNode(node *MapTypeNode) error {
-	if v.DoVisitMapTypeNode != nil {
-		return v.DoVisitMapTypeNode(node)
+func (b *SimpleVisitor) VisitOneOfNode(node *OneOfNode) error {
+	if b.DoVisitOneOfNode != nil {
+		return b.DoVisitOneOfNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitOneofNode(node *OneofNode) error {
-	if v.DoVisitOneofNode != nil {
-		return v.DoVisitOneofNode(node)
+func (b *SimpleVisitor) VisitEnumNode(node *EnumNode) error {
+	if b.DoVisitEnumNode != nil {
+		return b.DoVisitEnumNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitEnumNode(node *EnumNode) error {
-	if v.DoVisitEnumNode != nil {
-		return v.DoVisitEnumNode(node)
+func (b *SimpleVisitor) VisitEnumValueNode(node *EnumValueNode) error {
+	if b.DoVisitEnumValueNode != nil {
+		return b.DoVisitEnumValueNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitEnumValueNode(node *EnumValueNode) error {
-	if v.DoVisitEnumValueNode != nil {
-		return v.DoVisitEnumValueNode(node)
+func (b *SimpleVisitor) VisitServiceNode(node *ServiceNode) error {
+	if b.DoVisitServiceNode != nil {
+		return b.DoVisitServiceNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitServiceNode(node *ServiceNode) error {
-	if v.DoVisitServiceNode != nil {
-		return v.DoVisitServiceNode(node)
+func (b *SimpleVisitor) VisitRPCNode(node *RPCNode) error {
+	if b.DoVisitRPCNode != nil {
+		return b.DoVisitRPCNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitRPCNode(node *RPCNode) error {
-	if v.DoVisitRPCNode != nil {
-		return v.DoVisitRPCNode(node)
+func (b *SimpleVisitor) VisitRPCTypeNode(node *RPCTypeNode) error {
+	if b.DoVisitRPCTypeNode != nil {
+		return b.DoVisitRPCTypeNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitRPCTypeNode(node *RPCTypeNode) error {
-	if v.DoVisitRPCTypeNode != nil {
-		return v.DoVisitRPCTypeNode(node)
+func (b *SimpleVisitor) VisitIdentNode(node *IdentNode) error {
+	if b.DoVisitIdentNode != nil {
+		return b.DoVisitIdentNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitIdentNode(node *IdentNode) error {
-	if v.DoVisitIdentNode != nil {
-		return v.DoVisitIdentNode(node)
+func (b *SimpleVisitor) VisitCompoundIdentNode(node *CompoundIdentNode) error {
+	if b.DoVisitCompoundIdentNode != nil {
+		return b.DoVisitCompoundIdentNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitCompoundIdentNode(node *CompoundIdentNode) error {
-	if v.DoVisitCompoundIdentNode != nil {
-		return v.DoVisitCompoundIdentNode(node)
+func (b *SimpleVisitor) VisitStringLiteralNode(node *StringLiteralNode) error {
+	if b.DoVisitStringLiteralNode != nil {
+		return b.DoVisitStringLiteralNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitStringLiteralNode(node *StringLiteralNode) error {
-	if v.DoVisitStringLiteralNode != nil {
-		return v.DoVisitStringLiteralNode(node)
+func (b *SimpleVisitor) VisitCompoundStringLiteralNode(node *CompoundStringLiteralNode) error {
+	if b.DoVisitCompoundStringLiteralNode != nil {
+		return b.DoVisitCompoundStringLiteralNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitCompoundStringLiteralNode(node *CompoundStringLiteralNode) error {
-	if v.DoVisitCompoundStringLiteralNode != nil {
-		return v.DoVisitCompoundStringLiteralNode(node)
+func (b *SimpleVisitor) VisitUintLiteralNode(node *UintLiteralNode) error {
+	if b.DoVisitUintLiteralNode != nil {
+		return b.DoVisitUintLiteralNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitUintLiteralNode(node *UintLiteralNode) error {
-	if v.DoVisitUintLiteralNode != nil {
-		return v.DoVisitUintLiteralNode(node)
+func (b *SimpleVisitor) VisitPositiveUintLiteralNode(node *PositiveUintLiteralNode) error {
+	if b.DoVisitPositiveUintLiteralNode != nil {
+		return b.DoVisitPositiveUintLiteralNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitNegativeIntLiteralNode(node *NegativeIntLiteralNode) error {
-	if v.DoVisitNegativeIntLiteralNode != nil {
-		return v.DoVisitNegativeIntLiteralNode(node)
+func (b *SimpleVisitor) VisitNegativeIntLiteralNode(node *NegativeIntLiteralNode) error {
+	if b.DoVisitNegativeIntLiteralNode != nil {
+		return b.DoVisitNegativeIntLiteralNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitFloatLiteralNode(node *FloatLiteralNode) error {
-	if v.DoVisitFloatLiteralNode != nil {
-		return v.DoVisitFloatLiteralNode(node)
+func (b *SimpleVisitor) VisitFloatLiteralNode(node *FloatLiteralNode) error {
+	if b.DoVisitFloatLiteralNode != nil {
+		return b.DoVisitFloatLiteralNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitSpecialFloatLiteralNode(node *SpecialFloatLiteralNode) error {
-	if v.DoVisitSpecialFloatLiteralNode != nil {
-		return v.DoVisitSpecialFloatLiteralNode(node)
+func (b *SimpleVisitor) VisitSpecialFloatLiteralNode(node *SpecialFloatLiteralNode) error {
+	if b.DoVisitSpecialFloatLiteralNode != nil {
+		return b.DoVisitSpecialFloatLiteralNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitSignedFloatLiteralNode(node *SignedFloatLiteralNode) error {
-	if v.DoVisitSignedFloatLiteralNode != nil {
-		return v.DoVisitSignedFloatLiteralNode(node)
+func (b *SimpleVisitor) VisitSignedFloatLiteralNode(node *SignedFloatLiteralNode) error {
+	if b.DoVisitSignedFloatLiteralNode != nil {
+		return b.DoVisitSignedFloatLiteralNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitArrayLiteralNode(node *ArrayLiteralNode) error {
-	if v.DoVisitArrayLiteralNode != nil {
-		return v.DoVisitArrayLiteralNode(node)
+func (b *SimpleVisitor) VisitArrayLiteralNode(node *ArrayLiteralNode) error {
+	if b.DoVisitArrayLiteralNode != nil {
+		return b.DoVisitArrayLiteralNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitMessageLiteralNode(node *MessageLiteralNode) error {
-	if v.DoVisitMessageLiteralNode != nil {
-		return v.DoVisitMessageLiteralNode(node)
+func (b *SimpleVisitor) VisitMessageLiteralNode(node *MessageLiteralNode) error {
+	if b.DoVisitMessageLiteralNode != nil {
+		return b.DoVisitMessageLiteralNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitMessageFieldNode(node *MessageFieldNode) error {
-	if v.DoVisitMessageFieldNode != nil {
-		return v.DoVisitMessageFieldNode(node)
+func (b *SimpleVisitor) VisitMessageFieldNode(node *MessageFieldNode) error {
+	if b.DoVisitMessageFieldNode != nil {
+		return b.DoVisitMessageFieldNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitKeywordNode(node *KeywordNode) error {
-	if v.DoVisitKeywordNode != nil {
-		return v.DoVisitKeywordNode(node)
+func (b *SimpleVisitor) VisitKeywordNode(node *KeywordNode) error {
+	if b.DoVisitKeywordNode != nil {
+		return b.DoVisitKeywordNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitRuneNode(node *RuneNode) error {
-	if v.DoVisitRuneNode != nil {
-		return v.DoVisitRuneNode(node)
+func (b *SimpleVisitor) VisitRuneNode(node *RuneNode) error {
+	if b.DoVisitRuneNode != nil {
+		return b.DoVisitRuneNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }
 
-func (v *SimpleVisitor) VisitEmptyDeclNode(node *EmptyDeclNode) error {
-	if v.DoVisitEmptyDeclNode != nil {
-		return v.DoVisitEmptyDeclNode(node)
+func (b *SimpleVisitor) VisitEmptyDeclNode(node *EmptyDeclNode) error {
+	if b.DoVisitEmptyDeclNode != nil {
+		return b.DoVisitEmptyDeclNode(node)
 	}
-	return v.visitInterface(node)
+	return b.visitInterface(node)
 }

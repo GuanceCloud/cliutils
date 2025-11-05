@@ -24,7 +24,6 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/internal"
 	"github.com/jhump/protoreflect/desc/protoparse/ast"
 )
 
@@ -40,12 +39,7 @@ func FileContentsFromMap(files map[string]string) FileAccessor {
 	return func(filename string) (io.ReadCloser, error) {
 		contents, ok := files[filename]
 		if !ok {
-			// Try changing path separators since user-provided
-			// map may use different separators.
-			contents, ok = files[filepath.ToSlash(filename)]
-			if !ok {
-				return nil, os.ErrNotExist
-			}
+			return nil, os.ErrNotExist
 		}
 		return ioutil.NopCloser(strings.NewReader(contents)), nil
 	}
@@ -152,24 +146,17 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 		srcInfoMode = protocompile.SourceInfoExtraComments
 	}
 	rep := newReporter(p.ErrorReporter, p.WarningReporter)
-	res, srcSpanAddr := p.getResolver(filenames)
+	res, srcPosAddr := p.getResolver(filenames)
 
 	if p.InferImportPaths {
 		// we must first compile everything to protos
-		results, err := parseToProtosRecursive(res, filenames, reporter.NewHandler(rep), srcSpanAddr)
+		results, err := parseToProtosRecursive(res, filenames, reporter.NewHandler(rep), srcPosAddr)
 		if err != nil {
 			return nil, err
 		}
 		// then we can infer import paths
-		var rewritten map[string]string
-		results, rewritten = fixupFilenames(results)
-		if len(rewritten) > 0 {
-			for i := range filenames {
-				if replace, ok := rewritten[filenames[i]]; ok {
-					filenames[i] = replace
-				}
-			}
-		}
+		// TODO: if this re-writes one of the names in filenames, lookups below will break
+		results = fixupFilenames(results)
 		resolverFromResults := protocompile.ResolverFunc(func(path string) (protocompile.SearchResult, error) {
 			res, ok := results[path]
 			if !ok {
@@ -192,10 +179,11 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	}
 
 	fds := make([]protoreflect.FileDescriptor, len(results))
-	alreadySeen := make(map[string]struct{}, len(results))
 	for i, res := range results {
-		removeDynamicExtensions(res, alreadySeen)
-		fds[i] = res
+		if linkRes, ok := res.(linker.Result); ok {
+			removeDynamicExtensions(linkRes.FileDescriptorProto())
+		}
+		fds[i] = results[i]
 	}
 	return desc.WrapFiles(fds)
 }
@@ -246,7 +234,6 @@ func (r noCloneParseResult) Clone() parser.Result {
 // ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
 func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*descriptorpb.FileDescriptorProto, error) {
 	rep := newReporter(p.ErrorReporter, p.WarningReporter)
-	p.ImportPaths = nil // not used for this "do not link" operation.
 	res, _ := p.getResolver(filenames)
 	results, err := parseToProtos(res, filenames, reporter.NewHandler(rep), p.ValidateUnlinkedFiles)
 	if err != nil {
@@ -258,15 +245,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*descriptorpb.Fil
 		for _, res := range results {
 			resultsMap[res.FileDescriptorProto().GetName()] = res
 		}
-		var rewritten map[string]string
-		resultsMap, rewritten = fixupFilenames(resultsMap)
-		if len(rewritten) > 0 {
-			for i := range filenames {
-				if replace, ok := rewritten[filenames[i]]; ok {
-					filenames[i] = replace
-				}
-			}
-		}
+		resultsMap = fixupFilenames(resultsMap)
 		for i := range filenames {
 			results[i] = resultsMap[filenames[i]]
 		}
@@ -275,17 +254,17 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*descriptorpb.Fil
 	protos := make([]*descriptorpb.FileDescriptorProto, len(results))
 	for i, res := range results {
 		protos[i] = res.FileDescriptorProto()
-		var optsIndex sourceinfo.OptionIndex
+		var optsIndex options.Index
 		if p.InterpretOptionsInUnlinkedFiles {
 			var err error
 			optsIndex, err = options.InterpretUnlinkedOptions(res)
 			if err != nil {
 				return nil, err
 			}
-			removeDynamicExtensionsFromProto(protos[i])
+			removeDynamicExtensions(protos[i])
 		}
 		if p.IncludeSourceCodeInfo {
-			protos[i].SourceCodeInfo = sourceinfo.GenerateSourceInfo(res.AST(), optsIndex, sourceinfo.WithExtraComments())
+			protos[i].SourceCodeInfo = sourceinfo.GenerateSourceInfo(res.AST(), optsIndex)
 		}
 	}
 
@@ -381,118 +360,51 @@ func parseToProtos(res protocompile.Resolver, filenames []string, rep *reporter.
 	return results, nil
 }
 
-func parseToProtosRecursive(res protocompile.Resolver, filenames []string, rep *reporter.Handler, srcSpanAddr *ast2.SourceSpan) (map[string]parser.Result, error) {
+func parseToProtosRecursive(res protocompile.Resolver, filenames []string, rep *reporter.Handler, srcPosAddr *SourcePos) (map[string]parser.Result, error) {
 	results := make(map[string]parser.Result, len(filenames))
 	for _, filename := range filenames {
-		if err := parseToProtoRecursive(res, filename, rep, srcSpanAddr, results); err != nil {
-			return results, err
-		}
+		parseToProtoRecursive(res, filename, rep, srcPosAddr, results)
 	}
 	return results, rep.Error()
 }
 
-func parseToProtoRecursive(res protocompile.Resolver, filename string, rep *reporter.Handler, srcSpanAddr *ast2.SourceSpan, results map[string]parser.Result) error {
+func parseToProtoRecursive(res protocompile.Resolver, filename string, rep *reporter.Handler, srcPosAddr *SourcePos, results map[string]parser.Result) {
 	if _, ok := results[filename]; ok {
 		// already processed this one
-		return nil
+		return
 	}
 	results[filename] = nil // placeholder entry
 
-	astRoot, parseResult, err := parseToAST(res, filename, rep)
-	if err != nil {
-		return err
+	astRoot, parseResult, _ := parseToAST(res, filename, rep)
+	if rep.ReporterError() != nil {
+		return
 	}
 	if parseResult == nil {
-		parseResult, err = parser.ResultFromAST(astRoot, true, rep)
-		if err != nil {
-			return err
+		parseResult, _ = parser.ResultFromAST(astRoot, true, rep)
+		if rep.ReporterError() != nil {
+			return
 		}
 	}
 	results[filename] = parseResult
 
-	if astRoot != nil {
-		// We have an AST, so we use it to recursively examine imports.
-		for _, decl := range astRoot.Decls {
-			imp, ok := decl.(*ast2.ImportNode)
-			if !ok {
-				continue
-			}
-			err := func() error {
-				orig := *srcSpanAddr
-				*srcSpanAddr = astRoot.NodeInfo(imp.Name)
-				defer func() {
-					*srcSpanAddr = orig
-				}()
-
-				return parseToProtoRecursive(res, imp.Name.AsString(), rep, srcSpanAddr, results)
-			}()
-			if err != nil {
-				return err
-			}
+	for _, decl := range astRoot.Decls {
+		imp, ok := decl.(*ast2.ImportNode)
+		if !ok {
+			continue
 		}
-		return nil
-	}
-
-	// Without an AST, we must recursively examine the proto. This makes it harder
-	// (but not necessarily impossible) to get the source location of the import.
-	fd := parseResult.FileDescriptorProto()
-	for i, dep := range fd.Dependency {
-		path := []int32{internal.File_dependencyTag, int32(i)}
-		err := func() error {
-			orig := *srcSpanAddr
-			found := false
-			for _, loc := range fd.GetSourceCodeInfo().GetLocation() {
-				if pathsEqual(loc.Path, path) {
-					start := SourcePos{
-						Filename: dep,
-						Line:     int(loc.Span[0]),
-						Col:      int(loc.Span[1]),
-					}
-					var end SourcePos
-					if len(loc.Span) > 3 {
-						end = SourcePos{
-							Filename: dep,
-							Line:     int(loc.Span[2]),
-							Col:      int(loc.Span[3]),
-						}
-					} else {
-						end = SourcePos{
-							Filename: dep,
-							Line:     int(loc.Span[0]),
-							Col:      int(loc.Span[2]),
-						}
-					}
-					*srcSpanAddr = ast2.NewSourceSpan(start, end)
-					found = true
-					break
-				}
-			}
-			if !found {
-				*srcSpanAddr = ast2.UnknownSpan(dep)
-			}
+		func() {
+			orig := *srcPosAddr
+			*srcPosAddr = astRoot.NodeInfo(imp.Name).Start()
 			defer func() {
-				*srcSpanAddr = orig
+				*srcPosAddr = orig
 			}()
 
-			return parseToProtoRecursive(res, dep, rep, srcSpanAddr, results)
+			parseToProtoRecursive(res, imp.Name.AsString(), rep, srcPosAddr, results)
 		}()
-		if err != nil {
-			return err
+		if rep.ReporterError() != nil {
+			return
 		}
 	}
-	return nil
-}
-
-func pathsEqual(a, b []int32) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func newReporter(errRep ErrorReporter, warnRep WarningReporter) reporter.Reporter {
@@ -517,8 +429,8 @@ func newReporter(errRep ErrorReporter, warnRep WarningReporter) reporter.Reporte
 	return reporter.NewReporter(errRep, warnRep)
 }
 
-func (p Parser) getResolver(filenames []string) (protocompile.Resolver, *ast2.SourceSpan) {
-	var srcSpan ast2.SourceSpan
+func (p Parser) getResolver(filenames []string) (protocompile.Resolver, *SourcePos) {
+	var srcPos SourcePos
 	accessor := p.Accessor
 	if accessor == nil {
 		accessor = func(name string) (io.ReadCloser, error) {
@@ -533,8 +445,8 @@ func (p Parser) getResolver(filenames []string) (protocompile.Resolver, *ast2.So
 					// errors that don't include the filename that failed are no bueno
 					err = errorWithFilename{filename: filename, underlying: err}
 				}
-				if srcSpan != nil {
-					err = reporter.Error(srcSpan, err)
+				if srcPos.Filename != "" {
+					err = reporter.Error(srcPos, err)
 				}
 			}
 			return in, err
@@ -561,20 +473,26 @@ func (p Parser) getResolver(filenames []string) (protocompile.Resolver, *ast2.So
 		}))
 	}
 	backupResolver := protocompile.WithStandardImports(importResolver)
+	mustBeSource := make(map[string]struct{}, len(filenames))
+	for _, name := range filenames {
+		mustBeSource[name] = struct{}{}
+	}
 	return protocompile.CompositeResolver{
 		sourceResolver,
 		protocompile.ResolverFunc(func(path string) (protocompile.SearchResult, error) {
+			if _, ok := mustBeSource[path]; ok {
+				return protocompile.SearchResult{}, os.ErrNotExist
+			}
 			return backupResolver.FindFileByPath(path)
 		}),
-	}, &srcSpan
+	}, &srcPos
 }
 
-func fixupFilenames(protos map[string]parser.Result) (revisedProtos map[string]parser.Result, rewrittenPaths map[string]string) {
+func fixupFilenames(protos map[string]parser.Result) map[string]parser.Result {
 	// In the event that the given filenames (keys in the supplied map) do not
 	// match the actual paths used in 'import' statements in the files, we try
 	// to revise names in the protos so that they will match and be linkable.
-	revisedProtos = make(map[string]parser.Result, len(protos))
-	rewrittenPaths = make(map[string]string, len(protos))
+	revisedProtos := map[string]parser.Result{}
 
 	protoPaths := map[string]struct{}{}
 	// TODO: this is O(n^2) but could likely be O(n) with a clever data structure (prefix tree that is indexed backwards?)
@@ -584,7 +502,7 @@ func fixupFilenames(protos map[string]parser.Result) (revisedProtos map[string]p
 		candidatesAvailable[name] = struct{}{}
 		for _, f := range protos {
 			for _, imp := range f.FileDescriptorProto().Dependency {
-				if strings.HasSuffix(name, imp) || strings.HasSuffix(imp, name) {
+				if strings.HasSuffix(name, imp) {
 					candidates := importCandidates[imp]
 					if candidates == nil {
 						candidates = map[string]struct{}{}
@@ -612,62 +530,37 @@ func fixupFilenames(protos map[string]parser.Result) (revisedProtos map[string]p
 			if best == "" {
 				best = c
 			} else {
-				// NB: We can't actually tell which file is supposed to match
-				// this import. So we prefer the longest name. On a tie, we
-				// choose the lexically earliest match.
+				// HACK: we can't actually tell which files is supposed to match
+				// this import, so arbitrarily pick the "shorter" one (fewest
+				// path elements) or, on a tie, the lexically earlier one
 				minLen := strings.Count(best, string(filepath.Separator))
 				cLen := strings.Count(c, string(filepath.Separator))
-				if cLen > minLen || (cLen == minLen && c < best) {
+				if cLen < minLen || (cLen == minLen && c < best) {
 					best = c
 				}
 			}
 		}
 		if best != "" {
-			if len(best) > len(imp) {
-				prefix := best[:len(best)-len(imp)]
+			prefix := best[:len(best)-len(imp)]
+			if len(prefix) > 0 {
 				protoPaths[prefix] = struct{}{}
 			}
 			f := protos[best]
 			f.FileDescriptorProto().Name = proto.String(imp)
 			revisedProtos[imp] = f
-			rewrittenPaths[best] = imp
 			delete(candidatesAvailable, best)
-
-			// If other candidates are actually references to the same file, remove them.
-			for c := range candidates {
-				if _, ok := candidatesAvailable[c]; !ok {
-					// already used this candidate and re-written its filename accordingly
-					continue
-				}
-				possibleDup := protos[c]
-				prevName := possibleDup.FileDescriptorProto().Name
-				possibleDup.FileDescriptorProto().Name = proto.String(imp)
-				if !proto.Equal(f.FileDescriptorProto(), protos[c].FileDescriptorProto()) {
-					// not equal: restore name and look at next one
-					possibleDup.FileDescriptorProto().Name = prevName
-					continue
-				}
-				// This file used a different name but was actually the same file. So
-				// we prune it from the set.
-				rewrittenPaths[c] = imp
-				delete(candidatesAvailable, c)
-				if len(c) > len(imp) {
-					prefix := c[:len(c)-len(imp)]
-					protoPaths[prefix] = struct{}{}
-				}
-			}
 		}
 	}
 
 	if len(candidatesAvailable) == 0 {
-		return revisedProtos, rewrittenPaths
+		return revisedProtos
 	}
 
 	if len(protoPaths) == 0 {
 		for c := range candidatesAvailable {
 			revisedProtos[c] = protos[c]
 		}
-		return revisedProtos, rewrittenPaths
+		return revisedProtos
 	}
 
 	// Any remaining candidates are entry-points (not imported by others), so
@@ -696,32 +589,15 @@ func fixupFilenames(protos map[string]parser.Result) (revisedProtos map[string]p
 			f.FileDescriptorProto().Name = proto.String(imp)
 			f.FileNode()
 			revisedProtos[imp] = f
-			rewrittenPaths[c] = imp
 		} else {
 			revisedProtos[c] = protos[c]
 		}
 	}
 
-	return revisedProtos, rewrittenPaths
+	return revisedProtos
 }
 
-func removeDynamicExtensions(fd protoreflect.FileDescriptor, alreadySeen map[string]struct{}) {
-	if _, ok := alreadySeen[fd.Path()]; ok {
-		// already processed
-		return
-	}
-	alreadySeen[fd.Path()] = struct{}{}
-	res, ok := fd.(linker.Result)
-	if ok {
-		removeDynamicExtensionsFromProto(res.FileDescriptorProto())
-	}
-	// also remove extensions from dependencies
-	for i, length := 0, fd.Imports().Len(); i < length; i++ {
-		removeDynamicExtensions(fd.Imports().Get(i).FileDescriptor, alreadySeen)
-	}
-}
-
-func removeDynamicExtensionsFromProto(fd *descriptorpb.FileDescriptorProto) {
+func removeDynamicExtensions(fd *descriptorpb.FileDescriptorProto) {
 	// protocompile returns descriptors with dynamic extension fields for custom options.
 	// But protoparse only used known custom options and everything else defined in the
 	// sources would be stored as unrecognized fields. So to bridge the difference in

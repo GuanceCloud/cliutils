@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,123 +20,100 @@ func UnknownPos(filename string) SourcePos {
 	return SourcePos{Filename: filename}
 }
 
-// UnknownSpan is a placeholder span when only the source file
-// name is known.
-func UnknownSpan(filename string) SourceSpan {
-	return unknownSpan{filename: filename}
-}
-
-type unknownSpan struct {
-	filename string
-}
-
-func (s unknownSpan) Start() SourcePos {
-	return UnknownPos(s.filename)
-}
-
-func (s unknownSpan) End() SourcePos {
-	return UnknownPos(s.filename)
-}
-
 // NoSourceNode is a placeholder AST node that implements numerous
 // interfaces in this package. It can be used to represent an AST
 // element for a file whose source is not available.
-type NoSourceNode FileInfo
+type NoSourceNode struct {
+	filename string
+}
 
 // NewNoSourceNode creates a new NoSourceNode for the given filename.
-func NewNoSourceNode(filename string) *NoSourceNode {
-	return &NoSourceNode{name: filename}
+func NewNoSourceNode(filename string) NoSourceNode {
+	return NoSourceNode{filename: filename}
 }
 
-func (n *NoSourceNode) Name() string {
-	return n.name
+func (n NoSourceNode) Name() string {
+	return n.filename
 }
 
-func (n *NoSourceNode) Start() Token {
+func (n NoSourceNode) Start() Token {
 	return 0
 }
 
-func (n *NoSourceNode) End() Token {
+func (n NoSourceNode) End() Token {
 	return 0
 }
 
-func (n *NoSourceNode) NodeInfo(Node) NodeInfo {
+func (n NoSourceNode) NodeInfo(Node) NodeInfo {
 	return NodeInfo{
-		fileInfo: (*FileInfo)(n),
+		fileInfo: &FileInfo{name: n.filename},
 	}
 }
 
-func (n *NoSourceNode) GetSyntax() Node {
+func (n NoSourceNode) GetSyntax() Node {
 	return n
 }
 
-func (n *NoSourceNode) GetName() Node {
+func (n NoSourceNode) GetName() Node {
 	return n
 }
 
-func (n *NoSourceNode) GetValue() ValueNode {
+func (n NoSourceNode) GetValue() ValueNode {
 	return n
 }
 
-func (n *NoSourceNode) FieldLabel() Node {
+func (n NoSourceNode) FieldLabel() Node {
 	return n
 }
 
-func (n *NoSourceNode) FieldName() Node {
+func (n NoSourceNode) FieldName() Node {
 	return n
 }
 
-func (n *NoSourceNode) FieldType() Node {
+func (n NoSourceNode) FieldType() Node {
 	return n
 }
 
-func (n *NoSourceNode) FieldTag() Node {
+func (n NoSourceNode) FieldTag() Node {
 	return n
 }
 
-func (n *NoSourceNode) FieldExtendee() Node {
+func (n NoSourceNode) FieldExtendee() Node {
 	return n
 }
 
-func (n *NoSourceNode) GetGroupKeyword() Node {
+func (n NoSourceNode) GetGroupKeyword() Node {
 	return n
 }
 
-func (n *NoSourceNode) GetOptions() *CompactOptionsNode {
+func (n NoSourceNode) GetOptions() *CompactOptionsNode {
 	return nil
 }
 
-func (n *NoSourceNode) RangeStart() Node {
+func (n NoSourceNode) RangeStart() Node {
 	return n
 }
 
-func (n *NoSourceNode) RangeEnd() Node {
+func (n NoSourceNode) RangeEnd() Node {
 	return n
 }
 
-func (n *NoSourceNode) GetNumber() Node {
+func (n NoSourceNode) GetNumber() Node {
 	return n
 }
 
-func (n *NoSourceNode) MessageName() Node {
+func (n NoSourceNode) MessageName() Node {
 	return n
 }
 
-func (n *NoSourceNode) OneofName() Node {
+func (n NoSourceNode) GetInputType() Node {
 	return n
 }
 
-func (n *NoSourceNode) GetInputType() Node {
+func (n NoSourceNode) GetOutputType() Node {
 	return n
 }
 
-func (n *NoSourceNode) GetOutputType() Node {
-	return n
-}
-
-func (n *NoSourceNode) Value() interface{} {
+func (n NoSourceNode) Value() interface{} {
 	return nil
-}
-
-func (n *NoSourceNode) RangeOptions(func(*OptionNode) bool) {
 }

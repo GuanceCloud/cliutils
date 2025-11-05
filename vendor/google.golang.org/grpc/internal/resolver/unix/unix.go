@@ -34,8 +34,8 @@ type builder struct {
 }
 
 func (b *builder) Build(target resolver.Target, cc resolver.ClientConn, _ resolver.BuildOptions) (resolver.Resolver, error) {
-	if target.URL.Host != "" {
-		return nil, fmt.Errorf("invalid (non-empty) authority: %v", target.URL.Host)
+	if target.Authority != "" {
+		return nil, fmt.Errorf("invalid (non-empty) authority: %v", target.Authority)
 	}
 
 	// gRPC was parsing the dial target manually before PR #4817, and we
@@ -59,10 +59,6 @@ func (b *builder) Build(target resolver.Target, cc resolver.ClientConn, _ resolv
 
 func (b *builder) Scheme() string {
 	return b.scheme
-}
-
-func (b *builder) OverrideAuthority(resolver.Target) string {
-	return "localhost"
 }
 
 type nopResolver struct {

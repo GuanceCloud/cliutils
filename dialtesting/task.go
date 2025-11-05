@@ -679,6 +679,13 @@ func (t *Task) GetPostScriptVars() Vars {
 		return nil
 	}
 
+	if ct, ok := t.child.(*GRPCTask); ok {
+		if ct.postScriptResult != nil {
+			return ct.postScriptResult.Vars
+		}
+		return nil
+	}
+
 	return nil
 }
 

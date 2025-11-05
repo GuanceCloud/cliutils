@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,10 +36,6 @@ type ValueNode interface {
 	// literal:
 	//   * For array literals, the type returned will be []ValueNode
 	//   * For message literals, the type returned will be []*MessageFieldNode
-	//
-	// If the ValueNode is a NoSourceNode, indicating that there is no actual
-	// source code (and thus not AST information), then this method always
-	// returns nil.
 	Value() interface{}
 }
 
@@ -48,13 +44,14 @@ var _ ValueNode = (*CompoundIdentNode)(nil)
 var _ ValueNode = (*StringLiteralNode)(nil)
 var _ ValueNode = (*CompoundStringLiteralNode)(nil)
 var _ ValueNode = (*UintLiteralNode)(nil)
+var _ ValueNode = (*PositiveUintLiteralNode)(nil)
 var _ ValueNode = (*NegativeIntLiteralNode)(nil)
 var _ ValueNode = (*FloatLiteralNode)(nil)
 var _ ValueNode = (*SpecialFloatLiteralNode)(nil)
 var _ ValueNode = (*SignedFloatLiteralNode)(nil)
 var _ ValueNode = (*ArrayLiteralNode)(nil)
 var _ ValueNode = (*MessageLiteralNode)(nil)
-var _ ValueNode = (*NoSourceNode)(nil)
+var _ ValueNode = NoSourceNode{}
 
 // StringValueNode is an AST node that represents a string literal.
 // Such a node can be a single literal (*StringLiteralNode) or a
@@ -141,18 +138,19 @@ type IntValueNode interface {
 
 // AsInt32 range checks the given int value and returns its value is
 // in the range or 0, false if it is outside the range.
-func AsInt32(n IntValueNode, minVal, maxVal int32) (int32, bool) {
+func AsInt32(n IntValueNode, min, max int32) (int32, bool) {
 	i, ok := n.AsInt64()
 	if !ok {
 		return 0, false
 	}
-	if i < int64(minVal) || i > int64(maxVal) {
+	if i < int64(min) || i > int64(max) {
 		return 0, false
 	}
 	return int32(i), true
 }
 
 var _ IntValueNode = (*UintLiteralNode)(nil)
+var _ IntValueNode = (*PositiveUintLiteralNode)(nil)
 var _ IntValueNode = (*NegativeIntLiteralNode)(nil)
 
 // UintLiteralNode represents a simple integer literal with no sign character.
@@ -187,6 +185,49 @@ func (n *UintLiteralNode) AsUint64() (uint64, bool) {
 
 func (n *UintLiteralNode) AsFloat() float64 {
 	return float64(n.Val)
+}
+
+// PositiveUintLiteralNode represents an integer literal with a positive (+) sign.
+type PositiveUintLiteralNode struct {
+	compositeNode
+	Plus *RuneNode
+	Uint *UintLiteralNode
+	Val  uint64
+}
+
+// NewPositiveUintLiteralNode creates a new *PositiveUintLiteralNode. Both
+// arguments must be non-nil.
+func NewPositiveUintLiteralNode(sign *RuneNode, i *UintLiteralNode) *PositiveUintLiteralNode {
+	if sign == nil {
+		panic("sign is nil")
+	}
+	if i == nil {
+		panic("i is nil")
+	}
+	children := []Node{sign, i}
+	return &PositiveUintLiteralNode{
+		compositeNode: compositeNode{
+			children: children,
+		},
+		Plus: sign,
+		Uint: i,
+		Val:  i.Val,
+	}
+}
+
+func (n *PositiveUintLiteralNode) Value() interface{} {
+	return n.Val
+}
+
+func (n *PositiveUintLiteralNode) AsInt64() (int64, bool) {
+	if n.Val > math.MaxInt64 {
+		return 0, false
+	}
+	return int64(n.Val), true
+}
+
+func (n *PositiveUintLiteralNode) AsUint64() (uint64, bool) {
+	return n.Val, true
 }
 
 // NegativeIntLiteralNode represents an integer literal with a negative (-) sign.
@@ -275,14 +316,12 @@ type SpecialFloatLiteralNode struct {
 }
 
 // NewSpecialFloatLiteralNode returns a new *SpecialFloatLiteralNode for the
-// given keyword. The given keyword should be "inf", "infinity", or "nan"
-// in any case.
+// given keyword, which must be "inf" or "nan".
 func NewSpecialFloatLiteralNode(name *KeywordNode) *SpecialFloatLiteralNode {
 	var f float64
-	switch strings.ToLower(name.Val) {
-	case "inf", "infinity":
+	if name.Val == "inf" {
 		f = math.Inf(1)
-	default:
+	} else {
 		f = math.NaN()
 	}
 	return &SpecialFloatLiteralNode{

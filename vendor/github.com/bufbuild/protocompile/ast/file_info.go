@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -163,10 +163,10 @@ func (f *FileInfo) TokenInfo(t Token) NodeInfo {
 
 func (f *FileInfo) nodeInfo(start, end int) NodeInfo {
 	if start < 0 || start >= len(f.items) {
-		return NodeInfo{fileInfo: f}
+		return NodeInfo{}
 	}
 	if end < 0 || end >= len(f.items) {
-		return NodeInfo{fileInfo: f}
+		return NodeInfo{}
 	}
 	return NodeInfo{fileInfo: f, startIndex: start, endIndex: end}
 }
@@ -351,7 +351,7 @@ func (f *FileInfo) SourcePos(offset int) SourcePos {
 		return f.lines[n] > offset
 	})
 
-	// If it weren't for tabs and multibyte unicode characters, we
+	// If it weren't for tabs and multi-byte unicode characters, we
 	// could trivially compute the column just based on offset and the
 	// starting offset of lineNumber :(
 	// Wish this were more efficient... that would require also storing
@@ -399,7 +399,8 @@ type Item int
 // ItemInfo provides details about an item's location in the source file and
 // its contents.
 type ItemInfo interface {
-	SourceSpan
+	Start() SourcePos
+	End() SourcePos
 	LeadingWhitespace() string
 	RawText() string
 }
@@ -596,32 +597,6 @@ func (pos SourcePos) String() string {
 	}
 	return fmt.Sprintf("%s:%d:%d", pos.Filename, pos.Line, pos.Col)
 }
-
-// SourceSpan represents a range of source positions.
-type SourceSpan interface {
-	Start() SourcePos
-	End() SourcePos
-}
-
-// NewSourceSpan creates a new span that covers the given range.
-func NewSourceSpan(start SourcePos, end SourcePos) SourceSpan {
-	return sourceSpan{StartPos: start, EndPos: end}
-}
-
-type sourceSpan struct {
-	StartPos SourcePos
-	EndPos   SourcePos
-}
-
-func (p sourceSpan) Start() SourcePos {
-	return p.StartPos
-}
-
-func (p sourceSpan) End() SourcePos {
-	return p.EndPos
-}
-
-var _ SourceSpan = sourceSpan{}
 
 // Comments represents a range of sequential comments in a source file
 // (e.g. no interleaving items or AST nodes).

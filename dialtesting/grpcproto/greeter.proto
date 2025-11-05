@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package greeter;
+
+option go_package = "datakittest/grpc/pb";
+
+import "grpcproto/common.proto";
+
+service Greeter {
+  rpc SayHello (HelloRequest) returns (common.result) {}
+}
+
+message HelloRequest {
+  string name = 1;
+}

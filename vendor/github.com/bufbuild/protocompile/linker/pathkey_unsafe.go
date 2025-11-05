@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,10 +30,6 @@ import (
 var pathElementType = reflect.TypeOf(protoreflect.SourcePath{}).Elem()
 
 func pathKey(p protoreflect.SourcePath) interface{} {
-	if p == nil {
-		// Reflection code below doesn't work with nil slices
-		return [0]int32{}
-	}
 	hdr := (*reflect.SliceHeader)(unsafe.Pointer(reflect.ValueOf(&p).Pointer()))
 	array := reflect.NewAt(reflect.ArrayOf(hdr.Len, pathElementType), unsafe.Pointer(hdr.Data))
 	return array.Elem().Interface()

@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,20 +19,20 @@ import "fmt"
 // MessageDeclNode is a node in the AST that defines a message type. This
 // includes normal message fields as well as implicit messages:
 //   - *MessageNode
-//   - *SyntheticGroupMessageNode (the group is a field and inline message type)
-//   - *SyntheticMapEntryNode (map fields implicitly define a MapEntry message type)
+//   - *GroupNode (the group is a field and inline message type)
+//   - *MapFieldNode (map fields implicitly define a MapEntry message type)
 //
 // This also allows NoSourceNode to be used in place of one of the above
 // for some usages.
 type MessageDeclNode interface {
-	NodeWithOptions
+	Node
 	MessageName() Node
 }
 
 var _ MessageDeclNode = (*MessageNode)(nil)
-var _ MessageDeclNode = (*SyntheticGroupMessageNode)(nil)
-var _ MessageDeclNode = (*SyntheticMapEntryNode)(nil)
-var _ MessageDeclNode = (*NoSourceNode)(nil)
+var _ MessageDeclNode = (*GroupNode)(nil)
+var _ MessageDeclNode = (*MapFieldNode)(nil)
+var _ MessageDeclNode = NoSourceNode{}
 
 // MessageNode represents a message declaration. Example:
 //
@@ -92,16 +92,6 @@ func (n *MessageNode) MessageName() Node {
 	return n.Name
 }
 
-func (n *MessageNode) RangeOptions(fn func(*OptionNode) bool) {
-	for _, decl := range n.Decls {
-		if opt, ok := decl.(*OptionNode); ok {
-			if !fn(opt) {
-				return
-			}
-		}
-	}
-}
-
 // MessageBody represents the body of a message. It is used by both
 // MessageNodes and GroupNodes.
 type MessageBody struct {
@@ -115,7 +105,7 @@ func populateMessageBody(m *MessageBody, openBrace *RuneNode, decls []MessageEle
 	m.Decls = decls
 	for _, decl := range decls {
 		switch decl.(type) {
-		case *OptionNode, *FieldNode, *MapFieldNode, *GroupNode, *OneofNode,
+		case *OptionNode, *FieldNode, *MapFieldNode, *GroupNode, *OneOfNode,
 			*MessageNode, *EnumNode, *ExtendNode, *ExtensionRangeNode,
 			*ReservedNode, *EmptyDeclNode:
 		default:
@@ -135,7 +125,7 @@ type MessageElement interface {
 var _ MessageElement = (*OptionNode)(nil)
 var _ MessageElement = (*FieldNode)(nil)
 var _ MessageElement = (*MapFieldNode)(nil)
-var _ MessageElement = (*OneofNode)(nil)
+var _ MessageElement = (*OneOfNode)(nil)
 var _ MessageElement = (*GroupNode)(nil)
 var _ MessageElement = (*MessageNode)(nil)
 var _ MessageElement = (*EnumNode)(nil)

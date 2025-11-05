@@ -8,18 +8,17 @@ import (
 	"reflect"
 	"runtime"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	refv1 "google.golang.org/grpc/reflection/grpc_reflection_v1"
 	refv1alpha "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
+	refv1 "github.com/jhump/protoreflect/grpcreflect/internal/grpc_reflection_v1"
 	"github.com/jhump/protoreflect/internal"
 )
 
@@ -63,31 +62,14 @@ const (
 )
 
 func symbolNotFound(symbol string, symType symbolType, cause *elementNotFoundError) error {
-	if cause != nil && cause.kind == elementKindSymbol && cause.name == symbol {
-		// no need to wrap
-		if symType != symbolTypeUnknown && cause.symType == symbolTypeUnknown {
-			// We previously didn't know symbol type but now do?
-			// Create a new error that has the right symbol type.
-			return &elementNotFoundError{name: symbol, symType: symType, kind: elementKindSymbol}
-		}
-		return cause
-	}
 	return &elementNotFoundError{name: symbol, symType: symType, kind: elementKindSymbol, cause: cause}
 }
 
 func extensionNotFound(extendee string, tag int32, cause *elementNotFoundError) error {
-	if cause != nil && cause.kind == elementKindExtension && cause.name == extendee && cause.tag == tag {
-		// no need to wrap
-		return cause
-	}
 	return &elementNotFoundError{name: extendee, tag: tag, kind: elementKindExtension, cause: cause}
 }
 
 func fileNotFound(file string, cause *elementNotFoundError) error {
-	if cause != nil && cause.kind == elementKindFile && cause.name == file {
-		// no need to wrap
-		return cause
-	}
 	return &elementNotFoundError{name: file, kind: elementKindFile, cause: cause}
 }
 
@@ -98,15 +80,15 @@ func (e *elementNotFoundError) Error() string {
 		if first {
 			first = false
 		} else {
-			_, _ = fmt.Fprint(&b, "\ncaused by: ")
+			fmt.Fprint(&b, "\ncaused by: ")
 		}
 		switch e.kind {
 		case elementKindSymbol:
-			_, _ = fmt.Fprintf(&b, "%s not found: %s", e.symType, e.name)
+			fmt.Fprintf(&b, "%s not found: %s", e.symType, e.name)
 		case elementKindExtension:
-			_, _ = fmt.Fprintf(&b, "Extension not found: tag %d for %s", e.tag, e.name)
+			fmt.Fprintf(&b, "Extension not found: tag %d for %s", e.tag, e.name)
 		default:
-			_, _ = fmt.Fprintf(&b, "File not found: %s", e.name)
+			fmt.Fprintf(&b, "File not found: %s", e.name)
 		}
 	}
 	return b.String()
@@ -137,11 +119,10 @@ type extDesc struct {
 // Client is a client connection to a server for performing reflection calls
 // and resolving remote symbols.
 type Client struct {
-	ctx          context.Context
-	now          func() time.Time
-	stubV1       refv1.ServerReflectionClient
-	stubV1Alpha  refv1alpha.ServerReflectionClient
-	allowMissing atomic.Bool
+	ctx         context.Context
+	now         func() time.Time
+	stubV1      refv1.ServerReflectionClient
+	stubV1Alpha refv1alpha.ServerReflectionClient
 
 	connMu      sync.Mutex
 	cancel      context.CancelFunc
@@ -203,15 +184,6 @@ func NewClientAuto(ctx context.Context, cc grpc.ClientConnInterface) *Client {
 	stubv1 := refv1.NewServerReflectionClient(cc)
 	stubv1alpha := refv1alpha.NewServerReflectionClient(cc)
 	return newClient(ctx, stubv1, stubv1alpha)
-}
-
-// AllowMissingFileDescriptors configures the client to allow missing files
-// when building descriptors when possible. Missing files are often fatal
-// errors, but with this option they can sometimes be worked around. Building
-// a schema can only succeed with some files missing if the files in question
-// only provide custom options and/or other unused types.
-func (cr *Client) AllowMissingFileDescriptors() {
-	cr.allowMissing.Store(true)
 }
 
 // TODO: We should also have a NewClientV1. However that should not refer to internal
@@ -382,34 +354,16 @@ func (cr *Client) getAndCacheFileDescriptors(req *refv1alpha.ServerReflectionReq
 }
 
 func (cr *Client) descriptorFromProto(fd *descriptorpb.FileDescriptorProto) (*desc.FileDescriptor, error) {
-	allowMissing := cr.allowMissing.Load()
-	deps := make([]*desc.FileDescriptor, 0, len(fd.GetDependency()))
-	var deferredErr error
-	var missingDeps []int
+	deps := make([]*desc.FileDescriptor, len(fd.GetDependency()))
 	for i, depName := range fd.GetDependency() {
 		if dep, err := cr.FileByFilename(depName); err != nil {
-			if _, ok := err.(*elementNotFoundError); !ok || !allowMissing {
-				return nil, err
-			}
-			// We'll ignore for now to see if the file is really necessary.
-			// (If it only supplies custom options, we can get by without it.)
-			if deferredErr == nil {
-				deferredErr = err
-			}
-			missingDeps = append(missingDeps, i)
+			return nil, err
 		} else {
-			deps = append(deps, dep)
+			deps[i] = dep
 		}
-	}
-	if len(missingDeps) > 0 {
-		fd = fileWithoutDeps(fd, missingDeps)
 	}
 	d, err := desc.CreateFileDescriptor(fd, deps...)
 	if err != nil {
-		if deferredErr != nil {
-			// assume the issue is the missing dep
-			return nil, deferredErr
-		}
 		return nil, err
 	}
 	d = cr.cacheFile(d)
@@ -561,15 +515,7 @@ func (cr *Client) doSendLocked(attemptCount int, prevErr error, req *refv1alpha.
 	if attemptCount >= 3 && prevErr != nil {
 		return nil, prevErr
 	}
-	if (status.Code(prevErr) == codes.Unimplemented ||
-		status.Code(prevErr) == codes.Unavailable) &&
-		cr.useV1() {
-		// If v1 is unimplemented, fallback to v1alpha.
-		// We also fallback on unavailable because some servers have been
-		// observed to close the connection/cancel the stream, w/out sending
-		// back status or headers, when the service name is not known. When
-		// this happens, the RPC status code is unavailable.
-		// See https://github.com/fullstorydev/grpcurl/issues/434
+	if status.Code(prevErr) == codes.Unimplemented && cr.useV1() {
 		cr.useV1Alpha = true
 		cr.lastTriedV1 = cr.now()
 	}
@@ -747,46 +693,6 @@ func (cr *Client) ResolveExtension(extendedType string, extensionNumber int32) (
 	}
 }
 
-func fileWithoutDeps(fd *descriptorpb.FileDescriptorProto, missingDeps []int) *descriptorpb.FileDescriptorProto {
-	// We need to rebuild the file without the missing deps.
-	fd = proto.Clone(fd).(*descriptorpb.FileDescriptorProto)
-	newNumDeps := len(fd.GetDependency()) - len(missingDeps)
-	newDeps := make([]string, 0, newNumDeps)
-	remapped := make(map[int]int, newNumDeps)
-	missingIdx := 0
-	for i, dep := range fd.GetDependency() {
-		if missingIdx < len(missingDeps) {
-			if i == missingDeps[missingIdx] {
-				// This dep was missing. Skip it.
-				missingIdx++
-				continue
-			}
-		}
-		remapped[i] = len(newDeps)
-		newDeps = append(newDeps, dep)
-	}
-	// Also rebuild public and weak import slices.
-	newPublic := make([]int32, 0, len(fd.GetPublicDependency()))
-	for _, idx := range fd.GetPublicDependency() {
-		newIdx, ok := remapped[int(idx)]
-		if ok {
-			newPublic = append(newPublic, int32(newIdx))
-		}
-	}
-	newWeak := make([]int32, 0, len(fd.GetWeakDependency()))
-	for _, idx := range fd.GetWeakDependency() {
-		newIdx, ok := remapped[int(idx)]
-		if ok {
-			newWeak = append(newWeak, int32(newIdx))
-		}
-	}
-
-	fd.Dependency = newDeps
-	fd.PublicDependency = newPublic
-	fd.WeakDependency = newWeak
-	return fd
-}
-
 func findExtension(extendedType string, extensionNumber int32, scope extensionScope) *desc.FieldDescriptor {
 	// search extensions in this scope
 	for _, ext := range scope.extensions() {
@@ -852,7 +758,7 @@ type adaptStreamFromV1 struct {
 }
 
 func (a adaptStreamFromV1) Send(request *refv1alpha.ServerReflectionRequest) error {
-	v1req := toV1Request(request)
+	v1req := refv1.ToV1Request(request)
 	return a.ServerReflection_ServerReflectionInfoClient.Send(v1req)
 }
 
@@ -861,5 +767,5 @@ func (a adaptStreamFromV1) Recv() (*refv1alpha.ServerReflectionResponse, error) 
 	if err != nil {
 		return nil, err
 	}
-	return toV1AlphaResponse(v1resp), nil
+	return refv1.ToV1AlphaResponse(v1resp), nil
 }

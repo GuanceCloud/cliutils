@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -61,12 +61,6 @@ const (
 	// FileOptionsTag is the tag number of the options element in a file
 	// descriptor proto.
 	FileOptionsTag = 8
-	// FileOptionsJavaStringCheckUTF8Tag is the tag number of the java_string_check_utf8
-	// field in the FileOptions proto.
-	FileOptionsJavaStringCheckUTF8Tag = 27
-	// FileOptionsFeaturesTag is the tag number of the features field in the
-	// FileOptions proto.
-	FileOptionsFeaturesTag = 50
 	// FileSourceCodeInfoTag is the tag number of the source code info element
 	// in a file descriptor proto.
 	FileSourceCodeInfoTag = 9
@@ -79,9 +73,6 @@ const (
 	// FileSyntaxTag is the tag number of the syntax element in a file
 	// descriptor proto.
 	FileSyntaxTag = 12
-	// FileEditionTag is the tag number of the edition element in a file
-	// descriptor proto.
-	FileEditionTag = 14
 	// MessageNameTag is the tag number of the name element in a message
 	// descriptor proto.
 	MessageNameTag = 1
@@ -103,12 +94,9 @@ const (
 	// MessageOptionsTag is the tag number of the options element in a message
 	// descriptor proto.
 	MessageOptionsTag = 7
-	// MessageOptionsFeaturesTag is the tag number of the features field in the
-	// MessageOptions proto.
-	MessageOptionsFeaturesTag = 12
-	// MessageOneofsTag is the tag number of the one-ofs element in a message
+	// MessageOneOfsTag is the tag number of the one-ofs element in a message
 	// descriptor proto.
-	MessageOneofsTag = 8
+	MessageOneOfsTag = 8
 	// MessageReservedRangesTag is the tag number of the reserved ranges element
 	// in a message descriptor proto.
 	MessageReservedRangesTag = 9
@@ -124,30 +112,6 @@ const (
 	// ExtensionRangeOptionsTag is the tag number of the options element in an
 	// extension range proto.
 	ExtensionRangeOptionsTag = 3
-	// ExtensionRangeOptionsDeclarationTag is the tag number of the declaration
-	// field in the ExtensionRangeOptions proto.
-	ExtensionRangeOptionsDeclarationTag = 2
-	// ExtensionRangeOptionsVerificationTag is the tag number of the verification
-	// field in the ExtensionRangeOptions proto.
-	ExtensionRangeOptionsVerificationTag = 3
-	// ExtensionRangeOptionsDeclarationNumberTag is the tag number of the number
-	// field in the ExtensionRangeOptions.Declaration proto.
-	ExtensionRangeOptionsDeclarationNumberTag = 1
-	// ExtensionRangeOptionsDeclarationFullNameTag is the tag number of the full_name
-	// field in the ExtensionRangeOptions.Declaration proto.
-	ExtensionRangeOptionsDeclarationFullNameTag = 2
-	// ExtensionRangeOptionsDeclarationTypeTag is the tag number of the type
-	// field in the ExtensionRangeOptions.Declaration proto.
-	ExtensionRangeOptionsDeclarationTypeTag = 3
-	// ExtensionRangeOptionsDeclarationReservedTag is the tag number of the reserved
-	// field in the ExtensionRangeOptions.Declaration proto.
-	ExtensionRangeOptionsDeclarationReservedTag = 5
-	// ExtensionRangeOptionsDeclarationRepeatedTag is the tag number of the repeated
-	// field in the ExtensionRangeOptions.Declaration proto.
-	ExtensionRangeOptionsDeclarationRepeatedTag = 6
-	// ExtensionRangeOptionsFeaturesTag is the tag number of the features field in the
-	// ExtensionRangeOptions proto.
-	ExtensionRangeOptionsFeaturesTag = 50
 	// ReservedRangeStartTag is the tag number of the start index in a reserved
 	// range proto. This field number is the same for both "flavors" of reserved
 	// ranges: DescriptorProto.ReservedRange and EnumDescriptorProto.EnumReservedRange.
@@ -180,24 +144,6 @@ const (
 	// FieldOptionsTag is the tag number of the options element in a field
 	// descriptor proto.
 	FieldOptionsTag = 8
-	// FieldOptionsCTypeTag is the number of the ctype field in the
-	// FieldOptions proto.
-	FieldOptionsCTypeTag = 1
-	// FieldOptionsPackedTag is the number of the packed field in the
-	// FieldOptions proto.
-	FieldOptionsPackedTag = 2
-	// FieldOptionsLazyTag is the number of the lazy field in the
-	// FieldOptions proto.
-	FieldOptionsLazyTag = 5
-	// FieldOptionsJSTypeTag is the number of the jstype field in the
-	// FieldOptions proto.
-	FieldOptionsJSTypeTag = 6
-	// FieldOptionsUnverifiedLazyTag is the number of the unverified_lazy
-	// field in the FieldOptions proto.
-	FieldOptionsUnverifiedLazyTag = 15
-	// FieldOptionsFeaturesTag is the tag number of the features field in the
-	// FieldOptions proto.
-	FieldOptionsFeaturesTag = 21
 	// FieldOneofIndexTag is the tag number of the oneof index element in a
 	// field descriptor proto.
 	FieldOneofIndexTag = 9
@@ -207,15 +153,12 @@ const (
 	// FieldProto3OptionalTag is the tag number of the proto3_optional element
 	// in a descriptor proto.
 	FieldProto3OptionalTag = 17
-	// OneofNameTag is the tag number of the name element in a one-of
+	// OneOfNameTag is the tag number of the name element in a one-of
 	// descriptor proto.
-	OneofNameTag = 1
-	// OneofOptionsTag is the tag number of the options element in a one-of
+	OneOfNameTag = 1
+	// OneOfOptionsTag is the tag number of the options element in a one-of
 	// descriptor proto.
-	OneofOptionsTag = 2
-	// OneofOptionsFeaturesTag is the tag number of the features field in the
-	// OneofOptions proto.
-	OneofOptionsFeaturesTag = 1
+	OneOfOptionsTag = 2
 	// EnumNameTag is the tag number of the name element in an enum descriptor
 	// proto.
 	EnumNameTag = 1
@@ -225,9 +168,6 @@ const (
 	// EnumOptionsTag is the tag number of the options element in an enum
 	// descriptor proto.
 	EnumOptionsTag = 3
-	// EnumOptionsFeaturesTag is the tag number of the features field in the
-	// EnumOptions proto.
-	EnumOptionsFeaturesTag = 7
 	// EnumReservedRangesTag is the tag number of the reserved ranges element in
 	// an enum descriptor proto.
 	EnumReservedRangesTag = 4
@@ -243,9 +183,6 @@ const (
 	// EnumValOptionsTag is the tag number of the options element in an enum
 	// value descriptor proto.
 	EnumValOptionsTag = 3
-	// EnumValOptionsFeaturesTag is the tag number of the features field in the
-	// EnumValueOptions proto.
-	EnumValOptionsFeaturesTag = 2
 	// ServiceNameTag is the tag number of the name element in a service
 	// descriptor proto.
 	ServiceNameTag = 1
@@ -255,9 +192,6 @@ const (
 	// ServiceOptionsTag is the tag number of the options element in a service
 	// descriptor proto.
 	ServiceOptionsTag = 3
-	// ServiceOptionsFeaturesTag is the tag number of the features field in the
-	// ServiceOptions proto.
-	ServiceOptionsFeaturesTag = 34
 	// MethodNameTag is the tag number of the name element in a method
 	// descriptor proto.
 	MethodNameTag = 1
@@ -270,9 +204,6 @@ const (
 	// MethodOptionsTag is the tag number of the options element in a method
 	// descriptor proto.
 	MethodOptionsTag = 4
-	// MethodOptionsFeaturesTag is the tag number of the features field in the
-	// MethodOptions proto.
-	MethodOptionsFeaturesTag = 35
 	// MethodInputStreamTag is the tag number of the input stream flag in a
 	// method descriptor proto.
 	MethodInputStreamTag = 5
@@ -309,28 +240,4 @@ const (
 	// UninterpretedNameNameTag is the tag number of the name element in an
 	// uninterpreted option name proto.
 	UninterpretedNameNameTag = 1
-
-	// AnyTypeURLTag is the tag number of the type_url field of the Any proto.
-	AnyTypeURLTag = 1
-	// AnyValueTag is the tag number of the value field of the Any proto.
-	AnyValueTag = 2
-
-	// FeatureSetFieldPresenceTag is the tag number of the field_presence field
-	// in the FeatureSet proto.
-	FeatureSetFieldPresenceTag = 1
-	// FeatureSetEnumTypeTag is the tag number of the enum_type field in the
-	// FeatureSet proto.
-	FeatureSetEnumTypeTag = 2
-	// FeatureSetRepeatedFieldEncodingTag is the tag number of the repeated_field_encoding
-	// field in the FeatureSet proto.
-	FeatureSetRepeatedFieldEncodingTag = 3
-	// FeatureSetUTF8ValidationTag is the tag number of the utf8_validation field
-	// in the FeatureSet proto.
-	FeatureSetUTF8ValidationTag = 4
-	// FeatureSetMessageEncodingTag is the tag number of the message_encoding
-	// field in the FeatureSet proto.
-	FeatureSetMessageEncodingTag = 5
-	// FeatureSetJSONFormatTag is the tag number of the json_format field in
-	// the FeatureSet proto.
-	FeatureSetJSONFormatTag = 6
 )

@@ -53,6 +53,13 @@ func LoadFileDescriptor(file string) (*FileDescriptor, error) {
 
 	var fd *FileDescriptor
 	loadedDescriptors.withLock(func(cache descriptorCache) {
+		// double-check cache, in case it was concurrently added while
+		// we were waiting for the lock
+		f := cache.get(d)
+		if f != nil {
+			fd = f.(*FileDescriptor)
+			return
+		}
 		fd, err = wrapFile(d, cache)
 	})
 	return fd, err

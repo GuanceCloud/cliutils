@@ -1,4 +1,4 @@
-// Copyright 2020-2024 Buf Technologies, Inc.
+// Copyright 2020-2022 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,45 +30,39 @@ var ErrInvalidSource = errors.New("parse failed: invalid proto source")
 // about the location in the file that caused the error.
 type ErrorWithPos interface {
 	error
-	ast.SourceSpan
-	// GetPosition returns the start source position that caused the underlying error.
+	// GetPosition returns the source position that caused the underlying error.
 	GetPosition() ast.SourcePos
 	// Unwrap returns the underlying error.
 	Unwrap() error
 }
 
 // Error creates a new ErrorWithPos from the given error and source position.
-func Error(span ast.SourceSpan, err error) ErrorWithPos {
-	var ewp ErrorWithPos
-	if errors.As(err, &ewp) {
-		// replace existing position with given one
-		return &errorWithSpan{SourceSpan: span, underlying: ewp.Unwrap()}
-	}
-	return &errorWithSpan{SourceSpan: span, underlying: err}
+func Error(pos ast.SourcePos, err error) ErrorWithPos {
+	return errorWithSourcePos{pos: pos, underlying: err}
 }
 
 // Errorf creates a new ErrorWithPos whose underlying error is created using the
 // given message format and arguments (via fmt.Errorf).
-func Errorf(span ast.SourceSpan, format string, args ...interface{}) ErrorWithPos {
-	return Error(span, fmt.Errorf(format, args...))
+func Errorf(pos ast.SourcePos, format string, args ...interface{}) ErrorWithPos {
+	return errorWithSourcePos{pos: pos, underlying: fmt.Errorf(format, args...)}
 }
 
-type errorWithSpan struct {
-	ast.SourceSpan
+type errorWithSourcePos struct {
 	underlying error
+	pos        ast.SourcePos
 }
 
-func (e *errorWithSpan) Error() string {
+func (e errorWithSourcePos) Error() string {
 	sourcePos := e.GetPosition()
 	return fmt.Sprintf("%s: %v", sourcePos, e.underlying)
 }
 
-func (e *errorWithSpan) GetPosition() ast.SourcePos {
-	return e.Start()
+func (e errorWithSourcePos) GetPosition() ast.SourcePos {
+	return e.pos
 }
 
-func (e *errorWithSpan) Unwrap() error {
+func (e errorWithSourcePos) Unwrap() error {
 	return e.underlying
 }
 
-var _ ErrorWithPos = (*errorWithSpan)(nil)
+var _ ErrorWithPos = errorWithSourcePos{}
