@@ -350,12 +350,12 @@ func GinGetArg(c *gin.Context, hdr, param string) (v string, err error) {
 func Unzip(in []byte) (out []byte, err error) {
 	gzr, err := gzip.NewReader(bytes.NewBuffer(in))
 	if err != nil {
-		return
+		return nil, fmt.Errorf("unable to new gzip reader: %w", err)
 	}
 
 	out, err = io.ReadAll(gzr)
 	if err != nil {
-		return
+		return out, fmt.Errorf("unable to ReadAll from gzip reader: %w", err)
 	}
 
 	if err := gzr.Close(); err != nil {
