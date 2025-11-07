@@ -1,0 +1,3 @@
+{ `source` =  'manager'  and ( `llllll` in [ 'lllllll' ] )};
+{ `source` =  'worker-0'  and ( `jinei` in [ 'ss' ] )};
+{ `source` = re(`.*`) and ( `host` in [ 'cn-hangzhou.172.16.211.112' ] )};
