@@ -503,7 +503,6 @@ func (t *GRPCTask) run() error {
 		t.reqCost = time.Since(start)
 	}()
 
-	// Check configuration
 	opt := t.AdvanceOptions
 	if opt == nil || opt.RequestOptions == nil {
 		t.reqError = "request options required"
