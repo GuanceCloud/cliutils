@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/time/rate"
 )
 
@@ -45,88 +46,117 @@ var (
 )
 
 type Logger struct {
-	*zap.SugaredLogger
+	name   string
+	zsl    *zap.SugaredLogger
 	rlimit *rate.Limiter
+}
+
+func (l *Logger) Name() string {
+	return l.name
 }
 
 func (l *Logger) Infof(fmt string, args ...any) {
 	if l.rlimit != nil {
 		if l.rlimit.Allow() {
-			l.SugaredLogger.Infof(fmt, args...)
+			l.zsl.Infof(fmt, args...)
 		}
 	} else {
-		l.SugaredLogger.Infof(fmt, args...)
+		l.zsl.Infof(fmt, args...)
 	}
 }
 
-func (l *Logger) Info(fmt string) {
+func (l *Logger) Info(args ...any) {
 	if l.rlimit != nil {
 		if l.rlimit.Allow() {
-			l.SugaredLogger.Info(fmt)
+			l.zsl.Info(args...)
 		}
 	} else {
-		l.SugaredLogger.Info(fmt)
+		l.zsl.Info(args...)
 	}
 }
 
 func (l *Logger) Warnf(fmt string, args ...any) {
 	if l.rlimit != nil {
 		if l.rlimit.Allow() {
-			l.SugaredLogger.Warnf(fmt, args...)
+			l.zsl.Warnf(fmt, args...)
 		}
 	} else {
-		l.SugaredLogger.Warnf(fmt, args...)
+		l.zsl.Warnf(fmt, args...)
 	}
 }
 
-func (l *Logger) Warn(fmt string) {
+func (l *Logger) Warn(args ...any) {
 	if l.rlimit != nil {
 		if l.rlimit.Allow() {
-			l.SugaredLogger.Warn(fmt)
+			l.zsl.Warn(args...)
 		}
 	} else {
-		l.SugaredLogger.Warn(fmt)
+		l.zsl.Warn(args...)
 	}
 }
 
 func (l *Logger) Errorf(fmt string, args ...any) {
 	if l.rlimit != nil {
 		if l.rlimit.Allow() {
-			l.SugaredLogger.Errorf(fmt, args...)
+			l.zsl.Errorf(fmt, args...)
 		}
 	} else {
-		l.SugaredLogger.Errorf(fmt, args...)
+		l.zsl.Errorf(fmt, args...)
 	}
 }
 
-func (l *Logger) Error(fmt string) {
+func (l *Logger) Error(args ...any) {
 	if l.rlimit != nil {
 		if l.rlimit.Allow() {
-			l.SugaredLogger.Error(fmt)
+			l.zsl.Error(args...)
 		}
 	} else {
-		l.SugaredLogger.Error(fmt)
+		l.zsl.Error(args...)
 	}
 }
 
 func (l *Logger) Debugf(fmt string, args ...any) {
 	if l.rlimit != nil {
 		if l.rlimit.Allow() {
-			l.SugaredLogger.Debugf(fmt, args...)
+			l.zsl.Debugf(fmt, args...)
 		}
 	} else {
-		l.SugaredLogger.Debugf(fmt, args...)
+		l.zsl.Debugf(fmt, args...)
 	}
 }
 
-func (l *Logger) Debug(fmt string) {
+func (l *Logger) Debug(args ...any) {
 	if l.rlimit != nil {
 		if l.rlimit.Allow() {
-			l.SugaredLogger.Debug(fmt)
+			l.zsl.Debug(args...)
 		}
 	} else {
-		l.SugaredLogger.Debug(fmt)
+		l.zsl.Debug(args...)
 	}
+}
+
+func (l *Logger) Fatalf(fmt string, args ...any) {
+	// fatal log not rate limited
+	l.zsl.Fatalf(fmt, args...)
+}
+
+func (l *Logger) Fatal(args ...any) {
+	// fatal log not rate limited
+	l.zsl.Fatal(args...)
+}
+
+func (l *Logger) Panicf(fmt string, args ...any) {
+	// panic log not rate limited
+	l.zsl.Panicf(fmt, args...)
+}
+
+func (l *Logger) Panic(args ...any) {
+	// panic log not rate limited
+	l.zsl.Panic(args...)
+}
+
+func (l *Logger) Level() zapcore.Level {
+	return l.zsl.Level()
 }
 
 type Option struct {

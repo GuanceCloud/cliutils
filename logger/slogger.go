@@ -6,6 +6,7 @@
 package logger
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -23,7 +24,8 @@ type SLogerOpt func(*Logger)
 func WithRateLimiter(limit float64) SLogerOpt {
 	return func(sl *Logger) {
 		if limit > 0 {
-			sl.rlimit = rate.NewLimiter(rate.Limit(limit), 1) // no burst
+			sl.rlimit = rate.NewLimiter(rate.Limit(limit), 1)  // no burst
+			sl.name = sl.name + fmt.Sprintf("-%.1f-rl", limit) // add suffix to logger name
 		}
 	}
 }
@@ -33,15 +35,21 @@ func SLogger(name string, opts ...SLogerOpt) *Logger {
 		panic("should not been here: root logger not set")
 	}
 
-	sl := &Logger{SugaredLogger: slogger(name, 1)}
+	sl := &Logger{
+		name: name,
+	}
+
 	for _, opt := range opts {
 		opt(sl)
 	}
+
+	sl.zsl = slogger(sl.name, 1)
+
 	return sl
 }
 
 func DefaultSLogger(name string) *Logger {
-	return &Logger{SugaredLogger: slogger(name, 1)}
+	return &Logger{zsl: slogger(name, 1)}
 }
 
 func TotalSLoggers() int64 {
