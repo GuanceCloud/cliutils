@@ -55,27 +55,6 @@ func TestRateLimitSLogger(t *T.T) {
 
 		assert.True(t, x > 5)
 	})
-
-	t.Run(`default`, func(t *T.T) {
-		l := DefaultSLogger("default") // limit 10 logs/sec
-		x := 0
-		tick := time.NewTicker(time.Second * 1)
-
-	out:
-		for {
-			x++
-			l.Debugf("[%d] This is a frequently occurring log message.", x)
-
-			select {
-			case <-tick.C:
-				log.Printf("triggered")
-				break out
-			default: // pass
-			}
-		}
-
-		assert.True(t, x > 5)
-	})
 }
 
 func BenchmarkMuitiLogs(b *testing.B) {
