@@ -58,6 +58,8 @@ func (rl *RateLimitedLogger) Infof(fmt string, args ...any) {
 		if rl.rlimit.Allow() {
 			rl.l.Infof(fmt, args...)
 		}
+	} else {
+		rl.l.Infof(fmt, args...)
 	}
 }
 
@@ -66,6 +68,8 @@ func (rl *RateLimitedLogger) Info(fmt string) {
 		if rl.rlimit.Allow() {
 			rl.l.Info(fmt)
 		}
+	} else {
+		rl.l.Info(fmt)
 	}
 }
 
@@ -74,6 +78,8 @@ func (rl *RateLimitedLogger) Warnf(fmt string, args ...any) {
 		if rl.rlimit.Allow() {
 			rl.l.Warnf(fmt, args...)
 		}
+	} else {
+		rl.l.Warnf(fmt, args...)
 	}
 }
 
@@ -82,6 +88,8 @@ func (rl *RateLimitedLogger) Warn(fmt string) {
 		if rl.rlimit.Allow() {
 			rl.l.Warn(fmt)
 		}
+	} else {
+		rl.l.Warn(fmt)
 	}
 }
 
@@ -90,6 +98,8 @@ func (rl *RateLimitedLogger) Errorf(fmt string, args ...any) {
 		if rl.rlimit.Allow() {
 			rl.l.Errorf(fmt, args...)
 		}
+	} else {
+		rl.l.Errorf(fmt, args...)
 	}
 }
 
@@ -98,6 +108,8 @@ func (rl *RateLimitedLogger) Error(fmt string) {
 		if rl.rlimit.Allow() {
 			rl.l.Error(fmt)
 		}
+	} else {
+		rl.l.Error(fmt)
 	}
 }
 
@@ -106,6 +118,8 @@ func (rl *RateLimitedLogger) Debugf(fmt string, args ...any) {
 		if rl.rlimit.Allow() {
 			rl.l.Debugf(fmt, args...)
 		}
+	} else {
+		rl.l.Debugf(fmt, args...)
 	}
 }
 
@@ -114,6 +128,8 @@ func (rl *RateLimitedLogger) Debug(fmt string) {
 		if rl.rlimit.Allow() {
 			rl.l.Debug(fmt)
 		}
+	} else {
+		rl.l.Debug(fmt)
 	}
 }
 

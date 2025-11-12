@@ -31,15 +31,26 @@ func RateLimitSLogger(name string, logsPerSec float64) *RateLimitedLogger {
 		panic("should not been here: root logger not set")
 	}
 
-	return &RateLimitedLogger{
-		// we have re-defined new Logger functions(Infof/Warnf/...), so setup callstack skip 1.
-		l:      &Logger{SugaredLogger: slogger(name, 1)},
-		rlimit: rate.NewLimiter(rate.Limit(logsPerSec), 1), // no burst
+	if logsPerSec > 0 {
+		return &RateLimitedLogger{
+			// we have re-defined new Logger functions(Infof/Warnf/...), so setup callstack skip 1.
+			l:      &Logger{SugaredLogger: slogger(name, 1)},
+			rlimit: rate.NewLimiter(rate.Limit(logsPerSec), 1), // no burst
+		}
+	} else {
+		return &RateLimitedLogger{
+			// we have re-defined new Logger functions(Infof/Warnf/...), so setup callstack skip 1.
+			l: &Logger{SugaredLogger: slogger(name, 1)},
+		}
 	}
 }
 
 func DefaultSLogger(name string) *Logger {
 	return &Logger{SugaredLogger: slogger(name, 0)}
+}
+
+func DefaultRateLimitSLogger(name string) *Logger {
+	return RateLimitSLogger(name, 0)
 }
 
 func TotalSLoggers() int64 {
