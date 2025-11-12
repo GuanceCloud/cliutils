@@ -49,7 +49,7 @@ func DefaultSLogger(name string) *Logger {
 	return &Logger{SugaredLogger: slogger(name, 0)}
 }
 
-func DefaultRateLimitSLogger(name string) *Logger {
+func DefaultRateLimitSLogger(name string) *RateLimitedLogger {
 	return RateLimitSLogger(name, 0)
 }
 
