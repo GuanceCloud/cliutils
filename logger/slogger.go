@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
 var (
@@ -22,18 +23,30 @@ func SLogger(name string) *Logger {
 		panic("should not been here: root logger not set")
 	}
 
-	return &Logger{SugaredLogger: slogger(name)}
+	return &Logger{SugaredLogger: slogger(name, 0)}
+}
+
+func RateLimitSLogger(name string, logsPerSec float64) *RateLimitedLogger {
+	if root == nil && defaultStdoutRootLogger == nil {
+		panic("should not been here: root logger not set")
+	}
+
+	return &RateLimitedLogger{
+		// we have re-defined new Logger functions(Infof/Warnf/...), so setup callstack skip 1.
+		l:      &Logger{SugaredLogger: slogger(name, 1)},
+		rlimit: rate.NewLimiter(rate.Limit(logsPerSec), 1), // no burst
+	}
 }
 
 func DefaultSLogger(name string) *Logger {
-	return &Logger{SugaredLogger: slogger(name)}
+	return &Logger{SugaredLogger: slogger(name, 0)}
 }
 
 func TotalSLoggers() int64 {
 	return atomic.LoadInt64(&totalSloggers)
 }
 
-func slogger(name string) *zap.SugaredLogger {
+func slogger(name string, callerSkip int) *zap.SugaredLogger {
 	r := root // prefer root logger
 
 	if r == nil {
@@ -44,7 +57,7 @@ func slogger(name string) *zap.SugaredLogger {
 		panic("should not been here")
 	}
 
-	newlog := getSugarLogger(r, name)
+	newlog := getSugarLogger(r, name, callerSkip)
 	if root != nil {
 		l, loaded := slogs.LoadOrStore(name, newlog)
 		if !loaded {
@@ -57,6 +70,10 @@ func slogger(name string) *zap.SugaredLogger {
 	return newlog
 }
 
-func getSugarLogger(l *zap.Logger, name string) *zap.SugaredLogger {
-	return l.Sugar().Named(name)
+func getSugarLogger(l *zap.Logger, name string, callerSkip int) *zap.SugaredLogger {
+	if callerSkip > 0 {
+		return l.WithOptions(zap.AddCallerSkip(callerSkip)).Sugar().Named(name)
+	} else {
+		return l.Sugar().Named(name)
+	}
 }

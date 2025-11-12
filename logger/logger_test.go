@@ -15,10 +15,47 @@ import (
 	"os"
 	"strings"
 	"testing"
+	T "testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 )
+
+func TestRateLimitSLogger(t *T.T) {
+	opt := &Option{
+		Path:  "stdout",
+		Level: DEBUG,
+		Flags: OPT_ENC_CONSOLE | OPT_SHORT_CALLER,
+	}
+
+	assert.NoError(t, InitRoot(opt))
+
+	t.Run(`basic`, func(t *T.T) {
+		l := RateLimitSLogger("basic", 10) // limit 10 logs/sec
+		x := 0
+		tick := time.NewTicker(time.Second * 5)
+
+	out:
+		for {
+			x++
+			l.Infof("[%d] This is a frequently occurring log message.", x)
+			l.Warnf("[%d] This is a frequently occurring log message.", x)
+			l.Debugf("[%d] This is a frequently occurring log message.", x)
+			l.Errorf("[%d] This is a frequently occurring log message.", x)
+
+			select {
+			case <-tick.C:
+				log.Printf("triggered")
+				break out
+			default: // pass
+			}
+		}
+
+		assert.True(t, x > 5)
+	})
+}
 
 func BenchmarkMuitiLogs(b *testing.B) {
 	opt := &Option{
@@ -31,17 +68,34 @@ func BenchmarkMuitiLogs(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	for i := 0; i < b.N; i++ {
-		l := SLogger(fmt.Sprintf("bench-multi-%d", i))
+	b.Run(`basic`, func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			l := SLogger(fmt.Sprintf("bench-multi-%d", i))
 
-		l.Debug("debug message")
-		l.Info("info message")
-		l.Warn("warn message")
+			l.Debug("debug message")
+			l.Info("info message")
+			l.Warn("warn message")
 
-		l.Debugf("debugf message: %s", "hello debug")
-		l.Infof("info message: %s", "hello info")
-		l.Warnf("warn message: %s", "hello warn")
-	}
+			l.Debugf("debugf message: %s", "hello debug")
+			l.Infof("info message: %s", "hello info")
+			l.Warnf("warn message: %s", "hello warn")
+		}
+	})
+
+	b.Run(`rate-limited`, func(b *T.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			l := RateLimitSLogger(fmt.Sprintf("rate-limited-%d", i), 1)
+
+			l.Debug("debug message")
+			l.Info("info message")
+			l.Warn("warn message")
+
+			l.Debugf("debugf message: %s", "hello debug")
+			l.Infof("info message: %s", "hello info")
+			l.Warnf("warn message: %s", "hello warn")
+		}
+	})
 }
 
 func BenchmarkBasic(b *testing.B) {
@@ -55,16 +109,36 @@ func BenchmarkBasic(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	l := SLogger("bench")
-	for i := 0; i < b.N; i++ {
-		l.Debug("debug message")
-		l.Info("info message")
-		l.Warn("warn message")
+	b.Run(`basic`, func(b *T.B) {
+		l := SLogger("bench")
 
-		l.Debugf("debugf message: %s", "hello debug")
-		l.Infof("info message: %s", "hello info")
-		l.Warnf("warn message: %s", "hello warn")
-	}
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			l.Debug("debug message")
+			l.Info("info message")
+			l.Warn("warn message")
+
+			l.Debugf("debugf message: %s", "hello debug")
+			l.Infof("info message: %s", "hello info")
+			l.Warnf("warn message: %s", "hello warn")
+		}
+	})
+
+	b.Run(`rate-limited`, func(b *T.B) {
+		l := RateLimitSLogger("bench", 1)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			l.Debug("debug message")
+			l.Info("info message")
+			l.Warn("warn message")
+
+			l.Debugf("debugf message: %s", "hello debug")
+			l.Infof("info message: %s", "hello info")
+			l.Warnf("warn message: %s", "hello warn")
+		}
+	})
 }
 
 func TestLoggerSideEffect(t *testing.T) {
@@ -102,6 +176,9 @@ func TestJsonLogging(t *testing.T) {
 	}
 
 	assert.NoError(t, InitRoot(opt))
+
+	_, err := os.Stat(opt.Path)
+	require.NoError(t, err)
 
 	l := SLogger("json")
 
