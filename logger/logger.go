@@ -46,90 +46,86 @@ var (
 
 type Logger struct {
 	*zap.SugaredLogger
-}
-
-type RateLimitedLogger struct {
-	l      *Logger
 	rlimit *rate.Limiter
 }
 
-func (rl *RateLimitedLogger) Infof(fmt string, args ...any) {
-	if rl.rlimit != nil {
-		if rl.rlimit.Allow() {
-			rl.l.Infof(fmt, args...)
+func (l *Logger) Infof(fmt string, args ...any) {
+	if l.rlimit != nil {
+		if l.rlimit.Allow() {
+			l.SugaredLogger.Infof(fmt, args...)
 		}
 	} else {
-		rl.l.Infof(fmt, args...)
+		l.SugaredLogger.Infof(fmt, args...)
 	}
 }
 
-func (rl *RateLimitedLogger) Info(fmt string) {
-	if rl.rlimit != nil {
-		if rl.rlimit.Allow() {
-			rl.l.Info(fmt)
+func (l *Logger) Info(fmt string) {
+	if l.rlimit != nil {
+		if l.rlimit.Allow() {
+			l.SugaredLogger.Info(fmt)
 		}
 	} else {
-		rl.l.Info(fmt)
+		l.SugaredLogger.Info(fmt)
 	}
 }
 
-func (rl *RateLimitedLogger) Warnf(fmt string, args ...any) {
-	if rl.rlimit != nil {
-		if rl.rlimit.Allow() {
-			rl.l.Warnf(fmt, args...)
+func (l *Logger) Warnf(fmt string, args ...any) {
+	if l.rlimit != nil {
+		if l.rlimit.Allow() {
+			l.SugaredLogger.Warnf(fmt, args...)
 		}
 	} else {
-		rl.l.Warnf(fmt, args...)
+		l.SugaredLogger.Warnf(fmt, args...)
 	}
 }
 
-func (rl *RateLimitedLogger) Warn(fmt string) {
-	if rl.rlimit != nil {
-		if rl.rlimit.Allow() {
-			rl.l.Warn(fmt)
+func (l *Logger) Warn(fmt string) {
+	if l.rlimit != nil {
+		if l.rlimit.Allow() {
+			l.SugaredLogger.Warn(fmt)
 		}
 	} else {
-		rl.l.Warn(fmt)
+		l.SugaredLogger.Warn(fmt)
 	}
 }
 
-func (rl *RateLimitedLogger) Errorf(fmt string, args ...any) {
-	if rl.rlimit != nil {
-		if rl.rlimit.Allow() {
-			rl.l.Errorf(fmt, args...)
+func (l *Logger) Errorf(fmt string, args ...any) {
+	if l.rlimit != nil {
+		if l.rlimit.Allow() {
+			l.SugaredLogger.Errorf(fmt, args...)
 		}
 	} else {
-		rl.l.Errorf(fmt, args...)
+		l.SugaredLogger.Errorf(fmt, args...)
 	}
 }
 
-func (rl *RateLimitedLogger) Error(fmt string) {
-	if rl.rlimit != nil {
-		if rl.rlimit.Allow() {
-			rl.l.Error(fmt)
+func (l *Logger) Error(fmt string) {
+	if l.rlimit != nil {
+		if l.rlimit.Allow() {
+			l.SugaredLogger.Error(fmt)
 		}
 	} else {
-		rl.l.Error(fmt)
+		l.SugaredLogger.Error(fmt)
 	}
 }
 
-func (rl *RateLimitedLogger) Debugf(fmt string, args ...any) {
-	if rl.rlimit != nil {
-		if rl.rlimit.Allow() {
-			rl.l.Debugf(fmt, args...)
+func (l *Logger) Debugf(fmt string, args ...any) {
+	if l.rlimit != nil {
+		if l.rlimit.Allow() {
+			l.SugaredLogger.Debugf(fmt, args...)
 		}
 	} else {
-		rl.l.Debugf(fmt, args...)
+		l.SugaredLogger.Debugf(fmt, args...)
 	}
 }
 
-func (rl *RateLimitedLogger) Debug(fmt string) {
-	if rl.rlimit != nil {
-		if rl.rlimit.Allow() {
-			rl.l.Debug(fmt)
+func (l *Logger) Debug(fmt string) {
+	if l.rlimit != nil {
+		if l.rlimit.Allow() {
+			l.SugaredLogger.Debug(fmt)
 		}
 	} else {
-		rl.l.Debug(fmt)
+		l.SugaredLogger.Debug(fmt)
 	}
 }
 

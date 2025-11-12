@@ -33,7 +33,7 @@ func TestRateLimitSLogger(t *T.T) {
 	assert.NoError(t, InitRoot(opt))
 
 	t.Run(`basic`, func(t *T.T) {
-		l := RateLimitSLogger("basic", 10) // limit 10 logs/sec
+		l := SLogger("basic", WithRateLimiter(10)) // limit 10 logs/sec
 		x := 0
 		tick := time.NewTicker(time.Second * 5)
 
@@ -57,7 +57,7 @@ func TestRateLimitSLogger(t *T.T) {
 	})
 
 	t.Run(`default`, func(t *T.T) {
-		l := DefaultRateLimitSLogger("default") // limit 10 logs/sec
+		l := DefaultSLogger("default") // limit 10 logs/sec
 		x := 0
 		tick := time.NewTicker(time.Second * 1)
 
@@ -106,7 +106,7 @@ func BenchmarkMuitiLogs(b *testing.B) {
 	b.Run(`rate-limited`, func(b *T.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			l := RateLimitSLogger(fmt.Sprintf("rate-limited-%d", i), 1)
+			l := SLogger(fmt.Sprintf("rate-limited-%d", i), WithRateLimiter(1))
 
 			l.Debug("debug message")
 			l.Info("info message")
@@ -147,7 +147,7 @@ func BenchmarkBasic(b *testing.B) {
 	})
 
 	b.Run(`rate-limited`, func(b *T.B) {
-		l := RateLimitSLogger("bench", 1)
+		l := SLogger("bench", WithRateLimiter(1))
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {

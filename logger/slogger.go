@@ -18,39 +18,30 @@ var (
 	slogs         = &sync.Map{}
 )
 
-func SLogger(name string) *Logger {
-	if root == nil && defaultStdoutRootLogger == nil {
-		panic("should not been here: root logger not set")
-	}
+type SLogerOpt func(*Logger)
 
-	return &Logger{SugaredLogger: slogger(name, 0)}
+func WithRateLimiter(limit float64) SLogerOpt {
+	return func(sl *Logger) {
+		if limit > 0 {
+			sl.rlimit = rate.NewLimiter(rate.Limit(limit), 1) // no burst
+		}
+	}
 }
 
-func RateLimitSLogger(name string, logsPerSec float64) *RateLimitedLogger {
+func SLogger(name string, opts ...SLogerOpt) *Logger {
 	if root == nil && defaultStdoutRootLogger == nil {
 		panic("should not been here: root logger not set")
 	}
 
-	if logsPerSec > 0 {
-		return &RateLimitedLogger{
-			// we have re-defined new Logger functions(Infof/Warnf/...), so setup callstack skip 1.
-			l:      &Logger{SugaredLogger: slogger(name, 1)},
-			rlimit: rate.NewLimiter(rate.Limit(logsPerSec), 1), // no burst
-		}
-	} else {
-		return &RateLimitedLogger{
-			// we have re-defined new Logger functions(Infof/Warnf/...), so setup callstack skip 1.
-			l: &Logger{SugaredLogger: slogger(name, 1)},
-		}
+	sl := &Logger{SugaredLogger: slogger(name, 1)}
+	for _, opt := range opts {
+		opt(sl)
 	}
+	return sl
 }
 
 func DefaultSLogger(name string) *Logger {
-	return &Logger{SugaredLogger: slogger(name, 0)}
-}
-
-func DefaultRateLimitSLogger(name string) *RateLimitedLogger {
-	return RateLimitSLogger(name, 0)
+	return &Logger{SugaredLogger: slogger(name, 1)}
 }
 
 func TotalSLoggers() int64 {
