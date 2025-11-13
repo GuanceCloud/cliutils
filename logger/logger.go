@@ -60,12 +60,13 @@ func (l *Logger) allowed(r float64) (string, bool) {
 	}
 
 	for idx, rl := range l.rlimits {
-		if cliutils.FloatEquals(r, float64(rl.Limit())) && rl.Allow() {
-			return l.hints[idx], true
+		if cliutils.FloatEquals(r, float64(rl.Limit())) {
+			return l.hints[idx], rl.Allow()
 		}
 	}
 
-	return "", false
+	// @r not found, then no limiter on current log, we allow it.
+	return "", true
 }
 
 func (l *Logger) Name() string {
@@ -88,8 +89,12 @@ func (l *Logger) RLInfof(r float64, fmt string, args ...any) {
 
 func (l *Logger) RLInfo(r float64, args ...any) {
 	if h, ok := l.allowed(r); ok {
-		xargs := []any{h}
-		l.zsl.Info(append(xargs, args...)...)
+		if h != "" {
+			xargs := []any{h}
+			l.zsl.Info(append(xargs, args...)...)
+		} else {
+			l.zsl.Info(args...)
+		}
 	}
 }
 
@@ -109,8 +114,12 @@ func (l *Logger) RLWarnf(r float64, fmt string, args ...any) {
 
 func (l *Logger) RLWarn(r float64, args ...any) {
 	if h, ok := l.allowed(r); ok {
-		xargs := []any{h}
-		l.zsl.Warn(append(xargs, args...)...)
+		if h != "" {
+			xargs := []any{h}
+			l.zsl.Warn(append(xargs, args...)...)
+		} else {
+			l.zsl.Warn(args...)
+		}
 	}
 }
 
@@ -130,8 +139,12 @@ func (l *Logger) RLErrorf(r float64, fmt string, args ...any) {
 
 func (l *Logger) RLError(r float64, args ...any) {
 	if h, ok := l.allowed(r); ok {
-		xargs := []any{h}
-		l.zsl.Error(append(xargs, args...)...)
+		if h != "" {
+			xargs := []any{h}
+			l.zsl.Error(append(xargs, args...)...)
+		} else {
+			l.zsl.Error(args...)
+		}
 	}
 }
 
@@ -151,8 +164,12 @@ func (l *Logger) RLDebugf(r float64, fmt string, args ...any) {
 
 func (l *Logger) RLDebug(r float64, args ...any) {
 	if h, ok := l.allowed(r); ok {
-		xargs := []any{h}
-		l.zsl.Debug(append(xargs, args...))
+		if h != "" {
+			xargs := []any{h}
+			l.zsl.Debug(append(xargs, args...))
+		} else {
+			l.zsl.Debug(args...)
+		}
 	}
 }
 

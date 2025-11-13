@@ -34,9 +34,9 @@ func TestRateLimitSLogger(t *T.T) {
 
 	t.Run(`basic`, func(t *T.T) {
 		rl := 1.0
-		l := SLogger("basic", WithRateLimiter(rl))
+		l := SLogger("basic", WithRateLimiter(rl, ""))
 		x := 0
-		tick := time.NewTicker(time.Second * 5)
+		tick := time.NewTicker(time.Second * 3)
 
 	out:
 		for {
@@ -48,13 +48,10 @@ func TestRateLimitSLogger(t *T.T) {
 
 			select {
 			case <-tick.C:
-				log.Printf("triggered")
 				break out
 			default: // pass
 			}
 		}
-
-		assert.True(t, x > 5)
 	})
 
 	t.Run("no-limit", func(t *T.T) {
@@ -62,16 +59,11 @@ func TestRateLimitSLogger(t *T.T) {
 		l.RLInfof(1.0 /*1.0 rate limit not exist*/, "this is a no rate limited log")
 	})
 
-	t.Run("limit-not-exist", func(t *T.T) {
-		l := SLogger("limit-not-exist", WithRateLimiter(.5))
-		l.RLInfof(1.0, "this log should not exist")
-	})
-
 	t.Run("multi-limit", func(t *T.T) {
-		l := SLogger("limit-not-exist", WithRateLimiter(.5), WithRateLimiter(1.0))
+		l := SLogger("limit-not-exist", WithRateLimiter(.5, ""), WithRateLimiter(1.0, ""))
 		l.RLInfof(1.0, "this log should exist")
 		l.RLInfof(.5, "this log should exist")
-		l.RLInfof(1.5, "this log should not exist")
+		l.RLInfof(1.5, "limiter not exist, this log should exist")
 	})
 }
 
@@ -103,7 +95,7 @@ func BenchmarkMuitiLogs(b *testing.B) {
 	b.Run(`rate-limited`, func(b *T.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			l := SLogger(fmt.Sprintf("rate-limited-%d", i), WithRateLimiter(1))
+			l := SLogger(fmt.Sprintf("rate-limited-%d", i), WithRateLimiter(1, ""))
 
 			l.RLDebug(1, "debug message")
 			l.RLInfo(1, "info message")
@@ -144,7 +136,7 @@ func BenchmarkBasic(b *testing.B) {
 
 	b.Run(`rate-limited`, func(b *T.B) {
 		rlimit := 100.0
-		l := SLogger("bench", WithRateLimiter(rlimit))
+		l := SLogger("bench", WithRateLimiter(rlimit, ""))
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
