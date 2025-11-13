@@ -498,11 +498,6 @@ func (t *GRPCTask) getJSONRequest() string {
 }
 
 func (t *GRPCTask) run() error {
-	start := time.Now()
-	defer func() {
-		t.reqCost = time.Since(start)
-	}()
-
 	opt := t.AdvanceOptions
 	if opt == nil || opt.RequestOptions == nil {
 		t.reqError = "request options required"
@@ -554,8 +549,10 @@ func (t *GRPCTask) run() error {
 	}
 
 	// Execute RPC call
+	rpcStart := time.Now()
 	stub := grpcdynamic.NewStub(conn)
 	resp, err := stub.InvokeRpc(ctx, method, msg)
+	t.reqCost = time.Since(rpcStart)
 	if err != nil {
 		t.reqError = err.Error()
 		return nil
