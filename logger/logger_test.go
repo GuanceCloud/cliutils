@@ -33,17 +33,18 @@ func TestRateLimitSLogger(t *T.T) {
 	assert.NoError(t, InitRoot(opt))
 
 	t.Run(`basic`, func(t *T.T) {
-		l := SLogger("basic", WithRateLimiter(10)) // limit 10 logs/sec
+		rl := 1.0
+		l := SLogger("basic", WithRateLimiter(rl))
 		x := 0
 		tick := time.NewTicker(time.Second * 5)
 
 	out:
 		for {
 			x++
-			l.Infof("[%d] This is a frequently occurring log message.", x)
-			l.Warnf("[%d] This is a frequently occurring log message.", x)
-			l.Debugf("[%d] This is a frequently occurring log message.", x)
-			l.Errorf("[%d] This is a frequently occurring log message.", x)
+			l.RLInfof(rl, "[%d] This is a frequently occurring log message.", x)
+			l.RLWarn(rl, "This is a frequently occurring log message.")
+			l.RLDebugf(rl, "[%d] This is a frequently occurring log message.", x)
+			l.RLError(rl, "This is a frequently occurring log message.")
 
 			select {
 			case <-tick.C:
@@ -54,6 +55,23 @@ func TestRateLimitSLogger(t *T.T) {
 		}
 
 		assert.True(t, x > 5)
+	})
+
+	t.Run("no-limit", func(t *T.T) {
+		l := SLogger("no-limit")
+		l.RLInfof(1.0 /*1.0 rate limit not exist*/, "this is a no rate limited log")
+	})
+
+	t.Run("limit-not-exist", func(t *T.T) {
+		l := SLogger("limit-not-exist", WithRateLimiter(.5))
+		l.RLInfof(1.0, "this log should not exist")
+	})
+
+	t.Run("multi-limit", func(t *T.T) {
+		l := SLogger("limit-not-exist", WithRateLimiter(.5), WithRateLimiter(1.0))
+		l.RLInfof(1.0, "this log should exist")
+		l.RLInfof(.5, "this log should exist")
+		l.RLInfof(1.5, "this log should not exist")
 	})
 }
 
@@ -87,13 +105,12 @@ func BenchmarkMuitiLogs(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			l := SLogger(fmt.Sprintf("rate-limited-%d", i), WithRateLimiter(1))
 
-			l.Debug("debug message")
-			l.Info("info message")
-			l.Warn("warn message")
-
-			l.Debugf("debugf message: %s", "hello debug")
-			l.Infof("info message: %s", "hello info")
-			l.Warnf("warn message: %s", "hello warn")
+			l.RLDebug(1, "debug message")
+			l.RLInfo(1, "info message")
+			l.RLWarn(1, "warn message")
+			l.RLDebugf(1, "debugf message: %s", "hello debug")
+			l.RLInfof(1, "info message: %s", "hello info")
+			l.RLWarnf(1, "warn message: %s", "hello warn")
 		}
 	})
 }
@@ -126,17 +143,18 @@ func BenchmarkBasic(b *testing.B) {
 	})
 
 	b.Run(`rate-limited`, func(b *T.B) {
-		l := SLogger("bench", WithRateLimiter(1))
+		rlimit := 100.0
+		l := SLogger("bench", WithRateLimiter(rlimit))
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			l.Debug("debug message")
-			l.Info("info message")
-			l.Warn("warn message")
+			l.RLDebug(rlimit, "debug message")
+			l.RLInfo(rlimit, "info message")
+			l.RLWarn(rlimit, "warn message")
 
-			l.Debugf("debugf message: %s", "hello debug")
-			l.Infof("info message: %s", "hello info")
-			l.Warnf("warn message: %s", "hello warn")
+			l.RLDebugf(rlimit, "debugf message: %s", "hello debug")
+			l.RLInfof(rlimit, "info message: %s", "hello info")
+			l.RLWarnf(rlimit, "warn message: %s", "hello warn")
 		}
 	})
 }

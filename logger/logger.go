@@ -46,9 +46,24 @@ var (
 )
 
 type Logger struct {
-	name   string
-	zsl    *zap.SugaredLogger
-	rlimit *rate.Limiter
+	name    string
+	zsl     *zap.SugaredLogger
+	rlimits []*rate.Limiter
+	hints   []string
+}
+
+func (l *Logger) allowed(r float64) (string, bool) {
+	if len(l.rlimits) == 0 { // no limiter, log them all
+		return "", true
+	}
+
+	for idx, rl := range l.rlimits {
+		if r == float64(rl.Limit()) && rl.Allow() {
+			return l.hints[idx], true
+		}
+	}
+
+	return "", false
 }
 
 func (l *Logger) Name() string {
@@ -56,82 +71,86 @@ func (l *Logger) Name() string {
 }
 
 func (l *Logger) Infof(fmt string, args ...any) {
-	if l.rlimit != nil {
-		if l.rlimit.Allow() {
-			l.zsl.Infof(fmt, args...)
-		}
-	} else {
-		l.zsl.Infof(fmt, args...)
-	}
+	l.zsl.Infof(fmt, args...)
 }
 
 func (l *Logger) Info(args ...any) {
-	if l.rlimit != nil {
-		if l.rlimit.Allow() {
-			l.zsl.Info(args...)
-		}
-	} else {
-		l.zsl.Info(args...)
+	l.zsl.Info(args...)
+}
+
+func (l *Logger) RLInfof(r float64, fmt string, args ...any) {
+	if h, ok := l.allowed(r); ok {
+		l.zsl.Infof(h+fmt, args...)
+	}
+}
+
+func (l *Logger) RLInfo(r float64, args ...any) {
+	if h, ok := l.allowed(r); ok {
+		xargs := []any{h}
+		l.zsl.Info(append(xargs, args...)...)
 	}
 }
 
 func (l *Logger) Warnf(fmt string, args ...any) {
-	if l.rlimit != nil {
-		if l.rlimit.Allow() {
-			l.zsl.Warnf(fmt, args...)
-		}
-	} else {
-		l.zsl.Warnf(fmt, args...)
-	}
+	l.zsl.Warnf(fmt, args...)
 }
 
 func (l *Logger) Warn(args ...any) {
-	if l.rlimit != nil {
-		if l.rlimit.Allow() {
-			l.zsl.Warn(args...)
-		}
-	} else {
-		l.zsl.Warn(args...)
+	l.zsl.Warn(args...)
+}
+
+func (l *Logger) RLWarnf(r float64, fmt string, args ...any) {
+	if h, ok := l.allowed(r); ok {
+		l.zsl.Warnf(h+fmt, args...)
+	}
+}
+
+func (l *Logger) RLWarn(r float64, args ...any) {
+	if h, ok := l.allowed(r); ok {
+		xargs := []any{h}
+		l.zsl.Warn(append(xargs, args...)...)
 	}
 }
 
 func (l *Logger) Errorf(fmt string, args ...any) {
-	if l.rlimit != nil {
-		if l.rlimit.Allow() {
-			l.zsl.Errorf(fmt, args...)
-		}
-	} else {
-		l.zsl.Errorf(fmt, args...)
-	}
+	l.zsl.Errorf(fmt, args...)
 }
 
 func (l *Logger) Error(args ...any) {
-	if l.rlimit != nil {
-		if l.rlimit.Allow() {
-			l.zsl.Error(args...)
-		}
-	} else {
-		l.zsl.Error(args...)
+	l.zsl.Error(args...)
+}
+
+func (l *Logger) RLErrorf(r float64, fmt string, args ...any) {
+	if h, ok := l.allowed(r); ok {
+		l.zsl.Errorf(h+fmt, args...)
+	}
+}
+
+func (l *Logger) RLError(r float64, args ...any) {
+	if h, ok := l.allowed(r); ok {
+		xargs := []any{h}
+		l.zsl.Error(append(xargs, args...)...)
 	}
 }
 
 func (l *Logger) Debugf(fmt string, args ...any) {
-	if l.rlimit != nil {
-		if l.rlimit.Allow() {
-			l.zsl.Debugf(fmt, args...)
-		}
-	} else {
-		l.zsl.Debugf(fmt, args...)
-	}
+	l.zsl.Debugf(fmt, args...)
 }
 
 func (l *Logger) Debug(args ...any) {
-	if l.rlimit != nil {
-		if l.rlimit.Allow() {
-			l.zsl.Debug(args...)
-		}
-	} else {
-		l.zsl.Debug(args...)
+	l.zsl.Debug(args...)
+}
+
+func (l *Logger) RLDebugf(r float64, fmt string, args ...any) {
+	if h, ok := l.allowed(r); ok {
+		l.zsl.Debugf(h+fmt, args...)
+	}
+}
+
+func (l *Logger) RLDebug(r float64, args ...any) {
+	if h, ok := l.allowed(r); ok {
+		xargs := []any{h}
+		l.zsl.Debug(append(xargs, args...))
 	}
 }
 

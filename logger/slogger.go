@@ -24,8 +24,15 @@ type SLogerOpt func(*Logger)
 func WithRateLimiter(limit float64) SLogerOpt {
 	return func(sl *Logger) {
 		if limit > 0 {
-			sl.rlimit = rate.NewLimiter(rate.Limit(limit), 1) // no burst
-			sl.name += fmt.Sprintf("-%.1f-rl", limit)         // add suffix to logger name
+			for _, rl := range sl.rlimits {
+				if float64(rl.Limit()) == limit {
+					return // exist limit skipped
+				}
+			}
+
+			// add new limiter
+			sl.rlimits = append(sl.rlimits, rate.NewLimiter(rate.Limit(limit), 1)) // no burst
+			sl.hints = append(sl.hints, fmt.Sprintf("[%.1f-rl] ", limit))
 		}
 	}
 }
