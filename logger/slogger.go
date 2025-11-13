@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/GuanceCloud/cliutils"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )
@@ -25,7 +26,7 @@ func WithRateLimiter(limit float64) SLogerOpt {
 	return func(sl *Logger) {
 		if limit > 0 {
 			for _, rl := range sl.rlimits {
-				if float64(rl.Limit()) == limit {
+				if cliutils.FloatEquals(float64(rl.Limit()), limit) {
 					return // exist limit skipped
 				}
 			}

@@ -12,6 +12,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/time/rate"
+
+	"github.com/GuanceCloud/cliutils"
 )
 
 const (
@@ -58,7 +60,7 @@ func (l *Logger) allowed(r float64) (string, bool) {
 	}
 
 	for idx, rl := range l.rlimits {
-		if r == float64(rl.Limit()) && rl.Allow() {
+		if cliutils.FloatEquals(r, float64(rl.Limit())) && rl.Allow() {
 			return l.hints[idx], true
 		}
 	}
