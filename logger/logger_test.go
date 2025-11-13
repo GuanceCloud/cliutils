@@ -156,6 +156,8 @@ func TestLoggerSideEffect(t *testing.T) {
 		return fmt.Sprintf("%d", x.i)
 	}
 
+	Reset()
+
 	if err := InitRoot(opt); err != nil {
 		t.Error(err)
 	}
@@ -169,6 +171,8 @@ func TestLoggerSideEffect(t *testing.T) {
 }
 
 func TestJsonLogging(t *testing.T) {
+	Reset()
+
 	opt := &Option{
 		Path:  "log.json",
 		Level: DEBUG,
@@ -177,12 +181,12 @@ func TestJsonLogging(t *testing.T) {
 
 	assert.NoError(t, InitRoot(opt))
 
-	_, err := os.Stat(opt.Path)
-	require.NoError(t, err)
-
 	l := SLogger("json")
 
 	l.Info("this is the json message with short path")
+
+	_, err := os.Stat(opt.Path)
+	require.NoError(t, err)
 
 	showLog(t, opt.Path)
 
