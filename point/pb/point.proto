@@ -64,6 +64,8 @@ enum MetricType {
 	COUNT = 1;
 	RATE = 2;
 	GAUGE = 3;
+	SUM_DELTA = 4;
+	SUM_CUMULATIVE = 5;
 }
 
 message Field {
