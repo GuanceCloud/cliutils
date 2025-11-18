@@ -506,6 +506,22 @@ func TestRotateOnDevNull(t *testing.T) {
 	}
 }
 
+func TestBasic(t *T.T) {
+	opt := &Option{
+		Path:  "stdout",
+		Level: DEBUG,
+		Flags: OPT_ENC_CONSOLE | OPT_SHORT_CALLER,
+	}
+
+	assert.NoError(t, InitRoot(opt))
+
+	t.Run("XXXw()", func(t *T.T) {
+		l := SLogger("XXXw()")
+
+		l.Infow("this", "was", false, "a", 3.14, "log", 46)
+	})
+}
+
 type BufferSync struct {
 	io.ReadWriter
 }

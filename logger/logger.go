@@ -77,6 +77,10 @@ func (l *Logger) Infof(fmt string, args ...any) {
 	l.zsl.Infof(fmt, args...)
 }
 
+func (l *Logger) Infow(fmt string, args ...any) {
+	l.zsl.Infow(fmt, args...)
+}
+
 func (l *Logger) Info(args ...any) {
 	l.zsl.Info(args...)
 }
@@ -100,6 +104,10 @@ func (l *Logger) RLInfo(r float64, args ...any) {
 
 func (l *Logger) Warnf(fmt string, args ...any) {
 	l.zsl.Warnf(fmt, args...)
+}
+
+func (l *Logger) Warnw(fmt string, args ...any) {
+	l.zsl.Warnw(fmt, args...)
 }
 
 func (l *Logger) Warn(args ...any) {
@@ -127,6 +135,10 @@ func (l *Logger) Errorf(fmt string, args ...any) {
 	l.zsl.Errorf(fmt, args...)
 }
 
+func (l *Logger) Errorw(fmt string, args ...any) {
+	l.zsl.Errorw(fmt, args...)
+}
+
 func (l *Logger) Error(args ...any) {
 	l.zsl.Error(args...)
 }
@@ -150,6 +162,10 @@ func (l *Logger) RLError(r float64, args ...any) {
 
 func (l *Logger) Debugf(fmt string, args ...any) {
 	l.zsl.Debugf(fmt, args...)
+}
+
+func (l *Logger) Debugw(fmt string, args ...any) {
+	l.zsl.Debugw(fmt, args...)
 }
 
 func (l *Logger) Debug(args ...any) {
@@ -178,6 +194,11 @@ func (l *Logger) Fatalf(fmt string, args ...any) {
 	l.zsl.Fatalf(fmt, args...)
 }
 
+func (l *Logger) Fatalw(fmt string, args ...any) {
+	// fatal log not rate limited
+	l.zsl.Fatalw(fmt, args...)
+}
+
 func (l *Logger) Fatal(args ...any) {
 	// fatal log not rate limited
 	l.zsl.Fatal(args...)
@@ -186,6 +207,11 @@ func (l *Logger) Fatal(args ...any) {
 func (l *Logger) Panicf(fmt string, args ...any) {
 	// panic log not rate limited
 	l.zsl.Panicf(fmt, args...)
+}
+
+func (l *Logger) Panicw(fmt string, args ...any) {
+	// panic log not rate limited
+	l.zsl.Panicw(fmt, args...)
 }
 
 func (l *Logger) Panic(args ...any) {
