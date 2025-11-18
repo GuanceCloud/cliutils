@@ -111,8 +111,6 @@ func newRootLogger(fpath, level string, options int) (*zap.Logger, error) {
 		return newNormalRootLogger(fpath, level, options)
 	}
 
-	log.Printf("new root logger on file %s", fpath)
-
 	u, err := url.Parse(fpath)
 	if err != nil {
 		return nil, err
@@ -129,8 +127,6 @@ func newRootLogger(fpath, level string, options int) (*zap.Logger, error) {
 			if err := os.MkdirAll(filepath.Dir(fpath), 0o600); err != nil {
 				return nil, fmt.Errorf("MkdirAll(%s): %w", fpath, err)
 			}
-
-			log.Printf("create %s", fpath)
 
 			// create empty log file
 			if err := os.WriteFile(fpath, nil, 0o600); err != nil {
