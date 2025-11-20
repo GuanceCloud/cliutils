@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package common;
+
+option go_package = "datakittest/grpc/pb";
+
+message result {
+    int32 code = 1;
+    string msg = 2;
+}
