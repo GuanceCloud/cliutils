@@ -103,8 +103,10 @@ type GRPCTask struct {
 	timeout          time.Duration
 	postScriptResult *ScriptResult
 
-	rawTask          *GRPCTask
-	methodDescriptor *pdesc.MethodDescriptor // cached method descriptor for ProtoFiles discovery
+	rawTask                    *GRPCTask
+	healthMethodDescriptor     *pdesc.MethodDescriptor // cached method descriptor for HealthCheck discovery
+	protoFilesMethodDescriptor *pdesc.MethodDescriptor // cached method descriptor for ProtoFiles discovery
+	reflectionMethodDescriptor *pdesc.MethodDescriptor // cached method descriptor for Reflection discovery
 }
 
 func (t *GRPCTask) initTask() {
@@ -182,11 +184,17 @@ func (t *GRPCTask) init() error {
 
 	// Cache method descriptor if using ProtoFiles discovery
 	if reqOpt.ProtoFiles != nil && len(reqOpt.ProtoFiles.ProtoFiles) > 0 {
-		methodDesc, err := t.findMethodAmongProtofiles()
+		_, err := t.findMethodAmongProtofiles()
 		if err != nil {
 			return fmt.Errorf("find method descriptor failed: %w", err)
 		}
-		t.methodDescriptor = methodDesc
+	}
+
+	if reqOpt.HealthCheck != nil {
+		_, err := t.findHealthCheckMethod()
+		if err != nil {
+			return fmt.Errorf("find health check method failed: %w", err)
+		}
 	}
 
 	return nil
@@ -262,6 +270,10 @@ func (t *GRPCTask) findMethod(ctx context.Context, conn *grpc.ClientConn) (*pdes
 }
 
 func (t *GRPCTask) findHealthCheckMethod() (*pdesc.MethodDescriptor, error) {
+	if t.healthMethodDescriptor != nil {
+		return t.healthMethodDescriptor, nil
+	}
+
 	healthFD := grpc_health_v1.File_grpc_health_v1_health_proto
 	if healthFD == nil {
 		return nil, fmt.Errorf("health check file descriptor not available")
@@ -281,11 +293,16 @@ func (t *GRPCTask) findHealthCheckMethod() (*pdesc.MethodDescriptor, error) {
 	if md == nil {
 		return nil, fmt.Errorf("health check method %s not found", HealthCheckMethodName)
 	}
+	t.healthMethodDescriptor = md
 
 	return md, nil
 }
 
 func (t *GRPCTask) findMethodByReflection(ctx context.Context, conn *grpc.ClientConn) (*pdesc.MethodDescriptor, error) {
+	if t.reflectionMethodDescriptor != nil {
+		return t.reflectionMethodDescriptor, nil
+	}
+
 	opt := t.AdvanceOptions
 	if opt == nil || opt.RequestOptions == nil || opt.RequestOptions.Reflection == nil {
 		return nil, fmt.Errorf("reflection discovery not configured")
@@ -321,13 +338,14 @@ func (t *GRPCTask) findMethodByReflection(ctx context.Context, conn *grpc.Client
 	if md == nil {
 		return nil, fmt.Errorf("method %s not found in service %s", methodName, serviceName)
 	}
+	t.reflectionMethodDescriptor = md
 	return md, nil
 }
 
 func (t *GRPCTask) findMethodAmongProtofiles() (*pdesc.MethodDescriptor, error) {
 	// Return cached method descriptor if available
-	if t.methodDescriptor != nil {
-		return t.methodDescriptor, nil
+	if t.protoFilesMethodDescriptor != nil {
+		return t.protoFilesMethodDescriptor, nil
 	}
 
 	opt := t.AdvanceOptions
@@ -371,6 +389,7 @@ func (t *GRPCTask) findMethodAmongProtofiles() (*pdesc.MethodDescriptor, error) 
 	for _, fd := range desc {
 		if sd := fd.FindService(service); sd != nil {
 			if md := sd.FindMethodByName(method); md != nil {
+				t.protoFilesMethodDescriptor = md
 				return md, nil
 			}
 		}
@@ -942,7 +961,7 @@ func (t *GRPCTask) renderProtoFiles(protoFiles *GRPCProtoFilesDiscovery, fm temp
 		}
 		// if full method is changed, clear the cached method descriptor
 		if t.AdvanceOptions.RequestOptions.ProtoFiles.FullMethod != fullMethod {
-			t.methodDescriptor = nil
+			t.protoFilesMethodDescriptor = nil
 		}
 		t.AdvanceOptions.RequestOptions.ProtoFiles.FullMethod = fullMethod
 	}
@@ -967,6 +986,10 @@ func (t *GRPCTask) renderReflection(reflection *GRPCReflectionDiscovery, fm temp
 		fullMethod, err := t.GetParsedString(reflection.FullMethod, fm)
 		if err != nil {
 			return fmt.Errorf("render reflection full method failed: %w", err)
+		}
+		// if full method is changed, clear the cached method descriptor
+		if t.AdvanceOptions.RequestOptions.Reflection.FullMethod != fullMethod {
+			t.reflectionMethodDescriptor = nil
 		}
 		t.AdvanceOptions.RequestOptions.Reflection.FullMethod = fullMethod
 	}
