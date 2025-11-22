@@ -489,6 +489,26 @@ func TestCheckFields(t *T.T) {
 	}
 }
 
+func TestCheckAfterDelete(t *T.T) {
+	t.Run(`basic`, func(t *T.T) {
+		cfg := GetCfg()
+		defer PutCfg(cfg)
+
+		WithMaxFieldValLen(1)(cfg)
+		WithDisabledKeys(NewKey("f3", 0), NewKey("f5", 0))(cfg)
+
+		c := checker{cfg: cfg}
+		var kvs KVs
+
+		kvs1 := kvs.Add("f1", "1").Add("f2", 2).Add("f3", "333").Add("f4", 3.14).Add("f5", 1.414).Add("f6", "foo")
+		kvs2 := c.checkKVs(kvs1)
+		t.Logf("%s", kvs2.Pretty())
+		t.Logf("%s", kvs1.Pretty())
+
+		c.checkKVs(kvs1)
+	})
+}
+
 func TestAdjustKV(t *T.T) {
 	cases := []struct {
 		name, x, y string
