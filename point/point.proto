@@ -74,6 +74,7 @@ enum MetricType {
 	HISTOGRAM_MIN=10;
 	HISTOGRAM_COUNT=11;
 	HISTOGRAM_SUM=12;
+	HISTOGRAM_BUCKET=13;
 }
 
 message Field {
