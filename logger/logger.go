@@ -261,9 +261,14 @@ func init() {
 		panic(err.Error())
 	}
 
+	lvl := DEBUG
+	if v, ok := os.LookupEnv("LOGGER_LEVEL"); ok {
+		lvl = v
+	}
+
 	if v, ok := os.LookupEnv("LOGGER_PATH"); ok {
 		opt := &Option{
-			Level: DEBUG,
+			Level: lvl,
 			Flags: OPT_DEFAULT,
 			Path:  v,
 		}
