@@ -222,7 +222,7 @@ func (t *MultiTask) runHTTPStep(step *MultiStep) (map[string]interface{}, error)
 		}
 		task.Stop()
 
-		if err == nil {
+		if err == nil && result["status"] == "OK" {
 			break
 		}
 
