@@ -377,7 +377,7 @@ func (p *Point) GetS(k string) (string, bool) {
 	kvs := KVs(p.pt.Fields)
 
 	if kv := kvs.Get(k); kv != nil {
-		if _, ok := kv.Val.(*Field_D); ok {
+		if _, ok := kv.Val.(*Field_S); ok {
 			return kv.GetS(), true
 		}
 	}
