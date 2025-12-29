@@ -2,6 +2,7 @@ package aggregate
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
@@ -29,6 +30,8 @@ type AggregatorConfigure struct {
 	AggregateRules []*AggregateRule `toml:"aggregate_rules" json:"aggregate_rules"`
 	DefaultAction  Action           `toml:"action" json:"action"`
 	Version        int64            `toml:"version" json:"version"`
+
+	calcs map[uint64]Calculator
 }
 
 // AggregateRule configured a specific aggregate rule.
@@ -62,7 +65,12 @@ func (a *AggregatorConfigure) Setup() error {
 		if err := ar.Selector.Setup(); err != nil {
 			return err
 		}
+
+		// make the group by tags sorted for point hash.
+		sort.Strings(ar.Groupby)
 	}
+
+	a.calcs = map[uint64]Calculator{}
 
 	return nil
 }
@@ -172,9 +180,9 @@ func (s *ruleSelector) doSelect(groupby []string, pts []*point.Point) (res []*po
 				case *point.Field_F:
 					kvs = kvs.Add(kv.Key, v.F)
 				case *point.Field_I:
-					kvs = kvs.Add(kv.Key, v.I)
+					kvs = kvs.Add(kv.Key, float64(v.I)) // convert all into float
 				case *point.Field_U:
-					kvs = kvs.Add(kv.Key, v.U)
+					kvs = kvs.Add(kv.Key, float64(v.U)) // convert all into float
 				default:
 					// pass: aggregate fields should only be int/float
 					l.Debugf("skip non-numbermic field %q", kv.Key)

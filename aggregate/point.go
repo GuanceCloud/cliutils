@@ -71,3 +71,18 @@ func hash(pt *point.Point, sortedTagKeys []string) uint64 {
 func HashCombine(seed, hash uint64) uint64 {
 	return ((seed + 0x9e3779b9) ^ hash) * 0x517cc1b727220a95
 }
+
+// pointAggrTags calculate point's aggregate tags.
+func pointAggrTags(pt *point.Point, sortedKeys []string) [][2]string {
+	kvs := [][2]string{}
+
+	for _, k := range sortedKeys {
+		if x := pt.Get(k); x != nil {
+			if v, ok := x.(string); ok {
+				kvs = append(kvs, [2]string{k, v})
+			}
+		}
+	}
+
+	return kvs
+}
