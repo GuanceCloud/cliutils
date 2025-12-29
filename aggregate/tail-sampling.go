@@ -5,13 +5,15 @@ import "time"
 type TailSampling struct {
 	TraceTTL       time.Duration    `toml:"trace_ttl" json:"trace_ttl"`
 	DerivedMetrics []*DerivedMetric `toml:"derived_metrics" json:"derived_metrics"`
+
+	Version int64 `toml:"version" json:"version"`
 }
 
 type DerivedMetric struct {
-	Name      string     `toml:"name" json:"name"`
-	Aggregate *Aggregate `toml:"aggregate" json:"aggregate"`
-	Condition string     `toml:"condition" json:"condition"`
-	Groupby   []string   `toml:"group_by" json:"group_by"`
+	Name      string                  `toml:"name" json:"name"`
+	Aggregate *aggregateAlgoConfigure `toml:"aggregate" json:"aggregate"`
+	Condition string                  `toml:"condition" json:"condition"`
+	Groupby   []string                `toml:"group_by" json:"group_by"`
 }
 
 type (
@@ -68,7 +70,7 @@ var (
 		Condition: "",                              // user specific or empty
 		Groupby:   []string{"service", "resource"}, // user can add more tag keys here.
 
-		Aggregate: &Aggregate{
+		Aggregate: &aggregateAlgoConfigure{
 			Algorithm:   AlgoHistogram,
 			SourceField: "$trace_duration",
 			Buckets: []float64{
@@ -88,7 +90,7 @@ var (
 		Condition: "",                              // user specific or empty
 		Groupby:   []string{"service", "resource"}, // user can add more tag keys here.
 
-		Aggregate: &Aggregate{
+		Aggregate: &aggregateAlgoConfigure{
 			Algorithm:   AlgoCount,
 			SourceField: "<USER-SPECIFIED>",
 		},
@@ -99,7 +101,7 @@ var (
 		Condition: `{status="error"}`,
 		Groupby:   []string{"service", "resource"}, // user can add more tag keys here.
 
-		Aggregate: &Aggregate{
+		Aggregate: &aggregateAlgoConfigure{
 			Algorithm:   AlgoCount,
 			SourceField: "status",
 		},
