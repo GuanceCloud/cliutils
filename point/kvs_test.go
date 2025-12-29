@@ -682,3 +682,84 @@ func BenchmarkShuffle(b *T.B) {
 		}
 	})
 }
+
+func BenchmarkKVGet(b *T.B) {
+	r := NewRander()
+	pts := r.Rand(1)
+	pts[0].Set("a", 123)
+	pts[0].Set("b", false)
+	pts[0].Set("c", "hello")
+	pts[0].Set("d", 1.0)
+	pts[0].Set("e", []byte("worldworldworldworldworldworldworldworldworldworldworldworldworldworldworldworld"))
+	pts[0].SetTag("f", "f")
+
+	b.ResetTimer()
+	b.Run("get-int", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			pts[0].Get("a")
+		}
+	})
+
+	b.ResetTimer()
+	b.Run("get-bool", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			pts[0].GetB("b")
+		}
+	})
+
+	b.ResetTimer()
+	b.Run("raw-get-bool", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			pts[0].Get("b")
+		}
+	})
+
+	b.ResetTimer()
+	b.Run("get-string", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			pts[0].GetS("c")
+		}
+	})
+
+	b.ResetTimer()
+	b.Run("raw-get-string", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			pts[0].Get("c")
+		}
+	})
+
+	b.ResetTimer()
+	b.Run("get-float", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			pts[0].GetF("d")
+		}
+	})
+
+	b.ResetTimer()
+	b.Run("raw-get-float", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			pts[0].Get("d")
+		}
+	})
+
+	b.ResetTimer()
+	b.Run("get-bytes", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			pts[0].GetD("e")
+		}
+	})
+
+	b.ResetTimer()
+	b.Run("raw-get-bytes", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			pts[0].Get("e")
+		}
+	})
+
+	b.ResetTimer()
+	b.Run("get-tag", func(b *T.B) {
+		for i := 0; i < b.N; i++ {
+			pts[0].GetTag("f")
+		}
+	})
+}
