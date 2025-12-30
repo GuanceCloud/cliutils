@@ -8,6 +8,73 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestBatch(t *T.T) {
+	t.Run(`basic`, func(t *T.T) {
+		r := point.NewRander()
+		npts := 10
+		pts := r.Rand(npts)
+
+		for idx, pt := range pts {
+			pt.SetName("basic") // override point name for better hash
+			pt.SetTag("idx", strconv.Itoa(idx%3))
+			pt.Set("f1", float64(idx)/3.14)
+		}
+
+		a := AggregatorConfigure{
+			AggregateRules: []*AggregateRule{
+				{
+					Groupby: []string{"idx"},
+					Selector: &ruleSelector{
+						Category: point.Metric.String(),
+						Fields:   []string{"f1"},
+					},
+					Algorithms: map[string]*AggregationAlgo{
+						"f1": {
+							Method:      SUM,
+							SourceField: "f1",
+							AddTags: map[string]string{
+								"extra_tag_1": "some_value",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		assert.NoError(t, a.Setup())
+
+		groups := a.SelectPoints(pts)
+		assert.Len(t, groups, 1)
+		assert.Len(t, groups[0], npts) // forked into 2X points
+
+		for _, pt := range groups[0] {
+			assert.NotEmpty(t, pt.GetTag("idx"))
+
+			_, ok := pt.GetF("f1")
+			assert.True(t, ok)
+		}
+
+		batches := a.AggregateRules[0].GroupbyBatch(&a, groups[0])
+		assert.Len(t, batches, 3)
+
+		// build protobuf
+		var pbs [][]byte
+		for _, b := range batches {
+			pb, err := b.Marshal()
+			assert.NoError(t, err)
+			t.Logf("%d points, hash: %d, pb: %d, size: %d",
+				len(b.Points.Arr), b.RoutingKey, len(pb), b.Size())
+			pbs = append(pbs, pb)
+		}
+
+		// load from protobuf
+		for _, pb := range pbs {
+			var batch AggregationBatch
+			assert.NoError(t, batch.Unmarshal(pb))
+		}
+	})
+}
+
 func TestAggregator(t *T.T) {
 	t.Run("select-multiple-field-on-regex", func(t *T.T) {
 		r := point.NewRander()

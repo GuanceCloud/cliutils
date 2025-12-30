@@ -1,6 +1,7 @@
 package aggregate
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
@@ -9,6 +10,7 @@ import (
 	fp "github.com/GuanceCloud/cliutils/filter"
 	"github.com/GuanceCloud/cliutils/logger"
 	"github.com/GuanceCloud/cliutils/point"
+	"github.com/cespare/xxhash/v2"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -29,9 +31,19 @@ type AggregatorConfigure struct {
 	DefaultWindow  time.Duration    `toml:"default_window" json:"default_window"`
 	AggregateRules []*AggregateRule `toml:"aggregate_rules" json:"aggregate_rules"`
 	DefaultAction  Action           `toml:"action" json:"action"`
-	Version        int64            `toml:"version" json:"version"`
 
+	hash  uint64
+	raw   []byte
 	calcs map[uint64]Calculator
+}
+
+func (ac *AggregatorConfigure) doHash() {
+	if j, err := json.Marshal(ac); err != nil {
+		return
+	} else {
+		ac.raw = j
+		ac.hash = xxhash.Sum64(j)
+	}
 }
 
 // AggregateRule configured a specific aggregate rule.
@@ -60,8 +72,8 @@ type ruleSelector struct {
 	conds     fp.WhereConditions
 }
 
-func (a *AggregatorConfigure) Setup() error {
-	for _, ar := range a.AggregateRules {
+func (ac *AggregatorConfigure) Setup() error {
+	for _, ar := range ac.AggregateRules {
 		if err := ar.Selector.Setup(); err != nil {
 			return err
 		}
@@ -70,13 +82,14 @@ func (a *AggregatorConfigure) Setup() error {
 		sort.Strings(ar.Groupby)
 	}
 
-	a.calcs = map[uint64]Calculator{}
+	ac.doHash()
+	ac.calcs = map[uint64]Calculator{}
 
 	return nil
 }
 
-func (a *AggregatorConfigure) SelectPoints(pts []*point.Point) (groups [][]*point.Point) {
-	for _, ar := range a.AggregateRules {
+func (ac *AggregatorConfigure) SelectPoints(pts []*point.Point) (groups [][]*point.Point) {
+	for _, ar := range ac.AggregateRules {
 		groups = append(groups, ar.SelectPoints(pts))
 	}
 	return
@@ -135,6 +148,34 @@ func (ar *AggregateRule) GroupbyPoints(pts []*point.Point) map[uint64][]*point.P
 	}
 
 	return res
+}
+
+func (ar *AggregateRule) GroupbyBatch(ac *AggregatorConfigure, pts []*point.Point) (batches []*AggregationBatch) {
+	hashedPts := map[uint64][]*point.Point{}
+	for _, pt := range pts {
+		h := hash(pt, ar.Groupby)
+		hashedPts[h] = append(hashedPts[h], pt)
+	}
+
+	for h, pts := range hashedPts {
+		b := &AggregationBatch{
+			RoutingKey:      h,
+			ConfigHash:      ac.hash,
+			RawConfig:       ac.raw,
+			AggregationOpts: ar.Algorithms,
+			Points: func() *point.PBPoints {
+				var pbpts point.PBPoints
+				for _, pt := range pts {
+					pbpts.Arr = append(pbpts.Arr, pt.PBPoint())
+				}
+				return &pbpts
+			}(),
+		}
+
+		batches = append(batches, b)
+	}
+
+	return batches
 }
 
 func (s *ruleSelector) doSelect(groupby []string, pts []*point.Point) (res []*point.Point) {

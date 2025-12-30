@@ -227,6 +227,13 @@ func FromPB(pb *PBPoint) *Point {
 	return pt
 }
 
+func WrapPB(pt *Point, pb *PBPoint) *Point {
+	if pt == nil {
+		return &Point{pt: pb}
+	}
+	return &Point{pt: pb}
+}
+
 // LineProto convert point to text lineprotocol(both for
 // lineproto point and protobuf point).
 func (p *Point) LineProto(prec ...Precision) string {

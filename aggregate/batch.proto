@@ -11,7 +11,7 @@ message AggregationBatch {
   uint64 config_hash=2;
 
   // raw toml configures
-  string raw_config=3;
+  bytes raw_config=3;
 
   map<string, AggregationAlgo> aggregation_opts=4;
 
