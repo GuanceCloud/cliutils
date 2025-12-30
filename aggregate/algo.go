@@ -22,25 +22,25 @@ const (
 type Algorithm string
 
 // aggregateAlgoConfigure defines the algorithm used for specific field.
-type aggregateAlgoConfigure struct {
-	Algorithm Algorithm `toml:"algorithm" json:"algorithm"`
-
-	// source fields used for current algorithm
-	SourceField string `toml:"source_field,omitempty" json:"source_field,omitempty"`
-
-	// for AlgoHistogram
-	Buckets []float64 `toml:"buckets" json:"buckets"`
-
-	// for AlgoExpoHistogram
-	MaxScale     int  `toml:"max_scale" json:"max_scale"`
-	MaxBucket    int  `toml:"max_buckets" json:"max_buckets"`
-	RecordMinMax bool `toml:"record_min_max" json:"record_min_max"`
-
-	// for quantiles
-	Percentiles []float64 `toml:"percentiles" json:"percentiles"`
-
-	AddTags map[string]string `toml:"add_tags,omitempty" json:"add_tags,omitempty"`
-}
+//type aggregateAlgoConfigure struct {
+//	Algorithm Algorithm `toml:"algorithm" json:"algorithm"`
+//
+//	// source fields used for current algorithm
+//	SourceField string `toml:"source_field,omitempty" json:"source_field,omitempty"`
+//
+//	// for AlgoHistogram
+//	Buckets []float64 `toml:"buckets" json:"buckets"`
+//
+//	// for AlgoExpoHistogram
+//	MaxScale     int  `toml:"max_scale" json:"max_scale"`
+//	MaxBucket    int  `toml:"max_buckets" json:"max_buckets"`
+//	RecordMinMax bool `toml:"record_min_max" json:"record_min_max"`
+//
+//	// for quantiles
+//	Percentiles []float64 `toml:"percentiles" json:"percentiles"`
+//
+//	AddTags map[string]string `toml:"add_tags,omitempty" json:"add_tags,omitempty"`
+//}
 
 type Calculator interface {
 	addNewPoints(pt []*point.Point)

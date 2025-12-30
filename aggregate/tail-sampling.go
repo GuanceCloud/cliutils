@@ -10,10 +10,10 @@ type TailSampling struct {
 }
 
 type DerivedMetric struct {
-	Name      string                  `toml:"name" json:"name"`
-	Aggregate *aggregateAlgoConfigure `toml:"aggregate" json:"aggregate"`
-	Condition string                  `toml:"condition" json:"condition"`
-	Groupby   []string                `toml:"group_by" json:"group_by"`
+	Name      string           `toml:"name" json:"name"`
+	Algorithm *AggregationAlgo `toml:"aggregate" json:"aggregate"`
+	Condition string           `toml:"condition" json:"condition"`
+	Groupby   []string         `toml:"group_by" json:"group_by"`
 }
 
 type (
@@ -70,18 +70,22 @@ var (
 		Condition: "",                              // user specific or empty
 		Groupby:   []string{"service", "resource"}, // user can add more tag keys here.
 
-		Aggregate: &aggregateAlgoConfigure{
-			Algorithm:   AlgoHistogram,
+		Algorithm: &AggregationAlgo{
+			Method:      HISTOGRAM,
 			SourceField: "$trace_duration",
-			Buckets: []float64{
-				10_000,     // 10ms
-				50_000,     // 50ms
-				100_000,    // 100ms
-				500_000,    // 500ms
-				1_000_000,  // 1s
-				5_000_000,  // 5s
-				10_000_000, // 10s
-			}, // duration us
+			Options: &AggregationAlgo_HistogramOpts{
+				HistogramOpts: &HistogramOptions{
+					Buckets: []float64{
+						10_000,     // 10ms
+						50_000,     // 50ms
+						100_000,    // 100ms
+						500_000,    // 500ms
+						1_000_000,  // 1s
+						5_000_000,  // 5s
+						10_000_000, // 10s
+					}, // duration us
+				},
+			},
 		},
 	}
 
@@ -90,8 +94,8 @@ var (
 		Condition: "",                              // user specific or empty
 		Groupby:   []string{"service", "resource"}, // user can add more tag keys here.
 
-		Aggregate: &aggregateAlgoConfigure{
-			Algorithm:   AlgoCount,
+		Algorithm: &AggregationAlgo{
+			Method:      COUNT,
 			SourceField: "<USER-SPECIFIED>",
 		},
 	}
@@ -101,8 +105,8 @@ var (
 		Condition: `{status="error"}`,
 		Groupby:   []string{"service", "resource"}, // user can add more tag keys here.
 
-		Aggregate: &aggregateAlgoConfigure{
-			Algorithm:   AlgoCount,
+		Algorithm: &AggregationAlgo{
+			Method:      COUNT,
 			SourceField: "status",
 		},
 	}

@@ -41,9 +41,9 @@ type AggregateRule struct {
 	// override default window
 	Window time.Duration `toml:"window,omitempty" json:"window,omitempty"`
 
-	Selector   *ruleSelector                      `toml:"select" json:"select"`
-	Groupby    []string                           `toml:"group_by" json:"group_by"`
-	Aggregates map[string]*aggregateAlgoConfigure `toml:"aggregates" json:"aggregates"`
+	Selector   *ruleSelector               `toml:"select" json:"select"`
+	Groupby    []string                    `toml:"group_by" json:"group_by"`
+	Algorithms map[string]*AggregationAlgo `toml:"algorithms" json:"algorithms"`
 }
 
 // ruleSelector is the selector to select measurements and fields among points.

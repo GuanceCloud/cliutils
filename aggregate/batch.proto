@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+option go_package = "/;aggregate";
+
+package aggregate.v1;
+
+import "point/point.proto";
+
+message AggregationBatch {
+  uint64 routing_key=1;
+  uint64 config_hash=2;
+
+  // raw toml configures
+  string raw_config=3;
+
+  map<string, AggregationAlgo> aggregation_opts=4;
+
+  point.PBPoints points=5;
+}
+
+enum AlgoMethod {
+  METHOD_UNSPECIFIED = 0;
+  SUM               = 1;
+  AVG               = 2;
+  COUNT             = 3;
+  MIN               = 4;
+  MAX               = 5;
+  HISTOGRAM         = 6;
+  EXPO_HISTOGRAM    = 7;
+  STDEV             = 8;
+  QUANTILES         = 9;
+  COUNT_DISTINCT    = 10;
+  LAST              = 11;
+  FIRST             = 12;
+}
+
+message AggregationAlgo {
+  // 1. which algorithm to apply for specific field?
+  AlgoMethod method=1;
+
+  // 2. what the origin field name of the data?
+  string source_field=2;
+
+  oneof options{
+    HistogramOptions histogram_opts = 10;
+    ExpoHistogramOptions expo_opts = 11;
+    QuantileOptions quantile_opts = 12;
+  }
+
+  map<string,string> add_tags=8;
+}
+
+message HistogramOptions {
+  // for explict histogram(e.g.  10, 50, 100)
+  repeated double buckets=1;
+}
+
+message ExpoHistogramOptions {
+  int32 max_scale = 1;   // int32 is sufficient for scale
+  int32 max_buckets = 2; // int32 is sufficient for size (usually 160)
+  bool record_min_max = 3;
+}
+
+message QuantileOptions {
+  // The target percentiles (e.g. 0.50, 0.99)
+  repeated double percentiles = 1;
+  
+  // Optional: Compression factor for the sketch (accuracy vs memory trade-off)
+  // uint32 compression = 2; 
+}

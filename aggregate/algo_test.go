@@ -28,9 +28,9 @@ func TestAlgo(t *T.T) {
 						Category: point.Metric.String(),
 						Fields:   []string{"f1"},
 					},
-					Aggregates: map[string]*aggregateAlgoConfigure{
+					Algorithms: map[string]*AggregationAlgo{
 						"f1": {
-							Algorithm:   AlgoSumDelta,
+							Method:      SUM,
 							SourceField: "f1",
 							AddTags: map[string]string{
 								"extra_tag_1": "some_value",
