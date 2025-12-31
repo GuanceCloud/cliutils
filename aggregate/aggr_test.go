@@ -1,12 +1,105 @@
 package aggregate
 
 import (
+	io "io"
+	"net/http"
+	"net/http/httptest"
 	"strconv"
 	T "testing"
+	"time"
 
 	"github.com/GuanceCloud/cliutils/point"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestHTTPPostBatch(t *T.T) {
+	t.Run(`basic`, func(t *T.T) {
+		r := point.NewRander()
+		npts := 1000
+		pts := r.Rand(npts)
+
+		for idx, pt := range pts {
+			pt.SetName("basic") // override point name for better hash
+			pt.SetTag("idx", strconv.Itoa(idx%123))
+			pt.Set("f1", float64(idx)/3.14)
+		}
+
+		a := AggregatorConfigure{
+			AggregateRules: []*AggregateRule{
+				{
+					Groupby: []string{"idx"},
+					Selector: &ruleSelector{
+						Category: point.Metric.String(),
+						Fields:   []string{"f1"},
+					},
+					Algorithms: map[string]*AggregationAlgo{
+						"f1": {
+							Method:      SUM,
+							SourceField: "f1",
+							AddTags: map[string]string{
+								"extra_tag_1": "some_value",
+							},
+						},
+						"f1_max": {
+							Method:      MAX,
+							SourceField: "f1",
+							AddTags: map[string]string{
+								"extra_tag_1": "some_value",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		assert.NoError(t, a.Setup())
+
+		groups := a.SelectPoints(pts)
+		assert.Len(t, groups, 1)
+		assert.Len(t, groups[0], npts)
+
+		for _, pt := range groups[0] {
+			assert.NotEmpty(t, pt.GetTag("idx"))
+
+			_, ok := pt.GetF("f1")
+			assert.True(t, ok)
+		}
+
+		batches := a.AggregateRules[0].GroupbyBatch(&a, groups[0])
+
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			routeKey := r.Header.Get(GuanceRoutingKey)
+			assert.NotEmpty(t, GuanceRoutingKey)
+			strconv.ParseUint(routeKey, 10, 64)
+
+			body, err := io.ReadAll(r.Body)
+			assert.NoError(t, err)
+			defer r.Body.Close()
+
+			var batch AggregationBatch
+			assert.NoError(t, batch.Unmarshal(body))
+			assert.True(t, len(batch.Points.Arr) > 0)
+
+			t.Logf("payload: %d, pts: %d", len(body), len(batch.Points.Arr))
+		}))
+		defer ts.Close() //nolint:errcheck
+
+		time.Sleep(time.Second)
+
+		cli := http.Client{}
+
+		t.Logf("%d batches", len(batches))
+
+		// build protobuf
+		for _, b := range batches {
+			req, err := batchRequest(b, ts.URL)
+			assert.NoError(t, err)
+			resp, err := cli.Do(req)
+			assert.NoError(t, err)
+			assert.Equal(t, 200, resp.StatusCode)
+		}
+	})
+}
 
 func TestBatch(t *T.T) {
 	t.Run(`basic`, func(t *T.T) {

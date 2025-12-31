@@ -41,6 +41,8 @@ message AggregationAlgo {
   // 2. what the origin field name of the data?
   string source_field=2;
 
+  int64 window = 3;
+
   oneof options{
     HistogramOptions histogram_opts = 10;
     ExpoHistogramOptions expo_opts = 11;

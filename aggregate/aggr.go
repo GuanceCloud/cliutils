@@ -1,9 +1,12 @@
 package aggregate
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
@@ -50,9 +53,6 @@ func (ac *AggregatorConfigure) doHash() {
 type AggregateRule struct {
 	Name string `toml:"name" json:"name"`
 
-	// override default window
-	Window time.Duration `toml:"window,omitempty" json:"window,omitempty"`
-
 	Selector   *ruleSelector               `toml:"select" json:"select"`
 	Groupby    []string                    `toml:"group_by" json:"group_by"`
 	Algorithms map[string]*AggregationAlgo `toml:"algorithms" json:"algorithms"`
@@ -76,6 +76,13 @@ func (ac *AggregatorConfigure) Setup() error {
 	for _, ar := range ac.AggregateRules {
 		if err := ar.Selector.Setup(); err != nil {
 			return err
+		}
+
+		// set default window
+		for _, algo := range ar.Algorithms {
+			if algo.Window <= 0 {
+				algo.Window = int64(ac.DefaultWindow)
+			}
 		}
 
 		// make the group by tags sorted for point hash.
@@ -178,6 +185,26 @@ func (ar *AggregateRule) GroupbyBatch(ac *AggregatorConfigure, pts []*point.Poin
 	return batches
 }
 
+const (
+	GuanceRoutingKey = "Guance-Routing-Key"
+)
+
+func batchRequest(ab *AggregationBatch, url string) (*http.Request, error) {
+	body, err := ab.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+
+	// add routine header
+	req.Header.Set(GuanceRoutingKey, strconv.FormatUint(ab.RoutingKey, 10))
+	return req, nil
+}
+
 func (s *ruleSelector) doSelect(groupby []string, pts []*point.Point) (res []*point.Point) {
 	ptwrapper := &ptWrap{}
 
@@ -224,6 +251,15 @@ func (s *ruleSelector) doSelect(groupby []string, pts []*point.Point) (res []*po
 					kvs = kvs.Add(kv.Key, float64(v.I)) // convert all into float
 				case *point.Field_U:
 					kvs = kvs.Add(kv.Key, float64(v.U)) // convert all into float
+
+				// for category logging-like, we may need to check if tag/field exist/first/last
+				case *point.Field_S:
+					kvs = kvs.Add(kv.Key, v.S)
+				case *point.Field_D:
+					kvs = kvs.Add(kv.Key, v.D)
+				case *point.Field_B:
+					kvs = kvs.Add(kv.Key, v.B)
+
 				default:
 					// pass: aggregate fields should only be int/float
 					l.Debugf("skip non-numbermic field %q", kv.Key)
