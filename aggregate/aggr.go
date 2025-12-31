@@ -213,7 +213,6 @@ func (s *ruleSelector) doSelect(groupby []string, pts []*point.Point) (res []*po
 
 		if len(s.measurementsWhitelist) > 0 {
 			if !cliutils.WhiteListMatched(ptname, s.measurementsWhitelist) {
-				l.Debugf("skip measurement %q", ptname)
 				continue
 			}
 		}
@@ -233,12 +232,10 @@ func (s *ruleSelector) doSelect(groupby []string, pts []*point.Point) (res []*po
 		if len(s.fieldsWhitelist) > 0 {
 			for _, kv := range pt.KVs() {
 				if !cliutils.WhiteListMatched(kv.Key, s.fieldsWhitelist) {
-					l.Debugf("skip field %q", kv.Key)
 					continue
 				}
 
 				if kv.IsTag {
-					l.Debugf("skip tag %q", kv.Key)
 					continue
 				}
 

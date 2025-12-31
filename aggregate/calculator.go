@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,6 +33,7 @@ type metricBase struct {
 	key,
 	name string
 
+	tenantHash, // not used
 	hash uint64
 
 	window,
@@ -45,21 +47,25 @@ func NewCaculatorCache() *CaculatorCache {
 	}
 }
 
-func (cc *CaculatorCache) addBatch(batch *AggregationBatch) {
+func (cc *CaculatorCache) addBatches(batches ...*AggregationBatch) {
 	cc.mtx.Lock()
 	defer cc.mtx.Unlock()
 
-	for _, c := range newCalculators(batch) {
-		calcHash := c.base().hash
+	for _, b := range batches {
+		for _, c := range newCalculators(b) {
+			calcHash := c.base().hash
 
-		if calc, ok := cc.cache[calcHash]; ok {
-			l.Debug("append new instance")
-			calc.add(c)
-		} else {
-			l.Debug("create new instance")
-			c.base().build()
-			cc.cache[calcHash] = c
-			heap.Push(cc, c)
+			if calc, ok := cc.cache[calcHash]; ok {
+				calc.add(c)
+				l.Debugf("append to instance %s, heap size %d", c.base(), len(cc.heap))
+			} else {
+				c.base().build()
+
+				cc.cache[calcHash] = c
+				heap.Push(cc, c)
+
+				l.Debugf("create new instance %s, heap size %d", c.base(), len(cc.heap))
+			}
 		}
 	}
 }
@@ -91,7 +97,12 @@ func (cc *CaculatorCache) peekNext() (Calculator, bool) {
 func (cc *CaculatorCache) scheduleJob(c Calculator) {
 	cc.mtx.Lock()
 	defer cc.mtx.Unlock()
-	// TODO
+
+	mb := c.base()
+	mb.nextWallTime = alignNextWallTime(time.Now(), time.Duration(mb.window)).UnixNano()
+	mb.heapIdx = len(cc.heap)
+	heap.Push(cc, c)
+	cc.cache[mb.hash] = c
 }
 
 func (cc *CaculatorCache) Len() int {
@@ -99,10 +110,25 @@ func (cc *CaculatorCache) Len() int {
 }
 
 func (cc *CaculatorCache) Less(i, j int) bool {
-	return cc.heap[i].base().nextWallTime < cc.heap[j].base().nextWallTime
+	// larger nextWallTime means lower priority.
+	less := (cc.heap[i].base().nextWallTime > cc.heap[j].base().nextWallTime)
+
+	l.Debugf("compare [%d]%s <-> [%d]%s => %v",
+		i,
+		time.Duration(cc.heap[i].base().nextWallTime),
+		j,
+		time.Duration(cc.heap[j].base().nextWallTime), less)
+
+	return less
 }
 
 func (cc *CaculatorCache) Swap(i, j int) {
+	if len(cc.heap) == 0 {
+		return
+	}
+
+	l.Debugf("swap %s <-> %s, len: %d", cc.heap[i].base(), cc.heap[j].base(), len(cc.heap))
+
 	cc.heap[i], cc.heap[j] = cc.heap[j], cc.heap[i]
 	cc.heap[i].base().heapIdx = i
 	cc.heap[j].base().heapIdx = j
@@ -117,6 +143,11 @@ func (cc *CaculatorCache) Push(x any) {
 func (cc *CaculatorCache) Pop() any {
 	old := cc.heap
 	n := len(old)
+	if n == 0 {
+		return nil
+	}
+
+	// pop out the last one
 	c := old[n-1]
 	c.base().heapIdx = -1 // label removed
 	cc.heap = old[0 : n-1]
@@ -134,16 +165,12 @@ func alignNextWallTime(t time.Time, align time.Duration) time.Time {
 }
 
 func newCalculators(batch *AggregationBatch) (res []Calculator) {
-	var (
-		ptwrap *point.Point
-		now    = time.Now()
-	)
+	var ptwrap *point.Point
+	// now    = time.Now()
 
 	for key, algo := range batch.AggregationOpts {
-		var (
-			extraTags    [][2]string
-			nextWallTime = alignNextWallTime(now, time.Duration(algo.Window))
-		)
+		var extraTags [][2]string
+		// nextWallTime = alignNextWallTime(now, time.Duration(algo.Window))
 
 		if len(algo.AddTags) > 0 {
 			// NOTE: we first add these extra-tags from algorithm configure. If origin
@@ -188,7 +215,8 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 				name:     ptwrap.Name(),
 				aggrTags: extraTags,
 				// align to next wall-time
-				nextWallTime: nextWallTime.UnixNano(),
+				// XXX: what if the point reach too late?
+				nextWallTime: alignNextWallTime(ptwrap.Time(), time.Duration(algo.Window)).UnixNano(),
 				window:       algo.Window,
 			}
 
@@ -244,15 +272,26 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 
 // build used to delay build the tags.
 func (mb *metricBase) build() {
-	l.Debugf("before build aggr tags %+#v", mb.aggrTags)
-
 	for _, kv := range mb.pt.Fields {
 		if kv.IsTag {
 			mb.aggrTags = append(mb.aggrTags, [2]string{kv.Key, kv.GetS()})
 		}
 	}
+}
 
-	l.Debugf("aggr tags %+#v", mb.aggrTags)
+func (mb *metricBase) String() string {
+	arr := []string{}
+	arr = append(arr,
+		fmt.Sprintf("aggrTags: %+#v", mb.aggrTags),
+		fmt.Sprintf("key: %s", mb.key),
+		fmt.Sprintf("name: %s", mb.name),
+		fmt.Sprintf("tenantHash: %d", mb.tenantHash),
+		fmt.Sprintf("hash: %d", mb.hash),
+		fmt.Sprintf("window: %s", time.Duration(mb.window)),
+		fmt.Sprintf("nextWallTime: %s", time.Unix(0, mb.nextWallTime)),
+		fmt.Sprintf("heap index: %d", mb.heapIdx),
+	)
+	return strings.Join(arr, "\n")
 }
 
 func prettyBatch(ab *AggregationBatch) string {
