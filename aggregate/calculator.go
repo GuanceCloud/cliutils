@@ -110,8 +110,8 @@ func (cc *CaculatorCache) Len() int {
 }
 
 func (cc *CaculatorCache) Less(i, j int) bool {
-	// larger nextWallTime means lower priority.
-	less := (cc.heap[i].base().nextWallTime > cc.heap[j].base().nextWallTime)
+	// smallest nextWallTime pop first.
+	less := (cc.heap[i].base().nextWallTime < cc.heap[j].base().nextWallTime)
 
 	l.Debugf("compare [%d]%s <-> [%d]%s => %v",
 		i,

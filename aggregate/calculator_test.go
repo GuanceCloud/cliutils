@@ -73,6 +73,8 @@ func Test_heap(t *T.T) {
 			t.Logf("base: %s", c.base())
 		}
 
+		var prev int64
+
 		for {
 			c := heap.Pop(cc)
 			if c == nil {
@@ -82,6 +84,12 @@ func Test_heap(t *T.T) {
 			sum, ok := c.(*algoSum)
 			assert.True(t, ok)
 			assert.Equal(t, int64(10*time.Second), sum.window)
+
+			assert.True(t, sum.nextWallTime > prev) // should always larher than previous one
+			prev = sum.nextWallTime
+
+			assert.Equal(t, -1, sum.heapIdx) // heap index has set to -1
+
 			// assert.Equal(t, now-int64(npts), sum.nextWallTime/int64(time.Second))
 			t.Logf("pop base: %s", sum.base())
 		}
