@@ -19,6 +19,12 @@ func Test_alignNextWallTime(t *T.T) {
 
 		wallTime = alignNextWallTime(now, time.Second).Unix()
 		assert.Equal(t, int64(123), wallTime)
+
+		wallTime = alignNextWallTime(time.Unix(129, 0), time.Second*10).Unix()
+		assert.Equal(t, int64(130), wallTime)
+
+		wallTime = alignNextWallTime(time.Unix(119, 12345), time.Second*10).Unix()
+		assert.Equal(t, int64(120), wallTime)
 	})
 }
 
