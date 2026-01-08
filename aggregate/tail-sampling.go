@@ -3,10 +3,10 @@ package aggregate
 import "time"
 
 type TailSampling struct {
-	TraceTTL       time.Duration    `toml:"trace_ttl" json:"trace_ttl"`
-	DerivedMetrics []*DerivedMetric `toml:"derived_metrics" json:"derived_metrics"`
-
-	Version int64 `toml:"version" json:"version"`
+	TraceTTL       time.Duration       `toml:"trace_ttl" json:"trace_ttl"`
+	DerivedMetrics []*DerivedMetric    `toml:"derived_metrics" json:"derived_metrics"`
+	Pipelines      []*SamplingPipeline `toml:"sampling_pipeline" json:"pipelines"`
+	Version        int64               `toml:"version" json:"version"`
 }
 
 type DerivedMetric struct {

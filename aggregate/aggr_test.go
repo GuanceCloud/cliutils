@@ -12,18 +12,47 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func otelHistograms(n int) []*point.Point {
+	pts := make([]*point.Point, 0)
+	for i := 0; i < n; i++ {
+		var kvs point.KVs
+		kvs = kvs.AddTag("service", "tmall").
+			AddTag("agent_version", "1.30").
+			AddTag("http_method", "GET").
+			AddTag("http_route", "/tmall/*").
+			AddTag("scope_name", "io.opentelemetry.tomcat-7.0").
+			AddTag("host_name", "myClientHost").
+			Add("http.server.duration_bucket", i).
+			Add("le", float64(i*10))
+		opts := point.DefaultMetricOptions()
+		opts = append(opts, point.WithTime(time.Now()))
+		pts = append(pts, point.NewPoint("otel_service", kvs, opts...))
+	}
+
+	return pts
+}
+
+func randPoints(npts int) []*point.Point {
+	r := point.NewRander()
+	pts := r.Rand(npts)
+
+	for idx, pt := range pts {
+		pt.SetName("basic") // override point name for better hash
+		pt.SetTag("idx", strconv.Itoa(idx%123))
+		pt.Set("f1", float64(idx)/3.14)
+	}
+	return pts
+}
+
+func getPoints(n int) []*point.Point {
+	// return randPoints()
+	return otelHistograms(n)
+}
+
 func TestHTTPPostBatch(t *T.T) {
 	t.Run(`basic`, func(t *T.T) {
-		r := point.NewRander()
-		npts := 1000
-		pts := r.Rand(npts)
-
-		for idx, pt := range pts {
-			pt.SetName("basic") // override point name for better hash
-			pt.SetTag("idx", strconv.Itoa(idx%123))
-			pt.Set("f1", float64(idx)/3.14)
-		}
-
+		npts := 100
+		pts := randPoints(npts)
 		a := AggregatorConfigure{
 			AggregateRules: []*AggregateRule{
 				{
@@ -62,6 +91,80 @@ func TestHTTPPostBatch(t *T.T) {
 			assert.NotEmpty(t, pt.GetTag("idx"))
 
 			_, ok := pt.GetF("f1")
+			assert.True(t, ok)
+		}
+
+		batches := a.AggregateRules[0].GroupbyBatch(&a, groups[0])
+
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			routeKey := r.Header.Get(GuanceRoutingKey)
+			assert.NotEmpty(t, GuanceRoutingKey)
+			strconv.ParseUint(routeKey, 10, 64)
+
+			body, err := io.ReadAll(r.Body)
+			assert.NoError(t, err)
+			defer r.Body.Close()
+
+			var batch AggregationBatch
+			assert.NoError(t, batch.Unmarshal(body))
+			assert.True(t, len(batch.Points.Arr) > 0)
+
+			t.Logf("payload: %d, pts: %d", len(body), len(batch.Points.Arr))
+		}))
+		defer ts.Close() //nolint:errcheck
+
+		time.Sleep(time.Second)
+
+		cli := http.Client{}
+
+		t.Logf("%d batches", len(batches))
+
+		// build protobuf
+		for _, b := range batches {
+			req, err := batchRequest(b, ts.URL)
+			assert.NoError(t, err)
+			resp, err := cli.Do(req)
+			assert.NoError(t, err)
+			assert.Equal(t, 200, resp.StatusCode)
+		}
+	})
+
+	t.Run(`otel_service`, func(t *T.T) {
+		npts := 100
+		pts := otelHistograms(npts)
+		a := AggregatorConfigure{
+			AggregateRules: []*AggregateRule{
+				{
+					Groupby: []string{"service", "http_method", "http_route", "le"},
+					Selector: &ruleSelector{
+						Category: point.Metric.String(),
+						Fields:   []string{"http.server.duration_bucket"},
+					},
+					Algorithms: map[string]*AggregationAlgo{
+						"otel.histograms": {
+							Method:      HISTOGRAM,
+							SourceField: "http.server.duration_bucket",
+							Options: &AggregationAlgo_HistogramOpts{
+								HistogramOpts: &HistogramOptions{
+									Buckets: []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		assert.NoError(t, a.Setup())
+
+		groups := a.SelectPoints(pts)
+		assert.Len(t, groups, 1)
+		assert.Len(t, groups[0], npts)
+
+		for _, pt := range groups[0] {
+			assert.NotEmpty(t, pt.GetTag("service"))
+
+			_, ok := pt.GetF("le")
 			assert.True(t, ok)
 		}
 

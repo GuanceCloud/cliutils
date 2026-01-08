@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"go.uber.org/zap/zapcore"
 	"net/http"
 	"sort"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 	"github.com/GuanceCloud/cliutils/logger"
 	"github.com/GuanceCloud/cliutils/point"
 	"github.com/cespare/xxhash/v2"
-	"go.uber.org/zap/zapcore"
 )
 
 type (
@@ -279,11 +279,19 @@ func (s *ruleSelector) doSelect(groupby []string, pts []*point.Point) (res []*po
 				if v := pt.GetTag(tagKey); v != "" {
 					for i := range forkedPts { // each point attach these tags
 						forkedPts[i].SetTag(tagKey, v)
-
-						if l.Level() == zapcore.DebugLevel {
-							l.Debugf("tagged point: %s", forkedPts[i].Pretty())
-						}
 					}
+				}
+				// histogram 'le' 和 'bucket' 关联，不能拆分，需要放进去
+				// todo histogram 定制
+				if v := pt.Get(tagKey); v != nil {
+					for i := range forkedPts { // each point attach these tags
+						forkedPts[i].Add(tagKey, v)
+					}
+				}
+			}
+			for i := range forkedPts {
+				if l.Level() == zapcore.DebugLevel {
+					l.Debugf("tagged point: %s", forkedPts[i].Pretty())
 				}
 			}
 
