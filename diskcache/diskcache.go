@@ -24,6 +24,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/GuanceCloud/cliutils/logger"
 )
 
 const (
@@ -57,6 +59,9 @@ var (
 
 	// Invalid file header.
 	ErrBadHeader = errors.New("bad header")
+
+	l    = logger.DefaultSLogger("diskcache")
+	once sync.Once
 )
 
 // DiskCache is the representation of a disk cache.

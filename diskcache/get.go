@@ -31,6 +31,8 @@ func (c *DiskCache) skipBadFile() error {
 		droppedDataVec.WithLabelValues(c.path, reasonBadDataFile).Observe(float64(c.curReadSize))
 	}()
 
+	l.Warnf("skip bad file %s with size %d bytes", c.curReadfile, c.curReadSize)
+
 	return c.switchNextFile()
 }
 
@@ -98,6 +100,14 @@ retry:
 	}
 
 	if n, err = c.rfd.Read(c.batchHeader); err != nil || n != dataHeaderLen {
+		if err != nil && err != io.EOF {
+			l.Errorf("read %d bytes header error: %s", dataHeaderLen, err.Error())
+		}
+
+		if n > 0 && n != dataHeaderLen {
+			l.Errorf("invalid header length: %d, expect %d", n, dataHeaderLen)
+		}
+
 		// On bad datafile, just ignore and delete the file.
 		if err = c.skipBadFile(); err != nil {
 			return err
@@ -133,6 +143,8 @@ retry:
 		if _, err := c.rfd.Seek(int64(nbytes), io.SeekCurrent); err != nil {
 			return fmt.Errorf("rfd.Seek(%d): %w", nbytes, err)
 		}
+
+		l.Warnf("got %d bytes to read into buffer with length %d", nbytes, len(readbuf))
 
 		droppedDataVec.WithLabelValues(c.path, reasonTooSmallReadBuffer).Observe(float64(nbytes))
 		return ErrTooSmallReadBuf

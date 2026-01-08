@@ -13,10 +13,20 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/GuanceCloud/cliutils/logger"
 )
+
+func setupLogger() {
+	once.Do(func() {
+		l = logger.SLogger("diskcache")
+	})
+}
 
 // Open init and create a new disk cache. We can set other options with various options.
 func Open(opts ...CacheOption) (*DiskCache, error) {
+	setupLogger()
+
 	c := defaultInstance()
 
 	// apply extra options
