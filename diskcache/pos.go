@@ -12,11 +12,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type pos struct {
 	Seek int64  `json:"seek"`
 	Name []byte `json:"name"`
+
+	cnt,
+	dumpCount int // position update count
+	dumpTick *time.Ticker
 
 	fd    *os.File
 	fname string        // where to dump the binary data
@@ -30,6 +35,10 @@ func (p *pos) close() error {
 		}
 
 		p.fd = nil
+	}
+
+	if p.dumpTick != nil {
+		p.dumpTick.Stop()
 	}
 
 	return nil
@@ -108,10 +117,10 @@ func (p *pos) reset() error {
 	p.Seek = -1
 	p.Name = nil
 
-	return p.dumpFile()
+	return p.doDumpFile()
 }
 
-func (p *pos) dumpFile() error {
+func (p *pos) doDumpFile() error {
 	if p.fd == nil {
 		if fd, err := os.OpenFile(p.fname, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600); err != nil {
 			return fmt.Errorf("open pos file(%q) failed: %w", p.fname, err)
@@ -137,6 +146,25 @@ func (p *pos) dumpFile() error {
 
 		return nil
 	}
+}
+
+func (p *pos) dumpFile() (bool, error) {
+	if p.dumpCount == 0 { // force dump .pos on every Get action.
+		return true, p.doDumpFile()
+	}
+
+	p.cnt++
+	if p.cnt%p.dumpCount == 0 {
+		return true, p.doDumpFile()
+	}
+
+	select {
+	case <-p.dumpTick.C:
+		return true, p.doDumpFile()
+	default: // pass
+	}
+
+	return false, nil
 }
 
 // for benchmark.

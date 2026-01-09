@@ -179,11 +179,11 @@ __updatePos:
 	// update seek position
 	if !c.noPos && nbytes > 0 {
 		c.pos.Seek += int64(dataHeaderLen + nbytes)
-		if derr := c.pos.dumpFile(); derr != nil {
+		if do, derr := c.pos.dumpFile(); derr != nil {
 			return derr
+		} else if do {
+			posUpdatedVec.WithLabelValues("get", c.path).Inc()
 		}
-
-		posUpdatedVec.WithLabelValues("get", c.path).Inc()
 	}
 
 __end:
