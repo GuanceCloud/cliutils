@@ -7,6 +7,7 @@ package diskcache
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -82,9 +83,10 @@ func (c *DiskCache) doGet(buf []byte, fn Fn, bfn BufFunc) error {
 		if err = func() error {
 			c.wlock.Lock()
 			defer c.wlock.Unlock()
+
 			return c.rotate()
 		}(); err != nil {
-			return err
+			return fmt.Errorf("wakeup error: %w", err)
 		}
 	}
 
@@ -100,7 +102,7 @@ retry:
 	}
 
 	if n, err = c.rfd.Read(c.batchHeader); err != nil || n != dataHeaderLen {
-		if err != nil && err != io.EOF {
+		if err != nil && !errors.Is(err, io.EOF) {
 			l.Errorf("read %d bytes header error: %s", dataHeaderLen, err.Error())
 		}
 
@@ -140,14 +142,15 @@ retry:
 
 	if len(readbuf) < nbytes {
 		// seek to next read position
-		if _, err := c.rfd.Seek(int64(nbytes), io.SeekCurrent); err != nil {
+		if x, err := c.rfd.Seek(int64(nbytes), io.SeekCurrent); err != nil {
 			return fmt.Errorf("rfd.Seek(%d): %w", nbytes, err)
+		} else {
+			l.Warnf("got %d bytes to buffer with len %d, seek to new read position %d, drop %d bytes within file %s",
+				nbytes, len(readbuf), x, nbytes, c.curReadfile)
+
+			droppedDataVec.WithLabelValues(c.path, reasonTooSmallReadBuffer).Observe(float64(nbytes))
+			return ErrTooSmallReadBuf
 		}
-
-		l.Warnf("got %d bytes to read into buffer with length %d", nbytes, len(readbuf))
-
-		droppedDataVec.WithLabelValues(c.path, reasonTooSmallReadBuffer).Observe(float64(nbytes))
-		return ErrTooSmallReadBuf
 	}
 
 	if n, err := c.rfd.Read(readbuf[:nbytes]); err != nil {

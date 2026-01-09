@@ -94,7 +94,8 @@ type DiskCache struct {
 	pos   *pos   // current read fd position info
 
 	// specs of current diskcache
-	size          atomic.Int64 // current byte size
+	size atomic.Int64 // current byte size
+
 	curBatchSize, // current writing file's size
 	curReadSize, // current reading file's size
 	batchSize, // current batch size(static)
