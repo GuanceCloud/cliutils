@@ -76,8 +76,8 @@ func defaultInstance() *DiskCache {
 			Name: nil,
 
 			// dump position each 100ms or 100 update
-			dumpTick:  time.NewTicker(time.Millisecond * 100),
-			dumpCount: 100,
+			dumpInterval: time.Millisecond * 100,
+			dumpCount:    100,
 		},
 	}
 }

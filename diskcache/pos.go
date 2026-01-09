@@ -20,8 +20,9 @@ type pos struct {
 	Name []byte `json:"name"`
 
 	cnt,
-	dumpCount int // position update count
-	dumpTick *time.Ticker
+	dumpCount int
+	dumpInterval time.Duration
+	lastDump     time.Time
 
 	fd    *os.File
 	fname string        // where to dump the binary data
@@ -35,10 +36,6 @@ func (p *pos) close() error {
 		}
 
 		p.fd = nil
-	}
-
-	if p.dumpTick != nil {
-		p.dumpTick.Stop()
 	}
 
 	return nil
@@ -155,13 +152,15 @@ func (p *pos) dumpFile() (bool, error) {
 
 	p.cnt++
 	if p.cnt%p.dumpCount == 0 {
+		p.lastDump = time.Now()
 		return true, p.doDumpFile()
 	}
 
-	select {
-	case <-p.dumpTick.C:
-		return true, p.doDumpFile()
-	default: // pass
+	if p.dumpInterval > 0 {
+		if time.Since(p.lastDump) >= p.dumpInterval {
+			p.lastDump = time.Now()
+			return true, p.doDumpFile()
+		}
 	}
 
 	return false, nil

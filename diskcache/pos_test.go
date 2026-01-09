@@ -107,10 +107,10 @@ func BenchmarkPosDump(b *T.B) {
 
 	b.Run("interval-dump", func(b *T.B) {
 		p := pos{
-			Seek:      1024 * 1024 * 1024,
-			Name:      fmt.Appendf(nil, "data.%032d", 1234),
-			dumpCount: 100,
-			dumpTick:  time.NewTicker(100 * time.Millisecond),
+			Seek:         1024 * 1024 * 1024,
+			Name:         fmt.Appendf(nil, "data.%032d", 1234),
+			dumpCount:    100,
+			dumpInterval: 100 * time.Millisecond,
 		}
 
 		for i := 0; i < b.N; i++ {

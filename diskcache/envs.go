@@ -40,7 +40,7 @@ func (c *DiskCache) syncEnv() {
 
 	if v, ok := os.LookupEnv("ENV_DISKCACHE_POS_DUMP_INTERVAL"); ok && v != "" {
 		if du, err := time.ParseDuration(v); err == nil && du > 0 {
-			c.pos.dumpTick = time.NewTicker(du)
+			c.pos.dumpInterval = du
 		}
 	}
 

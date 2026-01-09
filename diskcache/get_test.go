@@ -521,7 +521,9 @@ func TestPutGet(t *T.T) {
 			os.RemoveAll(p)
 		})
 	})
+}
 
+func TestDelayPosDump(t *T.T) {
 	t.Run("pos-sync-at", func(t *T.T) {
 		ResetMetrics()
 
@@ -577,7 +579,7 @@ func TestPutGet(t *T.T) {
 		ResetMetrics()
 
 		p := t.TempDir()
-		c, err := Open(WithPath(p), WithPosUpdate(10000, time.Duration(time.Millisecond)))
+		c, err := Open(WithPath(p), WithPosUpdate(-1, time.Millisecond*100))
 		assert.NoError(t, err)
 
 		testData := []byte("0123456789")
@@ -597,7 +599,58 @@ func TestPutGet(t *T.T) {
 				return nil
 			}))
 
-			time.Sleep(time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
+		}
+
+		assert.Equal(t, 3*int64(len(testData)+dataHeaderLen), c.pos.Seek)
+		assert.NoError(t, c.Close())
+
+		_, err = os.Stat(c.pos.fname)
+		require.NoError(t, err)
+
+		reg := prometheus.NewRegistry()
+		reg.MustRegister(Metrics()...)
+		mfs, err := reg.Gather()
+		require.NoError(t, err)
+
+		assert.Equalf(t, float64(3),
+			metrics.GetMetricOnLabels(mfs,
+				"diskcache_pos_updated_total",
+				"get",
+				c.path,
+			).GetCounter().GetValue(),
+			"got metrics\n%s", metrics.MetricFamily2Text(mfs),
+		)
+
+		t.Cleanup(func() {
+			c.Close()
+			os.RemoveAll(p)
+		})
+	})
+
+	t.Run("pos-sync-force", func(t *T.T) {
+		ResetMetrics()
+
+		p := t.TempDir()
+		c, err := Open(WithPath(p), WithPosUpdate(0, time.Millisecond*100))
+		assert.NoError(t, err)
+
+		testData := []byte("0123456789")
+		ndata := 10
+
+		for i := 0; i < ndata; i++ { // write 10 data
+			require.NoError(t, c.Put(testData), "cache: %s", c)
+		}
+
+		// make data file readable.
+		require.NoError(t, c.rotate())
+
+		// create n read pos
+		for i := 0; i < 3; i++ {
+			assert.NoError(t, c.Get(func(data []byte) error {
+				assert.Len(t, data, len(testData))
+				return nil
+			}))
 		}
 
 		assert.Equal(t, 3*int64(len(testData)+dataHeaderLen), c.pos.Seek)

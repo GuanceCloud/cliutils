@@ -79,8 +79,8 @@ func WithPosUpdate(cnt int, du time.Duration) CacheOption {
 			c.pos.dumpCount = cnt
 		}
 
-		if du > 0 {
-			c.pos.dumpTick = time.NewTicker(du)
+		if du >= 0 {
+			c.pos.dumpInterval = du
 		}
 	}
 }
