@@ -12,7 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// LockType represents different types of locks in diskcache
+// LockType represents different types of locks in diskcache.
 type LockType string
 
 const (
@@ -21,7 +21,7 @@ const (
 	LockTypeRW    LockType = "rw"
 )
 
-// InstrumentedMutex wraps sync.Mutex with contention tracking
+// InstrumentedMutex wraps sync.Mutex with contention tracking.
 type InstrumentedMutex struct {
 	mu           sync.Mutex
 	lockType     LockType
@@ -30,7 +30,7 @@ type InstrumentedMutex struct {
 	contention   *prometheus.CounterVec
 }
 
-// NewInstrumentedMutex creates a new instrumented mutex
+// NewInstrumentedMutex creates a new instrumented mutex.
 func NewInstrumentedMutex(lockType LockType, path string, lockWaitTime *prometheus.HistogramVec, contention *prometheus.CounterVec) *InstrumentedMutex {
 	return &InstrumentedMutex{
 		lockType:     lockType,
@@ -40,7 +40,7 @@ func NewInstrumentedMutex(lockType LockType, path string, lockWaitTime *promethe
 	}
 }
 
-// Lock acquires the mutex with contention tracking
+// Lock acquires the mutex with contention tracking.
 func (im *InstrumentedMutex) Lock() {
 	start := time.Now()
 
@@ -57,7 +57,7 @@ func (im *InstrumentedMutex) Lock() {
 	im.observeLockTime(start, true)
 }
 
-// TryLock attempts to acquire mutex without blocking
+// TryLock attempts to acquire mutex without blocking.
 func (im *InstrumentedMutex) TryLock() bool {
 	start := time.Now()
 	acquired := im.mu.TryLock()
@@ -69,12 +69,12 @@ func (im *InstrumentedMutex) TryLock() bool {
 	return acquired
 }
 
-// Unlock releases the mutex
+// Unlock releases the mutex.
 func (im *InstrumentedMutex) Unlock() {
 	im.mu.Unlock()
 }
 
-// observeLockTime records the total time to acquire the lock
+// observeLockTime records the total time to acquire the lock.
 func (im *InstrumentedMutex) observeLockTime(start time.Time, hadContention bool) {
 	duration := time.Since(start).Seconds()
 
@@ -87,12 +87,12 @@ func (im *InstrumentedMutex) observeLockTime(start time.Time, hadContention bool
 	}
 }
 
-// observeContention records a contention event
+// observeContention records a contention event.
 func (im *InstrumentedMutex) observeContention() {
 	im.contention.WithLabelValues(string(im.lockType), im.path).Inc()
 }
 
-// InstrumentedRWMutex wraps sync.RWMutex with contention tracking
+// InstrumentedRWMutex wraps sync.RWMutex with contention tracking.
 type InstrumentedRWMutex struct {
 	mu           sync.RWMutex
 	path         string
@@ -100,7 +100,7 @@ type InstrumentedRWMutex struct {
 	contention   *prometheus.CounterVec
 }
 
-// NewInstrumentedRWMutex creates a new instrumented RWMutex
+// NewInstrumentedRWMutex creates a new instrumented RWMutex.
 func NewInstrumentedRWMutex(path string, lockWaitTime *prometheus.HistogramVec, contention *prometheus.CounterVec) *InstrumentedRWMutex {
 	return &InstrumentedRWMutex{
 		path:         path,
@@ -109,7 +109,7 @@ func NewInstrumentedRWMutex(path string, lockWaitTime *prometheus.HistogramVec, 
 	}
 }
 
-// RLock acquires read lock with contention tracking
+// RLock acquires read lock with contention tracking.
 func (irm *InstrumentedRWMutex) RLock() {
 	start := time.Now()
 
@@ -125,7 +125,7 @@ func (irm *InstrumentedRWMutex) RLock() {
 	irm.lockWaitTime.WithLabelValues(string(LockTypeRead), irm.path).Observe(time.Since(start).Seconds())
 }
 
-// TryRLock attempts to acquire read lock without blocking
+// TryRLock attempts to acquire read lock without blocking.
 func (irm *InstrumentedRWMutex) TryRLock() bool {
 	start := time.Now()
 	acquired := irm.mu.TryRLock()
@@ -137,12 +137,12 @@ func (irm *InstrumentedRWMutex) TryRLock() bool {
 	return acquired
 }
 
-// RUnlock releases read lock
+// RUnlock releases read lock.
 func (irm *InstrumentedRWMutex) RUnlock() {
 	irm.mu.RUnlock()
 }
 
-// Lock acquires write lock with contention tracking
+// Lock acquires write lock with contention tracking.
 func (irm *InstrumentedRWMutex) Lock() {
 	start := time.Now()
 
@@ -158,7 +158,7 @@ func (irm *InstrumentedRWMutex) Lock() {
 	irm.lockWaitTime.WithLabelValues(string(LockTypeWrite), irm.path).Observe(time.Since(start).Seconds())
 }
 
-// TryLock attempts to acquire write lock without blocking
+// TryLock attempts to acquire write lock without blocking.
 func (irm *InstrumentedRWMutex) TryLock() bool {
 	start := time.Now()
 	acquired := irm.mu.TryLock()
@@ -170,7 +170,7 @@ func (irm *InstrumentedRWMutex) TryLock() bool {
 	return acquired
 }
 
-// Unlock releases write lock
+// Unlock releases write lock.
 func (irm *InstrumentedRWMutex) Unlock() {
 	irm.mu.Unlock()
 }

@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// Operation type for error context
+// Operation type for error context.
 type Operation string
 
 const (
@@ -36,7 +36,7 @@ const (
 	OpStat      Operation = "Stat"
 )
 
-// CacheError represents an enhanced error with operation context and details
+// CacheError represents an enhanced error with operation context and details.
 type CacheError struct {
 	Operation Operation
 	Path      string
@@ -46,7 +46,7 @@ type CacheError struct {
 	Caller    string
 }
 
-// Error implements the error interface
+// Error implements the error interface.
 func (e *CacheError) Error() string {
 	var parts []string
 
@@ -73,12 +73,12 @@ func (e *CacheError) Error() string {
 	return base
 }
 
-// Unwrap returns the underlying error for compatibility with errors.Is/As
+// Unwrap returns the underlying error for compatibility with errors.Is/As.
 func (e *CacheError) Unwrap() error {
 	return e.Err
 }
 
-// NewCacheError creates a new CacheError with enhanced context
+// NewCacheError creates a new CacheError with enhanced context.
 func NewCacheError(op Operation, err error, details string) *CacheError {
 	return &CacheError{
 		Operation: op,
@@ -88,19 +88,19 @@ func NewCacheError(op Operation, err error, details string) *CacheError {
 	}
 }
 
-// WithPath adds path context to the error
+// WithPath adds path context to the error.
 func (e *CacheError) WithPath(path string) *CacheError {
 	e.Path = path
 	return e
 }
 
-// WithFile adds file context to the error
+// WithFile adds file context to the error.
 func (e *CacheError) WithFile(file string) *CacheError {
 	e.File = file
 	return e
 }
 
-// WithDetails adds additional details to the error
+// WithDetails adds additional details to the error.
 func (e *CacheError) WithDetails(details string) *CacheError {
 	if e.Details != "" {
 		e.Details = fmt.Sprintf("%s: %s", e.Details, details)
@@ -110,7 +110,7 @@ func (e *CacheError) WithDetails(details string) *CacheError {
 	return e
 }
 
-// getCaller returns the calling function name for debugging
+// getCaller returns the calling function name for debugging.
 func getCaller() string {
 	_, file, line, ok := runtime.Caller(2)
 	if !ok {
@@ -128,48 +128,48 @@ func getCaller() string {
 
 // Helper functions for creating specific error types
 
-// WrapPutError wraps errors from Put operations
+// WrapPutError wraps errors from Put operations.
 func WrapPutError(err error, path string, dataSize int) *CacheError {
 	return NewCacheError(OpPut, err, fmt.Sprintf("data_size=%d", dataSize)).WithPath(path)
 }
 
-// WrapGetError wraps errors from Get operations
+// WrapGetError wraps errors from Get operations.
 func WrapGetError(err error, path string, file string) *CacheError {
 	return NewCacheError(OpGet, err, "").WithPath(path).WithFile(file)
 }
 
-// WrapRotateError wraps errors from Rotate operations
+// WrapRotateError wraps errors from Rotate operations.
 func WrapRotateError(err error, path string, oldFile, newFile string) *CacheError {
 	details := fmt.Sprintf("old=%s -> new=%s", oldFile, newFile)
 	return NewCacheError(OpRotate, err, details).WithPath(path)
 }
 
-// WrapOpenError wraps errors from Open operations
+// WrapOpenError wraps errors from Open operations.
 func WrapOpenError(err error, path string) *CacheError {
 	return NewCacheError(OpOpen, err, "").WithPath(path)
 }
 
-// WrapCloseError wraps errors from Close operations
+// WrapCloseError wraps errors from Close operations.
 func WrapCloseError(err error, path string, fdType string) *CacheError {
 	return NewCacheError(OpClose, err, fmt.Sprintf("fd_type=%s", fdType)).WithPath(path)
 }
 
-// WrapLockError wraps errors from locking operations
+// WrapLockError wraps errors from locking operations.
 func WrapLockError(err error, path string, pid int) *CacheError {
 	return NewCacheError(OpLock, err, fmt.Sprintf("pid=%d", pid)).WithPath(path)
 }
 
-// WrapPosError wraps errors from position operations
+// WrapPosError wraps errors from position operations.
 func WrapPosError(err error, path string, seek int64) *CacheError {
 	return NewCacheError(OpPos, err, fmt.Sprintf("seek=%d", seek)).WithPath(path)
 }
 
-// WrapFileOperationError wraps errors from generic file operations
+// WrapFileOperationError wraps errors from generic file operations.
 func WrapFileOperationError(op Operation, err error, path, file string) *CacheError {
 	return NewCacheError(op, err, "").WithPath(path).WithFile(file)
 }
 
-// IsRetryable checks if an error is retryable based on its type and context
+// IsRetryable checks if an error is retryable based on its type and context.
 func IsRetryable(err error) bool {
 	if err == nil {
 		return false
@@ -192,7 +192,7 @@ func IsRetryable(err error) bool {
 	}
 }
 
-// isCacheError checks if error is of type CacheError
+// isCacheError checks if error is of type CacheError.
 func isCacheError(err error, target **CacheError) bool {
 	// Use type assertion instead of errors.As for direct check
 	if ce, ok := err.(*CacheError); ok {
@@ -202,7 +202,7 @@ func isCacheError(err error, target **CacheError) bool {
 	return false
 }
 
-// isTemporaryError checks if an underlying error is temporary/retryable
+// isTemporaryError checks if an underlying error is temporary/retryable.
 func isTemporaryError(err error) bool {
 	errStr := err.Error()
 	temporaryPatterns := []string{
@@ -222,7 +222,7 @@ func isTemporaryError(err error) bool {
 	return false
 }
 
-// GetErrorContext extracts useful context information from errors
+// GetErrorContext extracts useful context information from errors.
 func GetErrorContext(err error) map[string]interface{} {
 	context := make(map[string]interface{})
 

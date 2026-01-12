@@ -31,7 +31,7 @@ var (
 	getLatencyVec,
 	putLatencyVec *prometheus.SummaryVec
 
-	// Lock contention metrics
+	// Lock contention metrics.
 	lockWaitTimeVec   *prometheus.HistogramVec
 	lockContentionVec *prometheus.CounterVec
 
