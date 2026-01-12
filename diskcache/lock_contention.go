@@ -31,7 +31,11 @@ type InstrumentedMutex struct {
 }
 
 // NewInstrumentedMutex creates a new instrumented mutex.
-func NewInstrumentedMutex(lockType LockType, path string, lockWaitTime *prometheus.HistogramVec, contention *prometheus.CounterVec) *InstrumentedMutex {
+func NewInstrumentedMutex(lockType LockType,
+	path string,
+	lockWaitTime *prometheus.HistogramVec,
+	contention *prometheus.CounterVec,
+) *InstrumentedMutex {
 	return &InstrumentedMutex{
 		lockType:     lockType,
 		path:         path,
@@ -59,7 +63,7 @@ func (im *InstrumentedMutex) Lock() {
 
 // TryLock attempts to acquire mutex without blocking.
 func (im *InstrumentedMutex) TryLock() bool {
-	start := time.Now()
+	start := time.Now() // nolint:ifshort
 	acquired := im.mu.TryLock()
 	if acquired {
 		im.observeLockTime(start, false)

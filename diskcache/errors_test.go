@@ -80,7 +80,7 @@ func TestNewCacheError(t *testing.T) {
 	if cacheErr.Operation != OpGet {
 		t.Errorf("Expected operation %v, got %v", OpGet, cacheErr.Operation)
 	}
-	if cacheErr.Err != err {
+	if cacheErr.Err != err { // nolint:errorlint
 		t.Errorf("Expected error %v, got %v", err, cacheErr.Err)
 	}
 	if cacheErr.Details != "test details" {

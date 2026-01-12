@@ -181,7 +181,7 @@ func IsRetryable(err error) bool {
 		return isTemporaryError(err)
 	}
 
-	switch cacheErr.Operation {
+	switch cacheErr.Operation { // nolint:exhaustive
 	case OpWrite, OpRead, OpSync, OpSeek:
 		return isTemporaryError(cacheErr.Err)
 	case OpLock:
@@ -195,7 +195,7 @@ func IsRetryable(err error) bool {
 // isCacheError checks if error is of type CacheError.
 func isCacheError(err error, target **CacheError) bool {
 	// Use type assertion instead of errors.As for direct check
-	if ce, ok := err.(*CacheError); ok {
+	if ce, ok := err.(*CacheError); ok { // nolint:errorlint
 		*target = ce
 		return true
 	}

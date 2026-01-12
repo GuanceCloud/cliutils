@@ -18,7 +18,7 @@ func TestLockContention(t *testing.T) {
 	// Test immediate lock (no contention)
 	start := time.Now()
 	mu.Lock()
-	duration1 := time.Since(start)
+	duration1 := time.Since(start) // nolint:ifshort
 	mu.Unlock()
 
 	// Should be very fast (no contention)
