@@ -140,7 +140,6 @@ func newRootLogger(fpath, errorPath, level string, options int) (*zap.Logger, er
 	if options&OPT_ROTATE != 0 &&
 		options&OPT_STDOUT == 0 && // can't rotate stdout
 		fpath != os.DevNull { // can't rotate(rename) /dev/null
-
 		if errorPath != "" {
 			// Create separate rotating logger for errors
 			return newMultiWriterRootLogger(fpath, errorPath, level, options)

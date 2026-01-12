@@ -42,7 +42,7 @@ func doSetStdoutLogger(opt *Option) error {
 	return nil
 }
 
-func doSetStdoutLoggerWithErrors(opt *Option) error {
+func doSetStdoutLoggerWithErrors(opt *Option) error { // nolint:deadcode,unused
 	// reset default stdout logger
 	defaultStdoutRootLogger = nil
 	var err error
