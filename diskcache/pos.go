@@ -32,7 +32,8 @@ type pos struct {
 func (p *pos) close() error {
 	if p.fd != nil {
 		if err := p.fd.Close(); err != nil {
-			return err
+			return WrapFileOperationError(OpClose, err, "", p.fname).
+				WithDetails("failed_to_close_position_fd")
 		}
 
 		p.fd = nil
@@ -51,7 +52,8 @@ func (p *pos) String() string {
 func posFromFile(fname string) (*pos, error) {
 	bin, err := os.ReadFile(filepath.Clean(fname))
 	if err != nil {
-		return nil, err
+		return nil, WrapFileOperationError(OpRead, err, "", fname).
+			WithDetails("failed_to_read_position_file")
 	}
 
 	if len(bin) <= 8 {
@@ -60,7 +62,9 @@ func posFromFile(fname string) (*pos, error) {
 
 	var p pos
 	if err := p.UnmarshalBinary(bin); err != nil {
-		return nil, err
+		return nil, NewCacheError(OpPos, err,
+			fmt.Sprintf("failed_to_unmarshal_position_data: data_len=%d", len(bin))).
+			WithFile(fname)
 	}
 	return &p, nil
 }
@@ -97,7 +101,8 @@ func (p *pos) UnmarshalBinary(bin []byte) error {
 func (p *pos) reset() error {
 	if p.fd == nil {
 		if fd, err := os.OpenFile(p.fname, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600); err != nil {
-			return fmt.Errorf("open pos file(%q) failed: %w", p.fname, err)
+			return WrapFileOperationError(OpCreate, err, "", p.fname).
+				WithDetails("failed_to_create_position_file_for_reset")
 		} else {
 			p.fd = fd
 		}
@@ -120,25 +125,30 @@ func (p *pos) reset() error {
 func (p *pos) doDumpFile() error {
 	if p.fd == nil {
 		if fd, err := os.OpenFile(p.fname, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600); err != nil {
-			return fmt.Errorf("open pos file(%q) failed: %w", p.fname, err)
+			return WrapFileOperationError(OpCreate, err, "", p.fname).
+				WithDetails("failed_to_open_position_file_for_dump")
 		} else {
 			p.fd = fd
 		}
 	}
 
 	if data, err := p.MarshalBinary(); err != nil {
-		return err
+		return NewCacheError(OpPos, err, "failed_to_marshal_position_data").
+			WithFile(p.fname)
 	} else {
 		if err := p.fd.Truncate(0); err != nil {
-			return fmt.Errorf("fd.Truncate: %w", err)
+			return WrapFileOperationError(OpWrite, err, "", p.fname).
+				WithDetails("failed_to_truncate_position_file")
 		}
 
 		if _, err := p.fd.Seek(0, 0); err != nil {
-			return fmt.Errorf("fd.Seek: %w", err)
+			return WrapFileOperationError(OpSeek, err, "", p.fname).
+				WithDetails("failed_to_seek_to_start_of_position_file")
 		}
 
 		if _, err := p.fd.Write(data); err != nil {
-			return fmt.Errorf("dumpFile(%q): %w", p.fname, err)
+			return WrapFileOperationError(OpWrite, err, "", p.fname).
+				WithDetails("failed_to_write_position_data")
 		}
 
 		return nil

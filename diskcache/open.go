@@ -37,7 +37,7 @@ func Open(opts ...CacheOption) (*DiskCache, error) {
 	}
 
 	if err := c.doOpen(); err != nil {
-		return nil, err
+		return nil, WrapOpenError(err, c.path).WithDetails("failed_to_open_diskcache")
 	}
 
 	defer func() {
@@ -101,14 +101,15 @@ func (c *DiskCache) doOpen() error {
 	}
 
 	if err := os.MkdirAll(c.path, c.dirPerms); err != nil {
-		return err
+		return NewCacheError(OpCreate, err, fmt.Sprintf("failed_to_create_directory: perms=%o", c.dirPerms)).
+			WithPath(c.path)
 	}
 
 	// disable open multiple times
 	if !c.noLock {
 		fl := newFlock(c.path)
 		if err := fl.lock(); err != nil {
-			return fmt.Errorf("lock: %w", err)
+			return WrapLockError(err, c.path, 0).WithDetails("failed_to_acquire_directory_lock")
 		} else {
 			c.flock = fl
 		}
@@ -129,14 +130,16 @@ func (c *DiskCache) doOpen() error {
 
 	// write append fd, always write to the same-name file
 	if err := c.openWriteFile(); err != nil {
-		return err
+		return NewCacheError(OpOpen, err, "failed_to_open_write_file").
+			WithPath(c.path).WithFile(c.curWriteFile)
 	}
 
 	// list files under @path
 	if err := filepath.Walk(c.path,
 		func(path string, fi os.FileInfo, err error) error {
 			if err != nil {
-				return err
+				return NewCacheError(OpOpen, err, "failed_to_walk_directory").
+					WithPath(c.path).WithFile(path)
 			}
 
 			if fi.IsDir() {
@@ -164,7 +167,8 @@ func (c *DiskCache) doOpen() error {
 	// first get, try load .pos
 	if !c.noPos {
 		if err := c.loadUnfinishedFile(); err != nil {
-			return err
+			return NewCacheError(OpOpen, err, "failed_to_load_position_file").
+				WithPath(c.path)
 		}
 	}
 
@@ -184,7 +188,7 @@ func (c *DiskCache) Close() error {
 
 	if c.rfd != nil {
 		if err := c.rfd.Close(); err != nil {
-			return err
+			return WrapCloseError(err, c.path, "read_fd")
 		}
 		c.rfd = nil
 	}
@@ -192,21 +196,21 @@ func (c *DiskCache) Close() error {
 	if !c.noLock {
 		if c.flock != nil {
 			if err := c.flock.unlock(); err != nil {
-				return err
+				return WrapLockError(err, c.path, 0).WithDetails("failed_to_release_directory_lock")
 			}
 		}
 	}
 
 	if c.wfd != nil {
 		if err := c.wfd.Close(); err != nil {
-			return err
+			return WrapCloseError(err, c.path, "write_fd")
 		}
 		c.wfd = nil
 	}
 
 	if c.pos != nil {
 		if err := c.pos.close(); err != nil {
-			return err
+			return WrapPosError(err, c.path, c.pos.Seek).WithDetails("failed_to_close_position_file")
 		}
 	}
 
