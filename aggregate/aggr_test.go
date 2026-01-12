@@ -57,9 +57,14 @@ func TestHTTPPostBatch(t *T.T) {
 			AggregateRules: []*AggregateRule{
 				{
 					Groupby: []string{"idx"},
-					Selector: &ruleSelector{
-						Category: point.Metric.String(),
-						Fields:   []string{"f1"},
+					Selector: &RuleSelector{
+						Category:              point.Metric.String(),
+						Measurements:          nil,
+						measurementsWhitelist: nil,
+						Fields:                []string{"f1"},
+						fieldsWhitelist:       nil,
+						Condition:             "",
+						conds:                 nil,
 					},
 					Algorithms: map[string]*AggregationAlgo{
 						"f1": {
@@ -136,7 +141,7 @@ func TestHTTPPostBatch(t *T.T) {
 			AggregateRules: []*AggregateRule{
 				{
 					Groupby: []string{"service", "http_method", "http_route", "le"},
-					Selector: &ruleSelector{
+					Selector: &RuleSelector{
 						Category: point.Metric.String(),
 						Fields:   []string{"http.server.duration_bucket"},
 					},
@@ -220,7 +225,7 @@ func TestBatch(t *T.T) {
 			AggregateRules: []*AggregateRule{
 				{
 					Groupby: []string{"idx"},
-					Selector: &ruleSelector{
+					Selector: &RuleSelector{
 						Category: point.Metric.String(),
 						Fields:   []string{"f1"},
 					},
@@ -287,7 +292,7 @@ func TestAggregator(t *T.T) {
 			AggregateRules: []*AggregateRule{
 				{
 					Groupby: []string{"idx"},
-					Selector: &ruleSelector{
+					Selector: &RuleSelector{
 						Category: point.Metric.String(),
 						Fields:   []string{"reg:f_.*"},
 					},
@@ -308,7 +313,7 @@ func TestAggregator(t *T.T) {
 			assert.True(t, ok)
 		}
 
-		groupby := a.AggregateRules[0].GroupbyPoints(groups[0])
+		groupby := a.AggregateRules[0].PickPoints(groups[0])
 		assert.Len(t, groupby, 3)
 		for h, arr := range groupby {
 			t.Logf("%d: %d points", h, len(arr))
@@ -329,7 +334,7 @@ func TestAggregator(t *T.T) {
 			AggregateRules: []*AggregateRule{
 				{
 					Groupby: []string{"idx"},
-					Selector: &ruleSelector{
+					Selector: &RuleSelector{
 						Category: point.Metric.String(),
 						Fields:   []string{"f1"},
 					},
@@ -347,7 +352,7 @@ func TestAggregator(t *T.T) {
 			assert.NotEmpty(t, pt.GetTag("idx"))
 		}
 
-		groupby := a.AggregateRules[0].GroupbyPoints(groups[0])
+		groupby := a.AggregateRules[0].PickPoints(groups[0])
 		assert.Len(t, groupby, 3)
 		for h, arr := range groupby {
 			t.Logf("%d: %d points", h, len(arr))
@@ -370,7 +375,7 @@ func TestAggregator(t *T.T) {
 			AggregateRules: []*AggregateRule{
 				{
 					Groupby: []string{"idx"},
-					Selector: &ruleSelector{
+					Selector: &RuleSelector{
 						Category: point.Metric.String(),
 						Fields:   []string{"f1", "f2"},
 					},
@@ -393,7 +398,7 @@ func TestAggregator(t *T.T) {
 			assert.False(t, ok1 && ok2) // should not exist at the same time.
 		}
 
-		groupby := a.AggregateRules[0].GroupbyPoints(groups[0])
+		groupby := a.AggregateRules[0].PickPoints(groups[0])
 		assert.Len(t, groupby, 3*2)
 		for h, arr := range groupby {
 			t.Logf("%d: %d points", h, len(arr))
@@ -412,7 +417,7 @@ func TestAggregator(t *T.T) {
 		a := AggregatorConfigure{
 			AggregateRules: []*AggregateRule{
 				{
-					Selector: &ruleSelector{
+					Selector: &RuleSelector{
 						Category:  point.Metric.String(),
 						Fields:    []string{"f1"},
 						Condition: `{f1 IN [1,2,0]}`,

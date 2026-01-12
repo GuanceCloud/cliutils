@@ -24,7 +24,7 @@ func TestAlgo(t *T.T) {
 			AggregateRules: []*AggregateRule{
 				{
 					Groupby: []string{"idx"},
-					Selector: &ruleSelector{
+					Selector: &RuleSelector{
 						Category: point.Metric.String(),
 						Fields:   []string{"f1"},
 					},
@@ -110,7 +110,7 @@ func TestAlgo(t *T.T) {
 			AggregateRules: []*AggregateRule{
 				{
 					Groupby: []string{"idx"},
-					Selector: &ruleSelector{
+					Selector: &RuleSelector{
 						Category: point.Metric.String(),
 						Fields:   []string{"f1"},
 					},

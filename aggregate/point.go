@@ -67,6 +67,17 @@ func hash(pt *point.Point, sortedTagKeys []string) uint64 {
 	return h
 }
 
+func pickHash(pt *point.Point, sortedTagKeys []string) uint64 {
+	h := Seed1
+
+	// we always use measurement name and metric name for hash
+	h = HashCombine(h, xxhash.Sum64(cliutils.ToUnsafeBytes(pt.Name())))
+	for _, k := range sortedTagKeys {
+		h = HashCombine(h, xxhash.Sum64(cliutils.ToUnsafeBytes(k)))
+	}
+	return h
+}
+
 // HashCombine used to combine 2 u64 hash value, see https://zhuanlan.zhihu.com/p/574573421.
 func HashCombine(seed, hash uint64) uint64 {
 	return ((seed + 0x9e3779b9) ^ hash) * 0x517cc1b727220a95
