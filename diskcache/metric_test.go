@@ -126,52 +126,53 @@ func TestMetric(t *T.T) {
 		assert.NoError(t, c.Rotate())
 
 		mfs, err := reg.Gather()
+		fullMetrics := metrics.MetricFamily2Text(mfs)
 
 		assert.NoError(t, err)
 
 		m := metrics.GetMetricOnLabels(mfs, "diskcache_put_bytes", c.path)
-		require.NotNilf(t, m, "metrics:\n%s", c.path, metrics.MetricFamily2Text(mfs))
-		assert.Equal(t, uint64(1), m.GetSummary().GetSampleCount())
-		assert.Equal(t, float64(108), // 100 + size(4B) + eof(4B)
-			m.GetSummary().GetSampleSum())
+		require.NotNilf(t, m, fullMetrics)
+
+		assert.Equalf(t, uint64(1), m.GetSummary().GetSampleCount(), fullMetrics)
+		assert.Equalf(t, float64(108), // 100 + size(4B) + eof(4B)
+			m.GetSummary().GetSampleSum(), fullMetrics)
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
-		require.NotNil(t, m)
-		assert.Equal(t, float64(108),
-			m.GetGauge().GetValue())
+		require.NotNilf(t, m, fullMetrics)
+		assert.Equalf(t, float64(108), m.GetGauge().GetValue(), fullMetrics)
 
 		// these fileds all zero
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_dropped_batch", c.path)
-		require.Nil(t, m)
+		require.Nilf(t, m, fullMetrics)
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_get", c.path)
-		require.Nil(t, m)
+		require.Nilf(t, m, fullMetrics)
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_bytes_total", c.path)
-		require.Nil(t, m)
+		require.Nilf(t, m, fullMetrics)
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_latency", c.path)
-		require.Nil(t, m)
+		require.Nilf(t, m, fullMetrics)
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_rotate", c.path)
-		require.Nil(t, m)
+		require.Nilf(t, m, fullMetrics)
 
 		assert.NoError(t, c.Get(nil))
 		assert.Error(t, c.Get(nil)) // error: no data, trigger switch, and update get metrics
 
-		mfs, err = reg.Gather()
+		mfs, err = reg.Gather() // get updated metrics
 		assert.NoError(t, err)
 
-		t.Logf("metrics:\n%s", metrics.MetricFamily2Text(mfs))
+		fullMetrics = metrics.MetricFamily2Text(mfs)
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_bytes", c.path)
-		require.NotNil(t, m)
-		assert.Equal(t, uint64(1), m.GetSummary().GetSampleCount())
-		assert.Equal(t, float64(108), m.GetSummary().GetSampleSum())
+		require.NotNilf(t, m, fullMetrics)
+		assert.Equalf(t, uint64(1), m.GetSummary().GetSampleCount(), fullMetrics)
+		assert.Equalf(t, float64(108), m.GetSummary().GetSampleSum(), fullMetrics)
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
-		require.NotNil(t, m)
-		assert.Equal(t, 0.0, m.GetGauge().GetValue())
+		require.NotNilf(t, m, fullMetrics)
+		assert.Equalf(t, 0.0, m.GetGauge().GetValue(), fullMetrics)
 
 		assert.NoError(t, c.Close())
 

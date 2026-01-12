@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/GuanceCloud/cliutils/logger"
@@ -64,9 +63,9 @@ func defaultInstance() *DiskCache {
 		batchSize:   20 * 1024 * 1024,
 		maxDataSize: 0, // not set
 
-		wlock:  &sync.Mutex{},
-		rlock:  &sync.Mutex{},
-		rwlock: &sync.Mutex{},
+		wlock:  nil, // Will be initialized in doOpen() when path is known
+		rlock:  nil, // Will be initialized in doOpen() when path is known
+		rwlock: nil, // Will be initialized in doOpen() when path is known
 
 		wakeup:    time.Second * 3,
 		dirPerms:  0o750,
@@ -127,6 +126,17 @@ func (c *DiskCache) doOpen() error {
 	capVec.WithLabelValues(c.path).Set(float64(c.capacity))
 	maxDataVec.WithLabelValues(c.path).Set(float64(c.maxDataSize))
 	batchSizeVec.WithLabelValues(c.path).Set(float64(c.batchSize))
+
+	// Initialize instrumented locks now that we have the path
+	if c.wlock == nil {
+		c.wlock = NewInstrumentedMutex(LockTypeWrite, c.path, lockWaitTimeVec, lockContentionVec)
+	}
+	if c.rlock == nil {
+		c.rlock = NewInstrumentedMutex(LockTypeRead, c.path, lockWaitTimeVec, lockContentionVec)
+	}
+	if c.rwlock == nil {
+		c.rwlock = NewInstrumentedMutex(LockTypeRW, c.path, lockWaitTimeVec, lockContentionVec)
+	}
 
 	// write append fd, always write to the same-name file
 	if err := c.openWriteFile(); err != nil {

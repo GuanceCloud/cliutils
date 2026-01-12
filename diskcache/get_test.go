@@ -514,7 +514,8 @@ func TestPutGet(t *T.T) {
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
 
-		t.Logf("got metrics\n%s", metrics.MetricFamily2Text(mfs))
+		fullMetrics := metrics.MetricFamily2Text(mfs)
+		_ = fullMetrics
 
 		t.Cleanup(func() {
 			c2.Close()

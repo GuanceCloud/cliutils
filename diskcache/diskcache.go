@@ -86,9 +86,9 @@ type DiskCache struct {
 	// how long to wakeup a sleeping write-file
 	wakeup time.Duration
 
-	wlock, // write-lock: used to exclude concurrent Put to the header file.
-	rlock *sync.Mutex // read-lock: used to exclude concurrent Get on the tail file.
-	rwlock *sync.Mutex // used to exclude switch/rotate/drop/Close on current disk cache instance.
+	wlock  *InstrumentedMutex // write-lock: used to exclude concurrent Put to the header file.
+	rlock  *InstrumentedMutex // read-lock: used to exclude concurrent Get on the tail file.
+	rwlock *InstrumentedMutex // used to exclude switch/rotate/drop/Close on current disk cache instance.
 
 	flock *flock // disabled multi-Open on same path
 	pos   *pos   // current read fd position info
@@ -123,8 +123,10 @@ type DiskCache struct {
 }
 
 func (c *DiskCache) String() string {
-	c.rwlock.Lock()
-	defer c.rwlock.Unlock()
+	if c.rwlock != nil {
+		c.rwlock.Lock()
+		defer c.rwlock.Unlock()
+	}
 
 	// nolint: lll
 	// if there too many files(>10), only print file count
@@ -141,8 +143,10 @@ func (c *DiskCache) String() string {
 }
 
 func (c *DiskCache) Pretty() string {
-	c.rwlock.Lock()
-	defer c.rwlock.Unlock()
+	if c.rwlock != nil {
+		c.rwlock.Lock()
+		defer c.rwlock.Unlock()
+	}
 
 	arr := []string{}
 
