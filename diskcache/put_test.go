@@ -207,14 +207,15 @@ func TestConcurrentPutGet(t *T.T) {
 
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
-		t.Logf("got metrics:\n%s", metrics.MetricFamily2Text(mfs))
+
+		fullMetrics := metrics.MetricFamily2Text(mfs)
 
 		m := metrics.GetMetricOnLabels(mfs,
 			"diskcache_size",
 			c.path)
 
-		require.NotNil(t, m)
-		assert.InDelta(t, 0, m.GetGauge().GetValue(), 0.1)
+		require.NotNilf(t, m, fullMetrics)
+		assert.InDeltaf(t, 0, m.GetGauge().GetValue(), 0.1, fullMetrics)
 
 		t.Cleanup(func() {
 			ResetMetrics()
@@ -242,8 +243,6 @@ func TestConcurrentPutGet(t *T.T) {
 
 		mfs, err := reg.Gather()
 		require.NoError(t, err)
-
-		t.Logf("got metrics:\n%s", metrics.MetricFamily2Text(mfs))
 
 		mSize := metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
 
@@ -451,7 +450,6 @@ func TestPutOnCapacityReached(t *T.T) {
 		t.Cleanup(func() {
 			require.NoError(t, c.Close())
 			ResetMetrics()
-			t.Logf("metrics:\n%s", metrics.MetricFamily2Text(mfs))
 		})
 	})
 }
