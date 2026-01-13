@@ -13,10 +13,20 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/GuanceCloud/cliutils/logger"
 )
+
+func setupLogger() {
+	once.Do(func() {
+		l = logger.SLogger("diskcache")
+	})
+}
 
 // Open init and create a new disk cache. We can set other options with various options.
 func Open(opts ...CacheOption) (*DiskCache, error) {
+	setupLogger()
+
 	c := defaultInstance()
 
 	// apply extra options
@@ -64,6 +74,10 @@ func defaultInstance() *DiskCache {
 		pos: &pos{
 			Seek: 0,
 			Name: nil,
+
+			// dump position each 100ms or 100 update
+			dumpInterval: time.Millisecond * 100,
+			dumpCount:    100,
 		},
 	}
 }
@@ -132,10 +146,6 @@ func (c *DiskCache) doOpen() error {
 			switch filepath.Base(path) {
 			case ".lock", ".pos": // ignore them
 			case "data": // not rotated writing file, do not count on sizeVec.
-				c.size.Add(fi.Size())
-				// NOTE: c.size not always equal to sizeVec. c.size used to limit
-				// total bytes used for Put(), but sizeVec used to count size that
-				// waiting to be Get().
 			default:
 				c.size.Add(fi.Size())
 				sizeVec.WithLabelValues(c.path).Add(float64(fi.Size()))
@@ -148,6 +158,8 @@ func (c *DiskCache) doOpen() error {
 	}
 
 	sort.Strings(c.dataFiles) // make file-name sorted for FIFO Get()
+	l.Infof("on open loaded %d files", len(c.dataFiles))
+	datafilesVec.WithLabelValues(c.path).Set(float64(len(c.dataFiles)))
 
 	// first get, try load .pos
 	if !c.noPos {

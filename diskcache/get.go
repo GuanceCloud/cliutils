@@ -7,6 +7,7 @@ package diskcache
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -30,6 +31,8 @@ func (c *DiskCache) skipBadFile() error {
 	defer func() {
 		droppedDataVec.WithLabelValues(c.path, reasonBadDataFile).Observe(float64(c.curReadSize))
 	}()
+
+	l.Warnf("skip bad file %s with size %d bytes", c.curReadfile, c.curReadSize)
 
 	return c.switchNextFile()
 }
@@ -80,9 +83,10 @@ func (c *DiskCache) doGet(buf []byte, fn Fn, bfn BufFunc) error {
 		if err = func() error {
 			c.wlock.Lock()
 			defer c.wlock.Unlock()
+
 			return c.rotate()
 		}(); err != nil {
-			return err
+			return fmt.Errorf("wakeup error: %w", err)
 		}
 	}
 
@@ -98,6 +102,14 @@ retry:
 	}
 
 	if n, err = c.rfd.Read(c.batchHeader); err != nil || n != dataHeaderLen {
+		if err != nil && !errors.Is(err, io.EOF) {
+			l.Errorf("read %d bytes header error: %s", dataHeaderLen, err.Error())
+		}
+
+		if n > 0 && n != dataHeaderLen {
+			l.Errorf("invalid header length: %d, expect %d", n, dataHeaderLen)
+		}
+
 		// On bad datafile, just ignore and delete the file.
 		if err = c.skipBadFile(); err != nil {
 			return err
@@ -130,12 +142,15 @@ retry:
 
 	if len(readbuf) < nbytes {
 		// seek to next read position
-		if _, err := c.rfd.Seek(int64(nbytes), io.SeekCurrent); err != nil {
+		if x, err := c.rfd.Seek(int64(nbytes), io.SeekCurrent); err != nil {
 			return fmt.Errorf("rfd.Seek(%d): %w", nbytes, err)
-		}
+		} else {
+			l.Warnf("got %d bytes to buffer with len %d, seek to new read position %d, drop %d bytes within file %s",
+				nbytes, len(readbuf), x, nbytes, c.curReadfile)
 
-		droppedDataVec.WithLabelValues(c.path, reasonTooSmallReadBuffer).Observe(float64(nbytes))
-		return ErrTooSmallReadBuf
+			droppedDataVec.WithLabelValues(c.path, reasonTooSmallReadBuffer).Observe(float64(nbytes))
+			return ErrTooSmallReadBuf
+		}
 	}
 
 	if n, err := c.rfd.Read(readbuf[:nbytes]); err != nil {
@@ -164,11 +179,11 @@ __updatePos:
 	// update seek position
 	if !c.noPos && nbytes > 0 {
 		c.pos.Seek += int64(dataHeaderLen + nbytes)
-		if derr := c.pos.dumpFile(); derr != nil {
+		if do, derr := c.pos.dumpFile(); derr != nil {
 			return derr
+		} else if do {
+			posUpdatedVec.WithLabelValues("get", c.path).Inc()
 		}
-
-		posUpdatedVec.WithLabelValues("get", c.path).Inc()
 	}
 
 __end:

@@ -181,7 +181,7 @@ func setupMetrics() {
 		prometheus.GaugeOpts{
 			Namespace: ns,
 			Name:      "size",
-			Help:      "Current cache size that waiting to be consumed(get)",
+			Help:      "Current cache size that waiting to be consumed(get). The size include header bytes",
 		},
 		[]string{"path"},
 	)

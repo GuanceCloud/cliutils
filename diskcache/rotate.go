@@ -73,7 +73,7 @@ func (c *DiskCache) rotate() error {
 		return fmt.Errorf("rotate on Rename(%q, %q): %w", c.curWriteFile, newfile, err)
 	}
 
-	// new file added, plus it's size to cache size
+	// new file added, add it's size to cache size
 	if fi, err := os.Stat(newfile); err == nil {
 		if fi.Size() > dataHeaderLen {
 			c.size.Add(fi.Size())

@@ -12,11 +12,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type pos struct {
 	Seek int64  `json:"seek"`
 	Name []byte `json:"name"`
+
+	cnt,
+	dumpCount int
+	dumpInterval time.Duration
+	lastDump     time.Time
 
 	fd    *os.File
 	fname string        // where to dump the binary data
@@ -108,10 +114,10 @@ func (p *pos) reset() error {
 	p.Seek = -1
 	p.Name = nil
 
-	return p.dumpFile()
+	return p.doDumpFile()
 }
 
-func (p *pos) dumpFile() error {
+func (p *pos) doDumpFile() error {
 	if p.fd == nil {
 		if fd, err := os.OpenFile(p.fname, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600); err != nil {
 			return fmt.Errorf("open pos file(%q) failed: %w", p.fname, err)
@@ -137,6 +143,27 @@ func (p *pos) dumpFile() error {
 
 		return nil
 	}
+}
+
+func (p *pos) dumpFile() (bool, error) {
+	if p.dumpCount == 0 { // force dump .pos on every Get action.
+		return true, p.doDumpFile()
+	}
+
+	p.cnt++
+	if p.cnt%p.dumpCount == 0 {
+		p.lastDump = time.Now()
+		return true, p.doDumpFile()
+	}
+
+	if p.dumpInterval > 0 {
+		if time.Since(p.lastDump) >= p.dumpInterval {
+			p.lastDump = time.Now()
+			return true, p.doDumpFile()
+		}
+	}
+
+	return false, nil
 }
 
 // for benchmark.
