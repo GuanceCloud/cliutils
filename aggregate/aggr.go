@@ -177,9 +177,9 @@ func (ar *AggregateRule) GroupbyBatch(ac *AggregatorConfigure, pts []*point.Poin
 
 	for h, pts := range hashedPts {
 		b := &AggregationBatch{
-			RoutingKey:      h,
-			ConfigHash:      ac.hash,
-			RawConfig:       ac.raw,
+			RoutingKey: h,
+			ConfigHash: ac.hash,
+			//RawConfig:       ac.raw,
 			AggregationOpts: ar.Algorithms,
 			Points: func() *point.PBPoints {
 				var pbpts point.PBPoints

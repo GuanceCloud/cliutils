@@ -47,7 +47,7 @@ func NewCaculatorCache() *CaculatorCache {
 	}
 }
 
-func (cc *CaculatorCache) addBatches(batches ...*AggregationBatch) {
+func (cc *CaculatorCache) AddBatches(batches ...*AggregationBatch) {
 	cc.mtx.Lock()
 	defer cc.mtx.Unlock()
 
@@ -70,7 +70,7 @@ func (cc *CaculatorCache) addBatches(batches ...*AggregationBatch) {
 	}
 }
 
-func (cc *CaculatorCache) delBatch(id uint64) bool {
+func (cc *CaculatorCache) DelBatch(id uint64) bool {
 	cc.mtx.Lock()
 	defer cc.mtx.Unlock()
 
@@ -83,7 +83,7 @@ func (cc *CaculatorCache) delBatch(id uint64) bool {
 	}
 }
 
-func (cc *CaculatorCache) peekNext() (Calculator, bool) {
+func (cc *CaculatorCache) PeekNext() (Calculator, bool) {
 	cc.mtx.RLock()
 	defer cc.mtx.RUnlock()
 
@@ -94,12 +94,12 @@ func (cc *CaculatorCache) peekNext() (Calculator, bool) {
 	return cc.heap[0], true
 }
 
-func (cc *CaculatorCache) scheduleJob(c Calculator) {
+func (cc *CaculatorCache) ScheduleJob(c Calculator) {
 	cc.mtx.Lock()
 	defer cc.mtx.Unlock()
 
 	mb := c.base()
-	mb.nextWallTime = alignNextWallTime(time.Now(), time.Duration(mb.window)).UnixNano()
+	mb.nextWallTime = AlignNextWallTime(time.Now(), time.Duration(mb.window)).UnixNano()
 	mb.heapIdx = len(cc.heap)
 	heap.Push(cc, c)
 	cc.cache[mb.hash] = c
@@ -111,7 +111,7 @@ func (cc *CaculatorCache) Len() int {
 
 func (cc *CaculatorCache) Less(i, j int) bool {
 	// smallest nextWallTime pop first.
-	less := (cc.heap[i].base().nextWallTime < cc.heap[j].base().nextWallTime)
+	less := cc.heap[i].base().nextWallTime < cc.heap[j].base().nextWallTime
 
 	l.Debugf("compare [%d]%s <-> [%d]%s => %v",
 		i,
@@ -154,7 +154,7 @@ func (cc *CaculatorCache) Pop() any {
 	return c
 }
 
-func alignNextWallTime(t time.Time, align time.Duration) time.Time {
+func AlignNextWallTime(t time.Time, align time.Duration) time.Time {
 	truncated := t.Truncate(align)
 
 	if truncated.Equal(t) {
@@ -170,7 +170,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 
 	for key, algo := range batch.AggregationOpts {
 		var extraTags [][2]string
-		// nextWallTime = alignNextWallTime(now, time.Duration(algo.Window))
+		// nextWallTime = AlignNextWallTime(now, time.Duration(algo.Window))
 
 		if len(algo.AddTags) > 0 {
 			// NOTE: we first add these extra-tags from algorithm configure. If origin
@@ -216,7 +216,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 				aggrTags: extraTags,
 				// align to next wall-time
 				// XXX: what if the point reach too late?
-				nextWallTime: alignNextWallTime(ptwrap.Time(), time.Duration(algo.Window)).UnixNano(),
+				nextWallTime: AlignNextWallTime(ptwrap.Time(), time.Duration(algo.Window)).UnixNano(),
 				window:       algo.Window,
 			}
 

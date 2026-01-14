@@ -14,10 +14,10 @@ import (
 func Test_alignNextWallTime(t *T.T) {
 	t.Run(`basic`, func(t *T.T) {
 		now := time.Unix(123, 0)
-		wallTime := alignNextWallTime(now, time.Second*10).Unix()
+		wallTime := AlignNextWallTime(now, time.Second*10).Unix()
 		assert.Equal(t, int64(130), wallTime)
 
-		wallTime = alignNextWallTime(now, time.Second).Unix()
+		wallTime = AlignNextWallTime(now, time.Second).Unix()
 		assert.Equal(t, int64(123), wallTime)
 	})
 }
@@ -43,7 +43,7 @@ func Test_heap(t *T.T) {
 			AggregateRules: []*AggregateRule{
 				{
 					Groupby: []string{"idx"},
-					Selector: &ruleSelector{
+					Selector: &RuleSelector{
 						Category: point.Metric.String(),
 						Fields:   []string{"f1"},
 					},
@@ -67,7 +67,7 @@ func Test_heap(t *T.T) {
 		batches := a.AggregateRules[0].GroupbyBatch(&a, groups[0])
 
 		cc := NewCaculatorCache()
-		cc.addBatches(batches...)
+		cc.AddBatches(batches...)
 
 		for _, c := range cc.heap {
 			t.Logf("base: %s", c.base())

@@ -435,3 +435,57 @@ func TestAggregator(t *T.T) {
 		}
 	})
 }
+
+func TestOTEL(t *T.T) {
+	now := time.Now()
+	var kvs point.KVs
+	kvs = kvs.Add("jvm.buffer.memory.used", 100).
+		AddTag("service_name", "test").
+		AddTag("id", "1")
+	pt := point.NewPoint("opentelemetry", kvs, point.DefaultMetricOptions()...)
+	pt.SetTime(now)
+	var kvs2 point.KVs
+	kvs2 = kvs2.Add("jvm.buffer.memory.total", 100).
+		AddTag("service_name", "test").
+		AddTag("id", "1")
+	pt2 := point.NewPoint("opentelemetry", kvs2, point.DefaultMetricOptions()...)
+	pt2.SetTime(now)
+	pts := []*point.Point{pt, pt2}
+
+	a := &AggregatorConfigure{
+		AggregateRules: []*AggregateRule{
+			{
+				Name:    "jvm.buffer.memory",
+				Groupby: []string{"service_name", "id"},
+				Selector: &RuleSelector{
+					Category:  point.Metric.String(),
+					Fields:    []string{"jvm.buffer.memory.used"},
+					Condition: "",
+				},
+				Algorithms: map[string]*AggregationAlgo{
+					"jvm.buffer.memory.used.avg": {
+						Method:      AVG,
+						SourceField: "jvm.buffer.memory.used",
+						AddTags: map[string]string{
+							"extra_tag_1": "some_value",
+						},
+					},
+					"jvm.buffer.memory.used.max": {
+						Method:      MAX,
+						SourceField: "jvm.buffer.memory.used",
+						AddTags: map[string]string{
+							"extra_tag_1": "some_value",
+						},
+					},
+				},
+			},
+		},
+	}
+	a.Setup()
+	for _, rule := range a.AggregateRules {
+		group := rule.SelectPoints(pts)
+		t.Logf("group len=%d", len(group))
+		batchs := rule.GroupbyBatch(a, group)
+		t.Logf("batchs len=%d", len(batchs))
+	}
+}

@@ -58,7 +58,7 @@ func TestAlgo(t *T.T) {
 
 		cc := NewCaculatorCache()
 
-		cc.addBatches(batches...)
+		cc.AddBatches(batches...)
 
 		assert.Len(t, cc.cache, 6)
 
@@ -134,7 +134,7 @@ func TestAlgo(t *T.T) {
 		assert.Len(t, batches, 3)
 
 		cc := NewCaculatorCache()
-		cc.addBatches(batches...)
+		cc.AddBatches(batches...)
 
 		assert.Len(t, cc.cache, 3)
 
