@@ -16,6 +16,7 @@ message AggregationBatch {
   map<string, AggregationAlgo> aggregation_opts=4;
 
   point.PBPoints points=5;
+  uint64 peek_key=6;
 }
 
 enum AlgoMethod {

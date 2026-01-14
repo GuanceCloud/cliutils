@@ -63,7 +63,7 @@ func TestAlgo(t *T.T) {
 		assert.Len(t, cc.cache, 6)
 
 		for _, x := range cc.cache {
-			aggrPts, err := x.aggr()
+			aggrPts, err := x.Aggr()
 			assert.NoError(t, err)
 			assert.Len(t, aggrPts, 1)
 
@@ -76,7 +76,7 @@ func TestAlgo(t *T.T) {
 				assert.True(t, calc.count > 0)
 				assert.True(t, calc.maxTime > 0)
 				assert.True(t, calc.delta > 0)
-				calc.reset()
+				calc.Reset()
 				assert.Equal(t, int64(0), calc.count)
 				assert.Equal(t, int64(0), calc.maxTime)
 				assert.Equal(t, 0.0, calc.delta)
@@ -87,7 +87,7 @@ func TestAlgo(t *T.T) {
 				assert.True(t, calc.count > 0)
 				assert.True(t, calc.maxTime > 0)
 				assert.True(t, calc.max > 0)
-				calc.reset()
+				calc.Reset()
 				assert.Equal(t, int64(0), calc.count)
 				assert.Equal(t, int64(0), calc.maxTime)
 				assert.Equal(t, 0.0, calc.max)
@@ -139,7 +139,7 @@ func TestAlgo(t *T.T) {
 		assert.Len(t, cc.cache, 3)
 
 		for _, calc := range cc.cache {
-			aggrPts, err := calc.aggr()
+			aggrPts, err := calc.Aggr()
 			assert.NoError(t, err)
 			assert.Len(t, aggrPts, 1)
 			t.Logf("delta point: %s", aggrPts[0].Pretty())
@@ -148,7 +148,7 @@ func TestAlgo(t *T.T) {
 			assert.True(t, sum.count > 0)
 			assert.True(t, sum.maxTime > 0)
 			assert.True(t, sum.delta > 0)
-			sum.reset()
+			sum.Reset()
 			assert.Equal(t, int64(0), sum.count)
 			assert.Equal(t, int64(0), sum.maxTime)
 			assert.Equal(t, 0.0, sum.delta)

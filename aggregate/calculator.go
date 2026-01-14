@@ -4,7 +4,6 @@ import (
 	"container/heap"
 	"fmt"
 	"reflect"
-	"strings"
 	"sync"
 	"time"
 
@@ -19,28 +18,6 @@ type CaculatorCache struct {
 	mtx   sync.RWMutex
 }
 
-type Calculator interface {
-	add(any)
-	aggr() ([]*point.Point, error)
-	reset()
-	base() *metricBase
-}
-
-type metricBase struct {
-	pt *point.PBPoint
-
-	aggrTags [][2]string // hash tags
-	key,
-	name string
-
-	tenantHash, // not used
-	hash uint64
-
-	window,
-	nextWallTime int64
-	heapIdx int
-}
-
 func NewCaculatorCache() *CaculatorCache {
 	return &CaculatorCache{
 		cache: map[uint64]Calculator{},
@@ -53,18 +30,18 @@ func (cc *CaculatorCache) AddBatches(batches ...*AggregationBatch) {
 
 	for _, b := range batches {
 		for _, c := range newCalculators(b) {
-			calcHash := c.base().hash
+			calcHash := c.Base().hash
 
 			if calc, ok := cc.cache[calcHash]; ok {
-				calc.add(c)
-				l.Debugf("append to instance %s, heap size %d", c.base(), len(cc.heap))
+				calc.Add(c)
+				l.Debugf("append to instance %s, heap size %d", c.Base(), len(cc.heap))
 			} else {
-				c.base().build()
+				c.Base().build()
 
 				cc.cache[calcHash] = c
 				heap.Push(cc, c)
 
-				l.Debugf("create new instance %s, heap size %d", c.base(), len(cc.heap))
+				l.Debugf("create new instance %s, heap size %d", c.Base(), len(cc.heap))
 			}
 		}
 	}
@@ -77,7 +54,7 @@ func (cc *CaculatorCache) DelBatch(id uint64) bool {
 	if c, ok := cc.cache[id]; !ok {
 		return false // not exist
 	} else {
-		heap.Remove(cc, c.base().heapIdx)
+		heap.Remove(cc, c.Base().heapIdx)
 		delete(cc.cache, id)
 		return true
 	}
@@ -98,7 +75,7 @@ func (cc *CaculatorCache) ScheduleJob(c Calculator) {
 	cc.mtx.Lock()
 	defer cc.mtx.Unlock()
 
-	mb := c.base()
+	mb := c.Base()
 	mb.nextWallTime = AlignNextWallTime(time.Now(), time.Duration(mb.window)).UnixNano()
 	mb.heapIdx = len(cc.heap)
 	heap.Push(cc, c)
@@ -111,13 +88,13 @@ func (cc *CaculatorCache) Len() int {
 
 func (cc *CaculatorCache) Less(i, j int) bool {
 	// smallest nextWallTime pop first.
-	less := cc.heap[i].base().nextWallTime < cc.heap[j].base().nextWallTime
+	less := cc.heap[i].Base().nextWallTime < cc.heap[j].Base().nextWallTime
 
 	l.Debugf("compare [%d]%s <-> [%d]%s => %v",
 		i,
-		time.Duration(cc.heap[i].base().nextWallTime),
+		time.Duration(cc.heap[i].Base().nextWallTime),
 		j,
-		time.Duration(cc.heap[j].base().nextWallTime), less)
+		time.Duration(cc.heap[j].Base().nextWallTime), less)
 
 	return less
 }
@@ -127,16 +104,16 @@ func (cc *CaculatorCache) Swap(i, j int) {
 		return
 	}
 
-	l.Debugf("swap %s <-> %s, len: %d", cc.heap[i].base(), cc.heap[j].base(), len(cc.heap))
+	l.Debugf("swap %s <-> %s, len: %d", cc.heap[i].Base(), cc.heap[j].Base(), len(cc.heap))
 
 	cc.heap[i], cc.heap[j] = cc.heap[j], cc.heap[i]
-	cc.heap[i].base().heapIdx = i
-	cc.heap[j].base().heapIdx = j
+	cc.heap[i].Base().heapIdx = i
+	cc.heap[j].Base().heapIdx = j
 }
 
 func (cc *CaculatorCache) Push(x any) {
 	c := x.(Calculator)
-	c.base().heapIdx = len(cc.heap)
+	c.Base().heapIdx = len(cc.heap)
 	cc.heap = append(cc.heap, c)
 }
 
@@ -149,9 +126,16 @@ func (cc *CaculatorCache) Pop() any {
 
 	// pop out the last one
 	c := old[n-1]
-	c.base().heapIdx = -1 // label removed
+	c.Base().heapIdx = -1 // label removed
 	cc.heap = old[0 : n-1]
 	return c
+}
+
+type Calculator interface {
+	Add(any)
+	Aggr() ([]*point.Point, error)
+	Reset()
+	Base() *MetricBase
 }
 
 func AlignNextWallTime(t time.Time, align time.Duration) time.Time {
@@ -209,7 +193,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 				continue
 			}
 
-			mb := metricBase{
+			mb := MetricBase{
 				pt:       pt,
 				key:      keyName,
 				name:     ptwrap.Name(),
@@ -227,7 +211,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 					calc := &algoMax{
 						max:        f64,
 						maxTime:    ptwrap.Time().UnixNano(),
-						metricBase: mb,
+						MetricBase: mb,
 					}
 
 					calc.doHash(batch.RoutingKey)
@@ -242,7 +226,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 					calc := &algoSum{
 						delta:      f64,
 						maxTime:    ptwrap.Time().UnixNano(),
-						metricBase: mb,
+						MetricBase: mb,
 					}
 
 					calc.doHash(batch.RoutingKey)
@@ -270,101 +254,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 	return res
 }
 
-// build used to delay build the tags.
-func (mb *metricBase) build() {
-	for _, kv := range mb.pt.Fields {
-		if kv.IsTag {
-			mb.aggrTags = append(mb.aggrTags, [2]string{kv.Key, kv.GetS()})
-		}
-	}
-}
-
-func (mb *metricBase) String() string {
-	arr := []string{}
-	arr = append(arr,
-		fmt.Sprintf("aggrTags: %+#v", mb.aggrTags),
-		fmt.Sprintf("key: %s", mb.key),
-		fmt.Sprintf("name: %s", mb.name),
-		fmt.Sprintf("tenantHash: %d", mb.tenantHash),
-		fmt.Sprintf("hash: %d", mb.hash),
-		fmt.Sprintf("window: %s", time.Duration(mb.window)),
-		fmt.Sprintf("nextWallTime: %s", time.Unix(0, mb.nextWallTime)),
-		fmt.Sprintf("heap index: %d", mb.heapIdx),
-	)
-	return strings.Join(arr, "\n")
-}
-
 func prettyBatch(ab *AggregationBatch) string {
 	return fmt.Sprintf("routingKey: %d\nconfigHash: %d\npoints: %d",
 		ab.RoutingKey, ab.ConfigHash, len(ab.Points.Arr))
 }
-
-type (
-	algoAvg struct {
-		metricBase
-		sum float64
-		maxTime,
-		count int64
-	}
-	algoCount struct {
-		metricBase
-		maxTime,
-		count int64
-	}
-	algoMin struct {
-		metricBase
-		maxTime,
-		count int64
-		min float64
-	}
-
-	algoHistogram struct {
-		metricBase
-		min, max, sum float64
-		count         int64
-		bounds        []float64
-		buckets       []uint64
-	}
-
-	explicitBounds struct {
-		metricBase
-		index  int64
-		cnt    uint64
-		lb, ub float64
-		pos    bool
-	}
-
-	algoExpoHistogram struct {
-		metricBase
-		min, max, sum    float64
-		zeroCount, count int64
-		scale            int
-		maxTime, minTime int64
-		negBucketCounts,
-		posBucketCounts []uint64
-		bounds []*explicitBounds
-	}
-
-	algoStdev struct {
-		metricBase
-		// TODO
-	}
-
-	algoQuantiles struct {
-		metricBase
-		// TODO
-	}
-
-	algoCountDistinct struct {
-		metricBase
-		// TODO
-	}
-	algoCountLast struct {
-		metricBase
-		// TODO
-	}
-	algoCountFirst struct {
-		metricBase
-		// TODO
-	}
-)

@@ -70,7 +70,7 @@ func Test_heap(t *T.T) {
 		cc.AddBatches(batches...)
 
 		for _, c := range cc.heap {
-			t.Logf("base: %s", c.base())
+			t.Logf("base: %s", c.Base())
 		}
 
 		var prev int64
@@ -91,7 +91,7 @@ func Test_heap(t *T.T) {
 			assert.Equal(t, -1, sum.heapIdx) // heap index has set to -1
 
 			// assert.Equal(t, now-int64(npts), sum.nextWallTime/int64(time.Second))
-			t.Logf("pop base: %s", sum.base())
+			t.Logf("pop base: %s", sum.Base())
 		}
 	})
 }

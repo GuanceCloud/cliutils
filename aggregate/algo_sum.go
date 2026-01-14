@@ -7,7 +7,7 @@ import (
 )
 
 type algoSum struct {
-	metricBase
+	MetricBase
 	delta          float64
 	maxTime, count int64
 }
@@ -15,7 +15,7 @@ type algoSum struct {
 // type assertions
 var _ Calculator = &algoSum{}
 
-func (c *algoSum) add(x any) {
+func (c *algoSum) Add(x any) {
 	if inst, ok := x.(*algoSum); ok {
 		c.count++
 		c.delta += inst.delta
@@ -26,7 +26,7 @@ func (c *algoSum) add(x any) {
 	}
 }
 
-func (c *algoSum) aggr() ([]*point.Point, error) {
+func (c *algoSum) Aggr() ([]*point.Point, error) {
 	var kvs point.KVs
 
 	kvs = kvs.Add(c.key, c.delta).
@@ -42,7 +42,7 @@ func (c *algoSum) aggr() ([]*point.Point, error) {
 	}, nil
 }
 
-func (c *algoSum) reset() {
+func (c *algoSum) Reset() {
 	c.delta = 0
 	c.maxTime = 0
 	c.count = 0
@@ -51,9 +51,9 @@ func (c *algoSum) reset() {
 func (c *algoSum) doHash(h1 uint64) {
 	h := HashCombine(h1, xxhash.Sum64([]byte("sum")))
 	h = HashCombine(h, xxhash.Sum64(cliutils.ToUnsafeBytes(c.key)))
-	c.metricBase.hash = HashCombine(h, xxhash.Sum64(cliutils.ToUnsafeBytes(c.name)))
+	c.MetricBase.hash = HashCombine(h, xxhash.Sum64(cliutils.ToUnsafeBytes(c.name)))
 }
 
-func (c *algoSum) base() *metricBase {
-	return &c.metricBase
+func (c *algoSum) Base() *MetricBase {
+	return &c.MetricBase
 }

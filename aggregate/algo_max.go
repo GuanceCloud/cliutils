@@ -7,13 +7,13 @@ import (
 )
 
 type algoMax struct {
-	metricBase
+	MetricBase
 	maxTime,
 	count int64
 	max float64
 }
 
-func (c *algoMax) add(x any) {
+func (c *algoMax) Add(x any) {
 	if inst, ok := x.(*algoMax); ok {
 		if c.max < inst.max {
 			c.max = inst.max
@@ -25,7 +25,7 @@ func (c *algoMax) add(x any) {
 	}
 }
 
-func (c *algoMax) aggr() ([]*point.Point, error) {
+func (c *algoMax) Aggr() ([]*point.Point, error) {
 	var kvs point.KVs
 
 	kvs = kvs.Add(c.key, c.max).
@@ -39,14 +39,14 @@ func (c *algoMax) aggr() ([]*point.Point, error) {
 	}, nil
 }
 
-func (c *algoMax) reset() {
+func (c *algoMax) Reset() {
 	c.max = 0.0
 	c.count = 0
 	c.maxTime = 0
 }
 
-func (c *algoMax) base() *metricBase {
-	return &c.metricBase
+func (c *algoMax) Base() *MetricBase {
+	return &c.MetricBase
 }
 
 func (c *algoMax) doHash(h1 uint64) {
