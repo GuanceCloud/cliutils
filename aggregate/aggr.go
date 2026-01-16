@@ -101,23 +101,22 @@ func (ac *AggregatorConfigure) SelectPoints(pts []*point.Point) (groups [][]*poi
 	return
 }
 
-func (ac *AggregatorConfigure) PickPoints(count int, pts []*point.Point) map[int]*Batchs {
-	batchs := make(map[int]*Batchs, count)
+func (ac *AggregatorConfigure) PickPoints(pts []*point.Point) map[uint64]*Batchs {
+	batchs := make(map[uint64]*Batchs)
 	abs := make([]*AggregationBatch, 0)
 	for _, ar := range ac.AggregateRules {
 		abs = append(abs, ar.GroupbyBatch(ac, pts)...)
 	}
 
 	for _, ab := range abs {
-		i := int(ab.PickKey % uint64(count))
-		if _, ok := batchs[i]; !ok {
+		if _, ok := batchs[ab.PickKey]; !ok {
 			bs := &Batchs{
-				// PickKey: i,
-				Batchs: []*AggregationBatch{ab},
+				PickKey: ab.PickKey,
+				Batchs:  []*AggregationBatch{ab},
 			}
-			batchs[i] = bs
+			batchs[ab.PickKey] = bs
 		} else {
-			batchs[i].Batchs = append(batchs[i].Batchs, ab)
+			batchs[ab.PickKey].Batchs = append(batchs[ab.PickKey].Batchs, ab)
 		}
 	}
 	return batchs
