@@ -219,7 +219,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 
 					res = append(res, calc)
 				} else {
-					l.Warnf("non-numeric type(%s) for algorithm MAX, ignored", reflect.TypeOf(val))
+					l.Warnf("key %s non-numeric type(%s) for algorithm MAX, ignored", keyName, reflect.TypeOf(val))
 				}
 
 			case SUM:

@@ -178,27 +178,16 @@ func (ar *AggregateRule) GroupbyPoints(pts []*point.Point) map[uint64][]*point.P
 }
 
 func (ar *AggregateRule) GroupbyBatch(ac *AggregatorConfigure, pts []*point.Point) (batches []*AggregationBatch) {
-	hashedPts := map[uint64][]*point.Point{}
 	for _, pt := range pts {
 		h := hash(pt, ar.Groupby)
-		hashedPts[h] = append(hashedPts[h], pt)
-	}
-
-	for h, pts := range hashedPts {
+		pickKey := pickHash(pt, ar.Groupby)
 		b := &AggregationBatch{
-			RoutingKey: h,
-			ConfigHash: ac.hash,
-			//RawConfig:       ac.raw,
+			RoutingKey:      h,
+			ConfigHash:      ac.hash,
+			PickKey:         pickKey,
 			AggregationOpts: ar.Algorithms,
-			Points: func() *point.PBPoints {
-				var pbpts point.PBPoints
-				for _, pt := range pts {
-					pbpts.Arr = append(pbpts.Arr, pt.PBPoint())
-				}
-				return &pbpts
-			}(),
+			Points:          &point.PBPoints{Arr: []*point.PBPoint{pt.PBPoint()}},
 		}
-
 		batches = append(batches, b)
 	}
 
