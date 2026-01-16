@@ -91,12 +91,22 @@ func (c *Cache) AddBatch(token string, batch *AggregationBatch) (n, expN int) {
 	return n, expN
 }
 
+func (c *Cache) AddBatchs(token string, batchs []*AggregationBatch) (n, expN int) {
+	for _, batch := range batchs {
+		n1, expN1 := c.AddBatch(token, batch)
+		n += n1
+		expN += expN1
+	}
+	return n, expN
+}
+
 func (c *Cache) GetExpWidows() []*Window {
 	var wss []*Window
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	now := time.Now().Unix()
 	for t, ws := range c.WindowsBuckets {
+		l.Debugf("now:%d exptime %d", now, t)
 		if t <= now {
 			for _, w := range ws.WS {
 				wss = append(wss, w)

@@ -3,6 +3,9 @@ package aggregate
 import (
 	"fmt"
 	"github.com/GuanceCloud/cliutils/point"
+	"github.com/golang/protobuf/proto"
+	"io"
+	"net/http"
 	"sync"
 	"testing"
 	"time"
@@ -88,4 +91,65 @@ func TestCache_Concurrency(t *testing.T) {
 	}
 
 	t.Logf("cache expired window len:: %d\n", len(windows))
+}
+
+type MockServer struct {
+	t     *testing.T
+	cache *Cache
+	stop  chan struct{}
+}
+
+func (m *MockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	bts, err := io.ReadAll(r.Body)
+	if err != nil {
+		m.t.Errorf("read body failed:%v", err)
+		w.Write([]byte("bad body"))
+		return
+	}
+	batch := &AggregationBatch{}
+	err = proto.Unmarshal(bts, batch)
+	if err != nil {
+		m.t.Errorf("unmarshal failed:%v", err)
+		w.Write([]byte("bad body"))
+		return
+	}
+
+	n, bn := m.cache.AddBatch("token", batch)
+	m.t.Logf("add batch:%d, expired %d", n, bn)
+}
+
+func (m *MockServer) getPointData() {
+	ticker := time.NewTicker(time.Second * 5)
+	for {
+		select {
+		case <-ticker.C:
+			// 当前时间
+			m.t.Logf("start to get expired windows")
+			ws := m.cache.GetExpWidows()
+			if len(ws) > 0 {
+				pds := WindowsToData(ws)
+				m.t.Logf("point data len:%d", len(pds))
+				for _, pd := range pds {
+					m.t.Logf("point data:%s", pd.Token)
+					for _, p := range pd.PTS {
+						m.t.Logf("point:%s", p.LineProto())
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestHTTPServe(t *testing.T) {
+	server := &MockServer{
+		t:     t,
+		cache: NewCache(time.Second * 60),
+		stop:  make(chan struct{}),
+	}
+	go server.getPointData()
+	go func() {
+		http.ListenAndServe(":18080", server)
+	}()
+
+	time.Sleep(time.Minute * 3)
 }

@@ -14,10 +14,10 @@ import (
 func Test_alignNextWallTime(t *T.T) {
 	t.Run(`basic`, func(t *T.T) {
 		now := time.Unix(123, 0)
-		wallTime := AlignNextWallTime(now, time.Second*10).Unix()
+		wallTime := AlignNextWallTime(now, time.Second*10)
 		assert.Equal(t, int64(130), wallTime)
 
-		wallTime = AlignNextWallTime(now, time.Second).Unix()
+		wallTime = AlignNextWallTime(now, time.Second)
 		assert.Equal(t, int64(123), wallTime)
 	})
 }

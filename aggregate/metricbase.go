@@ -49,32 +49,6 @@ func (mb *MetricBase) String() string {
 // TODO ....
 
 type (
-	algoAvg struct {
-		MetricBase
-		sum float64
-		maxTime,
-		count int64
-	}
-	algoCount struct {
-		MetricBase
-		maxTime,
-		count int64
-	}
-	algoMin struct {
-		MetricBase
-		maxTime,
-		count int64
-		min float64
-	}
-
-	algoHistogram struct {
-		MetricBase
-		min, max, sum float64
-		count         int64
-		bounds        []float64
-		buckets       []uint64
-	}
-
 	explicitBounds struct {
 		MetricBase
 		index  int64

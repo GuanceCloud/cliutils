@@ -6,6 +6,11 @@ package aggregate.v1;
 
 import "point/point.proto";
 
+message Batchs {
+  repeated AggregationBatch batchs=1;
+  uint64 pick_key=2;
+}
+
 message AggregationBatch {
   uint64 routing_key=1;
   uint64 config_hash=2;
@@ -16,7 +21,7 @@ message AggregationBatch {
   map<string, AggregationAlgo> aggregation_opts=4;
 
   point.PBPoints points=5;
-  uint64 peek_key=6;
+  uint64 pick_key=6;
 }
 
 enum AlgoMethod {

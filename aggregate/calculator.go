@@ -71,17 +71,18 @@ func (cc *CaculatorCache) PeekNext() (Calculator, bool) {
 	return cc.heap[0], true
 }
 
-func (cc *CaculatorCache) ScheduleJob(c Calculator) {
-	cc.mtx.Lock()
-	defer cc.mtx.Unlock()
+/*
+	func (cc *CaculatorCache) ScheduleJob(c Calculator) {
+		cc.mtx.Lock()
+		defer cc.mtx.Unlock()
 
-	mb := c.Base()
-	mb.nextWallTime = AlignNextWallTime(time.Now(), time.Duration(mb.window)).UnixNano()
-	mb.heapIdx = len(cc.heap)
-	heap.Push(cc, c)
-	cc.cache[mb.hash] = c
-}
-
+		mb := c.Base()
+		mb.nextWallTime = AlignNextWallTime(time.Now(), time.Duration(mb.window))
+		mb.heapIdx = len(cc.heap)
+		heap.Push(cc, c)
+		cc.cache[mb.hash] = c
+	}
+*/
 func (cc *CaculatorCache) Len() int {
 	return len(cc.heap)
 }
@@ -138,14 +139,14 @@ type Calculator interface {
 	Base() *MetricBase
 }
 
-func AlignNextWallTime(t time.Time, align time.Duration) time.Time {
+func AlignNextWallTime(t time.Time, align time.Duration) int64 {
 	truncated := t.Truncate(align)
 
 	if truncated.Equal(t) {
-		return t
+		return t.Unix()
 	}
 
-	return truncated.Add(align)
+	return truncated.Add(align).Unix()
 }
 
 func newCalculators(batch *AggregationBatch) (res []Calculator) {
@@ -200,7 +201,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 				aggrTags: extraTags,
 				// align to next wall-time
 				// XXX: what if the point reach too late?
-				nextWallTime: AlignNextWallTime(ptwrap.Time(), time.Duration(algo.Window)).UnixNano(),
+				nextWallTime: AlignNextWallTime(ptwrap.Time(), time.Second*time.Duration(algo.Window)),
 				window:       algo.Window,
 			}
 
@@ -236,11 +237,58 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 					l.Warnf("non-numeric type(%s) for algorithm SUM, ignored", reflect.TypeOf(val))
 				}
 
-			case AVG,
-				COUNT,
-				MIN,
-				HISTOGRAM,
-				EXPO_HISTOGRAM,
+			case AVG:
+				if f64, ok := val.(float64); ok {
+					calc := &algoAvg{
+						delta:      f64,
+						maxTime:    ptwrap.Time().UnixNano(),
+						MetricBase: mb,
+					}
+
+					calc.doHash(batch.RoutingKey)
+
+					res = append(res, calc)
+				} else {
+					l.Warnf("non-numeric type(%s) for algorithm AVG, ignored", reflect.TypeOf(val))
+				}
+			case COUNT:
+				calc := &algoCount{
+					maxTime:    ptwrap.Time().UnixNano(),
+					MetricBase: mb,
+				}
+
+				calc.doHash(batch.RoutingKey)
+
+				res = append(res, calc)
+			case MIN:
+				if f64, ok := val.(float64); ok {
+					calc := &algoMin{
+						min:        f64,
+						maxTime:    ptwrap.Time().UnixNano(),
+						MetricBase: mb,
+					}
+
+					calc.doHash(batch.RoutingKey)
+
+					res = append(res, calc)
+				} else {
+					l.Warnf("non-numeric type(%s) for algorithm MIN, ignored", reflect.TypeOf(val))
+				}
+			case HISTOGRAM:
+				if f64, ok := val.(float64); ok {
+					calc := &algoHistogram{
+						val:        f64,
+						maxTime:    ptwrap.Time().UnixNano(),
+						MetricBase: mb,
+					}
+
+					calc.doHash(batch.RoutingKey)
+
+					res = append(res, calc)
+				} else {
+					l.Warnf("non-numeric type(%s) for algorithm Histogram, ignored", reflect.TypeOf(val))
+				}
+			case EXPO_HISTOGRAM,
 				STDEV,
 				COUNT_DISTINCT,
 				QUANTILES,

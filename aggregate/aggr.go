@@ -101,6 +101,28 @@ func (ac *AggregatorConfigure) SelectPoints(pts []*point.Point) (groups [][]*poi
 	return
 }
 
+func (ac *AggregatorConfigure) PickPoints(count int, pts []*point.Point) map[int]*Batchs {
+	batchs := make(map[int]*Batchs, count)
+	abs := make([]*AggregationBatch, 0)
+	for _, ar := range ac.AggregateRules {
+		abs = append(abs, ar.GroupbyBatch(ac, pts)...)
+	}
+
+	for _, ab := range abs {
+		i := int(ab.PickKey % uint64(count))
+		if _, ok := batchs[i]; !ok {
+			bs := &Batchs{
+				// PickKey: i,
+				Batchs: []*AggregationBatch{ab},
+			}
+			batchs[i] = bs
+		} else {
+			batchs[i].Batchs = append(batchs[i].Batchs, ab)
+		}
+	}
+	return batchs
+}
+
 func (rs *RuleSelector) Setup() error {
 	switch point.CatString(rs.Category) { // category required
 	case point.Metric,
@@ -146,18 +168,6 @@ func (ar *AggregateRule) SelectPoints(pts []*point.Point) []*point.Point {
 	return ar.Selector.doSelect(ar.Groupby, pts)
 }
 
-// PickPoints pick points by datakit selector.
-func (ar *AggregateRule) PickPoints(pts []*point.Point) map[uint64][]*point.Point {
-	// name + groupBy
-	res := map[uint64][]*point.Point{}
-	for _, pt := range pts {
-		h := pickHash(pt, ar.Groupby)
-		res[h] = append(res[h], pt)
-	}
-
-	return res
-}
-
 func (ar *AggregateRule) GroupbyPoints(pts []*point.Point) map[uint64][]*point.Point {
 	res := map[uint64][]*point.Point{}
 	for _, pt := range pts {
@@ -198,6 +208,7 @@ func (ar *AggregateRule) GroupbyBatch(ac *AggregatorConfigure, pts []*point.Poin
 
 const (
 	GuanceRoutingKey = "Guance-Routing-Key"
+	GuancePickKey    = "Guance-Pick-Key"
 )
 
 func batchRequest(ab *AggregationBatch, url string) (*http.Request, error) {

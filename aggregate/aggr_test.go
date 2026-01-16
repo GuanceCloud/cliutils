@@ -313,7 +313,7 @@ func TestAggregator(t *T.T) {
 			assert.True(t, ok)
 		}
 
-		groupby := a.AggregateRules[0].PickPoints(groups[0])
+		groupby := a.AggregateRules[0].GroupbyPoints(groups[0])
 		assert.Len(t, groupby, 3)
 		for h, arr := range groupby {
 			t.Logf("%d: %d points", h, len(arr))
@@ -352,7 +352,7 @@ func TestAggregator(t *T.T) {
 			assert.NotEmpty(t, pt.GetTag("idx"))
 		}
 
-		groupby := a.AggregateRules[0].PickPoints(groups[0])
+		groupby := a.AggregateRules[0].GroupbyPoints(groups[0])
 		assert.Len(t, groupby, 3)
 		for h, arr := range groupby {
 			t.Logf("%d: %d points", h, len(arr))
@@ -398,7 +398,7 @@ func TestAggregator(t *T.T) {
 			assert.False(t, ok1 && ok2) // should not exist at the same time.
 		}
 
-		groupby := a.AggregateRules[0].PickPoints(groups[0])
+		groupby := a.AggregateRules[0].GroupbyPoints(groups[0])
 		assert.Len(t, groupby, 3*2)
 		for h, arr := range groupby {
 			t.Logf("%d: %d points", h, len(arr))
