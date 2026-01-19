@@ -105,7 +105,8 @@ func (ac *AggregatorConfigure) PickPoints(pts []*point.Point) map[uint64]*Batchs
 	batchs := make(map[uint64]*Batchs)
 	abs := make([]*AggregationBatch, 0)
 	for _, ar := range ac.AggregateRules {
-		abs = append(abs, ar.GroupbyBatch(ac, pts)...)
+		sPts := ar.SelectPoints(pts)
+		abs = append(abs, ar.GroupbyBatch(ac, sPts)...)
 	}
 
 	for _, ab := range abs {

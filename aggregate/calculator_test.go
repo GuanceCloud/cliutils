@@ -1,13 +1,9 @@
 package aggregate
 
 import (
-	"container/heap"
-	"math/rand"
-	"strconv"
 	T "testing"
 	"time"
 
-	"github.com/GuanceCloud/cliutils/point"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,6 +18,7 @@ func Test_alignNextWallTime(t *T.T) {
 	})
 }
 
+/*
 func Test_heap(t *T.T) {
 	t.Run(`basic`, func(t *T.T) {
 		var (
@@ -95,3 +92,4 @@ func Test_heap(t *T.T) {
 		}
 	})
 }
+*/

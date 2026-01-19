@@ -1,16 +1,15 @@
 package aggregate
 
 import (
-	"container/heap"
 	"fmt"
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/GuanceCloud/cliutils/point"
 	"go.uber.org/zap/zapcore"
 )
 
+/*
 // CaculatorCache cache all Calculators.
 type CaculatorCache struct {
 	cache map[uint64]Calculator
@@ -71,18 +70,17 @@ func (cc *CaculatorCache) PeekNext() (Calculator, bool) {
 	return cc.heap[0], true
 }
 
-/*
-	func (cc *CaculatorCache) ScheduleJob(c Calculator) {
-		cc.mtx.Lock()
-		defer cc.mtx.Unlock()
+func (cc *CaculatorCache) ScheduleJob(c Calculator) {
+	cc.mtx.Lock()
+	defer cc.mtx.Unlock()
 
-		mb := c.Base()
-		mb.nextWallTime = AlignNextWallTime(time.Now(), time.Duration(mb.window))
-		mb.heapIdx = len(cc.heap)
-		heap.Push(cc, c)
-		cc.cache[mb.hash] = c
-	}
-*/
+	mb := c.Base()
+	mb.nextWallTime = AlignNextWallTime(time.Now(), time.Duration(mb.window))
+	mb.heapIdx = len(cc.heap)
+	heap.Push(cc, c)
+	cc.cache[mb.hash] = c
+}
+
 func (cc *CaculatorCache) Len() int {
 	return len(cc.heap)
 }
@@ -131,6 +129,9 @@ func (cc *CaculatorCache) Pop() any {
 	cc.heap = old[0 : n-1]
 	return c
 }
+
+
+*/
 
 type Calculator interface {
 	Add(any)
@@ -204,53 +205,44 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 				nextWallTime: AlignNextWallTime(ptwrap.Time(), time.Second*time.Duration(algo.Window)),
 				window:       algo.Window,
 			}
-
+			f64, ok := val.(float64)
+			if !ok {
+				if i64, ok := val.(int64); !ok {
+					l.Warnf("key %s non-numeric type(%s) for algorithm %s, ignored", keyName, reflect.TypeOf(val), algo.Method)
+					continue
+				} else {
+					f64 = float64(i64)
+				}
+			}
 			// we get the kv for current algorithm.
 			switch algo.Method {
 			case MAX:
-				if f64, ok := val.(float64); ok {
-					calc := &algoMax{
-						max:        f64,
-						maxTime:    ptwrap.Time().UnixNano(),
-						MetricBase: mb,
-					}
-
-					calc.doHash(batch.RoutingKey)
-
-					res = append(res, calc)
-				} else {
-					l.Warnf("key %s non-numeric type(%s) for algorithm MAX, ignored", keyName, reflect.TypeOf(val))
+				calc := &algoMax{
+					max:        f64,
+					maxTime:    ptwrap.Time().UnixNano(),
+					MetricBase: mb,
 				}
+				calc.doHash(batch.RoutingKey)
+				res = append(res, calc)
 
 			case SUM:
-				if f64, ok := val.(float64); ok {
-					calc := &algoSum{
-						delta:      f64,
-						maxTime:    ptwrap.Time().UnixNano(),
-						MetricBase: mb,
-					}
-
-					calc.doHash(batch.RoutingKey)
-
-					res = append(res, calc)
-				} else {
-					l.Warnf("non-numeric type(%s) for algorithm SUM, ignored", reflect.TypeOf(val))
+				calc := &algoSum{
+					delta:      f64,
+					maxTime:    ptwrap.Time().UnixNano(),
+					MetricBase: mb,
 				}
+				calc.doHash(batch.RoutingKey)
+				res = append(res, calc)
 
 			case AVG:
-				if f64, ok := val.(float64); ok {
-					calc := &algoAvg{
-						delta:      f64,
-						maxTime:    ptwrap.Time().UnixNano(),
-						MetricBase: mb,
-					}
-
-					calc.doHash(batch.RoutingKey)
-
-					res = append(res, calc)
-				} else {
-					l.Warnf("non-numeric type(%s) for algorithm AVG, ignored", reflect.TypeOf(val))
+				calc := &algoAvg{
+					delta:      f64,
+					maxTime:    ptwrap.Time().UnixNano(),
+					MetricBase: mb,
 				}
+				calc.doHash(batch.RoutingKey)
+				res = append(res, calc)
+
 			case COUNT:
 				calc := &algoCount{
 					maxTime:    ptwrap.Time().UnixNano(),
@@ -261,33 +253,24 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 
 				res = append(res, calc)
 			case MIN:
-				if f64, ok := val.(float64); ok {
-					calc := &algoMin{
-						min:        f64,
-						maxTime:    ptwrap.Time().UnixNano(),
-						MetricBase: mb,
-					}
-
-					calc.doHash(batch.RoutingKey)
-
-					res = append(res, calc)
-				} else {
-					l.Warnf("non-numeric type(%s) for algorithm MIN, ignored", reflect.TypeOf(val))
+				calc := &algoMin{
+					min:        f64,
+					maxTime:    ptwrap.Time().UnixNano(),
+					MetricBase: mb,
 				}
+
+				calc.doHash(batch.RoutingKey)
+				res = append(res, calc)
+
 			case HISTOGRAM:
-				if f64, ok := val.(float64); ok {
-					calc := &algoHistogram{
-						val:        f64,
-						maxTime:    ptwrap.Time().UnixNano(),
-						MetricBase: mb,
-					}
-
-					calc.doHash(batch.RoutingKey)
-
-					res = append(res, calc)
-				} else {
-					l.Warnf("non-numeric type(%s) for algorithm Histogram, ignored", reflect.TypeOf(val))
+				calc := &algoHistogram{
+					val:        f64,
+					maxTime:    ptwrap.Time().UnixNano(),
+					MetricBase: mb,
 				}
+				calc.doHash(batch.RoutingKey)
+				res = append(res, calc)
+
 			case EXPO_HISTOGRAM,
 				STDEV,
 				COUNT_DISTINCT,

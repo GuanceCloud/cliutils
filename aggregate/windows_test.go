@@ -106,7 +106,7 @@ func (m *MockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("bad body"))
 		return
 	}
-	batch := &AggregationBatch{}
+	batch := &Batchs{}
 	err = proto.Unmarshal(bts, batch)
 	if err != nil {
 		m.t.Errorf("unmarshal failed:%v", err)
@@ -114,7 +114,7 @@ func (m *MockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	n, bn := m.cache.AddBatch("token", batch)
+	n, bn := m.cache.AddBatchs("token", batch.Batchs)
 	m.t.Logf("add batch:%d, expired %d", n, bn)
 }
 
@@ -151,5 +151,5 @@ func TestHTTPServe(t *testing.T) {
 		http.ListenAndServe(":18080", server)
 	}()
 
-	time.Sleep(time.Minute * 3)
+	time.Sleep(time.Minute * 30)
 }
