@@ -107,7 +107,7 @@ func (c *DiskCache) doOpen() error {
 	// disable open multiple times
 	if !c.noLock {
 		fl := newFlock(c.path)
-		if err := fl.lock(); err != nil {
+		if ok, err := fl.TryLock(); !ok {
 			return WrapLockError(err, c.path, 0).WithDetails("failed_to_acquire_directory_lock")
 		} else {
 			c.flock = fl
@@ -205,7 +205,7 @@ func (c *DiskCache) Close() error {
 
 	if !c.noLock {
 		if c.flock != nil {
-			if err := c.flock.unlock(); err != nil {
+			if ok, err := c.flock.TryLock(); !ok {
 				return WrapLockError(err, c.path, 0).WithDetails("failed_to_release_directory_lock")
 			}
 		}
