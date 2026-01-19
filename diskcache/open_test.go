@@ -22,7 +22,11 @@ func TestOpen(t *T.T) {
 		// lock then no-lock
 		c, err := Open(WithPath(p))
 		assert.NoError(t, err)
+
+		assert.FileExists(t, filepath.Join(p, ".lock"))
+
 		assert.NoError(t, c.Close())
+		assert.NoFileExists(t, filepath.Join(p, ".lock"))
 
 		c2, err := Open(WithPath(p), WithNoPos(true))
 		assert.NoError(t, err)

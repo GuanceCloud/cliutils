@@ -110,6 +110,7 @@ func (c *DiskCache) doOpen() error {
 		if ok, err := fl.tryLock(); !ok {
 			return WrapLockError(err, c.path, 0).WithDetails("failed_to_acquire_directory_lock")
 		} else {
+			l.Infof("locked file %s ok", fl.file)
 			c.flock = fl
 		}
 	}

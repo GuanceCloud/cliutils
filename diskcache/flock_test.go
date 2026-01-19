@@ -23,6 +23,11 @@ func TestLockUnlock(t *T.T) {
 		ok, err := fl.tryLock()
 		assert.True(t, ok)
 		assert.NoError(t, err)
+
+		fi, err := os.Stat(filepath.Join(p, ".lock"))
+		assert.NoError(t, err)
+		t.Logf("fi: %+#v", fi)
+
 		fl.unlock()
 
 		_, err = os.Stat(filepath.Join(p, ".lock"))
