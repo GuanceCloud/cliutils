@@ -14,7 +14,7 @@ import (
 	"syscall"
 )
 
-func (l *walLock) TryLock() (bool, error) {
+func (l *walLock) tryLock() (bool, error) {
 	f, err := os.OpenFile(l.file, os.O_CREATE|os.O_RDWR, 0o666)
 	if err != nil {
 		return false, err
@@ -35,7 +35,7 @@ func (l *walLock) TryLock() (bool, error) {
 	return true, nil
 }
 
-func (l *walLock) Unlock() {
+func (l *walLock) unlock() {
 	if l.f != nil {
 		syscall.Flock(int(l.f.Fd()), syscall.LOCK_UN)
 		l.f.Close()

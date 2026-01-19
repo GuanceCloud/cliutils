@@ -6,6 +6,8 @@
 package diskcache
 
 import (
+	"os"
+	"path/filepath"
 	"sync"
 	T "testing"
 	"time"
@@ -14,6 +16,19 @@ import (
 )
 
 func TestLockUnlock(t *T.T) {
+	t.Run("unlock-remove", func(t *T.T) {
+		p := t.TempDir()
+		fl := newFlock(p)
+
+		ok, err := fl.tryLock()
+		assert.True(t, ok)
+		assert.NoError(t, err)
+		fl.unlock()
+
+		_, err = os.Stat(filepath.Join(p, ".lock"))
+		assert.Error(t, err)
+	})
+
 	t.Run("lock", func(t *T.T) {
 		p := t.TempDir()
 
@@ -24,11 +39,11 @@ func TestLockUnlock(t *T.T) {
 			defer wg.Done()
 			fl := newFlock(p)
 
-			ok, err := fl.TryLock()
+			ok, err := fl.tryLock()
 
 			assert.True(t, ok)
 			assert.NoError(t, err)
-			defer fl.Unlock()
+			defer fl.unlock()
 
 			time.Sleep(time.Second * 5)
 		}()
@@ -39,7 +54,7 @@ func TestLockUnlock(t *T.T) {
 			defer wg.Done()
 			fl := newFlock(p)
 
-			ok, err := fl.TryLock()
+			ok, err := fl.tryLock()
 			assert.False(t, ok)
 			assert.Error(t, err)
 
@@ -54,7 +69,7 @@ func TestLockUnlock(t *T.T) {
 
 			// try lock until ok
 			for {
-				if ok, err := fl.TryLock(); !ok {
+				if ok, err := fl.tryLock(); !ok {
 					t.Logf("[expect] err: %s", err.Error())
 					time.Sleep(time.Second)
 				} else {
