@@ -2,7 +2,11 @@ package aggregate
 
 import (
 	"container/list"
+	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert" // 建议使用 assert 库增加可读性
+	"io"
+	"net/http"
+	"net/url"
 	"testing"
 	"time"
 )
@@ -58,4 +62,102 @@ func TestGlobalSampler_AdvanceTime(t *testing.T) {
 	shard := sampler.shards[tidHash%uint64(shardCount)]
 	_, exists := shard.activeMap[tidHash]
 	assert.False(t, exists, "过期后数据应从 activeMap 中删除")
+}
+
+type MockSampler struct {
+	sampler *GlobalSampler
+	t       *testing.T
+	stop    chan struct{}
+}
+
+func (m *MockSampler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	values, err := url.ParseQuery(r.URL.String())
+	if err != nil {
+		m.t.Errorf("parse query failed:%v", err)
+		w.WriteHeader(400)
+		w.Write([]byte("bad query"))
+	}
+	token := values.Get("token")
+	m.t.Logf("token:%s", token)
+	bts, err := io.ReadAll(r.Body)
+	if err != nil {
+		m.t.Errorf("read body failed:%v", err)
+		w.Write([]byte("bad body"))
+		return
+	}
+	batch := &TraceDataPacket{}
+	err = proto.Unmarshal(bts, batch)
+	if err != nil {
+		m.t.Errorf("unmarshal failed:%v", err)
+		w.Write([]byte("bad body"))
+		return
+	}
+	batch.Token = token
+	m.sampler.Ingest(batch)
+}
+
+func (m *MockSampler) getTrace() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			traces := m.sampler.AdvanceTime()
+			if len(traces) > 0 {
+				for _, trace := range traces {
+					if trace.td != nil {
+						for _, span := range trace.td.Spans {
+							m.t.Logf("span:%v", span.String())
+						}
+					}
+				}
+			} else {
+				m.t.Logf("no trace")
+			}
+		case <-m.stop:
+			return
+		}
+	}
+}
+
+func TestSamplingServe(t *testing.T) {
+	server := &MockSampler{
+		t:       t,
+		sampler: NewGlobalSampler(64, time.Minute),
+		stop:    make(chan struct{}),
+	}
+	tsConfig := &TailSampling{
+		TraceTTL: time.Minute,
+		Pipelines: []*SamplingPipeline{
+			{
+				Name:      "server_keey",
+				Type:      PipelineTypeCondition,
+				Condition: `{ resource IN ["/resource"] }`,
+				Action:    PipelineActionKeep,
+			},
+			{
+				Name:      "drop_client",
+				Type:      PipelineTypeCondition,
+				Condition: `{ resource IN ["/client"] }`,
+				Action:    PipelineActionDrop,
+			},
+			{
+				Name:     "has_keys",
+				Type:     PipelineTypeCondition,
+				Action:   PipelineActionKeep,
+				HashKeys: []string{"db_host"},
+			},
+		},
+		Version: 1,
+	}
+	server.sampler.configMap = map[string]*TailSampling{
+		"TokenA": tsConfig,
+	}
+	go server.getTrace()
+	go func() {
+		http.ListenAndServe(":18081", server)
+	}()
+
+	time.Sleep(time.Minute * 30)
+	close(server.stop)
 }

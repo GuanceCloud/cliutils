@@ -13,7 +13,7 @@ message TraceDataPacket {
   string source        = 4;
 
   // version
-  int32 config_version = 5;
+  int64 config_version = 5;
   bool has_error       = 6;
   // int64 first_seen_nano = 7;
 

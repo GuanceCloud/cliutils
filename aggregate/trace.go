@@ -52,12 +52,28 @@ type GlobalSampler struct {
 }
 
 func NewGlobalSampler(shardCount int, waitTime time.Duration) *GlobalSampler {
-	return &GlobalSampler{
+	sampler := &GlobalSampler{
 		shards:     make([]*Shard, shardCount),
 		shardCount: shardCount,
 		waitTime:   waitTime,
 		configMap:  make(map[string]*TailSampling),
 	}
+
+	for i := 0; i < shardCount; i++ {
+		// 1. 初始化 Shard 结构体
+		sampler.shards[i] = &Shard{
+			activeMap: make(map[uint64]*TraceData),
+			// currentPos 默认为 0
+		}
+
+		// 2. 初始化时间轮的 3600 个槽位
+		// 必须为每个槽位创建一个新的 list.List
+		for j := 0; j < 3600; j++ {
+			sampler.shards[i].slots[j] = list.New()
+		}
+	}
+
+	return sampler
 }
 
 // hashTraceID 将字符串 TraceID 转换为 uint64
@@ -85,6 +101,7 @@ func (s *GlobalSampler) Ingest(packet *TraceDataPacket) {
 	// 2. 获取配置
 	config := s.GetConfig(packet.Token)
 	if config == nil {
+		l.Errorf("no tail sampling config for token: %s", packet.Token)
 		return // 或者根据业务逻辑直接导出/丢弃
 	}
 
@@ -95,10 +112,10 @@ func (s *GlobalSampler) Ingest(packet *TraceDataPacket) {
 	if ttlSec >= 3600 {
 		ttlSec = 3599
 	}
-
+	l.Debugf("ttl is %d", ttlSec)
 	// 计算时间轮槽位
 	expirePos := (shard.currentPos + ttlSec) % 3600
-
+	l.Debugf("expirePos is %d", expirePos)
 	if old, exists := shard.activeMap[packet.TraceIdHash]; exists {
 		// --- 场景 A：老 Trace 更新 ---
 		// 合并 Span 数据 (packet.Spans 是 proto 生成的 []*point.PBPoint)

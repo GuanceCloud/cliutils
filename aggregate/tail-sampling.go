@@ -118,6 +118,38 @@ func (sp *SamplingPipeline) DoAction(td *TraceDataPacket) (bool, *TraceDataPacke
 	return matched, td
 }
 
+func PickTrace(source string, pts []*point.Point) map[uint64]*TraceDataPacket {
+	traceDatas := make(map[uint64]*TraceDataPacket)
+	for _, pt := range pts {
+		v := pt.Get("trace_id")
+		if tid, ok := v.(string); ok {
+			id := hashTraceID(tid)
+			traceData, ok := traceDatas[id]
+			if !ok {
+				traceData = &TraceDataPacket{
+					TraceIdHash:   id,
+					RawTraceId:    tid,
+					Token:         "",
+					Source:        source,
+					ConfigVersion: 0,
+					Spans:         []*point.PBPoint{},
+				}
+				traceDatas[id] = traceData
+			}
+			traceData.Spans = append(traceData.Spans, pt.PBPoint())
+
+			status := pt.GetTag("status")
+			if status == "error" {
+				traceData.HasError = true
+			}
+		} else {
+			l.Errorf("invalid trace_id:%v", v)
+		}
+	}
+
+	return traceDatas
+}
+
 var (
 	// predefined pipeline
 	SlowTracePipeline = &SamplingPipeline{
