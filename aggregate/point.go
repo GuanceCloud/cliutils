@@ -11,6 +11,10 @@ type ptWrap struct {
 	*point.Point
 }
 
+func newptWrap(pt *point.PBPoint) *ptWrap {
+	return &ptWrap{point.FromPB(pt)}
+}
+
 func (d *ptWrap) Get(k string) (any, bool) {
 	v := d.KVs().Get(k)
 	if v == nil {

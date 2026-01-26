@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package aggregate.v1;
+
+option go_package = "/;aggregate";
+
+import "point/point.proto";
+
+message TraceDataPacket {
+  uint64 trace_id_hash = 1;
+  string raw_trace_id  = 2;
+  string token         = 3;
+  string source        = 4;
+
+  // version
+  int32 config_version = 5;
+  bool has_error       = 6;
+  // int64 first_seen_nano = 7;
+
+  repeated point.PBPoint spans = 8;
+}
+
+// batch packages
+message TraceBatch {
+  string collector_id = 1;
+  repeated TraceDataPacket packets = 2;
+}

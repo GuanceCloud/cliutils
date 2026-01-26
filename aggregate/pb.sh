@@ -14,9 +14,10 @@ MAPPINGS="Mgoogle/protobuf/any.proto=github.com/gogo/protobuf/types,\
 Mpoint/point.proto=${GO_MODULE}/point"
 
 # 3. Build batch.proto
-echo "Building batch.proto..."
+echo "Building batch.proto & tracedata.proto"
 protoc $INCLUDES \
     --gogoslick_out="${MAPPINGS}:." \
-    aggregate/batch.proto
+    aggregate/batch.proto \
+    aggregate/tracedata.proto
 
 echo "Done."

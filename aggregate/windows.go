@@ -12,6 +12,16 @@ type Window struct {
 	Token string // 用户唯一标记
 }
 
+// Reset 准备将对象放回池子前调用.
+func (w *Window) Reset() {
+	w.Token = ""
+	// 清空 Map 但保留底层哈希桶空间
+	// Go 1.11+ 优化：遍历 delete 所有的 key 是极快的
+	for k := range w.cache {
+		delete(w.cache, k)
+	}
+}
+
 func (w *Window) AddCal(cal Calculator) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
@@ -39,11 +49,13 @@ func (ws *Windows) AddCal(token string, cal Calculator) {
 	ws.lock.Lock()
 	id, ok := ws.IDs[token]
 	if !ok {
-		ws.IDs[token] = len(ws.WS)
-		ws.WS = append(ws.WS, &Window{
-			cache: make(map[uint64]Calculator),
-			Token: token,
-		})
+		// 从 Pool 获取对象而非直接 new
+		newW := windowPool.Get().(*Window)
+		newW.Token = token
+
+		id = len(ws.WS)
+		ws.IDs[token] = id
+		ws.WS = append(ws.WS, newW)
 	}
 	ws.lock.Unlock()
 
@@ -143,4 +155,13 @@ func WindowsToData(ws []*Window) []*PointsData {
 	}
 
 	return pds
+}
+
+var windowPool = sync.Pool{
+	New: func() interface{} {
+		return &Window{
+			// 预分配一定的初始容量，减少后续扩容次数
+			cache: make(map[uint64]Calculator, 64),
+		}
+	},
 }
