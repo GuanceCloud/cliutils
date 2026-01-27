@@ -178,22 +178,23 @@ func (s *GlobalSampler) AdvanceTime() map[uint64]*TraceData {
 	return frozenMap
 }
 
-func (s *GlobalSampler) TailSamplingTraces(traceDatas map[uint64]*TraceData) {
+func (s *GlobalSampler) TailSamplingTraces(traceDatas map[uint64]*TraceData) map[uint64]*TraceDataPacket {
+	traceDataPackets := make(map[uint64]*TraceDataPacket)
 	for _, td := range traceDatas {
 		config := s.GetConfig(td.td.Token)
-		if tailSampe(td.td, config) {
-			// 通过采样规则，确定要保留数据的 发送到中心存储
-			// todo ...
+		for _, pipeline := range config.Pipelines {
+			match, packet := pipeline.DoAction(td.td)
+			if match {
+				// 匹配到了规则
+			}
+			if packet != nil {
+				traceDataPackets[packet.TraceIdHash] = packet
+			}
 		}
-
 		td.Reset()
 		tracePool.Put(td)
 	}
-}
-
-func tailSampe(traceDataPacket *TraceDataPacket, config *TailSampling) bool {
-	// todo
-	return true
+	return traceDataPackets
 }
 
 func (s *GlobalSampler) UpdateConfig(token string, ts *TailSampling) {

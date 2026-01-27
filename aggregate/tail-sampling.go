@@ -58,6 +58,12 @@ type SamplingPipeline struct {
 }
 
 func (sp *SamplingPipeline) Apply() error {
+	if len(sp.HashKeys) > 0 {
+		return nil
+	}
+	if sp.Rate > 0 {
+		return nil
+	}
 	if ast, err := fp.GetConds(sp.Condition); err != nil {
 		return err
 	} else {
@@ -67,6 +73,9 @@ func (sp *SamplingPipeline) Apply() error {
 }
 
 func (sp *SamplingPipeline) DoAction(td *TraceDataPacket) (bool, *TraceDataPacket) {
+	if sp.conds == nil { // condition are required to do actions.
+		return false, td
+	}
 	ptw := &ptWrap{}
 	if len(sp.HashKeys) > 0 {
 		for _, key := range sp.HashKeys {
@@ -77,9 +86,6 @@ func (sp *SamplingPipeline) DoAction(td *TraceDataPacket) (bool, *TraceDataPacke
 				}
 			}
 		}
-	}
-	if sp.conds == nil { // condition are required to do actions.
-		return false, td
 	}
 
 	matched := false
@@ -118,7 +124,7 @@ func (sp *SamplingPipeline) DoAction(td *TraceDataPacket) (bool, *TraceDataPacke
 	return matched, td
 }
 
-func PickTrace(source string, pts []*point.Point) map[uint64]*TraceDataPacket {
+func PickTrace(source string, pts []*point.Point, version int64) map[uint64]*TraceDataPacket {
 	traceDatas := make(map[uint64]*TraceDataPacket)
 	for _, pt := range pts {
 		v := pt.Get("trace_id")
@@ -131,7 +137,7 @@ func PickTrace(source string, pts []*point.Point) map[uint64]*TraceDataPacket {
 					RawTraceId:    tid,
 					Token:         "",
 					Source:        source,
-					ConfigVersion: 0,
+					ConfigVersion: version,
 					Spans:         []*point.PBPoint{},
 				}
 				traceDatas[id] = traceData

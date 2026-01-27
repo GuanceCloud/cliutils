@@ -71,7 +71,7 @@ type MockSampler struct {
 }
 
 func (m *MockSampler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	values, err := url.ParseQuery(r.URL.String())
+	values, err := url.ParseQuery(r.URL.RawQuery)
 	if err != nil {
 		m.t.Errorf("parse query failed:%v", err)
 		w.WriteHeader(400)
@@ -106,6 +106,7 @@ func (m *MockSampler) getTrace() {
 			if len(traces) > 0 {
 				for _, trace := range traces {
 					if trace.td != nil {
+						m.t.Logf("trace:%v", trace.td.RawTraceId)
 						for _, span := range trace.td.Spans {
 							m.t.Logf("span:%v", span.String())
 						}
