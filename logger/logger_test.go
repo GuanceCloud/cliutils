@@ -13,6 +13,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	T "testing"
@@ -639,4 +640,114 @@ func logLines(f string) int {
 	}
 
 	return len(bytes.Split(logdata, []byte("\n"))) - 1
+}
+
+func TestSeparateErrorFile(t *testing.T) {
+	// Reset global logger state to avoid interference from other tests
+	Reset()
+
+	// Create temporary directory for test logs
+	tempDir := t.TempDir()
+
+	// Create log files directly in temp directory
+	mainLogFile := filepath.Join(tempDir, "app.log")
+	errorLogFile := filepath.Join(tempDir, "error.log")
+
+	// Clean up any existing files
+	os.Remove(mainLogFile)
+	os.Remove(errorLogFile)
+
+	// Initialize logger with separate error file (JSON format for testing)
+	opt := &Option{
+		Path:      mainLogFile,
+		ErrorPath: errorLogFile,
+		Level:     DEBUG,
+		Flags:     OPT_ROTATE, // Only rotation, keep JSON format
+	}
+
+	assert.NoError(t, InitRoot(opt))
+
+	// Get a named logger
+	l := SLogger("test")
+
+	// Log different levels
+	l.Debug("this is a debug message")
+	l.Info("this is an info message")
+	l.Warn("this is a warning message")
+	l.Error("this is an error message")
+
+	// Sync to ensure all logs are written
+	Close()
+
+	// Check main log file contains all logs
+	mainContent, err := os.ReadFile(mainLogFile)
+	assert.NoError(t, err)
+	assert.Contains(t, string(mainContent), "debug message")
+	assert.Contains(t, string(mainContent), "info message")
+	assert.Contains(t, string(mainContent), "warning message")
+	assert.Contains(t, string(mainContent), "error message")
+
+	// Check error log file contains only error+ level logs
+	errorContent, err := os.ReadFile(errorLogFile)
+	assert.NoError(t, err)
+	assert.NotContains(t, string(errorContent), "debug message")
+	assert.NotContains(t, string(errorContent), "info message")
+	assert.NotContains(t, string(errorContent), "warning message")
+	assert.Contains(t, string(errorContent), "error message")
+
+	// Test that both files have proper JSON structure
+	// Split by newlines since each log entry is a separate JSON line
+	mainLines := strings.Split(strings.TrimSpace(string(mainContent)), "\n")
+	errorLines := strings.Split(strings.TrimSpace(string(errorContent)), "\n")
+
+	// Remove empty strings from splits
+	var validMainLines, validErrorLines []string
+	for _, line := range mainLines {
+		if line != "" {
+			validMainLines = append(validMainLines, line)
+		}
+	}
+	for _, line := range errorLines {
+		if line != "" {
+			validErrorLines = append(validErrorLines, line)
+		}
+	}
+
+	// Verify main logs have 4 entries
+	assert.Len(t, validMainLines, 4)
+
+	// Verify error logs have 1 entry
+	assert.Len(t, validErrorLines, 1)
+
+	// Parse each line as JSON and verify levels
+	var mainLogs []map[string]interface{}
+	for _, line := range validMainLines {
+		var logEntry map[string]interface{}
+		err = json.Unmarshal([]byte(line), &logEntry)
+		assert.NoError(t, err)
+		mainLogs = append(mainLogs, logEntry)
+	}
+
+	var errorLogs []map[string]interface{}
+	for _, line := range validErrorLines {
+		var logEntry map[string]interface{}
+		err = json.Unmarshal([]byte(line), &logEntry)
+		assert.NoError(t, err)
+		errorLogs = append(errorLogs, logEntry)
+	}
+
+	// Verify error log has correct level
+	assert.Equal(t, "ERROR", errorLogs[0]["lev"])
+
+	// Verify main logs contain all expected levels
+	mainLevels := make(map[string]bool)
+	for _, log := range mainLogs {
+		if level, ok := log["lev"].(string); ok {
+			mainLevels[level] = true
+		}
+	}
+	assert.True(t, mainLevels["DEBUG"])
+	assert.True(t, mainLevels["INFO"])
+	assert.True(t, mainLevels["WARN"])
+	assert.True(t, mainLevels["ERROR"])
 }
