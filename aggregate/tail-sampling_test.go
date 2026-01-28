@@ -134,9 +134,9 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 				Name: "keep resource",
 				Type: PipelineTypeCondition,
 				// Condition: "{ resource EQ \"/resource\" }",
-				// Condition: `{ resource = "/resource" }`,
-				Action:   PipelineActionKeep,
-				HashKeys: []string{"db_host"},
+				Condition: `{ 1 = 1 }`,
+				Action:    PipelineActionKeep,
+				HashKeys:  []string{"db_host"},
 			},
 			args: args{
 				td: &TraceDataPacket{
@@ -150,6 +150,28 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 			},
 			want:    true,
 			tdIsNil: false,
+		},
+		{
+			name: "test_rate",
+			fields: fields{
+				Name: "keep resource",
+				Type: PipelineTypeSampling,
+				//Condition: "{ resource EQ \"/resource\" }",
+				Condition: `{ 1 = 1 }`,
+				Rate:      0.01,
+			},
+			args: args{
+				td: &TraceDataPacket{
+					TraceIdHash:   123123123123123,
+					RawTraceId:    "123456789",
+					Source:        "ddtrace",
+					ConfigVersion: 1,
+					HasError:      false,
+					Spans:         MockTrace(),
+				},
+			},
+			want:    true,
+			tdIsNil: true,
 		},
 	}
 	for _, tt := range tests {

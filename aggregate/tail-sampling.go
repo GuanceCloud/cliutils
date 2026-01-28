@@ -58,12 +58,6 @@ type SamplingPipeline struct {
 }
 
 func (sp *SamplingPipeline) Apply() error {
-	if len(sp.HashKeys) > 0 {
-		return nil
-	}
-	if sp.Rate > 0 {
-		return nil
-	}
 	if ast, err := fp.GetConds(sp.Condition); err != nil {
 		return err
 	} else {
@@ -82,6 +76,7 @@ func (sp *SamplingPipeline) DoAction(td *TraceDataPacket) (bool, *TraceDataPacke
 			for _, span := range td.Spans {
 				ptw.Point = point.FromPB(span)
 				if _, has := ptw.Get(key); has {
+					l.Debugf("has key =%s", key)
 					return true, td
 				}
 			}
@@ -95,7 +90,7 @@ func (sp *SamplingPipeline) DoAction(td *TraceDataPacket) (bool, *TraceDataPacke
 		if x := sp.conds.Eval(ptw); x < 0 {
 			continue
 		} // else: matched, fall through...
-
+		l.Debugf("matched")
 		matched = true
 		//r.mached++
 		if sp.Type == PipelineTypeSampling {
