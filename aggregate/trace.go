@@ -186,9 +186,12 @@ func (s *GlobalSampler) TailSamplingTraces(traceDatas map[uint64]*TraceData) map
 			match, packet := pipeline.DoAction(td.td)
 			if match {
 				// 匹配到了规则
-			}
-			if packet != nil {
-				traceDataPackets[packet.TraceIdHash] = packet
+				if packet != nil {
+					l.Debugf("matched, traceId: %s", packet.RawTraceId)
+					traceDataPackets[packet.TraceIdHash] = packet
+				}
+			} else {
+				// 不匹配，直接丢弃
 			}
 		}
 		td.Reset()
