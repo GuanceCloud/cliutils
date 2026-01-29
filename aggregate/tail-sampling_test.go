@@ -173,6 +173,27 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 			want:    true,
 			tdIsNil: true,
 		},
+		{
+			name: "test_drop_resource",
+			fields: fields{
+				Name:      "drop resource",
+				Type:      PipelineTypeCondition,
+				Condition: "{ resource = \"GET /tmall/**\" }",
+				Action:    PipelineActionDrop,
+			},
+			args: args{
+				td: &TraceDataPacket{
+					TraceIdHash:   123123123123123,
+					RawTraceId:    "123456789",
+					Source:        "ddtrace",
+					ConfigVersion: 1,
+					HasError:      false,
+					Spans:         MockTrace(),
+				},
+			},
+			want:    true,
+			tdIsNil: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -236,13 +257,24 @@ func MockTrace() []*point.PBPoint {
 		"trace_id":                    "1000000000",
 		"span_id":                     "1234567891",
 		"error_message":               "error",
-		"status":                      "error",
+		"status":                      "ok",
 		"start_time":                  time.Now().Unix(),
 		"duration":                    1000,
 	}), point.CommonLoggingOptions()...)
 	pt4.SetTime(now)
 
-	for _, p := range []*point.Point{pt1, pt2, pt3, pt4} {
+	pt5 := point.NewPoint("ddtrace", point.NewKVs(map[string]interface{}{
+		"http.server.requests_bucket": float64(10),
+		"resource":                    "GET /tmall/**",
+		"trace_id":                    "1000000000",
+		"span_id":                     "12345678912",
+		"status":                      "ok",
+		"start_time":                  time.Now().Unix(),
+		"duration":                    1000,
+	}), point.CommonLoggingOptions()...)
+	pt5.SetTime(now)
+
+	for _, p := range []*point.Point{pt1, pt2, pt3, pt4, pt5} {
 		pbs = append(pbs, p.PBPoint())
 	}
 

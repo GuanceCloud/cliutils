@@ -204,9 +204,11 @@ func (s *GlobalSampler) UpdateConfig(token string, ts *TailSampling) {
 	}
 
 	if tsO, ok := s.configMap[token]; !ok {
+		ts.Init()
 		s.configMap[token] = ts
 	} else {
 		if tsO.Version != ts.Version {
+			ts.Init()
 			s.configMap[token] = ts
 		}
 	}
