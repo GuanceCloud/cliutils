@@ -190,6 +190,7 @@ func (s *GlobalSampler) TailSamplingTraces(traceDatas map[uint64]*TraceData) map
 					l.Debugf("matched, traceId: %s", packet.RawTraceId)
 					traceDataPackets[packet.TraceIdHash] = packet
 				}
+				break
 			} else {
 				// 不匹配，直接丢弃
 			}
