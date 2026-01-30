@@ -19,12 +19,12 @@ var (
 	procLockFileEx = modkernel32.NewProc("LockFileEx")
 )
 
-func (l *walLock) tryLock() (bool, error) {
-	f, err := os.OpenFile(l.file, os.O_CREATE|os.O_RDWR, 0o666)
+func (wl *walLock) tryLock() (bool, error) {
+	f, err := os.OpenFile(wl.file, os.O_CREATE|os.O_RDWR, 0o666)
 	if err != nil {
 		return false, err
 	}
-	l.f = f
+	wl.f = f
 
 	// LOCKFILE_EXCLUSIVE_LOCK = 2, LOCKFILE_FAIL_IMMEDIATELY = 1
 	flags := uint32(2 | 1)
@@ -32,7 +32,7 @@ func (l *walLock) tryLock() (bool, error) {
 
 	// Call Win32 LockFileEx
 	ret, _, err := procLockFileEx.Call(
-		uintptr(l.f.Fd()),
+		uintptr(wl.f.Fd()),
 		uintptr(flags),
 		0, // reserved
 		0, // length low
@@ -43,19 +43,19 @@ func (l *walLock) tryLock() (bool, error) {
 	if ret == 0 {
 		// ERROR_LOCK_VIOLATION = 33
 		if errno, ok := err.(syscall.Errno); ok && errno == 33 {
-			l.f.Close()
+			wl.f.Close()
 			return false, nil
 		}
-		l.f.Close()
+		wl.f.Close()
 		return false, err
 	}
 
 	return true, nil
 }
 
-func (l *walLock) unlock() {
-	if l.f != nil {
-		l.f.Close() // Closing the file handle automatically releases the lock in Windows
-		os.Remove(l.file)
+func (wl *walLock) unlock() {
+	if wl.f != nil {
+		wl.f.Close() // Closing the file handle automatically releases the lock in Windows
+		os.Remove(wl.file)
 	}
 }
