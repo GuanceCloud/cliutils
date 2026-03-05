@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap/zapcore"
 	"net/http"
 	"sort"
 	"strconv"
 	"time"
+
+	"go.uber.org/zap/zapcore"
 
 	"github.com/GuanceCloud/cliutils"
 	fp "github.com/GuanceCloud/cliutils/filter"
@@ -71,6 +72,7 @@ type RuleSelector struct {
 	delSelectKey          bool
 }
 
+// Setup initializes the aggregator configuration, validates rules, and prepares calculators.
 func (ac *AggregatorConfigure) Setup() error {
 	for _, ar := range ac.AggregateRules {
 		if err := ar.Selector.Setup(); err != nil {
@@ -94,6 +96,7 @@ func (ac *AggregatorConfigure) Setup() error {
 	return nil
 }
 
+// SelectPoints selects points from the input slice based on aggregate rules.
 func (ac *AggregatorConfigure) SelectPoints(pts []*point.Point) (groups [][]*point.Point) {
 	for _, ar := range ac.AggregateRules {
 		groups = append(groups, ar.SelectPoints(pts))
@@ -101,12 +104,16 @@ func (ac *AggregatorConfigure) SelectPoints(pts []*point.Point) (groups [][]*poi
 	return
 }
 
-func (ac *AggregatorConfigure) PickPoints(pts []*point.Point) map[uint64]*Batchs {
+// PickPoints organizes points into batches based on aggregation rules and grouping keys.
+// 多种 category:M,L,RUM,T 类型的数据都可以筛选，返回的一定是指标类型。
+func (ac *AggregatorConfigure) PickPoints(category string, pts []*point.Point) map[uint64]*Batchs {
 	batchs := make(map[uint64]*Batchs)
 	abs := make([]*AggregationBatch, 0)
 	for _, ar := range ac.AggregateRules {
-		sPts := ar.SelectPoints(pts)
-		abs = append(abs, ar.GroupbyBatch(ac, sPts)...)
+		if ar.Selector.Category == category {
+			sPts := ar.SelectPoints(pts)
+			abs = append(abs, ar.GroupbyBatch(ac, sPts)...)
+		}
 	}
 
 	for _, ab := range abs {
@@ -123,6 +130,7 @@ func (ac *AggregatorConfigure) PickPoints(pts []*point.Point) map[uint64]*Batchs
 	return batchs
 }
 
+// Setup initializes the rule selector with validation and prepares whitelists.
 func (rs *RuleSelector) Setup() error {
 	switch point.CatString(rs.Category) { // category required
 	case point.Metric,
@@ -142,11 +150,11 @@ func (rs *RuleSelector) Setup() error {
 	}
 
 	if rs.Condition != "" {
-		if ast, err := fp.GetConds(rs.Condition); err != nil {
+		ast, err := fp.GetConds(rs.Condition)
+		if err != nil {
 			return err
-		} else {
-			rs.conds = ast
 		}
+		rs.conds = ast
 	}
 
 	if len(rs.Measurements) > 0 {
@@ -164,10 +172,13 @@ func (rs *RuleSelector) Setup() error {
 	return nil
 }
 
+// SelectPoints filters points based on the rule's selector criteria.
 func (ar *AggregateRule) SelectPoints(pts []*point.Point) []*point.Point {
+
 	return ar.Selector.doSelect(ar.Groupby, pts)
 }
 
+// GroupbyPoints groups points by their hash value calculated from grouping keys.
 func (ar *AggregateRule) GroupbyPoints(pts []*point.Point) map[uint64][]*point.Point {
 	res := map[uint64][]*point.Point{}
 	for _, pt := range pts {
@@ -178,6 +189,7 @@ func (ar *AggregateRule) GroupbyPoints(pts []*point.Point) map[uint64][]*point.P
 	return res
 }
 
+// GroupbyBatch creates aggregation batches from points based on grouping keys.
 func (ar *AggregateRule) GroupbyBatch(ac *AggregatorConfigure, pts []*point.Point) (batches []*AggregationBatch) {
 	for _, pt := range pts {
 		h := hash(pt, ar.Groupby)
@@ -200,6 +212,7 @@ const (
 	GuancePickKey    = "Guance-Pick-Key"
 )
 
+// batchRequest creates an HTTP request for sending aggregation batch data.
 func batchRequest(ab *AggregationBatch, url string) (*http.Request, error) {
 	body, err := ab.Marshal()
 	if err != nil {
@@ -251,7 +264,6 @@ func (s *RuleSelector) doSelect(groupby []string, pts []*point.Point) (res []*po
 					}
 				}
 				// histogram 'le' 和 'bucket' 关联，不能拆分，需要放进去
-				// todo histogram 定制
 				if v := pt.Get(tagKey); v != nil {
 					for i := range forkedPts { // each point attach these tags
 						forkedPts[i].Add(tagKey, v)
@@ -304,7 +316,6 @@ func (s *RuleSelector) selectKVS(delKey bool, pt *point.Point) []*point.Point {
 				// pass: aggregate fields should only be int/float
 				l.Debugf("skip non-numbermic field %q", kv.Key)
 			}
-
 			if len(kvs) > 0 {
 				l.Debugf("fork kv %q as new point", kv.Key)
 				if delKey { // 如果挑选结束需要删除，则删除

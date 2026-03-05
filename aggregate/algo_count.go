@@ -15,7 +15,7 @@ type algoCount struct {
 var _ Calculator = &algoCount{}
 
 func (c *algoCount) Add(x any) {
-	if inst, ok := x.(*algoAvg); ok {
+	if inst, ok := x.(*algoCount); ok {
 		c.count++
 		if inst.maxTime > c.maxTime {
 			c.maxTime = inst.maxTime

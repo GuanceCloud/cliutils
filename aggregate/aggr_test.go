@@ -452,6 +452,25 @@ func TestOTEL(t *T.T) {
 	pt2.SetTime(now)
 	pts := []*point.Point{pt, pt2}
 
+	pts = append(pts, point.FromPB(&point.PBPoint{
+		Name: "tmall",
+		Fields: []*point.Field{
+			{Key: "client_ip", Val: &point.Field_S{S: "127.0.0.1"}, IsTag: false},
+			{Key: "duration", Val: &point.Field_F{F: 200}, IsTag: false},
+			{Key: "message", Val: &point.Field_S{S: "this is logging message"}, IsTag: false},
+		},
+		Time: time.Now().Unix(),
+	}),
+		point.FromPB(&point.PBPoint{
+			Name: "tmall",
+			Fields: []*point.Field{
+				{Key: "client_ip", Val: &point.Field_S{S: "127.0.0.1"}, IsTag: false},
+				{Key: "duration", Val: &point.Field_F{F: 200}, IsTag: false},
+				{Key: "duration", Val: &point.Field_S{S: "this is logging message too"}, IsTag: false},
+			},
+			Time: time.Now().Unix(),
+		}))
+
 	a := &AggregatorConfigure{
 		AggregateRules: []*AggregateRule{
 			{
@@ -479,9 +498,26 @@ func TestOTEL(t *T.T) {
 					},
 				},
 			},
+			{
+				Name:    "test logging",
+				Groupby: []string{"client_ip", "service"},
+				Selector: &RuleSelector{
+					Category:     point.Logging.String(),
+					Measurements: []string{"tmall"},
+					Fields:       []string{"client_ip"},
+					Condition:    `{ 1 = 1 }`,
+				},
+				Algorithms: map[string]*AggregationAlgo{
+					"client_ip_count": {
+						Method:      COUNT_DISTINCT,
+						SourceField: "client_ip",
+					},
+				},
+			},
 		},
 	}
-	a.Setup()
+	err := a.Setup()
+	t.Logf("err=%v", err)
 	for _, rule := range a.AggregateRules {
 		group := rule.SelectPoints(pts)
 		t.Logf("group len=%d", len(group))

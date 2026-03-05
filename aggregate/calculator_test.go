@@ -18,6 +18,12 @@ func Test_alignNextWallTime(t *T.T) {
 	})
 }
 
+func TestQuantile(t *T.T) {
+	var q float64 = 0.95
+	t.Logf("quantile %f", q)
+	t.Logf("quantile int %0.0f", q*100)
+}
+
 /*
 func Test_heap(t *T.T) {
 	t.Run(`basic`, func(t *T.T) {

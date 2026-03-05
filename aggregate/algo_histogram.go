@@ -12,7 +12,8 @@ type algoHistogram struct {
 	//bounds  []float64
 	//buckets []uint64
 	val float64
-	// tag:"le" 固定tag
+	// tag:"le" 固定tag,存储："0":0,"10":1,"20":5
+	// 使用le和指标的值 一一对应。
 	leBucket map[string]float64
 	maxTime  int64
 }
@@ -38,20 +39,29 @@ func (c *algoHistogram) Add(x any) {
 }
 
 func (c *algoHistogram) Aggr() ([]*point.Point, error) {
-	var kvs point.KVs
+	var pts []*point.Point
+	// bucket
 	for le, f := range c.leBucket {
-		kvs = kvs.Add(le, f)
-	}
-	kvs = kvs.Add(c.key+"_count", c.count)
+		var kvs point.KVs
+		kvs = kvs.AddTag("le", le).Add(c.key, f)
 
+		for _, kv := range c.aggrTags {
+			// NOTE: if same-name tag key exist, apply the last one.
+			kvs = kvs.SetTag(kv[0], kv[1])
+		}
+
+		pts = append(pts, point.NewPoint(c.name, kvs, point.WithTimestamp(c.maxTime)))
+	}
+
+	// count
+	var kvs point.KVs
+	kvs = kvs.Add(c.key+"_count", c.count)
 	for _, kv := range c.aggrTags {
 		// NOTE: if same-name tag key exist, apply the last one.
 		kvs = kvs.SetTag(kv[0], kv[1])
 	}
-
-	return []*point.Point{
-		point.NewPoint(c.name, kvs, point.WithTimestamp(c.maxTime)),
-	}, nil
+	pts = append(pts, point.NewPoint(c.name, kvs, point.WithTimestamp(c.maxTime)))
+	return pts, nil
 }
 
 func (c *algoHistogram) Reset() {

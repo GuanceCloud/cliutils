@@ -2,9 +2,10 @@ package aggregate
 
 import (
 	"fmt"
-	"github.com/GuanceCloud/cliutils/point"
 	"strings"
 	"time"
+
+	"github.com/GuanceCloud/cliutils/point"
 )
 
 type MetricBase struct {
@@ -50,7 +51,6 @@ func (mb *MetricBase) String() string {
 
 type (
 	explicitBounds struct {
-		MetricBase
 		index  int64
 		cnt    uint64
 		lb, ub float64
@@ -68,20 +68,6 @@ type (
 		bounds []*explicitBounds
 	}
 
-	algoStdev struct {
-		MetricBase
-		// TODO
-	}
-
-	algoQuantiles struct {
-		MetricBase
-		// TODO
-	}
-
-	algoCountDistinct struct {
-		MetricBase
-		// TODO
-	}
 	algoCountLast struct {
 		MetricBase
 		// TODO

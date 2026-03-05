@@ -208,8 +208,12 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 			f64, ok := val.(float64)
 			if !ok {
 				if i64, ok := val.(int64); !ok {
-					l.Warnf("key %s non-numeric type(%s) for algorithm %s, ignored", keyName, reflect.TypeOf(val), algo.Method)
-					continue
+					if algo.Method == COUNT_DISTINCT || algo.Method == COUNT {
+						// 这里可以不需要转换成 float64
+					} else {
+						l.Warnf("key %s non-numeric type(%s) for algorithm %s, ignored", keyName, reflect.TypeOf(val), algo.Method)
+						continue
+					}
 				} else {
 					f64 = float64(i64)
 				}
@@ -250,8 +254,8 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 				}
 
 				calc.doHash(batch.RoutingKey)
-
 				res = append(res, calc)
+
 			case MIN:
 				calc := &algoMin{
 					min:        f64,
@@ -271,10 +275,39 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 				calc.doHash(batch.RoutingKey)
 				res = append(res, calc)
 
+			case QUANTILES:
+				calc := &algoQuantiles{
+					all:        []float64{f64},
+					maxTime:    ptwrap.Time().UnixNano(),
+					MetricBase: mb,
+				}
+				if algo.Options != nil {
+					switch algo.Options.(type) {
+					case *AggregationAlgo_QuantileOpts:
+						opt := algo.Options.(*AggregationAlgo_QuantileOpts)
+						calc.addOpts(opt)
+					default: //nolint
+					}
+				}
+
+				calc.doHash(batch.RoutingKey)
+				res = append(res, calc)
+
+			case STDEV:
+				calc := &algoStdev{
+					MetricBase: mb,
+					data:       []float64{f64},
+					maxTime:    ptwrap.Time().UnixNano(),
+				}
+				calc.doHash(batch.RoutingKey)
+				res = append(res, calc)
+
+			case COUNT_DISTINCT:
+				calc := newAlgoCountDistinct(mb, ptwrap.Time().UnixNano(), val)
+				calc.doHash(batch.RoutingKey)
+				res = append(res, calc)
+
 			case EXPO_HISTOGRAM,
-				STDEV,
-				COUNT_DISTINCT,
-				QUANTILES,
 				LAST,
 				FIRST: // TODO
 			default: // pass

@@ -1,12 +1,46 @@
 package aggregate
 
 import (
+	"hash/fnv"
+	"math"
+	"time"
+
 	fp "github.com/GuanceCloud/cliutils/filter"
 	"github.com/GuanceCloud/cliutils/logger"
 	"github.com/GuanceCloud/cliutils/point"
-	"math"
-	"time"
 )
+
+const (
+	PipelineTypeCondition = "condition"
+	PipelineTypeSampling  = "probabilistic"
+
+	PipelineActionKeep = "keep"
+	PipelineActionDrop = "drop"
+	sampleRange        = 10000
+)
+
+type (
+	PipelineType   string
+	PipelineAction string
+)
+
+type DerivedMetric struct {
+	Name      string           `toml:"name" json:"name"`
+	Algorithm *AggregationAlgo `toml:"aggregate" json:"aggregate"`
+	Condition string           `toml:"condition" json:"condition"`
+	Groupby   []string         `toml:"group_by" json:"group_by"`
+}
+
+type SamplingPipeline struct {
+	Name      string         `toml:"name" json:"name"`
+	Type      PipelineType   `toml:"type" json:"type"`
+	Condition string         `toml:"condition,omitempty" json:"condition,omitempty"`
+	Action    PipelineAction `toml:"action,omitempty" json:"action,omitempty"`
+	Rate      float64        `toml:"rate,omitempty" json:"rate,omitempty"`
+	HashKeys  []string       `toml:"hash_keys" json:"hash_keys"`
+
+	conds fp.WhereConditions
+}
 
 type TailSampling struct {
 	TraceTTL       time.Duration       `toml:"trace_ttl" json:"trace_ttl"`
@@ -24,42 +58,6 @@ func (ts *TailSampling) Init() {
 			l.Errorf("failed to apply sampling pipeline: %s", err)
 		}
 	}
-}
-
-func SetLogging(log *logger.Logger) {
-	l = log
-}
-
-type DerivedMetric struct {
-	Name      string           `toml:"name" json:"name"`
-	Algorithm *AggregationAlgo `toml:"aggregate" json:"aggregate"`
-	Condition string           `toml:"condition" json:"condition"`
-	Groupby   []string         `toml:"group_by" json:"group_by"`
-}
-
-type (
-	PipelineType   string
-	PipelineAction string
-)
-
-const (
-	PipelineTypeCondition = "condition"
-	PipelineTypeSampling  = "probabilistic"
-
-	PipelineActionKeep = "keep"
-	PipelineActionDrop = "drop"
-	sampleRange        = 10000
-)
-
-type SamplingPipeline struct {
-	Name      string         `toml:"name" json:"name"`
-	Type      PipelineType   `toml:"type" json:"type"`
-	Condition string         `toml:"condition,omitempty" json:"condition,omitempty"`
-	Action    PipelineAction `toml:"action,omitempty" json:"action,omitempty"`
-	Rate      float64        `toml:"rate,omitempty" json:"rate,omitempty"`
-	HashKeys  []string       `toml:"hash_keys" json:"hash_keys"`
-
-	conds fp.WhereConditions
 }
 
 func (sp *SamplingPipeline) Apply() error {
@@ -226,3 +224,14 @@ var (
 		},
 	}
 )
+
+func SetLogging(log *logger.Logger) {
+	l = log
+}
+
+// hashTraceID 将字符串 TraceID 转换为 uint64
+func hashTraceID(s string) uint64 {
+	h := fnv.New64a()
+	h.Write([]byte(s))
+	return h.Sum64()
+}
