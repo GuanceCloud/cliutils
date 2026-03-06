@@ -68,7 +68,7 @@ func TestEasyproto(t *T.T) {
 		var kvs KVs
 		kvs = kvs.Add("f1", 123)
 		kvs = kvs.Add("f2", 1.23)
-		kvs = kvs.Add("f3", uint(42), WithKVUnit("year"), WithKVType(GAUGE))
+		kvs = kvs.Add("f3", uint(42), WithKVUnit("year"), WithKVType(GAUGE), WithKVDesc("desc"))
 		kvs = kvs.Add("f4", false)
 		kvs = kvs.Add("f5", []byte("binary-data"))
 		kvs = kvs.Add("f6", "text-data")
@@ -98,9 +98,9 @@ func TestEasyproto(t *T.T) {
 
 	t.Run("easyproto-unmarshal", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f1", 123, WithKVUnit("dollar"), WithKVType(GAUGE))
-		kvs = kvs.Add("f2", 1.23, WithKVUnit("byte"), WithKVType(COUNT))
-		kvs = kvs.Add("f3", uint(42))
+		kvs = kvs.Add("f1", 123, WithKVUnit("dollar"), WithKVType(GAUGE), WithKVDesc("desc"))
+		kvs = kvs.Add("f2", 1.23, WithKVUnit("byte"), WithKVType(COUNT), WithKVDesc("desc"))
+		kvs = kvs.Add("f3", uint(42), WithKVDesc("field f3 is uint"))
 		kvs = kvs.Add("f4", false)
 		kvs = kvs.Add("f5", []byte("binary-data"))
 		kvs = kvs.Add("f6", "text-data")

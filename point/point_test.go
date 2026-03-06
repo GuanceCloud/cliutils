@@ -154,6 +154,7 @@ func TestGet(t *T.T) {
 		// get non-tag key
 		pt.pt.Fields = KVs(pt.pt.Fields).SetKV(NewKV(`f1`, 1.23,
 			WithKVUnit("bytes"),
+			WithKVDesc("f1 is bytes"),
 			WithKVTagSet(true), // set failed
 			WithKVType(COUNT)))
 		assert.Equal(t, "", pt.GetTag(`f1`))

@@ -156,6 +156,7 @@ func clearKV(kv *Field) *Field {
 	kv.IsTag = false
 	kv.Type = UNSPECIFIED
 	kv.Unit = ""
+	kv.Description = ""
 	return kv
 }
 

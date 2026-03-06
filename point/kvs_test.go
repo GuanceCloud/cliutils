@@ -363,7 +363,7 @@ func TestNewKVs(t *T.T) {
 		kvs = kvs.SetKV(NewKV(`t3`, []byte("v2"), WithKVTagSet(true)))
 
 		kvs = kvs.SetKV(NewKV(`f1`, "foo"))
-		kvs = kvs.SetKV(NewKV(`f2`, 123, WithKVUnit("MB"), WithKVType(COUNT)))
+		kvs = kvs.SetKV(NewKV(`f2`, 123, WithKVUnit("MB"), WithKVType(COUNT), WithKVDesc("desc")))
 		kvs = kvs.SetKV(NewKV(`f3`, 3.14, WithKVUnit("some"), WithKVType(GAUGE)))
 
 		assert.Equal(t, 6, len(kvs))

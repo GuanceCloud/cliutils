@@ -488,8 +488,8 @@ func TestNewPoint(t *T.T) {
 	}
 }
 
-func TestPointKeySorted(t *testing.T) {
-	t.Run("sorted", func(t *testing.T) {
+func TestPointKeySorted(t *T.T) {
+	t.Run("sorted", func(t *T.T) {
 		pt, err := NewPointDeprecated("basic",
 			map[string]string{
 				"t1": "v1",
@@ -756,7 +756,7 @@ func BenchmarkV2NewPoint(b *T.B) {
 	})
 }
 
-func FuzzPLPBEquality(f *testing.F) {
+func FuzzPLPBEquality(f *T.F) {
 	cases := []struct {
 		measurement string
 		tagk        string
