@@ -259,8 +259,8 @@ func TestKVsAdd(t *T.T) {
 
 	t.Run("add-v2", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f1", 123, WithKVUnit("dollar"), WithKVType(GAUGE))
-		kvs = kvs.Add("cap", 123, WithKVUnit("bytes"), WithKVType(COUNT))
+		kvs = kvs.Add("f1", 123, WithKVUnit("dollar"), WithKVType(GAUGE), WithKVDesc("dollar"))
+		kvs = kvs.Add("cap", 123, WithKVUnit("bytes"), WithKVType(COUNT), WithKVDesc("B"))
 
 		t.Logf("kvs: %s", kvs.Pretty())
 	})
@@ -363,7 +363,7 @@ func TestNewKVs(t *T.T) {
 		kvs = kvs.SetKV(NewKV(`t3`, []byte("v2"), WithKVTagSet(true)))
 
 		kvs = kvs.SetKV(NewKV(`f1`, "foo"))
-		kvs = kvs.SetKV(NewKV(`f2`, 123, WithKVUnit("MB"), WithKVType(COUNT)))
+		kvs = kvs.SetKV(NewKV(`f2`, 123, WithKVUnit("MB"), WithKVType(COUNT), WithKVDesc("desc")))
 		kvs = kvs.SetKV(NewKV(`f3`, 3.14, WithKVUnit("some"), WithKVType(GAUGE)))
 
 		assert.Equal(t, 6, len(kvs))

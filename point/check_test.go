@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"testing"
 	T "testing"
 
 	"github.com/GuanceCloud/cliutils"
@@ -17,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCheckMeasurement(t *testing.T) {
+func TestCheckMeasurement(t *T.T) {
 	cases := []struct {
 		name,
 		measurement,

@@ -8,7 +8,6 @@ package point
 import (
 	"encoding/json"
 	"fmt"
-	"testing"
 	T "testing"
 	"time"
 
@@ -89,7 +88,7 @@ func TestJSONUnmarshal(t *T.T) {
 	})
 }
 
-func TestJSONPointMarhsal(t *testing.T) {
+func TestJSONPointMarhsal(t *T.T) {
 	var kvs KVs
 
 	EnableMixedArrayField = true
