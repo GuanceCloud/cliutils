@@ -486,6 +486,13 @@ func WithKVUnit(u string) KVOption {
 	}
 }
 
+// WithKVDesc set value's description.
+func WithKVDesc(desc string) KVOption {
+	return func(kv *Field) {
+		kv.Description = desc
+	}
+}
+
 // WithKVType set field type(count/gauge/rate).
 func WithKVType(t MetricType) KVOption {
 	return func(kv *Field) {

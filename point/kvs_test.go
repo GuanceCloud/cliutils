@@ -259,8 +259,8 @@ func TestKVsAdd(t *T.T) {
 
 	t.Run("add-v2", func(t *T.T) {
 		var kvs KVs
-		kvs = kvs.Add("f1", 123, WithKVUnit("dollar"), WithKVType(GAUGE))
-		kvs = kvs.Add("cap", 123, WithKVUnit("bytes"), WithKVType(COUNT))
+		kvs = kvs.Add("f1", 123, WithKVUnit("dollar"), WithKVType(GAUGE), WithKVDesc("dollar"))
+		kvs = kvs.Add("cap", 123, WithKVUnit("bytes"), WithKVType(COUNT), WithKVDesc("B"))
 
 		t.Logf("kvs: %s", kvs.Pretty())
 	})

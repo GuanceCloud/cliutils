@@ -627,7 +627,7 @@ func TestPBJSON(t *T.T) {
 
 		kvs := KVs(pt.pt.Fields)
 		kvs = kvs.SetTag(`t1`, `v1`).
-			SetKV(NewKV(`f2`, 3.14, WithKVUnit("kb"), WithKVType(COUNT)))
+			SetKV(NewKV(`f2`, 3.14, WithKVUnit("kb"), WithKVType(COUNT), WithKVDesc("desc")))
 		pt.pt.Fields = kvs
 
 		j, _ := pt.PBJson()
