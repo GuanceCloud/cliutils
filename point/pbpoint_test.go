@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"math"
 	"strings"
-	"testing"
 	T "testing"
 	"time"
 
@@ -20,7 +19,7 @@ import (
 
 var name = "abc"
 
-func BenchmarkMarshal(b *testing.B) {
+func BenchmarkMarshal(b *T.B) {
 	cases := []struct {
 		name   string
 		repeat int
@@ -37,7 +36,7 @@ func BenchmarkMarshal(b *testing.B) {
 	}
 
 	for _, tc := range cases {
-		b.Run(tc.name+"_pb-marshal", func(b *testing.B) {
+		b.Run(tc.name+"_pb-marshal", func(b *T.B) {
 			pbpts := RandPBPoints(tc.repeat)
 
 			for i := 0; i < b.N; i++ {
@@ -47,7 +46,7 @@ func BenchmarkMarshal(b *testing.B) {
 			}
 		})
 
-		b.Run(tc.name+"_lp-marshal", func(b *testing.B) {
+		b.Run(tc.name+"_lp-marshal", func(b *T.B) {
 			pts := RandPoints(tc.repeat)
 			for i := 0; i < b.N; i++ {
 				arr := []string{}
@@ -61,7 +60,7 @@ func BenchmarkMarshal(b *testing.B) {
 
 		b.Logf("----------------------------------------------")
 
-		b.Run(tc.name+"_pb-unmarshal", func(b *testing.B) {
+		b.Run(tc.name+"_pb-unmarshal", func(b *T.B) {
 			pbpts := RandPBPoints(tc.repeat)
 
 			pb, err := proto.Marshal(pbpts)
@@ -75,7 +74,7 @@ func BenchmarkMarshal(b *testing.B) {
 			}
 		})
 
-		b.Run(tc.name+"_lp-unmarshal", func(b *testing.B) {
+		b.Run(tc.name+"_lp-unmarshal", func(b *T.B) {
 			pts := RandPoints(tc.repeat)
 			arr := []string{}
 			for i := 0; i < len(pts); i++ {
@@ -92,7 +91,7 @@ func BenchmarkMarshal(b *testing.B) {
 	}
 }
 
-func TestPBPointJSON(t *testing.T) {
+func TestPBPointJSON(t *T.T) {
 	cases := []struct {
 		name   string
 		tags   map[string]string
@@ -159,7 +158,7 @@ func TestPBPointJSON(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *T.T) {
 			pt, err := NewPointDeprecated(tc.name, tc.tags, tc.fields, WithEncoding(Protobuf), WithTime(tc.time), WithKeySorted(true))
 
 			assert.NoError(t, err)
@@ -225,7 +224,7 @@ func TestPBPointJSON(t *testing.T) {
 	}
 }
 
-func TestPBPointPayload(t *testing.T) {
+func TestPBPointPayload(t *T.T) {
 	cases := []struct {
 		name   string
 		repeat int
@@ -267,7 +266,7 @@ func TestPBPointPayload(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *T.T) {
 			lppts := RandPoints(tc.repeat)
 			pbpts := RandPBPoints(tc.repeat)
 
@@ -308,7 +307,7 @@ func TestPBPointPayload(t *testing.T) {
 }
 
 // nolint:ineffassign
-func TestPBPointPayloadSize(t *testing.T) {
+func TestPBPointPayloadSize(t *T.T) {
 	type tcase struct {
 		name string
 		n    int

@@ -7,7 +7,7 @@ package diskcache
 
 import (
 	"os"
-	"runtime"
+	"path/filepath"
 	"sync"
 	T "testing"
 	"time"
@@ -15,23 +15,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPidAlive(t *T.T) {
-	t.Run("pid-1", func(t *T.T) {
-		if runtime.GOOS != "windows" {
-			assert.True(t, pidAlive(1))
-		}
-	})
-
-	t.Run("pid-not-exist", func(t *T.T) {
-		assert.False(t, pidAlive(-1))
-	})
-
-	t.Run("cur-pid", func(t *T.T) {
-		assert.True(t, pidAlive(os.Getpid()))
-	})
-}
-
 func TestLockUnlock(t *T.T) {
+	t.Run("unlock-remove", func(t *T.T) {
+		p := t.TempDir()
+		fl := newFlock(p)
+
+		ok, err := fl.tryLock()
+		assert.True(t, ok)
+		assert.NoError(t, err)
+
+		fi, err := os.Stat(filepath.Join(p, ".lock"))
+		assert.NoError(t, err)
+		t.Logf("fi: %+#v", fi)
+
+		fl.unlock()
+
+		_, err = os.Stat(filepath.Join(p, ".lock"))
+		assert.Error(t, err)
+	})
+
 	t.Run("lock", func(t *T.T) {
 		p := t.TempDir()
 
@@ -42,7 +44,10 @@ func TestLockUnlock(t *T.T) {
 			defer wg.Done()
 			fl := newFlock(p)
 
-			assert.NoError(t, fl.lock())
+			ok, err := fl.tryLock()
+
+			assert.True(t, ok)
+			assert.NoError(t, err)
 			defer fl.unlock()
 
 			time.Sleep(time.Second * 5)
@@ -54,7 +59,8 @@ func TestLockUnlock(t *T.T) {
 			defer wg.Done()
 			fl := newFlock(p)
 
-			err := fl.lock()
+			ok, err := fl.tryLock()
+			assert.False(t, ok)
 			assert.Error(t, err)
 
 			t.Logf("[expect] err: %s", err.Error())
@@ -68,7 +74,7 @@ func TestLockUnlock(t *T.T) {
 
 			// try lock until ok
 			for {
-				if err := fl.lock(); err != nil {
+				if ok, err := fl.tryLock(); !ok {
 					t.Logf("[expect] err: %s", err.Error())
 					time.Sleep(time.Second)
 				} else {
