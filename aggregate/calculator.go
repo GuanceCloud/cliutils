@@ -209,7 +209,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 			if !ok {
 				if i64, ok := val.(int64); !ok {
 					if algo.Method == COUNT_DISTINCT || algo.Method == COUNT {
-						// 这里可以不需要转换成 float64
+						// 这两种类型可以不转换成 float64
 					} else {
 						l.Warnf("key %s non-numeric type(%s) for algorithm %s, ignored", keyName, reflect.TypeOf(val), algo.Method)
 						continue

@@ -3,7 +3,7 @@
 GO_MODULE="github.com/GuanceCloud/cliutils"
 
 # 1. Define Standard Imports
-# We include the current directory (.) so batch.proto can find point/point.proto
+# We include the current directory (.)
 INCLUDES="-I=. -I=.. -I=${GOPATH}/src -I=${GOPATH}/src/github.com/gogo/protobuf/protobuf"
 
 # 2. Define Mappings (The Critical Part)
@@ -13,11 +13,11 @@ INCLUDES="-I=. -I=.. -I=${GOPATH}/src -I=${GOPATH}/src/github.com/gogo/protobuf/
 MAPPINGS="Mgoogle/protobuf/any.proto=github.com/gogo/protobuf/types,\
 Mpoint/point.proto=${GO_MODULE}/point"
 
-# 3. Build batch.proto
-echo "Building batch.proto & tracedata.proto"
+# 3. Build aggrbatch.proto
+echo "Building aggrbatch.proto & tsdata.proto"
 protoc $INCLUDES \
     --gogoslick_out="${MAPPINGS}:." \
-    aggregate/batch.proto \
-    aggregate/tracedata.proto
+    aggregate/aggrbatch.proto \
+    aggregate/tsdata.proto
 
 echo "Done."

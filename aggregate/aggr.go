@@ -63,7 +63,7 @@ type AggregateRule struct {
 type RuleSelector struct {
 	Category     string   `toml:"category" json:"category"`
 	Measurements []string `toml:"measurements" json:"measurements"`
-	Fields       []string `toml:"fields" json:"fields"`
+	MetricName   []string `toml:"metric_name" json:"metric_name"`
 	Condition    string   `toml:"conditon" json:"condition"`
 
 	measurementsWhitelist []*cliutils.WhiteListItem
@@ -163,8 +163,8 @@ func (rs *RuleSelector) Setup() error {
 		}
 	}
 
-	if len(rs.Fields) > 0 {
-		for _, f := range rs.Fields {
+	if len(rs.MetricName) > 0 {
+		for _, f := range rs.MetricName {
 			rs.fieldsWhitelist = append(rs.fieldsWhitelist, cliutils.NewWhiteListItem(f))
 		}
 	}

@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package aggregate.v1;
+
+option go_package = "/;aggregate";
+
+import "point/point.proto";
+
+// 通用数据包，适用于所有数据类型
+message DataPacket {
+  uint64 group_id_hash = 1;    // 分组ID的哈希（原 trace_id_hash）
+  string raw_group_id  = 2;    // 原始分组ID（原 raw_trace_id）
+  string token         = 3;
+  string source        = 4;
+  string data_type     = 5;    // 新增：数据类型 tracing/logging/rum
+
+  // version
+  int64 config_version = 6;
+  bool has_error       = 7;
+
+  // 新增：分组键名称
+  string group_key     = 8;    // 如 "trace_id", "user_id", "order_id"
+
+  // 新增：数据点数量统计
+  int32 point_count    = 9;
+
+  // 新增：时间范围
+  int64 first_seen_nano = 10;
+  int64 last_seen_nano  = 11;
+
+  repeated point.PBPoint points = 12;  // 重命名：spans -> points
+}
+
+// batch packages
+message DataBatch {
+  string collector_id = 1;
+  repeated DataPacket packets = 2;
+}

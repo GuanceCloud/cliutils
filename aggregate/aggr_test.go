@@ -61,7 +61,7 @@ func TestHTTPPostBatch(t *T.T) {
 						Category:              point.Metric.String(),
 						Measurements:          nil,
 						measurementsWhitelist: nil,
-						Fields:                []string{"f1"},
+						MetricName:            []string{"f1"},
 						fieldsWhitelist:       nil,
 						Condition:             "",
 						conds:                 nil,
@@ -142,8 +142,8 @@ func TestHTTPPostBatch(t *T.T) {
 				{
 					Groupby: []string{"service", "http_method", "http_route", "le"},
 					Selector: &RuleSelector{
-						Category: point.Metric.String(),
-						Fields:   []string{"http.server.duration_bucket"},
+						Category:   point.Metric.String(),
+						MetricName: []string{"http.server.duration_bucket"},
 					},
 					Algorithms: map[string]*AggregationAlgo{
 						"otel.histograms": {
@@ -226,8 +226,8 @@ func TestBatch(t *T.T) {
 				{
 					Groupby: []string{"idx"},
 					Selector: &RuleSelector{
-						Category: point.Metric.String(),
-						Fields:   []string{"f1"},
+						Category:   point.Metric.String(),
+						MetricName: []string{"f1"},
 					},
 					Algorithms: map[string]*AggregationAlgo{
 						"f1": {
@@ -293,8 +293,8 @@ func TestAggregator(t *T.T) {
 				{
 					Groupby: []string{"idx"},
 					Selector: &RuleSelector{
-						Category: point.Metric.String(),
-						Fields:   []string{"reg:f_.*"},
+						Category:   point.Metric.String(),
+						MetricName: []string{"reg:f_.*"},
 					},
 				},
 			},
@@ -335,8 +335,8 @@ func TestAggregator(t *T.T) {
 				{
 					Groupby: []string{"idx"},
 					Selector: &RuleSelector{
-						Category: point.Metric.String(),
-						Fields:   []string{"f1"},
+						Category:   point.Metric.String(),
+						MetricName: []string{"f1"},
 					},
 				},
 			},
@@ -376,8 +376,8 @@ func TestAggregator(t *T.T) {
 				{
 					Groupby: []string{"idx"},
 					Selector: &RuleSelector{
-						Category: point.Metric.String(),
-						Fields:   []string{"f1", "f2"},
+						Category:   point.Metric.String(),
+						MetricName: []string{"f1", "f2"},
 					},
 				},
 			},
@@ -418,9 +418,9 @@ func TestAggregator(t *T.T) {
 			AggregateRules: []*AggregateRule{
 				{
 					Selector: &RuleSelector{
-						Category:  point.Metric.String(),
-						Fields:    []string{"f1"},
-						Condition: `{f1 IN [1,2,0]}`,
+						Category:   point.Metric.String(),
+						MetricName: []string{"f1"},
+						Condition:  `{f1 IN [1,2,0]}`,
 					},
 				},
 			},
@@ -477,9 +477,9 @@ func TestOTEL(t *T.T) {
 				Name:    "jvm.buffer.memory",
 				Groupby: []string{"service_name", "id"},
 				Selector: &RuleSelector{
-					Category:  point.Metric.String(),
-					Fields:    []string{"jvm.buffer.memory.used"},
-					Condition: "",
+					Category:   point.Metric.String(),
+					MetricName: []string{"jvm.buffer.memory.used"},
+					Condition:  "",
 				},
 				Algorithms: map[string]*AggregationAlgo{
 					"jvm.buffer.memory.used.avg": {
@@ -504,7 +504,7 @@ func TestOTEL(t *T.T) {
 				Selector: &RuleSelector{
 					Category:     point.Logging.String(),
 					Measurements: []string{"tmall"},
-					Fields:       []string{"client_ip"},
+					MetricName:   []string{"client_ip"},
 					Condition:    `{ 1 = 1 }`,
 				},
 				Algorithms: map[string]*AggregationAlgo{
