@@ -7,8 +7,8 @@
 **尾采样：**
     链路数据通过采集后按照hash值转发到尾采样器上，确保同一个 trace 落到同一个采样器中。
     采样规则大致可以归类：耗时长、有错误、包含特定的字段、字段等于某些特定值 等等。
+    尾采样包括：链路，日志和RUM类型。
 
-TODO： **日志尾采样：**
 
 > 配置文件在： ./config.md
 
@@ -106,6 +106,208 @@ select point（AggregatorConfigure.PickPoints）：
 * **确定性采样**：基于 `TraceIDHash` 的计算确保了链路在采样过程中的完整性。
 
 ---
+
+### 尾采样指标派生
+
+指标派生（Derived Metrics）是尾采样的重要功能，它允许从原始链路、日志和RUM数据中生成新的监控指标，无论数据最终是否被采样保留。这些派生指标提供了对系统行为的量化洞察。
+
+#### 1. 派生指标的核心概念
+
+**为什么需要派生指标？**
+- 从100%的原始数据中提取关键业务指标
+- 即使trace被丢弃，关键指标仍被保留
+- 提供实时监控和告警的基础数据
+
+**派生指标的类型：**
+- **计数器（Counter）**：统计事件发生次数，如错误数、请求数
+- **直方图（Histogram）**：记录数值分布，如响应时间分布
+- **摘要（Summary）**：计算百分位数，如P95、P99延迟
+
+#### 2. 派生指标配置结构
+
+派生指标配置支持多种数据源类型：
+
+**2.1 链路（Trace）派生指标**
+```toml
+[[trace.derived_metrics]]
+name = "trace_duration"
+condition = ""  # 可选：过滤条件
+group_by = ["service", "resource"]  # 分组标签
+
+[[trace.derived_metrics.aggregate]]
+method = "HISTOGRAM"
+source_field = "$trace_duration"  # 特殊变量：trace持续时间
+
+[[trace.derived_metrics.aggregate.histogram_opts]]
+buckets = [10000, 50000, 100000, 500000, 1000000, 5000000, 10000000]
+```
+
+**2.2 日志（Logging）派生指标**
+```toml
+[[logging.derived_metrics]]
+name = "trace_error"
+condition = "{status=\"error\"}"  # 条件过滤
+group_by = ["service", "resource"]
+
+[[logging.derived_metrics.aggregate]]
+method = "COUNT"
+source_field = "status"
+```
+
+**2.3 RUM派生指标**
+```toml
+[[rum.derived_metrics]]
+name = "page_load_time"
+condition = "{ event = \"page_load\" }"
+group_by = ["page_url", "device_type"]
+
+[[rum.derived_metrics.aggregate]]
+method = "HISTOGRAM"
+source_field = "load_time_ms"
+```
+
+#### 3. 支持的聚合方法
+
+| 方法 | 描述 | 适用场景 |
+|------|------|----------|
+| **COUNT** | 计数 | 统计事件发生次数 |
+| **HISTOGRAM** | 直方图 | 数值分布分析 |
+| **SUM** | 求和 | 累计值统计 |
+| **AVG** | 平均值 | 平均性能指标 |
+| **MAX/MIN** | 最大/最小值 | 极值监控 |
+| **QUANTILES** | 百分位数 | P95/P99延迟 |
+
+#### 4. 条件过滤语法
+
+派生指标支持灵活的过滤条件：
+
+```toml
+# 基本条件
+condition = "{ status = \"error\" }"
+
+# 组合条件
+condition = "{ status = \"error\" AND service = \"api\" }"
+
+# 数值比较
+condition = "{ response_time > 1000 }"
+
+# IN操作符
+condition = "{ resource IN [\"/healthz\", \"/ping\"] }"
+
+# 特殊变量
+condition = "{ $trace_duration > 5000000 }"  # trace持续时间>5秒
+```
+
+#### 5. 分组维度配置
+
+派生指标支持按不同维度分组生成指标：
+
+```toml
+# 按用户ID分组
+[[logging.group_dimensions]]
+group_key = "user_id"
+
+# 用户ID分组的派生指标
+[[logging.group_dimensions.derived_metrics]]
+name = "user_error_count"
+condition = "{ level = \"error\" }"
+group_by = ["user_id", "service"]
+
+[[logging.group_dimensions.derived_metrics.aggregate]]
+method = "COUNT"
+source_field = "level"
+```
+
+#### 6. 实际应用场景
+
+**场景1：API性能监控**
+```toml
+[[trace.derived_metrics]]
+name = "api_response_time"
+condition = "{ resource LIKE \"/api/*\" }"
+group_by = ["service", "resource", "http_method"]
+
+[[trace.derived_metrics.aggregate]]
+method = "HISTOGRAM"
+source_field = "$trace_duration"
+
+[[trace.derived_metrics.aggregate.histogram_opts]]
+buckets = [10, 50, 100, 500, 1000, 5000]
+```
+
+**场景2：业务错误监控**
+```toml
+[[logging.derived_metrics]]
+name = "business_error_rate"
+condition = "{ error_type = \"business_error\" }"
+group_by = ["service", "error_code"]
+
+[[logging.derived_metrics.aggregate]]
+method = "COUNT"
+source_field = "error_type"
+```
+
+**场景3：用户体验监控**
+```toml
+[[rum.derived_metrics]]
+name = "user_interaction_time"
+condition = "{ event_type = \"click\" }"
+group_by = ["page_url", "element_id"]
+
+[[rum.derived_metrics.aggregate]]
+method = "HISTOGRAM"
+source_field = "interaction_time_ms"
+```
+
+#### 7. 技术实现要点
+
+1. **实时计算**：派生指标在数据到达时实时计算，不依赖采样决策
+2. **内存高效**：使用聚合计算器（Calculator）减少内存占用
+3. **时间窗口**：按配置的时间窗口聚合指标数据
+4. **异步输出**：派生指标异步输出到监控系统
+
+#### 8. 内置派生指标
+
+系统提供了一系列内置派生指标，可以直接在配置中使用：
+
+**错误监控指标：**
+- `trace_error_count`：错误链路个数统计
+- `span_error_count`：错误Span个数统计  
+- `trace_error_rate`：错误链路率（百分比）
+
+**性能监控指标：**
+- `trace_duration_summary`：链路耗时统计摘要（P50/P95/P99）
+- `slow_trace_count`：慢链路个数统计（>5秒）
+- `trace_size_distribution`：链路大小分布（Span数量）
+
+**流量监控指标：**
+- `trace_total_count`：总链路条数统计
+- `span_total_count`：总Span个数统计
+
+**使用示例：**
+```go
+// 获取所有内置派生指标
+metrics := aggregate.GetBuiltinDerivedMetrics()
+
+// 获取特定内置指标
+traceErrorCount := aggregate.GetBuiltinMetric("trace_error_count")
+
+// 检查是否为内置指标
+if aggregate.IsBuiltinMetric("trace_total_count") {
+    // 是内置指标
+}
+```
+
+详细使用示例请参考：`builtin_derived_metrics_example.md`
+
+#### 9. 最佳实践
+
+1. **明确业务目标**：根据监控需求设计派生指标
+2. **合理分组**：避免分组维度过多导致指标爆炸
+3. **条件优化**：使用精确的条件过滤减少不必要的计算
+4. **桶配置**：根据业务特点合理设置直方图桶边界
+5. **监控告警**：基于派生指标设置合理的告警阈值
+6. **利用内置指标**：优先使用系统提供的内置派生指标
 
 
 

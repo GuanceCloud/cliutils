@@ -13,7 +13,7 @@ type algoCountDistinct struct {
 	distinctValues map[any]struct{}
 }
 
-// type assertions
+// type assertions.
 var _ Calculator = &algoCountDistinct{}
 
 func (c *algoCountDistinct) Add(x any) {
@@ -63,7 +63,7 @@ func (c *algoCountDistinct) Base() *MetricBase {
 	return &c.MetricBase
 }
 
-// 初始化函数，确保 map 被正确创建
+// 初始化函数，确保 map 被正确创建.
 func newAlgoCountDistinct(mb MetricBase, maxTime int64, value any) *algoCountDistinct {
 	return &algoCountDistinct{
 		MetricBase:     mb,

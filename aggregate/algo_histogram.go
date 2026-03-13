@@ -9,7 +9,7 @@ import (
 type algoHistogram struct {
 	MetricBase
 	count int64
-	//bounds  []float64
+
 	//buckets []uint64
 	val float64
 	// tag:"le" 固定tag,存储："0":0,"10":1,"20":5
@@ -18,7 +18,7 @@ type algoHistogram struct {
 	maxTime  int64
 }
 
-// type assertions
+// type assertions.
 var _ Calculator = &algoHistogram{}
 
 func (c *algoHistogram) Add(x any) {

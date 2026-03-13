@@ -25,7 +25,7 @@ type (
 var l = logger.DefaultSLogger("aggregator")
 
 const (
-	// actions
+	// actions.
 	ActionPassThrough = "passthrough"
 	ActionDrop        = "drop"
 )
@@ -64,7 +64,7 @@ type RuleSelector struct {
 	Category     string   `toml:"category" json:"category"`
 	Measurements []string `toml:"measurements" json:"measurements"`
 	MetricName   []string `toml:"metric_name" json:"metric_name"`
-	Condition    string   `toml:"conditon" json:"condition"`
+	Condition    string   `toml:"condition" json:"condition"`
 
 	measurementsWhitelist []*cliutils.WhiteListItem
 	fieldsWhitelist       []*cliutils.WhiteListItem
@@ -174,7 +174,6 @@ func (rs *RuleSelector) Setup() error {
 
 // SelectPoints filters points based on the rule's selector criteria.
 func (ar *AggregateRule) SelectPoints(pts []*point.Point) []*point.Point {
-
 	return ar.Selector.doSelect(ar.Groupby, pts)
 }
 
@@ -250,7 +249,7 @@ func (s *RuleSelector) doSelect(groupby []string, pts []*point.Point) (res []*po
 		}
 
 		// fork 1 or more points from pt, each forked points got only 1 non-tag field.
-		var forkedPts = s.selectKVS(false, pt)
+		forkedPts := s.selectKVS(false, pt)
 
 		// NOTE: we may have selected multiple non-tag field from this point,
 		// and we should build a new point on each of these non-tag field.

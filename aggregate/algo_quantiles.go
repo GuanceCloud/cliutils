@@ -32,7 +32,7 @@ func (a *algoQuantiles) Add(x any) {
 	}
 }
 
-// GetPercentile 是一个通用方法，用于获取第 p 个百分位数 (0-100)
+// GetPercentile 是一个通用方法，用于获取第 p 个百分位数 (0-100).
 func (a *algoQuantiles) GetPercentile(p float64) float64 {
 	n := len(a.all)
 	if n == 0 {

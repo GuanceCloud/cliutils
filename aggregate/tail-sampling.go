@@ -78,7 +78,7 @@ func (sp *SamplingPipeline) DoAction(td *DataPacket) (bool, *DataPacket) {
 		} // else: matched, fall through...
 		l.Debugf("matched condition =%s", sp.Condition)
 		matched = true
-		//r.mached++
+
 		if sp.Type == PipelineTypeSampling {
 			if sp.Rate > 0.0 {
 				if td.GroupIdHash%sampleRange < uint64(math.Floor(sp.Rate*float64(sampleRange))) {
@@ -115,7 +115,8 @@ func PickTrace(source string, pts []*point.Point, version int64) map[uint64]*Dat
 				traceData = &DataPacket{
 					GroupIdHash:   id,
 					RawGroupId:    tid,
-					Token:         "",
+					Token:         "", // 在pick调用处添加。
+					DataType:      point.Tracing.String(),
 					Source:        source,
 					ConfigVersion: version,
 					Points:        []*point.PBPoint{},
@@ -128,6 +129,7 @@ func PickTrace(source string, pts []*point.Point, version int64) map[uint64]*Dat
 			if status == "error" {
 				traceData.HasError = true
 			}
+			traceData.PointCount++
 		} else {
 			l.Errorf("invalid trace_id:%v", v)
 		}
@@ -216,10 +218,10 @@ type LoggingGroupDimension struct {
 }
 
 func (logGroup *LoggingGroupDimension) PickLogging(source string, pts []*point.Point) (map[uint64]*DataPacket, []*point.Point) {
-	return pickByGroupKey(logGroup.GroupKey, source, pts)
+	return pickByGroupKey(logGroup.GroupKey, source, pts, point.Logging)
 }
 
-func pickByGroupKey(groupKey string, source string, pts []*point.Point) (map[uint64]*DataPacket, []*point.Point) {
+func pickByGroupKey(groupKey string, source string, pts []*point.Point, category point.Category) (map[uint64]*DataPacket, []*point.Point) {
 	traceDatas := make(map[uint64]*DataPacket)
 	passedThrough := make([]*point.Point, 0)
 	for _, pt := range pts {
@@ -243,6 +245,7 @@ func pickByGroupKey(groupKey string, source string, pts []*point.Point) (map[uin
 				RawGroupId:  tid,
 				Token:       "",
 				Source:      source,
+				DataType:    category.String(),
 				//	ConfigVersion: version,
 				Points: []*point.PBPoint{},
 			}
@@ -259,7 +262,7 @@ func pickByGroupKey(groupKey string, source string, pts []*point.Point) (map[uin
 	return traceDatas, passedThrough
 }
 
-// RUM尾采样配置
+// RUM尾采样配置.
 type RUMTailSampling struct {
 	DataTTL        time.Duration    `toml:"data_ttl" json:"data_ttl"`
 	DerivedMetrics []*DerivedMetric `toml:"derived_metrics" json:"derived_metrics"`
@@ -276,11 +279,11 @@ type RUMGroupDimension struct {
 }
 
 func (rumGroup *RUMGroupDimension) PickRUM(source string, pts []*point.Point) (map[uint64]*DataPacket, []*point.Point) {
-	return pickByGroupKey(rumGroup.GroupKey, source, pts)
+	return pickByGroupKey(rumGroup.GroupKey, source, pts, point.RUM)
 }
 
 var (
-	// predefined pipeline
+	// predefined pipeline.
 	SlowTracePipeline = &SamplingPipeline{
 		Name:      "slow_trace",
 		Type:      PipelineTypeCondition,
@@ -291,7 +294,7 @@ var (
 	NoiseTracePipeline = &SamplingPipeline{
 		Name:      "noise_trace",
 		Type:      PipelineTypeCondition,
-		Condition: `{ resource IN ["/healthz", "/ping"] }`, // user can override these resouce values
+		Condition: `{ resource IN ["/healthz", "/ping"] }`, // user can override these resource values
 		Action:    PipelineActionDrop,
 	}
 
@@ -357,7 +360,7 @@ func SetLogging(log *logger.Logger) {
 	l = log
 }
 
-// hashTraceID 将字符串 TraceID 转换为 uint64
+// hashTraceID 将字符串 TraceID 转换为 uint64.
 func hashTraceID(s string) uint64 {
 	h := fnv.New64a()
 	h.Write([]byte(s))

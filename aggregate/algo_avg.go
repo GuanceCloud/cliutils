@@ -12,7 +12,7 @@ type algoAvg struct {
 	maxTime, count int64
 }
 
-// type assertions
+// type assertions.
 var _ Calculator = &algoAvg{}
 
 func (c *algoAvg) Add(x any) {

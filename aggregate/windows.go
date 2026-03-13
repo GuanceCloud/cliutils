@@ -1,9 +1,10 @@
 package aggregate
 
 import (
-	"github.com/GuanceCloud/cliutils/point"
 	"sync"
 	"time"
+
+	"github.com/GuanceCloud/cliutils/point"
 )
 
 type Window struct {
@@ -67,7 +68,7 @@ type Cache struct {
 	// 每一个窗口创建一个对象，针对这个Window 进行add 操作，最终到达容忍时间，整个windows会从map中删除
 	// key:容忍时间+窗口时间。
 	WindowsBuckets map[int64]*Windows
-	//容忍时间
+
 	Expired time.Duration
 }
 

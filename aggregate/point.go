@@ -87,6 +87,10 @@ func HashCombine(seed, hash uint64) uint64 {
 	return ((seed + 0x9e3779b9) ^ hash) * 0x517cc1b727220a95
 }
 
+func HashToken(token string, hash64 uint64) uint64 {
+	return HashCombine(hash64, xxhash.Sum64(cliutils.ToUnsafeBytes(token)))
+}
+
 // pointAggrTags calculate point's aggregate tags.
 func pointAggrTags(pt *point.Point, sortedKeys []string) [][2]string {
 	kvs := [][2]string{}

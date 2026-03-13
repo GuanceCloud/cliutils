@@ -45,7 +45,7 @@ func TestSamplingPipeline_DoAction1(t *testing.T) {
 	pip := &SamplingPipeline{
 		Name: "keep resource",
 		Type: PipelineTypeCondition,
-		//Condition: "{ resource EQ \"/resource\" }",
+		// Condition: "{ resource EQ \"/resource\" }",
 		Condition: `{ resource = "/resource" }`,
 		Action:    PipelineActionKeep,
 	}
@@ -93,7 +93,7 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 			fields: fields{
 				Name: "keep resource",
 				Type: PipelineTypeCondition,
-				//Condition: "{ resource EQ \"/resource\" }",
+				// Condition: "{ resource EQ \"/resource\" }",
 				Condition: `{ resource = "/resource" }`,
 				Action:    PipelineActionKeep,
 			},
@@ -115,7 +115,7 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 			fields: fields{
 				Name: "drop client",
 				Type: PipelineTypeCondition,
-				//Condition: "{ resource EQ \"/resource\" }",
+				// Condition: "{ resource EQ \"/resource\" }",
 				Condition: `{ resource = "/client" }`,
 				Action:    PipelineActionDrop,
 			},
@@ -160,7 +160,7 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 			fields: fields{
 				Name: "keep resource",
 				Type: PipelineTypeSampling,
-				//Condition: "{ resource EQ \"/resource\" }",
+				// Condition: "{ resource EQ \"/resource\" }",
 				Condition: `{ 1 = 1 }`,
 				Rate:      0.01,
 			},
@@ -481,7 +481,6 @@ func TestTailSamplingConfigs_Init(t *testing.T) {
 							assert.NotNil(t, pipeline.conds, "Logging pipeline conditions should be parsed")
 						}
 					}
-
 				}
 			}
 
@@ -724,7 +723,6 @@ func TestPickLogging(t *testing.T) {
 				sort.Strings(expectedKeys)
 				assert.Equal(t, expectedKeys, actualKeys, "Group keys mismatch")
 			}
-
 		})
 	}
 }

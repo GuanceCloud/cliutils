@@ -2,13 +2,14 @@ package aggregate
 
 import (
 	"fmt"
-	"github.com/GuanceCloud/cliutils/point"
-	"github.com/golang/protobuf/proto"
 	"io"
 	"net/http"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/GuanceCloud/cliutils/point"
+	"github.com/golang/protobuf/proto"
 )
 
 type MockCalculator struct {

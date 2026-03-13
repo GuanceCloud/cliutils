@@ -11,7 +11,7 @@ type algoCount struct {
 	maxTime, count int64
 }
 
-// type assertions
+// type assertions.
 var _ Calculator = &algoCount{}
 
 func (c *algoCount) Add(x any) {

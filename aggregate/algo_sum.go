@@ -12,7 +12,7 @@ type algoSum struct {
 	maxTime, count int64
 }
 
-// type assertions
+// type assertions.
 var _ Calculator = &algoSum{}
 
 func (c *algoSum) Add(x any) {

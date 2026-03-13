@@ -129,12 +129,12 @@ default_window = "10s"
 
 有几点补充：
 
-- [aggregate_rules.aggregate] 中 source_field 必须是 Field 不可以是 tag. 特别注意 logging 类型
+- [aggregate_rules.aggregate] 中 source_field 必须是 Field 不可以是 tag. 特别注意: logging 类型
 
 
 ## 尾采样
 
-配置文件（旧）
+配置文件（旧），以下面新的为准。
 
 
 ```toml
@@ -268,7 +268,6 @@ trace_ttl = "1m"  # 1 minute  # 1分钟
   hash_key = "trace_id"
 
 ```
-
 
 ---
 

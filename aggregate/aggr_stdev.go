@@ -18,7 +18,7 @@ type algoStdev struct {
 	maxTime int64
 }
 
-// type assertions
+// type assertions.
 var _ Calculator = &algoStdev{}
 
 func (c *algoStdev) Add(x any) {
@@ -70,7 +70,7 @@ func (c *algoStdev) Base() *MetricBase {
 	return &c.MetricBase
 }
 
-// SampleStdDev 计算样本标准差（除以 N-1）
+// SampleStdDev 计算样本标准差（除以 N-1）.
 func SampleStdDev(data []float64) (float64, error) {
 	n := len(data)
 	if n < 2 {
