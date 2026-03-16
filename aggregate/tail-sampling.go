@@ -130,6 +130,19 @@ func PickTrace(source string, pts []*point.Point, version int64) map[uint64]*Dat
 				traceData.HasError = true
 			}
 			traceData.PointCount++
+			start, duration := getTime(pt)
+			if traceData.TraceStartTimeUnixNano == 0 {
+				traceData.TraceStartTimeUnixNano = start
+			}
+			if traceData.TraceStartTimeUnixNano > start {
+				traceData.TraceStartTimeUnixNano = start
+			}
+			if traceData.TraceEndTimeUnixNano == 0 {
+				traceData.TraceEndTimeUnixNano = start + duration
+			}
+			if traceData.TraceEndTimeUnixNano < start+duration {
+				traceData.TraceEndTimeUnixNano = start + duration
+			}
 		} else {
 			l.Errorf("invalid trace_id:%v", v)
 		}
@@ -198,9 +211,8 @@ func (t *TailSamplingConfigs) Init() {
 }
 
 type LoggingTailSampling struct {
-	DataTTL        time.Duration    `toml:"data_ttl" json:"data_ttl"`
-	DerivedMetrics []*DerivedMetric `toml:"derived_metrics" json:"derived_metrics"`
-	Version        int64            `toml:"version" json:"version"`
+	DataTTL time.Duration `toml:"data_ttl" json:"data_ttl"`
+	Version int64         `toml:"version" json:"version"`
 
 	// 按分组维度配置（不再是全局管道）
 	GroupDimensions []*LoggingGroupDimension `toml:"group_dimensions" json:"group_dimensions"`
@@ -264,9 +276,8 @@ func pickByGroupKey(groupKey string, source string, pts []*point.Point, category
 
 // RUM尾采样配置.
 type RUMTailSampling struct {
-	DataTTL        time.Duration    `toml:"data_ttl" json:"data_ttl"`
-	DerivedMetrics []*DerivedMetric `toml:"derived_metrics" json:"derived_metrics"`
-	Version        int64            `toml:"version" json:"version"`
+	DataTTL time.Duration `toml:"data_ttl" json:"data_ttl"`
+	Version int64         `toml:"version" json:"version"`
 
 	// RUM可能也有多个分组维度
 	GroupDimensions []*RUMGroupDimension `toml:"group_dimensions" json:"group_dimensions"`
@@ -281,80 +292,6 @@ type RUMGroupDimension struct {
 func (rumGroup *RUMGroupDimension) PickRUM(source string, pts []*point.Point) (map[uint64]*DataPacket, []*point.Point) {
 	return pickByGroupKey(rumGroup.GroupKey, source, pts, point.RUM)
 }
-
-var (
-	// predefined pipeline.
-	SlowTracePipeline = &SamplingPipeline{
-		Name:      "slow_trace",
-		Type:      PipelineTypeCondition,
-		Condition: `{ $trace_duration > 5000000 }`, // larger than 5s, user can override this value
-		Action:    PipelineActionKeep,
-	}
-
-	NoiseTracePipeline = &SamplingPipeline{
-		Name:      "noise_trace",
-		Type:      PipelineTypeCondition,
-		Condition: `{ resource IN ["/healthz", "/ping"] }`, // user can override these resource values
-		Action:    PipelineActionDrop,
-	}
-
-	TailSamplingPipeline = &SamplingPipeline{
-		Name:     "sampling",
-		Type:     PipelineTypeSampling,
-		Rate:     0.1,                  // user can override this rate
-		HashKeys: []string{"trace_id"}, // always hash on trace ID, user should not override this
-	}
-
-	// TraceDuration predefined derived metrics
-	// group_by: 这里不能统计 service,resource,name 等等标签，因为一旦加上标签 就不能代表整条链路的耗时，而是服务耗时
-	// 如果要带 service,resource 标签，这个工作 dataKit 完全可以胜任，因为 dataKit 收到的就是一个service的链路
-	// 并且加上resource之后，指标会炸时间线。
-	TraceDuration = &DerivedMetric{
-		Name:      "trace_duration",
-		Condition: "",                              // user specific or empty
-		Groupby:   []string{"service", "resource"}, // user can add more tag keys here.
-
-		Algorithm: &AggregationAlgo{
-			Method:      HISTOGRAM,
-			SourceField: "$trace_duration",
-			Options: &AggregationAlgo_HistogramOpts{
-				HistogramOpts: &HistogramOptions{
-					Buckets: []float64{
-						10_000,     // 10ms
-						50_000,     // 50ms
-						100_000,    // 100ms
-						500_000,    // 500ms
-						1_000_000,  // 1s
-						5_000_000,  // 5s
-						10_000_000, // 10s
-					}, // duration us
-				},
-			},
-		},
-	}
-
-	CounterOnTrace = &DerivedMetric{
-		Name:      "trace_counter",
-		Condition: "",                              // user specific or empty
-		Groupby:   []string{"service", "resource"}, // user can add more tag keys here.
-
-		Algorithm: &AggregationAlgo{
-			Method:      COUNT,
-			SourceField: "<USER-SPECIFIED>",
-		},
-	}
-
-	CounterOnError = &DerivedMetric{
-		Name:      "trace_error",
-		Condition: `{status="error"}`,
-		Groupby:   []string{"service", "resource"}, // user can add more tag keys here.
-
-		Algorithm: &AggregationAlgo{
-			Method:      COUNT,
-			SourceField: "status",
-		},
-	}
-)
 
 func SetLogging(log *logger.Logger) {
 	l = log

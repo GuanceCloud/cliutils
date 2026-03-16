@@ -25,8 +25,8 @@ message DataPacket {
   int32 point_count    = 9;
 
   // 新增：时间范围
-  int64 first_seen_nano = 10;
-  int64 last_seen_nano  = 11;
+  int64 trace_start_time_unix_nano = 10;
+  int64 trace_end_time_unix_nano  = 11;
 
   repeated point.PBPoint points = 12;  // 重命名：spans -> points
 }

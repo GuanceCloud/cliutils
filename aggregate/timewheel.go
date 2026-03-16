@@ -5,8 +5,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GuanceCloud/cliutils/logger"
 	"github.com/GuanceCloud/cliutils/point"
 )
+
+var twl = logger.DefaultSLogger("aggregate.timewheel")
 
 var dataGroupPool = sync.Pool{
 	New: func() interface{} {
@@ -100,7 +103,7 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 	case point.STracing:
 		traceConfig := s.GetTraceConfig(packet.Token)
 		if traceConfig == nil {
-			l.Errorf("no tail sampling config for token: %s, data type: %s", packet.Token, packet.DataType)
+			twl.Errorf("no tail sampling config for token: %s, data type: %s", packet.Token, packet.DataType)
 			return
 		}
 
@@ -108,7 +111,7 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 	case point.SLogging:
 		loggingConfig := s.GetLoggingConfig(packet.Token)
 		if loggingConfig == nil {
-			l.Errorf("no tail sampling config for token: %s, data type: %s", packet.Token, packet.DataType)
+			twl.Errorf("no tail sampling config for token: %s, data type: %s", packet.Token, packet.DataType)
 			return
 		}
 
@@ -116,25 +119,26 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 	case point.SRUM:
 		rumConfig := s.GetRUMConfig(packet.Token)
 		if rumConfig == nil {
-			l.Errorf("no tail sampling config for token: %s, data type: %s", packet.Token, packet.DataType)
+			twl.Errorf("no tail sampling config for token: %s, data type: %s", packet.Token, packet.DataType)
 			return
 		}
 		ttlSec = int(rumConfig.DataTTL.Seconds())
 	default:
-		l.Errorf("unsupported data type: %s", packet.DataType)
+		twl.Errorf("unsupported data type: %s", packet.DataType)
 		return
 	}
 
 	if ttlSec <= 0 {
-		ttlSec = 1
+		twl.Errorf("invalid ttl for data type: %s", packet.DataType)
+		return
 	}
 	if ttlSec >= 3600 {
 		ttlSec = 3599
 	}
-	l.Debugf("ttl is %d for data type: %s", ttlSec, packet.DataType)
+	twl.Debugf("ttl is %d for data type: %s", ttlSec, packet.DataType)
 	// 计算时间轮槽位
 	expirePos := (shard.currentPos + ttlSec) % 3600
-	l.Debugf("expirePos is %d", expirePos)
+	twl.Debugf("expirePos is %d", expirePos)
 
 	// 创建组合键
 	key := HashToken(packet.Token, packet.GroupIdHash)
@@ -213,16 +217,13 @@ func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[u
 					if match {
 						// 匹配到了规则
 						if packet != nil {
-							l.Debugf("matched trace, traceId: %s", packet.RawGroupId)
+							twl.Debugf("matched trace, traceId: %s", packet.RawGroupId)
 							DataPackets[packet.GroupIdHash] = packet
 						}
 						break
 					}
 				}
-				for _, metric := range config.DerivedMetrics {
-					// TODO 链路指标化
-					l.Debugf("TODO trace metric: %s", metric)
-				}
+				s.handleDerivedMetrics(dg.td, dg.dataType, config.DerivedMetrics)
 			}
 		case point.SLogging:
 			config := s.GetLoggingConfig(dg.td.Token)
@@ -235,16 +236,13 @@ func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[u
 							if match {
 								// 匹配到了规则
 								if packet != nil {
-									l.Debugf("matched logging, groupId: %s", packet.RawGroupId)
+									twl.Debugf("matched logging, groupId: %s", packet.RawGroupId)
 									DataPackets[packet.GroupIdHash] = packet
 								}
 								break
 							}
 						}
-						for _, metric := range groupDim.DerivedMetrics {
-							// TODO 日志指标化
-							l.Debugf("TODO logging metric: %s", metric)
-						}
+						s.handleDerivedMetrics(dg.td, dg.dataType, groupDim.DerivedMetrics)
 						break
 					}
 				}
@@ -260,27 +258,34 @@ func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[u
 							if match {
 								// 匹配到了规则
 								if packet != nil {
-									l.Debugf("matched RUM, groupId: %s", packet.RawGroupId)
+									twl.Debugf("matched RUM, groupId: %s", packet.RawGroupId)
 									DataPackets[packet.GroupIdHash] = packet
 								}
 								break
 							}
 						}
-						for _, metric := range groupDim.DerivedMetrics {
-							// TODO RUM指标化
-							l.Debugf("TODO RUM metric: %s", metric)
-						}
+						s.handleDerivedMetrics(dg.td, dg.dataType, groupDim.DerivedMetrics)
 						break
 					}
 				}
 			}
 		default:
-			l.Errorf("unsupported data type in tail sampling: %s", dg.dataType)
+			twl.Errorf("unsupported data type in tail sampling: %s", dg.dataType)
 		}
 		dg.Reset()
 		dataGroupPool.Put(dg)
 	}
 	return DataPackets
+}
+
+func (s *GlobalSampler) handleDerivedMetrics(td *DataPacket, dataType string, metrics []*DerivedMetric) {
+	derivedPoints := GenerateDerivedMetrics(td, metrics)
+	if len(derivedPoints) == 0 {
+		return
+	}
+
+	twl.Debugf("generated %d derived metrics for %s: %s", len(derivedPoints), dataType, td.RawGroupId)
+	// TODO: 这里需要将生成的指标点发送到指标处理管道
 }
 
 func (s *GlobalSampler) UpdateConfig(token string, ts *TailSamplingConfigs) {
