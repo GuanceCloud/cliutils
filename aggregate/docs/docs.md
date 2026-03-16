@@ -125,45 +125,48 @@ select point（AggregatorConfigure.PickPoints）：
 
 #### 2. 派生指标配置结构
 
-派生指标配置支持多种数据源类型：
+当前尾采样阶段的派生指标配置以“显式开启内置指标”为主，自定义 `derived_metrics` 字段仍保留，但运行时暂未实现。
 
-**2.1 链路（Trace）派生指标**
+**2.1 链路（Trace）内置派生指标**
 ```toml
-[[trace.derived_metrics]]
-name = "trace_duration"
-condition = ""  # 可选：过滤条件
-group_by = ["service", "resource"]  # 分组标签
+[trace]
+data_ttl = "5m"
 
-[[trace.derived_metrics.aggregate]]
-method = "HISTOGRAM"
-source_field = "$trace_duration"  # 特殊变量：trace持续时间
+[[trace.builtin_derived_metrics]]
+name = "trace_total_count"
+enabled = true
 
-[[trace.derived_metrics.aggregate.histogram_opts]]
-buckets = [10000, 50000, 100000, 500000, 1000000, 5000000, 10000000]
+[[trace.builtin_derived_metrics]]
+name = "trace_error_count"
+enabled = true
+
+[[trace.builtin_derived_metrics]]
+name = "trace_duration_summary"
+enabled = true
 ```
 
-**2.2 日志（Logging）派生指标**
+**2.2 日志（Logging）内置派生指标**
 ```toml
-[[logging.derived_metrics]]
-name = "trace_error"
-condition = "{status=\"error\"}"  # 条件过滤
-group_by = ["service", "resource"]
+[[logging.group_dimensions]]
+group_key = "user_id"
 
-[[logging.derived_metrics.aggregate]]
-method = "COUNT"
-source_field = "status"
+[[logging.group_dimensions.builtin_derived_metrics]]
+name = "logging_total_count"
+enabled = true
+
+[[logging.group_dimensions.builtin_derived_metrics]]
+name = "logging_error_count"
+enabled = true
 ```
 
-**2.3 RUM派生指标**
+**2.3 RUM 内置派生指标**
 ```toml
-[[rum.derived_metrics]]
-name = "page_load_time"
-condition = "{ event = \"page_load\" }"
-group_by = ["page_url", "device_type"]
+[[rum.group_dimensions]]
+group_key = "session_id"
 
-[[rum.derived_metrics.aggregate]]
-method = "HISTOGRAM"
-source_field = "load_time_ms"
+[[rum.group_dimensions.builtin_derived_metrics]]
+name = "rum_total_count"
+enabled = true
 ```
 
 #### 3. 支持的聚合方法
@@ -200,71 +203,60 @@ condition = "{ $trace_duration > 5000000 }"  # trace持续时间>5秒
 
 #### 5. 分组维度配置
 
-派生指标支持按不同维度分组生成指标：
+logging / RUM 的内置派生指标是挂在具体 `group_dimensions` 下启用的：
 
 ```toml
-# 按用户ID分组
 [[logging.group_dimensions]]
 group_key = "user_id"
 
-# 用户ID分组的派生指标
-[[logging.group_dimensions.derived_metrics]]
-name = "user_error_count"
-condition = "{ level = \"error\" }"
-group_by = ["user_id", "service"]
-
-[[logging.group_dimensions.derived_metrics.aggregate]]
-method = "COUNT"
-source_field = "level"
+[[logging.group_dimensions.builtin_derived_metrics]]
+name = "logging_total_count"
+enabled = true
 ```
 
 #### 6. 实际应用场景
 
-**场景1：API性能监控**
+**场景1：Trace流量与错误监控**
 ```toml
-[[trace.derived_metrics]]
-name = "api_response_time"
-condition = "{ resource LIKE \"/api/*\" }"
-group_by = ["service", "resource", "http_method"]
+[[trace.builtin_derived_metrics]]
+name = "trace_total_count"
+enabled = true
 
-[[trace.derived_metrics.aggregate]]
-method = "HISTOGRAM"
-source_field = "$trace_duration"
-
-[[trace.derived_metrics.aggregate.histogram_opts]]
-buckets = [10, 50, 100, 500, 1000, 5000]
+[[trace.builtin_derived_metrics]]
+name = "trace_error_count"
+enabled = true
 ```
 
-**场景2：业务错误监控**
+**场景2：日志流量与错误监控**
 ```toml
-[[logging.derived_metrics]]
-name = "business_error_rate"
-condition = "{ error_type = \"business_error\" }"
-group_by = ["service", "error_code"]
+[[logging.group_dimensions]]
+group_key = "user_id"
 
-[[logging.derived_metrics.aggregate]]
-method = "COUNT"
-source_field = "error_type"
+[[logging.group_dimensions.builtin_derived_metrics]]
+name = "logging_total_count"
+enabled = true
+
+[[logging.group_dimensions.builtin_derived_metrics]]
+name = "logging_error_count"
+enabled = true
 ```
 
-**场景3：用户体验监控**
+**场景3：RUM流量监控**
 ```toml
-[[rum.derived_metrics]]
-name = "user_interaction_time"
-condition = "{ event_type = \"click\" }"
-group_by = ["page_url", "element_id"]
+[[rum.group_dimensions]]
+group_key = "session_id"
 
-[[rum.derived_metrics.aggregate]]
-method = "HISTOGRAM"
-source_field = "interaction_time_ms"
+[[rum.group_dimensions.builtin_derived_metrics]]
+name = "rum_total_count"
+enabled = true
 ```
 
 #### 7. 技术实现要点
 
-1. **实时计算**：派生指标在数据到达时实时计算，不依赖采样决策
-2. **内存高效**：使用聚合计算器（Calculator）减少内存占用
-3. **时间窗口**：按配置的时间窗口聚合指标数据
-4. **异步输出**：派生指标异步输出到监控系统
+1. **到期决策时生成**：尾采样数据到期后，按配置开启的内置指标生成点
+2. **回灌聚合模块**：运行时会直接把内置派生指标构造成 `AggregationBatch` 并写入 `Cache`
+3. **显式开启**：只有配置中 `enabled = true` 的内置指标会生效
+4. **自定义指标暂缓**：用户自定义 `derived_metrics` 仍是 TODO
 
 #### 8. 内置派生指标
 
@@ -283,6 +275,9 @@ source_field = "interaction_time_ms"
 **流量监控指标：**
 - `trace_total_count`：总链路条数统计
 - `span_total_count`：总Span个数统计
+- `logging_total_count`：日志分组数统计
+- `logging_error_count`：错误日志分组数统计
+- `rum_total_count`：RUM分组数统计
 
 **使用示例：**
 ```go
@@ -300,6 +295,12 @@ if aggregate.IsBuiltinMetric("trace_total_count") {
 
 详细使用示例请参考：`builtin_derived_metrics_example.md`
 
+注意：
+
+1. 目前真正接入尾采样运行时的是 `builtin_derived_metrics`
+2. `derived_metrics` 自定义配置字段暂时未实现
+3. builtin 是否可用还受数据类型限制，trace/logging/RUM 只会识别各自允许的指标名
+
 #### 9. 最佳实践
 
 1. **明确业务目标**：根据监控需求设计派生指标
@@ -308,6 +309,4 @@ if aggregate.IsBuiltinMetric("trace_total_count") {
 4. **桶配置**：根据业务特点合理设置直方图桶边界
 5. **监控告警**：基于派生指标设置合理的告警阈值
 6. **利用内置指标**：优先使用系统提供的内置派生指标
-
-
 

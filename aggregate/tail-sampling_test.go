@@ -261,7 +261,7 @@ func MockTrace() []*point.PBPoint {
 		"trace_id":                    "1000000000",
 		"span_id":                     "1234567891",
 		"error_message":               "error",
-		"status":                      "ok",
+		"status":                      "error",
 		"start_time":                  time.Now().Unix(),
 		"duration":                    1000,
 	}), point.CommonLoggingOptions()...)

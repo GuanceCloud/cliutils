@@ -176,3 +176,88 @@ func TestMetricGenerator_SpecialFields(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildDerivedMetricBatches_TraceTotalCount(t *testing.T) {
+	packet := &DataPacket{
+		RawGroupId: "1000000000",
+		Token:      "test-token",
+		DataType:   point.STracing,
+		HasError:   true,
+		Points:     MockTrace(),
+	}
+
+	batches := BuildDerivedMetricBatches(packet, []*DerivedMetric{TraceTotalCount}, 0)
+	assert.Len(t, batches, 1)
+
+	batch := batches[0]
+	assert.NotNil(t, batch)
+	assert.Equal(t, DefaultDerivedMetricWindowSeconds, batch.AggregationOpts["value"].Window)
+	assert.Equal(t, SUM, batch.AggregationOpts["value"].Method)
+	assert.Len(t, batch.Points.Arr, 1)
+
+	pt := point.FromPB(batch.Points.Arr[0])
+	assert.Equal(t, "trace_total_count", pt.Name())
+
+	value, ok := pt.GetF("value")
+	assert.True(t, ok)
+	assert.Equal(t, 1.0, value)
+
+	for _, batch := range batches {
+		// t.Logf("batch =%s", batch.String())
+		for _, pt := range batch.Points.Arr {
+			t.Logf("point string=%s", pt.String())
+		}
+	}
+}
+
+func TestBuildDerivedMetricBatches_SpanTotalCount(t *testing.T) {
+	packet := &DataPacket{
+		RawGroupId: "1000000000",
+		Token:      "test-token",
+		DataType:   point.STracing,
+		HasError:   true,
+		Points:     MockTrace(),
+	}
+
+	batches := BuildDerivedMetricBatches(packet, []*DerivedMetric{SpanTotalCount}, 0)
+	assert.Len(t, batches, 1)
+
+	batch := batches[0]
+	assert.NotNil(t, batch)
+	assert.Equal(t, DefaultDerivedMetricWindowSeconds, batch.AggregationOpts["value"].Window)
+	assert.Equal(t, SUM, batch.AggregationOpts["value"].Method)
+	assert.Len(t, batch.Points.Arr, 1)
+
+	pt := point.FromPB(batch.Points.Arr[0])
+	assert.Equal(t, "span_total_count", pt.Name())
+
+	value, ok := pt.GetF("value")
+	assert.True(t, ok)
+	assert.Equal(t, float64(len(packet.Points)), value)
+}
+
+func TestBuildDerivedMetricBatches_TraceErrorCount(t *testing.T) {
+	packet := &DataPacket{
+		RawGroupId: "1000000000",
+		Token:      "test-token",
+		DataType:   point.STracing,
+		HasError:   true,
+		Points:     MockTrace(),
+	}
+
+	batches := BuildDerivedMetricBatches(packet, []*DerivedMetric{TraceErrorCount}, 0)
+	assert.Len(t, batches, 1)
+
+	batch := batches[0]
+	assert.NotNil(t, batch)
+	assert.Equal(t, DefaultDerivedMetricWindowSeconds, batch.AggregationOpts["value"].Window)
+	assert.Equal(t, SUM, batch.AggregationOpts["value"].Method)
+	assert.Len(t, batch.Points.Arr, 1)
+
+	pt := point.FromPB(batch.Points.Arr[0])
+	assert.Equal(t, "trace_error_count", pt.Name())
+
+	value, ok := pt.GetF("value")
+	assert.True(t, ok)
+	assert.Equal(t, 1.0, value)
+}

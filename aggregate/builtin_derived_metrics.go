@@ -12,15 +12,15 @@ package aggregate
 
 var (
 	// TraceErrorCount 统计错误链路个数
-	// 条件：链路中包含错误状态.
+	// 条件：使用 DataPacket.HasError 判定当前链路是否出错.
 	TraceErrorCount = &DerivedMetric{
 		Name:      "trace_error_count",
-		Condition: `{error=true}`,
-		Groupby:   []string{"service", "resource", "status"}, // 按服务、资源和状态分组
+		Condition: "",
+		Groupby:   []string{"service", "status"}, // 按服务和状态分组
 
 		Algorithm: &AggregationAlgo{
 			Method:      COUNT,
-			SourceField: "error", // 使用error字段进行计数
+			SourceField: "$error_flag", // 使用 packet 级错误标记进行计数
 		},
 	}
 
@@ -28,8 +28,8 @@ var (
 	// 无条件：统计所有链路.
 	TraceTotalCount = &DerivedMetric{
 		Name:      "trace_total_count",
-		Condition: "",                              // 无条件，统计所有链路
-		Groupby:   []string{"service", "resource"}, // 按服务和资源分组
+		Condition: "",                  // 无条件，统计所有链路
+		Groupby:   []string{"service"}, // 按服务和资源分组
 
 		Algorithm: &AggregationAlgo{
 			Method:      COUNT,
@@ -124,6 +124,45 @@ var (
 			},
 		},
 	}
+
+	// LoggingTotalCount 统计日志分组总数
+	// 无条件：每个日志分组计数 1.
+	LoggingTotalCount = &DerivedMetric{
+		Name:      "logging_total_count",
+		Condition: "",
+		Groupby:   []string{"source", "service"},
+
+		Algorithm: &AggregationAlgo{
+			Method:      COUNT,
+			SourceField: "$trace_id",
+		},
+	}
+
+	// LoggingErrorCount 统计错误日志分组总数
+	// 条件：分组内至少有一条日志 status=error.
+	LoggingErrorCount = &DerivedMetric{
+		Name:      "logging_error_count",
+		Condition: `{status="error"}`,
+		Groupby:   []string{"source", "service"},
+
+		Algorithm: &AggregationAlgo{
+			Method:      COUNT,
+			SourceField: "$trace_id",
+		},
+	}
+
+	// RUMTotalCount 统计 RUM 分组总数
+	// 无条件：每个 RUM 分组计数 1.
+	RUMTotalCount = &DerivedMetric{
+		Name:      "rum_total_count",
+		Condition: "",
+		Groupby:   []string{"app_id", "service", "session_type"},
+
+		Algorithm: &AggregationAlgo{
+			Method:      COUNT,
+			SourceField: "$trace_id",
+		},
+	}
 )
 
 // GetBuiltinDerivedMetrics 获取所有内置派生指标
@@ -138,6 +177,9 @@ func GetBuiltinDerivedMetrics() map[string]*DerivedMetric {
 		"slow_trace_count":        SlowTraceCount,
 		"span_error_count":        SpanErrorCount,
 		"trace_size_distribution": TraceSizeDistribution,
+		"logging_total_count":     LoggingTotalCount,
+		"logging_error_count":     LoggingErrorCount,
+		"rum_total_count":         RUMTotalCount,
 	}
 }
 
@@ -147,9 +189,11 @@ func GetTraceBuiltinDerivedMetrics() []*DerivedMetric {
 	return []*DerivedMetric{
 		TraceErrorCount,
 		TraceTotalCount,
+		SpanTotalCount,
 		TraceErrorRate,
 		TraceDurationSummary,
 		SlowTraceCount,
+		SpanErrorCount,
 		TraceSizeDistribution,
 	}
 }
@@ -163,6 +207,71 @@ func GetSpanBuiltinDerivedMetrics() []*DerivedMetric {
 	}
 }
 
+// GetLoggingBuiltinDerivedMetrics 获取日志相关的内置派生指标.
+func GetLoggingBuiltinDerivedMetrics() []*DerivedMetric {
+	return []*DerivedMetric{
+		LoggingTotalCount,
+		LoggingErrorCount,
+	}
+}
+
+// GetRUMBuiltinDerivedMetrics 获取 RUM 相关的内置派生指标.
+func GetRUMBuiltinDerivedMetrics() []*DerivedMetric {
+	return []*DerivedMetric{
+		RUMTotalCount,
+	}
+}
+
+func builtinMetricRegistryByDataType(dataType string) map[string]*DerivedMetric {
+	registry := map[string]*DerivedMetric{}
+
+	var metrics []*DerivedMetric
+	switch dataType {
+	case "tracing":
+		metrics = GetTraceBuiltinDerivedMetrics()
+	case "logging":
+		metrics = GetLoggingBuiltinDerivedMetrics()
+	case "rum":
+		metrics = GetRUMBuiltinDerivedMetrics()
+	default:
+		return registry
+	}
+
+	for _, metric := range metrics {
+		registry[metric.Name] = metric
+	}
+
+	return registry
+}
+
+func resolveBuiltinDerivedMetrics(dataType string, configs []*BuiltinDerivedMetricConfig) []*DerivedMetric {
+	if len(configs) == 0 {
+		return nil
+	}
+
+	registry := builtinMetricRegistryByDataType(dataType)
+	if len(registry) == 0 {
+		return nil
+	}
+
+	resolved := make([]*DerivedMetric, 0, len(configs))
+	for _, cfg := range configs {
+		if cfg == nil || !cfg.Enabled || cfg.Name == "" {
+			continue
+		}
+
+		metric, ok := registry[cfg.Name]
+		if !ok {
+			l.Warnf("unsupported builtin derived metric %q for data type %q", cfg.Name, dataType)
+			continue
+		}
+
+		resolved = append(resolved, metric)
+	}
+
+	return resolved
+}
+
 // BuiltinMetricNames 内置指标名称列表.
 var BuiltinMetricNames = []string{
 	"trace_error_count",
@@ -173,6 +282,9 @@ var BuiltinMetricNames = []string{
 	"slow_trace_count",
 	"span_error_count",
 	"trace_size_distribution",
+	"logging_total_count",
+	"logging_error_count",
+	"rum_total_count",
 }
 
 // IsBuiltinMetric 检查是否为内置指标.

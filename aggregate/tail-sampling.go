@@ -32,6 +32,11 @@ type DerivedMetric struct {
 	Groupby   []string         `toml:"group_by" json:"group_by"`
 }
 
+type BuiltinDerivedMetricConfig struct {
+	Name    string `toml:"name" json:"name"`
+	Enabled bool   `toml:"enabled" json:"enabled"`
+}
+
 type SamplingPipeline struct {
 	Name      string         `toml:"name" json:"name"`
 	Type      PipelineType   `toml:"type" json:"type"`
@@ -152,10 +157,11 @@ func PickTrace(source string, pts []*point.Point, version int64) map[uint64]*Dat
 }
 
 type TraceTailSampling struct {
-	DataTTL        time.Duration       `toml:"data_ttl" json:"data_ttl"`
-	DerivedMetrics []*DerivedMetric    `toml:"derived_metrics" json:"derived_metrics"`
-	Pipelines      []*SamplingPipeline `toml:"sampling_pipeline" json:"pipelines"`
-	Version        int64               `toml:"version" json:"version"`
+	DataTTL               time.Duration                 `toml:"data_ttl" json:"data_ttl"`
+	BuiltinDerivedMetrics []*BuiltinDerivedMetricConfig `toml:"builtin_derived_metrics" json:"builtin_derived_metrics"`
+	DerivedMetrics        []*DerivedMetric              `toml:"derived_metrics" json:"derived_metrics"`
+	Pipelines             []*SamplingPipeline           `toml:"sampling_pipeline" json:"pipelines"`
+	Version               int64                         `toml:"version" json:"version"`
 
 	// 链路特有配置
 	GroupKey string `toml:"group_key" json:"group_key"` // 链路固定为 "trace_id"
@@ -176,6 +182,7 @@ func (t *TailSamplingConfigs) Init() {
 		if t.Tracing.GroupKey == "" {
 			t.Tracing.GroupKey = "trace_id"
 		}
+		resolveBuiltinDerivedMetrics(point.STracing, t.Tracing.BuiltinDerivedMetrics)
 		for _, pipeline := range t.Tracing.Pipelines {
 			if err := pipeline.Apply(); err != nil {
 				l.Errorf("failed to apply sampling pipeline: %s", err)
@@ -188,6 +195,7 @@ func (t *TailSamplingConfigs) Init() {
 			t.Logging.DataTTL = 1 * time.Minute
 		}
 		for _, group := range t.Logging.GroupDimensions {
+			resolveBuiltinDerivedMetrics(point.SLogging, group.BuiltinDerivedMetrics)
 			for _, pipeline := range group.Pipelines {
 				if err := pipeline.Apply(); err != nil {
 					l.Errorf("failed to apply sampling pipeline: %s", err)
@@ -201,6 +209,7 @@ func (t *TailSamplingConfigs) Init() {
 			t.RUM.DataTTL = 1 * time.Minute
 		}
 		for _, group := range t.RUM.GroupDimensions {
+			resolveBuiltinDerivedMetrics(point.SRUM, group.BuiltinDerivedMetrics)
 			for _, pipeline := range group.Pipelines {
 				if err := pipeline.Apply(); err != nil {
 					l.Errorf("failed to apply sampling pipeline: %s", err)
@@ -224,6 +233,9 @@ type LoggingGroupDimension struct {
 
 	// 该分组维度下的采样管道
 	Pipelines []*SamplingPipeline `toml:"pipelines" json:"pipelines"`
+
+	// 显式启用的内置派生指标
+	BuiltinDerivedMetrics []*BuiltinDerivedMetricConfig `toml:"builtin_derived_metrics" json:"builtin_derived_metrics"`
 
 	// 该分组特有的派生指标
 	DerivedMetrics []*DerivedMetric `toml:"derived_metrics" json:"derived_metrics"`
@@ -284,9 +296,10 @@ type RUMTailSampling struct {
 }
 
 type RUMGroupDimension struct {
-	GroupKey       string              `toml:"group_key" json:"group_key"` // session_id, user_id, page_id
-	Pipelines      []*SamplingPipeline `toml:"pipelines" json:"pipelines"`
-	DerivedMetrics []*DerivedMetric    `toml:"derived_metrics" json:"derived_metrics"`
+	GroupKey              string                        `toml:"group_key" json:"group_key"` // session_id, user_id, page_id
+	Pipelines             []*SamplingPipeline           `toml:"pipelines" json:"pipelines"`
+	BuiltinDerivedMetrics []*BuiltinDerivedMetricConfig `toml:"builtin_derived_metrics" json:"builtin_derived_metrics"`
+	DerivedMetrics        []*DerivedMetric              `toml:"derived_metrics" json:"derived_metrics"`
 }
 
 func (rumGroup *RUMGroupDimension) PickRUM(source string, pts []*point.Point) (map[uint64]*DataPacket, []*point.Point) {

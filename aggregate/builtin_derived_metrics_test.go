@@ -27,13 +27,16 @@ func TestGetBuiltinDerivedMetrics(t *testing.T) {
 	assert.Contains(t, metrics, "slow_trace_count")
 	assert.Contains(t, metrics, "span_error_count")
 	assert.Contains(t, metrics, "trace_size_distribution")
+	assert.Contains(t, metrics, "logging_total_count")
+	assert.Contains(t, metrics, "logging_error_count")
+	assert.Contains(t, metrics, "rum_total_count")
 
 	// 检查指标配置
 	traceErrorCount := metrics["trace_error_count"]
 	assert.Equal(t, "trace_error_count", traceErrorCount.Name)
-	assert.Equal(t, `{error=true}`, traceErrorCount.Condition)
+	assert.Equal(t, "", traceErrorCount.Condition)
 	assert.Equal(t, COUNT, traceErrorCount.Algorithm.Method)
-	assert.Equal(t, "error", traceErrorCount.Algorithm.SourceField)
+	assert.Equal(t, "$error_flag", traceErrorCount.Algorithm.SourceField)
 
 	traceTotalCount := metrics["trace_total_count"]
 	assert.Equal(t, "trace_total_count", traceTotalCount.Name)
@@ -46,6 +49,24 @@ func TestGetBuiltinDerivedMetrics(t *testing.T) {
 	assert.Equal(t, "", spanTotalCount.Condition) // 无条件
 	assert.Equal(t, COUNT, spanTotalCount.Algorithm.Method)
 	assert.Equal(t, "span_id", spanTotalCount.Algorithm.SourceField)
+
+	loggingTotalCount := metrics["logging_total_count"]
+	assert.Equal(t, "logging_total_count", loggingTotalCount.Name)
+	assert.Equal(t, "", loggingTotalCount.Condition)
+	assert.Equal(t, COUNT, loggingTotalCount.Algorithm.Method)
+	assert.Equal(t, "$trace_id", loggingTotalCount.Algorithm.SourceField)
+
+	loggingErrorCount := metrics["logging_error_count"]
+	assert.Equal(t, "logging_error_count", loggingErrorCount.Name)
+	assert.Equal(t, `{status="error"}`, loggingErrorCount.Condition)
+	assert.Equal(t, COUNT, loggingErrorCount.Algorithm.Method)
+	assert.Equal(t, "$trace_id", loggingErrorCount.Algorithm.SourceField)
+
+	rumTotalCount := metrics["rum_total_count"]
+	assert.Equal(t, "rum_total_count", rumTotalCount.Name)
+	assert.Equal(t, "", rumTotalCount.Condition)
+	assert.Equal(t, COUNT, rumTotalCount.Algorithm.Method)
+	assert.Equal(t, "$trace_id", rumTotalCount.Algorithm.SourceField)
 }
 
 func TestGetTraceBuiltinDerivedMetrics(t *testing.T) {
@@ -109,6 +130,9 @@ func TestIsBuiltinMetric(t *testing.T) {
 	assert.True(t, IsBuiltinMetric("slow_trace_count"))
 	assert.True(t, IsBuiltinMetric("span_error_count"))
 	assert.True(t, IsBuiltinMetric("trace_size_distribution"))
+	assert.True(t, IsBuiltinMetric("logging_total_count"))
+	assert.True(t, IsBuiltinMetric("logging_error_count"))
+	assert.True(t, IsBuiltinMetric("rum_total_count"))
 
 	// 测试非内置指标
 	assert.False(t, IsBuiltinMetric("custom_metric"))
@@ -121,7 +145,7 @@ func TestGetBuiltinMetric(t *testing.T) {
 	metric := GetBuiltinMetric("trace_error_count")
 	assert.NotNil(t, metric)
 	assert.Equal(t, "trace_error_count", metric.Name)
-	assert.Equal(t, `{error=true}`, metric.Condition)
+	assert.Equal(t, "", metric.Condition)
 
 	metric = GetBuiltinMetric("trace_total_count")
 	assert.NotNil(t, metric)
@@ -132,6 +156,18 @@ func TestGetBuiltinMetric(t *testing.T) {
 	assert.NotNil(t, metric)
 	assert.Equal(t, "trace_duration_summary", metric.Name)
 	assert.Equal(t, QUANTILES, metric.Algorithm.Method)
+
+	metric = GetBuiltinMetric("logging_total_count")
+	assert.NotNil(t, metric)
+	assert.Equal(t, "logging_total_count", metric.Name)
+
+	metric = GetBuiltinMetric("logging_error_count")
+	assert.NotNil(t, metric)
+	assert.Equal(t, "logging_error_count", metric.Name)
+
+	metric = GetBuiltinMetric("rum_total_count")
+	assert.NotNil(t, metric)
+	assert.Equal(t, "rum_total_count", metric.Name)
 
 	// 测试获取不存在的指标
 	metric = GetBuiltinMetric("non_existent_metric")

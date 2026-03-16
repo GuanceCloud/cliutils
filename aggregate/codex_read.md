@@ -325,12 +325,14 @@
   - RUM: 1m
 - trace 默认 `group_key = trace_id`
 - 对每条 pipeline 调 `Apply()` 解析条件
+- 会预解析并校验各数据类型配置的 `builtin_derived_metrics`
 
-要注意：
+当前配置模型要记住：
 
-- `LoggingTailSampling` 本身没有顶层 `DerivedMetrics` 字段，派生指标是挂在每个 `LoggingGroupDimension` 上的。
-- `RUMTailSampling` 既有顶层 `DerivedMetrics`，也有每个 group dimension 的 `DerivedMetrics`。
-  但当前 `TailSamplingData()` 对 RUM 走的是 group dimension 级派生指标。
+- trace 使用 `trace.builtin_derived_metrics`
+- logging 使用 `logging.group_dimensions[].builtin_derived_metrics`
+- RUM 使用 `rum.group_dimensions[].builtin_derived_metrics`
+- `derived_metrics` 自定义配置字段还在，但尾采样运行时暂时只打 TODO，不真正执行
 
 ## 6.4 采样管道
 
@@ -410,11 +412,13 @@
   - 取 trace config
   - 顺序执行 pipelines
   - 命中保留则写入返回的 `DataPacket` map
-  - 调用 `handleDerivedMetrics()`
+  - 按配置启用的 `builtin_derived_metrics` 调用 `handleBuiltinDerivedMetrics()`
+  - 自定义 `derived_metrics` 当前只记录 TODO
 - logging:
   - 找到匹配 `GroupKey` 的维度配置
   - 执行 pipelines
-  - 调用 `handleDerivedMetrics()`
+  - 按配置启用的 `builtin_derived_metrics` 调用 `handleBuiltinDerivedMetrics()`
+  - 自定义 `derived_metrics` 当前只记录 TODO
 - RUM:
   - 同 logging
 
@@ -458,8 +462,8 @@
 
 这是本模块最重要的注意项之一：
 
-1. `timewheel.go` 里虽然已经调用 `GenerateDerivedMetrics()`，但只打 debug log，后续发送仍是 `TODO`。
-   结论：当前代码会“生成派生指标点对象”，但没有真正把这些点送入后续指标链路。
+1. 当前已经不是“只打 debug log”。
+   `timewheel.go` 里启用的 builtin 派生指标会真正生成聚合批次，并通过 sink 直接写入 `Cache`。
 
 2. `$trace_duration` 的代码和文档单位不一致。
    `extractSourceValues()` 用 `(LastSeenNano - FirstSeenNano) / 1e6`，实际算出来是毫秒；但注释、文档和内置条件多处写的是微秒。
@@ -467,10 +471,13 @@
 3. `evaluateCondition()` 是在单个 point 上跑 filter 条件，并不天然支持 `DataPacket` 级特殊变量。
    所以像 `{$trace_duration > 5000000}` 这类条件，从当前代码看很可能无法按预期工作。
 
-4. `PickTrace()` / `pickByGroupKey()` 当前并没有填充 `FirstSeenNano` 和 `LastSeenNano`。
-   如果外部没有补这两个字段，那么依赖 `$trace_duration` 的派生指标根本没有输入。
+4. `PickTrace()` 现在已经在填充 `TraceStartTimeUnixNano` 和 `TraceEndTimeUnixNano`。
+   但 logging / RUM 这侧是否需要同样的 packet 级时间摘要，仍要结合后续内置指标扩展一起看。
 
-这几个点叠加起来，说明“派生指标的设计已经成形，但当前实现还没有完全闭环”。
+5. 真正进入尾采样运行时的，目前只有配置里显式开启的 builtin 派生指标。
+   用户自定义 `derived_metrics` 仍然是 TODO。
+
+这几个点叠加起来，说明“派生指标已经完成了 builtin 闭环，但自定义指标链路还没开放”。
 
 ---
 
@@ -486,6 +493,9 @@
 - `slow_trace_count`
 - `span_error_count`
 - `trace_size_distribution`
+- `logging_total_count`
+- `logging_error_count`
+- `rum_total_count`
 
 对应能力大致是：
 
@@ -497,6 +507,14 @@
 - 慢 trace 数
 - span 错误数
 - trace 大小分布
+- 日志分组总数
+- 错误日志分组数
+- RUM 分组总数
+
+还要记住一个限制：
+
+- builtin 虽然集中定义在一个文件里，但运行时会按 data type 过滤
+- trace/logging/RUM 只能启用各自允许的 builtin 名称
 
 测试文件 `builtin_derived_metrics_test.go` 主要验证：
 

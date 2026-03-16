@@ -48,11 +48,12 @@ type Shard struct {
 
 // 3. 全局管理器.
 type GlobalSampler struct {
-	shards     []*Shard
-	shardCount int
-	waitTime   time.Duration // 5分钟
-	configMap  map[string]*TailSamplingConfigs
-	lock       sync.RWMutex
+	shards             []*Shard
+	shardCount         int
+	waitTime           time.Duration // 5分钟
+	configMap          map[string]*TailSamplingConfigs
+	derivedMetricsSink DerivedMetricsSink
+	lock               sync.RWMutex
 }
 
 func NewGlobalSampler(shardCount int, waitTime time.Duration) *GlobalSampler {
@@ -78,6 +79,12 @@ func NewGlobalSampler(shardCount int, waitTime time.Duration) *GlobalSampler {
 	}
 
 	return sampler
+}
+
+func (s *GlobalSampler) SetDerivedMetricsSink(sink DerivedMetricsSink) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.derivedMetricsSink = sink
 }
 
 func (s *GlobalSampler) Ingest(packet *DataPacket) {
@@ -223,7 +230,10 @@ func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[u
 						break
 					}
 				}
-				s.handleDerivedMetrics(dg.td, dg.dataType, config.DerivedMetrics)
+				s.handleBuiltinDerivedMetrics(dg.td, dg.dataType, config.BuiltinDerivedMetrics)
+				if len(config.DerivedMetrics) > 0 {
+					twl.Debugf("custom derived metrics for %s are TODO, token=%s", dg.dataType, dg.td.Token)
+				}
 			}
 		case point.SLogging:
 			config := s.GetLoggingConfig(dg.td.Token)
@@ -242,7 +252,10 @@ func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[u
 								break
 							}
 						}
-						s.handleDerivedMetrics(dg.td, dg.dataType, groupDim.DerivedMetrics)
+						s.handleBuiltinDerivedMetrics(dg.td, dg.dataType, groupDim.BuiltinDerivedMetrics)
+						if len(groupDim.DerivedMetrics) > 0 {
+							twl.Debugf("custom derived metrics for %s are TODO, token=%s, group_key=%s", dg.dataType, dg.td.Token, groupDim.GroupKey)
+						}
 						break
 					}
 				}
@@ -264,7 +277,10 @@ func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[u
 								break
 							}
 						}
-						s.handleDerivedMetrics(dg.td, dg.dataType, groupDim.DerivedMetrics)
+						s.handleBuiltinDerivedMetrics(dg.td, dg.dataType, groupDim.BuiltinDerivedMetrics)
+						if len(groupDim.DerivedMetrics) > 0 {
+							twl.Debugf("custom derived metrics for %s are TODO, token=%s, group_key=%s", dg.dataType, dg.td.Token, groupDim.GroupKey)
+						}
 						break
 					}
 				}
@@ -278,14 +294,30 @@ func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[u
 	return DataPackets
 }
 
+func (s *GlobalSampler) handleBuiltinDerivedMetrics(td *DataPacket, dataType string, builtinCfgs []*BuiltinDerivedMetricConfig) {
+	s.handleDerivedMetrics(td, dataType, resolveBuiltinDerivedMetrics(dataType, builtinCfgs))
+}
+
 func (s *GlobalSampler) handleDerivedMetrics(td *DataPacket, dataType string, metrics []*DerivedMetric) {
-	derivedPoints := GenerateDerivedMetrics(td, metrics)
-	if len(derivedPoints) == 0 {
+	derivedBatchs := BuildDerivedMetricBatches(td, metrics, DefaultDerivedMetricWindowSeconds)
+	if len(derivedBatchs) == 0 {
 		return
 	}
 
-	twl.Debugf("generated %d derived metrics for %s: %s", len(derivedPoints), dataType, td.RawGroupId)
-	// TODO: 这里需要将生成的指标点发送到指标处理管道
+	twl.Debugf("generated %d derived metric batches for %s: %s", len(derivedBatchs), dataType, td.RawGroupId)
+
+	s.lock.RLock()
+	sink := s.derivedMetricsSink
+	s.lock.RUnlock()
+
+	if sink == nil {
+		twl.Debugf("derived metrics sink is nil for token=%s, dataType=%s", td.Token, dataType)
+		return
+	}
+
+	if err := sink.ConsumeDerivedMetrics(td.Token, derivedBatchs); err != nil {
+		twl.Errorf("consume derived metrics failed for token=%s, dataType=%s: %s", td.Token, dataType, err)
+	}
 }
 
 func (s *GlobalSampler) UpdateConfig(token string, ts *TailSamplingConfigs) {

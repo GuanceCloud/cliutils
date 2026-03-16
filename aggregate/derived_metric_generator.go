@@ -9,6 +9,7 @@ package aggregate
 
 import (
 	"math"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -116,7 +117,8 @@ func (mg *MetricGenerator) extractGroupTags(packet *DataPacket, groupBy []string
 }
 
 // generateMetricsByAlgorithm 根据算法生成指标
-func (mg *MetricGenerator) generateMetricsByAlgorithm(packet *DataPacket, metric *DerivedMetric, tags map[string]string) []*point.Point {
+func (mg *MetricGenerator) generateMetricsByAlgorithm(packet *DataPacket,
+	metric *DerivedMetric, tags map[string]string) []*point.Point {
 	algo := metric.Algorithm
 
 	switch algo.Method {
@@ -137,7 +139,8 @@ func (mg *MetricGenerator) generateMetricsByAlgorithm(packet *DataPacket, metric
 }
 
 // generateCountMetric 生成计数指标
-func (mg *MetricGenerator) generateCountMetric(packet *DataPacket, algo *AggregationAlgo, name string, tags map[string]string) []*point.Point {
+func (mg *MetricGenerator) generateCountMetric(packet *DataPacket, algo *AggregationAlgo,
+	name string, tags map[string]string) []*point.Point {
 	// 计算符合条件的span数量
 	count := 0
 	sourceField := algo.SourceField
@@ -147,6 +150,10 @@ func (mg *MetricGenerator) generateCountMetric(packet *DataPacket, algo *Aggrega
 		count = 1 // 每个trace计数1
 	} else if sourceField == "$span_count" {
 		count = len(packet.Points) // span数量
+	} else if sourceField == "$error_flag" {
+		if packet.HasError {
+			count = 1
+		}
 	} else {
 		// 统计具有特定字段的span数量
 		for _, pbPoint := range packet.Points {
@@ -492,6 +499,139 @@ func (mg *MetricGenerator) sortFloat64Slice(values []float64) []float64 {
 // Global metric generator instance
 var globalMetricGenerator = NewMetricGenerator()
 
+func cloneAggregationAlgo(algo *AggregationAlgo) *AggregationAlgo {
+	if algo == nil {
+		return nil
+	}
+
+	cloned := *algo
+	return &cloned
+}
+
+func metricPointToAggregationBatch(pt *point.Point, algo *AggregationAlgo, window int64) *AggregationBatch {
+	if pt == nil || algo == nil {
+		return nil
+	}
+
+	if window <= 0 {
+		window = DefaultDerivedMetricWindowSeconds
+	}
+
+	tagKeys := make([]string, 0)
+	for _, kv := range pt.KVs() {
+		if kv.IsTag {
+			tagKeys = append(tagKeys, kv.Key)
+		}
+	}
+	sort.Strings(tagKeys)
+
+	aggrAlgo := cloneAggregationAlgo(algo)
+	aggrAlgo.SourceField = "value"
+	aggrAlgo.Window = window
+
+	return &AggregationBatch{
+		RoutingKey: hash(pt, tagKeys),
+		PickKey:    pickHash(pt, tagKeys),
+		AggregationOpts: map[string]*AggregationAlgo{
+			"value": aggrAlgo,
+		},
+		Points: &point.PBPoints{
+			Arr: []*point.PBPoint{pt.PBPoint()},
+		},
+	}
+}
+
+func (mg *MetricGenerator) buildCountMetricBatches(packet *DataPacket, algo *AggregationAlgo, name string, tags map[string]string, window int64) []*AggregationBatch {
+	countPoints := mg.generateCountMetric(packet, algo, name, tags)
+	if len(countPoints) == 0 {
+		return nil
+	}
+
+	batches := make([]*AggregationBatch, 0, len(countPoints))
+	sumAlgo := &AggregationAlgo{
+		Method:      SUM,
+		SourceField: "value",
+	}
+
+	for _, pt := range countPoints {
+		if batch := metricPointToAggregationBatch(pt, sumAlgo, window); batch != nil {
+			batches = append(batches, batch)
+		}
+	}
+
+	return batches
+}
+
+func (mg *MetricGenerator) buildAggregationMetricBatches(packet *DataPacket, algo *AggregationAlgo, name string, tags map[string]string, window int64) []*AggregationBatch {
+	values := mg.extractSourceValues(packet, algo.SourceField)
+	if len(values) == 0 {
+		return nil
+	}
+
+	batches := make([]*AggregationBatch, 0, len(values))
+	rawAlgo := cloneAggregationAlgo(algo)
+	for _, value := range values {
+		fields := map[string]interface{}{
+			"value": value,
+		}
+		pts := mg.createMetricPoint(name, fields, tags)
+		if len(pts) == 0 {
+			continue
+		}
+		if batch := metricPointToAggregationBatch(pts[0], rawAlgo, window); batch != nil {
+			batches = append(batches, batch)
+		}
+	}
+
+	return batches
+}
+
+func (mg *MetricGenerator) buildHistogramMetricBatches(packet *DataPacket, algo *AggregationAlgo, name string, tags map[string]string, window int64) []*AggregationBatch {
+	points := mg.generateHistogramMetric(packet, algo, name, tags)
+	if len(points) == 0 {
+		return nil
+	}
+
+	batches := make([]*AggregationBatch, 0, len(points))
+	sumAlgo := &AggregationAlgo{
+		Method:      SUM,
+		SourceField: "value",
+	}
+
+	for _, pt := range points {
+		if batch := metricPointToAggregationBatch(pt, sumAlgo, window); batch != nil {
+			batches = append(batches, batch)
+		}
+	}
+
+	return batches
+}
+
+func (mg *MetricGenerator) buildMetricBatchesFromDataPacket(packet *DataPacket, metric *DerivedMetric, window int64) []*AggregationBatch {
+	if packet == nil || metric == nil || metric.Algorithm == nil {
+		return nil
+	}
+
+	if !mg.evaluateCondition(packet, metric.Condition) {
+		return nil
+	}
+
+	tags := mg.extractGroupTags(packet, metric.Groupby)
+	algo := metric.Algorithm
+
+	switch algo.Method {
+	case COUNT:
+		return mg.buildCountMetricBatches(packet, algo, metric.Name, tags, window)
+	case HISTOGRAM:
+		return mg.buildHistogramMetricBatches(packet, algo, metric.Name, tags, window)
+	case QUANTILES, AVG, SUM, MIN, MAX, STDEV:
+		return mg.buildAggregationMetricBatches(packet, algo, metric.Name, tags, window)
+	default:
+		mgl.Warnf("unsupported batch build algorithm method: %s for metric: %s", algo.Method, metric.Name)
+		return nil
+	}
+}
+
 // GenerateDerivedMetrics 生成派生指标的全局函数
 func GenerateDerivedMetrics(packet *DataPacket, metrics []*DerivedMetric) []*point.Point {
 	if packet == nil || len(metrics) == 0 {
@@ -507,4 +647,25 @@ func GenerateDerivedMetrics(packet *DataPacket, metrics []*DerivedMetric) []*poi
 	}
 
 	return allPoints
+}
+
+// BuildDerivedMetricBatches converts derived metrics into aggregation batches directly.
+func BuildDerivedMetricBatches(packet *DataPacket, metrics []*DerivedMetric, window int64) []*AggregationBatch {
+	if packet == nil || len(metrics) == 0 {
+		return nil
+	}
+
+	if window <= 0 {
+		window = DefaultDerivedMetricWindowSeconds
+	}
+
+	allBatches := make([]*AggregationBatch, 0)
+	for _, metric := range metrics {
+		batches := globalMetricGenerator.buildMetricBatchesFromDataPacket(packet, metric, window)
+		if len(batches) > 0 {
+			allBatches = append(allBatches, batches...)
+		}
+	}
+
+	return allBatches
 }
