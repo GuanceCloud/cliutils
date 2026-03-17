@@ -19,6 +19,13 @@ import (
 	"github.com/GuanceCloud/cliutils/point"
 )
 
+const (
+	DerivedMetricFieldTraceID       = "$trace_id"
+	DerivedMetricFieldSpanCount     = "$span_count"
+	DerivedMetricFieldTraceDuration = "$trace_duration"
+	DerivedMetricFieldErrorFlag     = "$error_flag"
+)
+
 var mgl = logger.DefaultSLogger("aggregate.metricgen")
 
 // MetricGenerator 派生指标生成器
@@ -146,11 +153,11 @@ func (mg *MetricGenerator) generateCountMetric(packet *DataPacket, algo *Aggrega
 	sourceField := algo.SourceField
 
 	// 特殊处理：使用$trace_id表示统计trace数量
-	if sourceField == "$trace_id" {
+	if sourceField == DerivedMetricFieldTraceID {
 		count = 1 // 每个trace计数1
-	} else if sourceField == "$span_count" {
+	} else if sourceField == DerivedMetricFieldSpanCount {
 		count = len(packet.Points) // span数量
-	} else if sourceField == "$error_flag" {
+	} else if sourceField == DerivedMetricFieldErrorFlag {
 		if packet.HasError {
 			count = 1
 		}
@@ -168,13 +175,12 @@ func (mg *MetricGenerator) generateCountMetric(packet *DataPacket, algo *Aggrega
 	if count == 0 {
 		return nil
 	}
-
 	// 创建指标点
 	fields := map[string]interface{}{
-		"value": float64(count),
+		name: float64(count),
 	}
 
-	return mg.createMetricPoint(name, fields, tags)
+	return mg.createMetricPoint(TailSamplingDerivedMetricName, fields, tags)
 }
 
 // generateHistogramMetric 生成直方图指标
@@ -221,8 +227,7 @@ func (mg *MetricGenerator) generateHistogramMetric(packet *DataPacket, algo *Agg
 	// 每个桶一个点
 	for bucket, count := range histogram {
 		fields := map[string]interface{}{
-			"value": float64(count),
-			"le":    bucket,
+			name + "_bucket": float64(count),
 		}
 		bucketTags := make(map[string]string)
 		for k, v := range tags {
@@ -230,14 +235,13 @@ func (mg *MetricGenerator) generateHistogramMetric(packet *DataPacket, algo *Agg
 		}
 		bucketTags["le"] = strconv.FormatFloat(bucket, 'f', -1, 64)
 
-		points = append(points, mg.createMetricPoint(name+"_bucket", fields, bucketTags)...)
+		points = append(points, mg.createMetricPoint(TailSamplingDerivedMetricName, fields, bucketTags)...)
 	}
 
 	// +Inf 桶
 	if infCount > 0 {
 		fields := map[string]interface{}{
-			"value": float64(infCount),
-			"le":    math.Inf(1),
+			name + "_bucket": float64(infCount),
 		}
 		infTags := make(map[string]string)
 		for k, v := range tags {
@@ -245,14 +249,14 @@ func (mg *MetricGenerator) generateHistogramMetric(packet *DataPacket, algo *Agg
 		}
 		infTags["le"] = "+Inf"
 
-		points = append(points, mg.createMetricPoint(name+"_bucket", fields, infTags)...)
+		points = append(points, mg.createMetricPoint(TailSamplingDerivedMetricName, fields, infTags)...)
 	}
 
 	// 总数
 	totalFields := map[string]interface{}{
-		"value": float64(len(values)),
+		name + "_count": float64(len(values)),
 	}
-	points = append(points, mg.createMetricPoint(name+"_count", totalFields, tags)...)
+	points = append(points, mg.createMetricPoint(TailSamplingDerivedMetricName, totalFields, tags)...)
 
 	// 总和
 	sum := 0.0
@@ -260,9 +264,9 @@ func (mg *MetricGenerator) generateHistogramMetric(packet *DataPacket, algo *Agg
 		sum += value
 	}
 	sumFields := map[string]interface{}{
-		"value": sum,
+		name + "_sum": sum,
 	}
-	points = append(points, mg.createMetricPoint(name+"_sum", sumFields, tags)...)
+	points = append(points, mg.createMetricPoint(TailSamplingDerivedMetricName, sumFields, tags)...)
 
 	return points
 }
@@ -307,7 +311,7 @@ func (mg *MetricGenerator) generateQuantileMetric(packet *DataPacket, algo *Aggr
 		value := sortedValues[index]
 
 		fields := map[string]interface{}{
-			"value": value,
+			name: value,
 		}
 		quantileTags := make(map[string]string)
 		for k, v := range tags {
@@ -315,7 +319,7 @@ func (mg *MetricGenerator) generateQuantileMetric(packet *DataPacket, algo *Aggr
 		}
 		quantileTags["quantile"] = strconv.FormatFloat(percentile, 'f', -1, 64)
 
-		points = append(points, mg.createMetricPoint(name, fields, quantileTags)...)
+		points = append(points, mg.createMetricPoint(TailSamplingDerivedMetricName, fields, quantileTags)...)
 	}
 
 	return points
@@ -360,10 +364,10 @@ func (mg *MetricGenerator) generateAggregationMetric(packet *DataPacket, algo *A
 	}
 
 	fields := map[string]interface{}{
-		"value": result,
+		name: result,
 	}
 
-	return mg.createMetricPoint(name, fields, tags)
+	return mg.createMetricPoint(TailSamplingDerivedMetricName, fields, tags)
 }
 
 // generateCountDistinctMetric 生成去重计数指标
@@ -387,16 +391,16 @@ func (mg *MetricGenerator) generateCountDistinctMetric(packet *DataPacket, algo 
 	}
 
 	fields := map[string]interface{}{
-		"value": float64(count),
+		name: float64(count),
 	}
 
-	return mg.createMetricPoint(name, fields, tags)
+	return mg.createMetricPoint(TailSamplingDerivedMetricName, fields, tags)
 }
 
 // extractSourceValues 提取源字段值
 func (mg *MetricGenerator) extractSourceValues(packet *DataPacket, sourceField string) []float64 {
 	// 特殊字段处理
-	if sourceField == "$trace_duration" {
+	if sourceField == DerivedMetricFieldTraceDuration {
 		// 计算trace持续时间（纳秒）
 		if packet.TraceStartTimeUnixNano > 0 &&
 			packet.TraceEndTimeUnixNano > packet.TraceStartTimeUnixNano {
@@ -408,7 +412,7 @@ func (mg *MetricGenerator) extractSourceValues(packet *DataPacket, sourceField s
 		return nil
 	}
 
-	if sourceField == "$error_flag" {
+	if sourceField == DerivedMetricFieldErrorFlag {
 		// 错误标志：有错误为1，无错误为0
 		if packet.HasError {
 			return []float64{1.0}
@@ -432,7 +436,8 @@ func (mg *MetricGenerator) extractSourceValues(packet *DataPacket, sourceField s
 }
 
 // createMetricPoint 创建指标点
-func (mg *MetricGenerator) createMetricPoint(name string, fields map[string]interface{}, tags map[string]string) []*point.Point {
+func (mg *MetricGenerator) createMetricPoint(name string, fields map[string]interface{},
+	tags map[string]string) []*point.Point {
 	// 添加额外标签
 	if len(tags) == 0 {
 		tags = make(map[string]string)
@@ -508,6 +513,20 @@ func cloneAggregationAlgo(algo *AggregationAlgo) *AggregationAlgo {
 	return &cloned
 }
 
+func metricFieldKey(pt *point.Point) string {
+	if pt == nil {
+		return ""
+	}
+
+	for _, kv := range pt.KVs() {
+		if !kv.IsTag {
+			return kv.Key
+		}
+	}
+
+	return ""
+}
+
 func metricPointToAggregationBatch(pt *point.Point, algo *AggregationAlgo, window int64) *AggregationBatch {
 	if pt == nil || algo == nil {
 		return nil
@@ -525,15 +544,20 @@ func metricPointToAggregationBatch(pt *point.Point, algo *AggregationAlgo, windo
 	}
 	sort.Strings(tagKeys)
 
+	fieldKey := metricFieldKey(pt)
+	if fieldKey == "" {
+		return nil
+	}
+
 	aggrAlgo := cloneAggregationAlgo(algo)
-	aggrAlgo.SourceField = "value"
+	aggrAlgo.SourceField = fieldKey
 	aggrAlgo.Window = window
 
 	return &AggregationBatch{
 		RoutingKey: hash(pt, tagKeys),
 		PickKey:    pickHash(pt, tagKeys),
 		AggregationOpts: map[string]*AggregationAlgo{
-			"value": aggrAlgo,
+			fieldKey: aggrAlgo,
 		},
 		Points: &point.PBPoints{
 			Arr: []*point.PBPoint{pt.PBPoint()},
@@ -550,7 +574,7 @@ func (mg *MetricGenerator) buildCountMetricBatches(packet *DataPacket, algo *Agg
 	batches := make([]*AggregationBatch, 0, len(countPoints))
 	sumAlgo := &AggregationAlgo{
 		Method:      SUM,
-		SourceField: "value",
+		SourceField: name,
 	}
 
 	for _, pt := range countPoints {
@@ -572,9 +596,9 @@ func (mg *MetricGenerator) buildAggregationMetricBatches(packet *DataPacket, alg
 	rawAlgo := cloneAggregationAlgo(algo)
 	for _, value := range values {
 		fields := map[string]interface{}{
-			"value": value,
+			name: value,
 		}
-		pts := mg.createMetricPoint(name, fields, tags)
+		pts := mg.createMetricPoint(TailSamplingDerivedMetricName, fields, tags)
 		if len(pts) == 0 {
 			continue
 		}
@@ -595,7 +619,7 @@ func (mg *MetricGenerator) buildHistogramMetricBatches(packet *DataPacket, algo 
 	batches := make([]*AggregationBatch, 0, len(points))
 	sumAlgo := &AggregationAlgo{
 		Method:      SUM,
-		SourceField: "value",
+		SourceField: name,
 	}
 
 	for _, pt := range points {

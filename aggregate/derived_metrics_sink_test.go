@@ -35,7 +35,7 @@ func TestAggregateDerivedMetricsSink_ConsumeDerivedMetrics(t *testing.T) {
 	packet := newTracePacketForDerivedMetrics()
 	derivedBatchs := BuildDerivedMetricBatches(packet, []*DerivedMetric{TraceTotalCount}, 0)
 	require.NotEmpty(t, derivedBatchs)
-	assert.Equal(t, DefaultDerivedMetricWindowSeconds, derivedBatchs[0].AggregationOpts["value"].Window)
+	assert.Equal(t, DefaultDerivedMetricWindowSeconds, derivedBatchs[0].AggregationOpts["trace_total_count"].Window)
 
 	err := sink.ConsumeDerivedMetrics(packet.Token, derivedBatchs)
 	require.NoError(t, err)
@@ -95,7 +95,7 @@ func TestGlobalSampler_TailSamplingDataUsesConfiguredBuiltinMetrics(t *testing.T
 					Groupby:   []string{"service"},
 					Algorithm: &AggregationAlgo{
 						Method:      COUNT,
-						SourceField: "$trace_id",
+						SourceField: DerivedMetricFieldTraceID,
 					},
 				},
 			},

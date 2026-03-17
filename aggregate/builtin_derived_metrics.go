@@ -10,6 +10,8 @@ package aggregate
 // Built-in derived metrics for tail sampling
 // 内置的尾采样派生指标
 
+const TailSamplingDerivedMetricName = "tail_sampling"
+
 var (
 	// TraceErrorCount 统计错误链路个数
 	// 条件：使用 DataPacket.HasError 判定当前链路是否出错.
@@ -20,7 +22,7 @@ var (
 
 		Algorithm: &AggregationAlgo{
 			Method:      COUNT,
-			SourceField: "$error_flag", // 使用 packet 级错误标记进行计数
+			SourceField: DerivedMetricFieldErrorFlag, // 使用 packet 级错误标记进行计数
 		},
 	}
 
@@ -33,7 +35,7 @@ var (
 
 		Algorithm: &AggregationAlgo{
 			Method:      COUNT,
-			SourceField: "$trace_id", // 使用特殊变量$trace_id进行计数
+			SourceField: DerivedMetricFieldTraceID, // 使用特殊变量$trace_id进行计数
 		},
 	}
 
@@ -58,8 +60,8 @@ var (
 		Groupby:   []string{"service", "resource"}, // 按服务和资源分组
 
 		Algorithm: &AggregationAlgo{
-			Method:      AVG,           // 使用平均值算法计算错误率
-			SourceField: "$error_flag", // 使用特殊变量$error_flag（0或1）
+			Method:      AVG,                         // 使用平均值算法计算错误率
+			SourceField: DerivedMetricFieldErrorFlag, // 使用特殊变量$error_flag（0或1）
 		},
 	}
 
@@ -72,7 +74,7 @@ var (
 
 		Algorithm: &AggregationAlgo{
 			Method:      QUANTILES,
-			SourceField: "$trace_duration", // 使用特殊变量$trace_duration
+			SourceField: DerivedMetricFieldTraceDuration, // 使用特殊变量$trace_duration
 			Options: &AggregationAlgo_QuantileOpts{
 				QuantileOpts: &QuantileOptions{
 					Percentiles: []float64{0.5, 0.75, 0.90, 0.95, 0.99}, // P50, P75, P90, P95, P99
@@ -90,7 +92,7 @@ var (
 
 		Algorithm: &AggregationAlgo{
 			Method:      COUNT,
-			SourceField: "$trace_duration", // 使用特殊变量$trace_duration
+			SourceField: DerivedMetricFieldTraceDuration, // 使用特殊变量$trace_duration
 		},
 	}
 
@@ -116,7 +118,7 @@ var (
 
 		Algorithm: &AggregationAlgo{
 			Method:      HISTOGRAM,
-			SourceField: "$span_count", // 使用特殊变量$span_count
+			SourceField: DerivedMetricFieldSpanCount, // 使用特殊变量$span_count
 			Options: &AggregationAlgo_HistogramOpts{
 				HistogramOpts: &HistogramOptions{
 					Buckets: []float64{1, 5, 10, 20, 50, 100, 200, 500}, // Span数量桶
@@ -134,7 +136,7 @@ var (
 
 		Algorithm: &AggregationAlgo{
 			Method:      COUNT,
-			SourceField: "$trace_id",
+			SourceField: DerivedMetricFieldTraceID,
 		},
 	}
 
@@ -147,7 +149,7 @@ var (
 
 		Algorithm: &AggregationAlgo{
 			Method:      COUNT,
-			SourceField: "$trace_id",
+			SourceField: DerivedMetricFieldTraceID,
 		},
 	}
 
@@ -160,7 +162,7 @@ var (
 
 		Algorithm: &AggregationAlgo{
 			Method:      COUNT,
-			SourceField: "$trace_id",
+			SourceField: DerivedMetricFieldTraceID,
 		},
 	}
 )

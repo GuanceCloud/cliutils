@@ -33,7 +33,7 @@ func TestGenerateDerivedMetrics_Basic(t *testing.T) {
 			Groupby:   []string{},
 			Algorithm: &AggregationAlgo{
 				Method:      COUNT,
-				SourceField: "$trace_id",
+				SourceField: DerivedMetricFieldTraceID,
 			},
 		},
 	}
@@ -61,7 +61,7 @@ func TestMetricGenerator_SimpleCount(t *testing.T) {
 		Groupby:   []string{},
 		Algorithm: &AggregationAlgo{
 			Method:      COUNT,
-			SourceField: "$trace_id",
+			SourceField: DerivedMetricFieldTraceID,
 		},
 	}
 
@@ -118,7 +118,7 @@ func TestMetricGenerator_SpecialFields(t *testing.T) {
 	}{
 		{
 			name:        "trace_id",
-			sourceField: "$trace_id",
+			sourceField: DerivedMetricFieldTraceID,
 			packet: &DataPacket{
 				RawGroupId: "trace-1",
 				Token:      "test-token",
@@ -129,7 +129,7 @@ func TestMetricGenerator_SpecialFields(t *testing.T) {
 		},
 		{
 			name:        "error_flag with error",
-			sourceField: "$error_flag",
+			sourceField: DerivedMetricFieldErrorFlag,
 			packet: &DataPacket{
 				RawGroupId: "trace-2",
 				Token:      "test-token",
@@ -141,7 +141,7 @@ func TestMetricGenerator_SpecialFields(t *testing.T) {
 		},
 		{
 			name:        "error_flag without error",
-			sourceField: "$error_flag",
+			sourceField: DerivedMetricFieldErrorFlag,
 			packet: &DataPacket{
 				RawGroupId: "trace-3",
 				Token:      "test-token",
@@ -149,7 +149,7 @@ func TestMetricGenerator_SpecialFields(t *testing.T) {
 				HasError:   false,
 				Points:     []*point.PBPoint{},
 			},
-			expectPoints: true, // 即使没有错误也应该生成点（值为0）
+			expectPoints: false, // COUNT + $error_flag 在无错误时不生成点
 		},
 	}
 
@@ -191,14 +191,14 @@ func TestBuildDerivedMetricBatches_TraceTotalCount(t *testing.T) {
 
 	batch := batches[0]
 	assert.NotNil(t, batch)
-	assert.Equal(t, DefaultDerivedMetricWindowSeconds, batch.AggregationOpts["value"].Window)
-	assert.Equal(t, SUM, batch.AggregationOpts["value"].Method)
+	assert.Equal(t, DefaultDerivedMetricWindowSeconds, batch.AggregationOpts["trace_total_count"].Window)
+	assert.Equal(t, SUM, batch.AggregationOpts["trace_total_count"].Method)
 	assert.Len(t, batch.Points.Arr, 1)
 
 	pt := point.FromPB(batch.Points.Arr[0])
-	assert.Equal(t, "trace_total_count", pt.Name())
+	assert.Equal(t, TailSamplingDerivedMetricName, pt.Name())
 
-	value, ok := pt.GetF("value")
+	value, ok := pt.GetF("trace_total_count")
 	assert.True(t, ok)
 	assert.Equal(t, 1.0, value)
 
@@ -224,14 +224,14 @@ func TestBuildDerivedMetricBatches_SpanTotalCount(t *testing.T) {
 
 	batch := batches[0]
 	assert.NotNil(t, batch)
-	assert.Equal(t, DefaultDerivedMetricWindowSeconds, batch.AggregationOpts["value"].Window)
-	assert.Equal(t, SUM, batch.AggregationOpts["value"].Method)
+	assert.Equal(t, DefaultDerivedMetricWindowSeconds, batch.AggregationOpts["span_total_count"].Window)
+	assert.Equal(t, SUM, batch.AggregationOpts["span_total_count"].Method)
 	assert.Len(t, batch.Points.Arr, 1)
 
 	pt := point.FromPB(batch.Points.Arr[0])
-	assert.Equal(t, "span_total_count", pt.Name())
+	assert.Equal(t, TailSamplingDerivedMetricName, pt.Name())
 
-	value, ok := pt.GetF("value")
+	value, ok := pt.GetF("span_total_count")
 	assert.True(t, ok)
 	assert.Equal(t, float64(len(packet.Points)), value)
 }
@@ -250,14 +250,14 @@ func TestBuildDerivedMetricBatches_TraceErrorCount(t *testing.T) {
 
 	batch := batches[0]
 	assert.NotNil(t, batch)
-	assert.Equal(t, DefaultDerivedMetricWindowSeconds, batch.AggregationOpts["value"].Window)
-	assert.Equal(t, SUM, batch.AggregationOpts["value"].Method)
+	assert.Equal(t, DefaultDerivedMetricWindowSeconds, batch.AggregationOpts["trace_error_count"].Window)
+	assert.Equal(t, SUM, batch.AggregationOpts["trace_error_count"].Method)
 	assert.Len(t, batch.Points.Arr, 1)
 
 	pt := point.FromPB(batch.Points.Arr[0])
-	assert.Equal(t, "trace_error_count", pt.Name())
+	assert.Equal(t, TailSamplingDerivedMetricName, pt.Name())
 
-	value, ok := pt.GetF("value")
+	value, ok := pt.GetF("trace_error_count")
 	assert.True(t, ok)
 	assert.Equal(t, 1.0, value)
 }

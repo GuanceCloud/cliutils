@@ -36,13 +36,13 @@ func TestGetBuiltinDerivedMetrics(t *testing.T) {
 	assert.Equal(t, "trace_error_count", traceErrorCount.Name)
 	assert.Equal(t, "", traceErrorCount.Condition)
 	assert.Equal(t, COUNT, traceErrorCount.Algorithm.Method)
-	assert.Equal(t, "$error_flag", traceErrorCount.Algorithm.SourceField)
+	assert.Equal(t, DerivedMetricFieldErrorFlag, traceErrorCount.Algorithm.SourceField)
 
 	traceTotalCount := metrics["trace_total_count"]
 	assert.Equal(t, "trace_total_count", traceTotalCount.Name)
 	assert.Equal(t, "", traceTotalCount.Condition) // 无条件
 	assert.Equal(t, COUNT, traceTotalCount.Algorithm.Method)
-	assert.Equal(t, "$trace_id", traceTotalCount.Algorithm.SourceField)
+	assert.Equal(t, DerivedMetricFieldTraceID, traceTotalCount.Algorithm.SourceField)
 
 	spanTotalCount := metrics["span_total_count"]
 	assert.Equal(t, "span_total_count", spanTotalCount.Name)
@@ -54,19 +54,19 @@ func TestGetBuiltinDerivedMetrics(t *testing.T) {
 	assert.Equal(t, "logging_total_count", loggingTotalCount.Name)
 	assert.Equal(t, "", loggingTotalCount.Condition)
 	assert.Equal(t, COUNT, loggingTotalCount.Algorithm.Method)
-	assert.Equal(t, "$trace_id", loggingTotalCount.Algorithm.SourceField)
+	assert.Equal(t, DerivedMetricFieldTraceID, loggingTotalCount.Algorithm.SourceField)
 
 	loggingErrorCount := metrics["logging_error_count"]
 	assert.Equal(t, "logging_error_count", loggingErrorCount.Name)
 	assert.Equal(t, `{status="error"}`, loggingErrorCount.Condition)
 	assert.Equal(t, COUNT, loggingErrorCount.Algorithm.Method)
-	assert.Equal(t, "$trace_id", loggingErrorCount.Algorithm.SourceField)
+	assert.Equal(t, DerivedMetricFieldTraceID, loggingErrorCount.Algorithm.SourceField)
 
 	rumTotalCount := metrics["rum_total_count"]
 	assert.Equal(t, "rum_total_count", rumTotalCount.Name)
 	assert.Equal(t, "", rumTotalCount.Condition)
 	assert.Equal(t, COUNT, rumTotalCount.Algorithm.Method)
-	assert.Equal(t, "$trace_id", rumTotalCount.Algorithm.SourceField)
+	assert.Equal(t, DerivedMetricFieldTraceID, rumTotalCount.Algorithm.SourceField)
 }
 
 func TestGetTraceBuiltinDerivedMetrics(t *testing.T) {
@@ -182,7 +182,7 @@ func TestBuiltinMetricConfigurations(t *testing.T) {
 	traceErrorRate := GetBuiltinMetric("trace_error_rate")
 	assert.NotNil(t, traceErrorRate)
 	assert.Equal(t, AVG, traceErrorRate.Algorithm.Method)
-	assert.Equal(t, "$error_flag", traceErrorRate.Algorithm.SourceField)
+	assert.Equal(t, DerivedMetricFieldErrorFlag, traceErrorRate.Algorithm.SourceField)
 
 	// 测试SlowTraceCount配置
 	slowTraceCount := GetBuiltinMetric("slow_trace_count")
