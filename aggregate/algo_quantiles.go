@@ -24,7 +24,7 @@ func (a *algoQuantiles) Add(x any) {
 		if a.all == nil {
 			a.all = make([]float64, a.count)
 		}
-		a.all = append(a.all, a.delta)
+		a.all = append(a.all, inst.delta)
 
 		if inst.maxTime > a.maxTime {
 			a.maxTime = inst.maxTime

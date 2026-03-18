@@ -45,7 +45,7 @@ func (c *algoCount) Reset() {
 }
 
 func (c *algoCount) doHash(h1 uint64) {
-	h := HashCombine(h1, xxhash.Sum64([]byte("avg")))
+	h := HashCombine(h1, xxhash.Sum64([]byte("count")))
 	h = HashCombine(h, xxhash.Sum64(cliutils.ToUnsafeBytes(c.key)))
 	c.MetricBase.hash = HashCombine(h, xxhash.Sum64(cliutils.ToUnsafeBytes(c.name)))
 }

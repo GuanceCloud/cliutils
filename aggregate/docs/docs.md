@@ -279,27 +279,11 @@ enabled = true
 - `logging_error_count`：错误日志分组数统计
 - `rum_total_count`：RUM分组数统计
 
-**使用示例：**
-```go
-// 获取所有内置派生指标
-metrics := aggregate.GetBuiltinDerivedMetrics()
-
-// 获取特定内置指标
-traceErrorCount := aggregate.GetBuiltinMetric("trace_error_count")
-
-// 检查是否为内置指标
-if aggregate.IsBuiltinMetric("trace_total_count") {
-    // 是内置指标
-}
-```
-
-详细使用示例请参考：`builtin_derived_metrics_example.md`
-
 注意：
 
-1. 目前真正接入尾采样运行时的是 `builtin_derived_metrics`
+1. 内置派生指标当前处于重新设计阶段，运行时代码已移除
 2. `derived_metrics` 自定义配置字段暂时未实现
-3. builtin 是否可用还受数据类型限制，trace/logging/RUM 只会识别各自允许的指标名
+3. `builtin_derived_metrics` 目前仅作为设计配置保留，后续会按新的尾采样方案重新接入
 
 #### 9. 最佳实践
 
@@ -309,4 +293,3 @@ if aggregate.IsBuiltinMetric("trace_total_count") {
 4. **桶配置**：根据业务特点合理设置直方图桶边界
 5. **监控告警**：基于派生指标设置合理的告警阈值
 6. **利用内置指标**：优先使用系统提供的内置派生指标
-

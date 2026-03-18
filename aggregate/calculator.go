@@ -222,6 +222,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 			switch algo.Method {
 			case MAX:
 				calc := &algoMax{
+					count:      1,
 					max:        f64,
 					maxTime:    ptwrap.Time().UnixNano(),
 					MetricBase: mb,
@@ -231,6 +232,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 
 			case SUM:
 				calc := &algoSum{
+					count:      1,
 					delta:      f64,
 					maxTime:    ptwrap.Time().UnixNano(),
 					MetricBase: mb,
@@ -240,6 +242,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 
 			case AVG:
 				calc := &algoAvg{
+					count:      1,
 					delta:      f64,
 					maxTime:    ptwrap.Time().UnixNano(),
 					MetricBase: mb,
@@ -251,6 +254,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 				calc := &algoCount{
 					maxTime:    ptwrap.Time().UnixNano(),
 					MetricBase: mb,
+					count:      1,
 				}
 
 				calc.doHash(batch.RoutingKey)
@@ -258,6 +262,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 
 			case MIN:
 				calc := &algoMin{
+					count:      1,
 					min:        f64,
 					maxTime:    ptwrap.Time().UnixNano(),
 					MetricBase: mb,
@@ -268,15 +273,21 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 
 			case HISTOGRAM:
 				calc := &algoHistogram{
+					count:      1,
 					val:        f64,
 					maxTime:    ptwrap.Time().UnixNano(),
 					MetricBase: mb,
+					leBucket:   map[string]float64{},
 				}
+				le, _ := ptwrap.GetS("le")
+				calc.leBucket[le] = f64
+
 				calc.doHash(batch.RoutingKey)
 				res = append(res, calc)
 
 			case QUANTILES:
 				calc := &algoQuantiles{
+					count:      1,
 					all:        []float64{f64},
 					maxTime:    ptwrap.Time().UnixNano(),
 					MetricBase: mb,

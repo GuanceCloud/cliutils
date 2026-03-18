@@ -29,11 +29,14 @@ func (c *algoHistogram) Add(x any) {
 			kvs := point.KVs(inst.pt.Fields)
 			if le := kvs.GetTag("le"); le != "" {
 				if _, ok := c.leBucket[le]; ok {
-					c.leBucket[le] += c.val
+					c.leBucket[le] += inst.val
 				} else {
 					c.leBucket[le] = inst.val
 				}
 			}
+		}
+		if inst.maxTime > c.maxTime {
+			c.maxTime = inst.maxTime
 		}
 	}
 }

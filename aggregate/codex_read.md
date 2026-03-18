@@ -7,7 +7,7 @@
 `aggregate` 同时承载两类能力：
 
 1. 指标聚合
-2. trace/logging/RUM 的尾采样，以及从这些数据里生成派生指标
+2. trace/logging/RUM 的尾采样
 
 这两类能力都围绕“先按规则分组，再延迟/聚合，再输出结果”展开，但它们的执行载体不同：
 
@@ -32,10 +32,6 @@
   尾采样配置、数据分组、采样管道、预置规则。
 - `timewheel.go`
   全局尾采样器、时间轮缓存、到期决策入口。
-- `derived_metric_generator.go`
-  从 `DataPacket` 生成派生指标点。
-- `builtin_derived_metrics.go`
-  内置派生指标定义。
 
 ### 2.2 算法实现
 
@@ -63,7 +59,7 @@
 - `*_test.go`
   行为样例和边界说明，很多真实语义要以测试为准。
 - `docs/*.md`
-  设计说明、配置示例、派生指标示例。
+  设计说明、配置示例、尾采样设计笔记。
 
 ---
 
@@ -86,13 +82,13 @@
 
 流程：
 
-`原始 trace/logging/RUM points -> PickTrace / PickLogging / PickRUM 分组为 DataPacket -> Ingest 进入时间轮 -> TTL 到期 -> TailSamplingData() 做规则决策 -> 保留部分 DataPacket + 生成派生指标`
+`原始 trace/logging/RUM points -> PickTrace / PickLogging / PickRUM 分组为 DataPacket -> Ingest 进入时间轮 -> TTL 到期 -> TailSamplingData() 做规则决策 -> 保留部分 DataPacket`
 
 关键点：
 
 - 尾采样不是立即决策，而是等待一个 TTL，让同组数据尽量收齐。
 - group key 对 trace 是 `trace_id`，对 logging/RUM 可配置。
-- 采样和派生指标是两条逻辑线：理论上派生指标可独立于最终是否保留。
+- 派生指标后续会重做，但当前代码里还没有重新接回运行时。
 
 ---
 
@@ -325,14 +321,11 @@
   - RUM: 1m
 - trace 默认 `group_key = trace_id`
 - 对每条 pipeline 调 `Apply()` 解析条件
-- 会预解析并校验各数据类型配置的 `builtin_derived_metrics`
 
 当前配置模型要记住：
 
-- trace 使用 `trace.builtin_derived_metrics`
-- logging 使用 `logging.group_dimensions[].builtin_derived_metrics`
-- RUM 使用 `rum.group_dimensions[].builtin_derived_metrics`
-- `derived_metrics` 自定义配置字段还在，但尾采样运行时暂时只打 TODO，不真正执行
+- trace / logging / RUM 目前都只保留 `derived_metrics` 配置位
+- `derived_metrics` 仍未实现，尾采样运行时暂时只保留 TODO
 
 ## 6.4 采样管道
 
@@ -412,13 +405,11 @@
   - 取 trace config
   - 顺序执行 pipelines
   - 命中保留则写入返回的 `DataPacket` map
-  - 按配置启用的 `builtin_derived_metrics` 调用 `handleBuiltinDerivedMetrics()`
-  - 自定义 `derived_metrics` 当前只记录 TODO
+  - 派生指标逻辑当前已清空，只保留 `TODO: 生成派生指标`
 - logging:
   - 找到匹配 `GroupKey` 的维度配置
   - 执行 pipelines
-  - 按配置启用的 `builtin_derived_metrics` 调用 `handleBuiltinDerivedMetrics()`
-  - 自定义 `derived_metrics` 当前只记录 TODO
+  - 派生指标逻辑当前已清空，只保留 `TODO: 生成派生指标`
 - RUM:
   - 同 logging
 
@@ -427,100 +418,36 @@
 - `dg.Reset()`
 - 放回 `dataGroupPool`
 
-## 7.2 派生指标生成器
+## 7.2 当前状态
 
-入口：
+此前做过一轮内置派生指标实现和 sink 闭环尝试，但这部分代码已经全部删除，准备按新的 15 秒批量转 `AggregationBatch` 方案重做。
 
-- `GenerateDerivedMetrics(packet, metrics)`
-- `MetricGenerator.GenerateFromDataPacket()`
-
-执行顺序：
-
-1. `evaluateCondition()`
-2. `extractGroupTags()`
-3. 按算法生成指标点
-
-支持算法：
-
-- `COUNT`
-- `HISTOGRAM`
-- `QUANTILES`
-- `AVG`
-- `SUM`
-- `MIN`
-- `MAX`
-- `COUNT_DISTINCT`
-
-特殊变量：
-
-- `$trace_id`
-- `$span_count`
-- `$trace_duration`
-- `$error_flag`
+后续理解这块时，应以 [tail-sampling.md](/home/songlq/gopath/src/github.com/GuanceCloud/cliutils/aggregate/tail-sampling.md) 的最新设计为准，不要再参考旧的 builtin/sink 接口。
 
 ## 7.3 当前派生指标实现和设计文档的差异
 
 这是本模块最重要的注意项之一：
 
-1. 当前已经不是“只打 debug log”。
-   `timewheel.go` 里启用的 builtin 派生指标会真正生成聚合批次，并通过 sink 直接写入 `Cache`。
+1. 当前运行时代码里已经没有 builtin 派生指标，也没有 sink 闭环。
+2. `TailSamplingData()` 只在采样决策后留了 `TODO: 生成派生指标`。
+3. `PickTrace()` 已经在填充 `TraceStartTimeUnixNano` 和 `TraceEndTimeUnixNano`，这是后续重做派生指标时可直接复用的 packet 级事实。
+4. logging / RUM 这侧目前只有 `HasError` 和原始 `Points` 汇总，后续是否补时间摘要，要跟新的 15 秒批量方案一起设计。
 
-2. `$trace_duration` 的代码和文档单位不一致。
-   `extractSourceValues()` 用 `(LastSeenNano - FirstSeenNano) / 1e6`，实际算出来是毫秒；但注释、文档和内置条件多处写的是微秒。
-
-3. `evaluateCondition()` 是在单个 point 上跑 filter 条件，并不天然支持 `DataPacket` 级特殊变量。
-   所以像 `{$trace_duration > 5000000}` 这类条件，从当前代码看很可能无法按预期工作。
-
-4. `PickTrace()` 现在已经在填充 `TraceStartTimeUnixNano` 和 `TraceEndTimeUnixNano`。
-   但 logging / RUM 这侧是否需要同样的 packet 级时间摘要，仍要结合后续内置指标扩展一起看。
-
-5. 真正进入尾采样运行时的，目前只有配置里显式开启的 builtin 派生指标。
-   用户自定义 `derived_metrics` 仍然是 TODO。
-
-这几个点叠加起来，说明“派生指标已经完成了 builtin 闭环，但自定义指标链路还没开放”。
+这几个点叠加起来，说明“派生指标处于拆除后的重设计阶段”，不要再按旧文档理解成已经闭环。
 
 ---
 
-## 8. 内置派生指标
+## 8. 派生指标重设计的已知输入
 
-`builtin_derived_metrics.go` 提供了一组预定义指标：
+虽然运行时代码已经删掉，但后续重做派生指标时，当前代码里已经存在一些可以直接复用的输入：
 
-- `trace_error_count`
-- `trace_total_count`
-- `span_total_count`
-- `trace_error_rate`
-- `trace_duration_summary`
-- `slow_trace_count`
-- `span_error_count`
-- `trace_size_distribution`
-- `logging_total_count`
-- `logging_error_count`
-- `rum_total_count`
+- `DataPacket.HasError`
+- `DataPacket.PointCount`
+- trace 的 `TraceStartTimeUnixNano`
+- trace 的 `TraceEndTimeUnixNano`
+- logging / RUM 的 `GroupKey` 和 `Points`
 
-对应能力大致是：
-
-- 错误数
-- 总量
-- span 数量
-- 错误率
-- 时延分位数
-- 慢 trace 数
-- span 错误数
-- trace 大小分布
-- 日志分组总数
-- 错误日志分组数
-- RUM 分组总数
-
-还要记住一个限制：
-
-- builtin 虽然集中定义在一个文件里，但运行时会按 data type 过滤
-- trace/logging/RUM 只能启用各自允许的 builtin 名称
-
-测试文件 `builtin_derived_metrics_test.go` 主要验证：
-
-- 名称是否完整
-- method / source_field / options 是否匹配预期
-- group by 维度是否正确
+这意味着下一轮实现不需要再回到“逐点临时推导基础事实”的路线，至少 trace 侧的错误标记、点数、起止时间已经在分组阶段就算好了。
 
 ---
 
@@ -597,9 +524,6 @@
 - `timewheel_test.go`
   证明了时间轮在 TTL 秒数到达后会把数据吐出来。
 
-- `derived_metric_generator_test.go`
-  目前更偏“基础可用性测试”，覆盖不深，但至少说明这块逻辑已经被显式纳入测试。
-
 ---
 
 ## 11. 我认为最重要的几个代码事实
@@ -612,8 +536,8 @@
 4. logging / RUM 尾采样不是按 trace_id，而是按配置的 `group_key`.
 5. logging / RUM 缺少分组键的数据会直接旁路，不进入采样缓存。
 6. 尾采样的 pipeline 是顺序短路执行，第一条决定结果的规则获胜。
-7. 当前派生指标还没有真正输出到后续处理链路，只是本地生成后打日志。
-8. `$trace_duration` 相关实现现在存在单位和可用性问题，不能盲信文档。
+7. 当前派生指标运行时代码已经全部删除，`TailSamplingData()` 里只保留了 TODO。
+8. trace 侧已经有 packet 级摘要字段，后续重做不要再回退成逐点重复计算。
 9. 聚合算法里有几个实现层风险，尤其是 `count` 初值、`algoCount` hash、histogram 合并逻辑。
 10. proto 里定义的算法不等于都已实现，落地能力要看 `newCalculators()`.
 
@@ -630,8 +554,7 @@
 5. `aggregate/windows.go`
 6. `aggregate/tail-sampling.go`
 7. `aggregate/timewheel.go`
-8. `aggregate/derived_metric_generator.go`
-9. 对应 `*_test.go`
+8. 对应 `*_test.go`
 
 这样先建立总结构，再进实现，再看测试修正理解，成本最低。
 
@@ -657,12 +580,12 @@
 - 多数据类型支持
 - 时间轮缓存
 - 规则驱动决策
-- 派生指标能力
+- 派生指标重设计入口
 
-但派生指标链路目前还不算闭环，且 packet 级特殊变量支持不完整。
+但派生指标目前处在“旧实现已删、新实现未接入”的阶段，下一步要按 15 秒批量转 `AggregationBatch` 的思路重做。
 
 ---
 
 ## 14. 一句话总结
 
-`aggregate` 是一个把“规则筛选、延迟聚合、按租户隔离、分布式友好路由”这些能力揉在一起的模块；它的框架已经足够清晰，但尾采样派生指标和部分聚合算法实现上，仍然存在几个必须带着怀疑去读的代码现实。
+`aggregate` 是一个把“规则筛选、延迟聚合、按租户隔离、分布式友好路由”这些能力揉在一起的模块；它的聚合主链路和尾采样主链路都已经清楚，当前真正处于重设计状态的是尾采样派生指标这条支线。

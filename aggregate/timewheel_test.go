@@ -43,6 +43,7 @@ func TestGlobalSampler_AdvanceTime(t *testing.T) { //nolint
 	packet := &DataPacket{
 		GroupIdHash: tidHash,
 		Token:       "TokenA",
+		DataType:    "tracing",
 	}
 	cKey := HashToken(packet.Token, packet.GroupIdHash)
 	// 这里我们需要模拟 GetConfig 返回 2s 的 TTL
