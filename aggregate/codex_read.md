@@ -1,6 +1,6 @@
 # aggregate 模块阅读笔记
 
-本文档是我在完整阅读 `aggregate/` 目录代码、测试和 `docs/` 文档后的理解整理。目标不是重复注释，而是给以后继续读这块代码时提供一个高密度、可回溯的知识入口。
+本文档是我在完整阅读 `aggregate/` 目录代码、测试和 `docs/` 文档后的理解整理。目标不是重复注释，而是给以后继续读这块代码，或者把这套能力迁移到别的项目里使用时，提供一个高密度、可回溯的知识入口。
 
 ## 1. 模块在做什么
 
@@ -13,6 +13,19 @@
 
 - 指标聚合依赖 `Cache -> Windows -> Window -> Calculator`
 - 尾采样依赖 `GlobalSampler -> Shard -> time wheel(3600 slots) -> DataGroup`
+
+### 1.1 当前代码状态
+
+当前代码有三个必须先分清的事实：
+
+1. 指标聚合主链路是当前可用能力。
+2. 尾采样主链路是当前可用能力。
+3. 尾采样派生指标处于“旧实现已删除，新实现待重做”的状态。
+
+因此：
+
+- 文档里凡是描述 `Cache`、`Windows`、`PickTrace()`、`GlobalSampler`、`TailSamplingData()` 的部分，默认都在描述当前代码现状。
+- 文档里凡是描述“15 秒批量转 `AggregationBatch` 的派生指标方案”的部分，默认都在描述下一步设计方向，而不是当前运行时行为。
 
 ---
 
@@ -60,6 +73,20 @@
   行为样例和边界说明，很多真实语义要以测试为准。
 - `docs/*.md`
   设计说明、配置示例、尾采样设计笔记。
+
+### 2.5 如果迁移到别的项目，优先带走什么
+
+如果你要把这套能力迁移到别的项目，我建议最先带走这三份文档：
+
+1. `aggregate/codex_read.md`
+2. `aggregate/tail-sampling.md`
+3. `aggregate/docs/config.md`
+
+原因是：
+
+- `codex_read.md` 负责解释当前代码怎么工作。
+- `tail-sampling.md` 负责解释尾采样派生指标接下来准备怎么重做。
+- `config.md` 负责解释外部项目实际需要提供什么配置。
 
 ---
 
@@ -179,6 +206,14 @@
 
 但在 `newCalculators()` 里仍是 `TODO`，当前没有落地实现。
 
+### 4.4.1 当前聚合实现里要特别记住的风险
+
+如果把这套模块迁移到别的项目，下面这几条不要默认“已经完全稳定”：
+
+1. `QUANTILES` 当前实现仍值得怀疑，尤其是 merge 和 `_count` 语义。
+2. `SUM` 等算法输出里的 `<field>_count` 是否等于样本数，要结合业务预期复核，不要直接盲信。
+3. `EXPO_HISTOGRAM` / `LAST` / `FIRST` 仍未实现，协议存在不代表可以直接配置使用。
+
 ## 4.5 窗口与缓存结构
 
 `windows.go` 的结构：
@@ -245,16 +280,9 @@
 
 这些是后续继续改这里时必须防守的点：
 
-1. `COUNT/AVG/SUM/MIN/MAX` 的 `count` 初始值普遍从 0 开始，只在 `Add()` 时递增。
-   这意味着单样本窗口的 `_count` 很可能是 0，`algoAvg` 甚至存在单样本除零风险。这看起来更像当前实现风险，而不是设计目标。
-
-2. `algoCount.doHash()` 里使用的是 `"avg"` 作为算法名参与 hash，而不是 `"count"`。
-   这意味着 `COUNT` 和 `AVG` 的 hash 可能发生冲突，是一个应被记住的实现问题。
-
-3. `algoHistogram.Add()` 里对已有 bucket 累加时使用了 `c.val`，而不是 `inst.val`。
-   当前行为需要仔细复核，读代码时不能直接假设 histogram 合并逻辑完全正确。
-
-4. `EXPO_HISTOGRAM/LAST/FIRST` 还没实现，不要只看 proto 以为它们已可用。
+1. `QUANTILES` 当前实现风险最高，读代码时不能默认结果正确。
+2. `SUM` 等算法的 `_count` 字段语义要结合业务定义确认。
+3. `EXPO_HISTOGRAM/LAST/FIRST` 还没实现，不要只看 proto 以为它们已可用。
 
 ---
 
@@ -273,11 +301,17 @@
 - `has_error`
 - `group_key`
 - `point_count`
-- `first_seen_nano`
-- `last_seen_nano`
+- `trace_start_time_unix_nano`
+- `trace_end_time_unix_nano`
 - `points`
 
 这是一个通用包，不只服务 trace，也服务 logging / RUM。
+
+当前真实语义要补一句：
+
+- trace 会补 `PointCount`、`HasError`、`TraceStartTimeUnixNano`、`TraceEndTimeUnixNano`
+- logging / RUM 会补 `PointCount`、`HasError`、`GroupKey`
+- logging / RUM 当前不补 trace 风格的起止时间，这是当前设计选择，不是遗漏
 
 ## 6.2 数据怎么先被分组
 
@@ -382,6 +416,8 @@
 6. 如果该组已经存在：
    - 追加 points
    - 合并 `HasError`
+   - 合并 `PointCount`
+   - trace 侧合并起止时间摘要
    - 从旧槽移到新槽
 7. 否则创建 `DataGroup` 并挂到目标槽
 
@@ -448,6 +484,39 @@
 - logging / RUM 的 `GroupKey` 和 `Points`
 
 这意味着下一轮实现不需要再回到“逐点临时推导基础事实”的路线，至少 trace 侧的错误标记、点数、起止时间已经在分组阶段就算好了。
+
+## 8.1 如果在别的项目里接入，现在应该怎么用
+
+当前代码状态下，外部项目应把“指标聚合”和“尾采样”当成两套独立能力初始化，而不是期待已有派生指标闭环。
+
+### 指标聚合接入顺序
+
+典型调用顺序：
+
+1. 构造 `AggregatorConfigure`
+2. 调 `Setup()`
+3. 初始化 `cache := aggregate.NewCache(...)`
+4. 把业务 point 送进 `PickPoints()`
+5. 把得到的 `AggregationBatch` 送进 `cache.AddBatchs()`
+6. 周期性调用 `GetExpWidows()` 和 `WindowsToData()` 取聚合结果
+
+### 尾采样接入顺序
+
+典型调用顺序：
+
+1. 初始化 `sampler := aggregate.NewGlobalSampler(...)`
+2. 为每个 token 调 `sampler.UpdateConfig(token, cfg)`
+3. 业务侧先调用 `PickTrace()` / `PickLogging()` / `PickRUM()` 完成组包
+4. 把 `DataPacket` 送进 `sampler.Ingest()`
+5. 定时调用 `AdvanceTime()`
+6. 把到期结果送给 `TailSamplingData()`
+7. 只消费它返回的保留 `DataPacket`
+
+### 当前不要假设的事
+
+1. 不要假设 `TailSamplingData()` 会自动生成派生指标。
+2. 不要假设 `GlobalSampler` 已经和 `Cache` 自动打通。
+3. 不要假设只初始化一个 runtime 就能同时闭环聚合和尾采样。
 
 ---
 
@@ -538,7 +607,7 @@
 6. 尾采样的 pipeline 是顺序短路执行，第一条决定结果的规则获胜。
 7. 当前派生指标运行时代码已经全部删除，`TailSamplingData()` 里只保留了 TODO。
 8. trace 侧已经有 packet 级摘要字段，后续重做不要再回退成逐点重复计算。
-9. 聚合算法里有几个实现层风险，尤其是 `count` 初值、`algoCount` hash、histogram 合并逻辑。
+9. 聚合算法里仍有几个实现层风险，尤其是 `quantiles` 和部分 `_count` 语义。
 10. proto 里定义的算法不等于都已实现，落地能力要看 `newCalculators()`.
 
 ---
@@ -570,7 +639,7 @@
 - 路由和窗口管理明确
 - 算法扩展点明确
 
-但实现细节里仍有值得复核的地方，尤其是部分算法的计数语义。
+但实现细节里仍有值得复核的地方，尤其是 `quantiles` 和部分 `_count` 语义。
 
 ### 尾采样模块
 
@@ -588,4 +657,4 @@
 
 ## 14. 一句话总结
 
-`aggregate` 是一个把“规则筛选、延迟聚合、按租户隔离、分布式友好路由”这些能力揉在一起的模块；它的聚合主链路和尾采样主链路都已经清楚，当前真正处于重设计状态的是尾采样派生指标这条支线。
+`aggregate` 是一个把“规则筛选、延迟聚合、按租户隔离、分布式友好路由”这些能力揉在一起的模块；它的聚合主链路和尾采样主链路都已经清楚，当前真正处于重设计状态的是尾采样派生指标这条支线，而不是整个尾采样模块本身。

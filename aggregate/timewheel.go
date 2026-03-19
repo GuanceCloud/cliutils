@@ -55,6 +55,12 @@ type GlobalSampler struct {
 	lock       sync.RWMutex
 }
 
+type TailSamplingOutcome struct {
+	Packet       *DataPacket
+	SourcePacket *DataPacket
+	Decision     DerivedMetricDecision
+}
+
 func NewGlobalSampler(shardCount int, waitTime time.Duration) *GlobalSampler {
 	sampler := &GlobalSampler{
 		shards:     make([]*Shard, shardCount),
@@ -213,9 +219,12 @@ func (s *GlobalSampler) AdvanceTime() map[uint64]*DataGroup {
 	return frozenMap
 }
 
-func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[uint64]*DataPacket {
-	DataPackets := make(map[uint64]*DataPacket)
+func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) map[uint64]*TailSamplingOutcome {
+	outcomes := make(map[uint64]*TailSamplingOutcome, len(dataGroups))
 	for _, dg := range dataGroups {
+		decision := DerivedMetricDecisionDropped
+		var keptPacket *DataPacket
+
 		switch dg.dataType {
 		case point.STracing:
 			config := s.GetTraceConfig(dg.td.Token)
@@ -226,12 +235,12 @@ func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[u
 						// 匹配到了规则
 						if packet != nil {
 							twl.Debugf("matched trace, traceId: %s", packet.RawGroupId)
-							DataPackets[packet.GroupIdHash] = packet
+							keptPacket = packet
+							decision = DerivedMetricDecisionKept
 						}
 						break
 					}
 				}
-				// TODO: 生成派生指标
 				if len(config.DerivedMetrics) > 0 {
 					twl.Debugf("custom derived metrics for %s are TODO, token=%s", dg.dataType, dg.td.Token)
 				}
@@ -248,12 +257,12 @@ func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[u
 								// 匹配到了规则
 								if packet != nil {
 									twl.Debugf("matched logging, groupId: %s", packet.RawGroupId)
-									DataPackets[packet.GroupIdHash] = packet
+									keptPacket = packet
+									decision = DerivedMetricDecisionKept
 								}
 								break
 							}
 						}
-						// TODO: 生成派生指标
 						if len(groupDim.DerivedMetrics) > 0 {
 							twl.Debugf("custom derived metrics for %s are TODO, token=%s, group_key=%s", dg.dataType, dg.td.Token, groupDim.GroupKey)
 						}
@@ -273,12 +282,12 @@ func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[u
 								// 匹配到了规则
 								if packet != nil {
 									twl.Debugf("matched RUM, groupId: %s", packet.RawGroupId)
-									DataPackets[packet.GroupIdHash] = packet
+									keptPacket = packet
+									decision = DerivedMetricDecisionKept
 								}
 								break
 							}
 						}
-						// TODO: 生成派生指标
 						if len(groupDim.DerivedMetrics) > 0 {
 							twl.Debugf("custom derived metrics for %s are TODO, token=%s, group_key=%s", dg.dataType, dg.td.Token, groupDim.GroupKey)
 						}
@@ -289,10 +298,31 @@ func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[u
 		default:
 			twl.Errorf("unsupported data type in tail sampling: %s", dg.dataType)
 		}
+
+		outcomes[dg.td.GroupIdHash] = &TailSamplingOutcome{
+			Packet:       keptPacket,
+			SourcePacket: dg.td,
+			Decision:     decision,
+		}
+
 		dg.Reset()
 		dataGroupPool.Put(dg)
 	}
-	return DataPackets
+	return outcomes
+}
+
+func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[uint64]*DataPacket {
+	outcomes := s.TailSamplingOutcomes(dataGroups)
+	packets := make(map[uint64]*DataPacket)
+
+	for key, outcome := range outcomes {
+		if outcome == nil || outcome.Packet == nil {
+			continue
+		}
+		packets[key] = outcome.Packet
+	}
+
+	return packets
 }
 
 func (s *GlobalSampler) UpdateConfig(token string, ts *TailSamplingConfigs) {

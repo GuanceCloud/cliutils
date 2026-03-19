@@ -1,253 +1,285 @@
-# 尾采样设计说明
+# 尾采样与派生指标说明
 
-本文档用于约束后续尾采样和内置派生指标的代码改造方向。目标不是描述现状，而是明确下一步应按什么模型继续改。
+本文档用于放到别的项目中复用，重点说明三件事：
 
-## 1. 总体流程
+1. 当前 `aggregate` 目录里的尾采样主链路怎么工作
+2. 当前新增的派生指标代码已经做到哪一步
+3. 在别的项目里应该怎样初始化和调用
 
-1. Datakit 加载聚合配置和尾采样配置到内存。
-2. Datakit 按 token / 路由规则将配置分发到后端尾采样器。
-3. Datakit 将链路、日志、RUM 先按各自的分组规则组包，再发送到后端尾采样器。
-4. 尾采样器收到 `DataPacket` 后，按 TTL 缓存到时间轮中。
-5. 到期后执行 `pipeline.DoAction`，决定这一组数据保留还是丢弃。
-6. 在尾采样过程中生成内置派生指标，并将其转成聚合批次继续进入聚合链路。
+## 1. 先分清现状
 
-## 2. 先明确几个设计结论
+当前代码里有两条相关链路：
 
-这些结论应该视为后续改码时的约束，不再反复摇摆。
+1. 尾采样主链路
+2. 派生指标子链路
 
-### 2.1 尾采样阶段只处理内置派生指标
+它们的关系是：
 
-当前阶段：
+- 尾采样主链路已经可用
+- 派生指标子链路已经有最小骨架
+- 但还没有做到“配置驱动、完整闭环、全部 builtin 都可控启用”
 
-- 支持内置派生指标
-- 用户自定义 `derived_metrics` 配置先不实现
+也就是说，当前状态不是“完全没有派生指标”，也不是“派生指标已经全部完成”，而是：
 
-也就是说，后续代码改造应该优先把 builtin 跑通，不要继续在用户自定义指标上分散精力。
+- ingest / decision 两个阶段已经能产出 record
+- record 已经能本地 collect
+- collect 已经能定时 flush 成 point
+- 但当前 builtin 仍是代码内置默认集合，不是配置驱动
 
-### 2.2 派生指标不依赖 `AggregatorConfigure`
+## 2. 当前代码结构
 
-尾采样代码里没有 `AggregatorConfigure`，所以尾采样器不应该依赖：
+### 2.1 尾采样主链路
 
-- `PickPoints`
-- 聚合规则筛选
-- 外部额外初始化一套“专供派生指标使用”的 `AggregatorConfigure`
+当前主链路仍然是：
 
-结论：
+1. `PickTrace()` / `PickLogging()` / `PickRUM()`
+2. `GlobalSampler.Ingest()`
+3. `AdvanceTime()`
+4. `TailSamplingData()`
 
-- 尾采样器后续会按 15 秒定时批量转成 `AggregationBatch`
-- 当前代码里这部分实现已经移除，`TailSamplingData()` 只保留 `TODO: 生成派生指标`
+这里面：
 
-### 2.3 `point.NewPoint()` 使用固定指标集
+- `Pick*` 负责组包成 `DataPacket`
+- `GlobalSampler` 负责时间轮缓存
+- `TailSamplingData()` 负责保留 / 丢弃决策
 
-这是后续重做时仍然建议遵守的重要约束：
+### 2.2 派生指标子链路
 
-- `measurement` 使用固定的指标集
-- `fields` 才是指标名和值
+当前新增的派生指标子链路是：
 
-例如：
+1. `DerivedMetricRecord`
+2. `DerivedMetricCollector`
+3. `TailSamplingBuiltinMetric`
+4. `TailSamplingProcessor`
 
-- measurement: `tail_sampling`
-- field: `trace_total_count = 1`
-- tags: `service=api, status=error`
+职责分别是：
 
-这意味着：
+- `DerivedMetricRecord`
+  派生指标的轻量事件对象
+- `DerivedMetricCollector`
+  本地按固定窗口汇聚 record
+- `TailSamplingBuiltinMetric`
+  builtin 指标接口
+- `TailSamplingProcessor`
+  对外入口，负责把尾采样主链路和派生指标子链路串起来
 
-- 不应该把具体指标名放在 measurement 上
-- 不应该再用 measurement 后缀去区分 bucket / count / sum
-- bucket / count / sum 应该体现在 field 名上
+## 3. 当前推荐入口
 
-例如：
+在别的项目里，不建议直接把 `GlobalSampler` 当作唯一入口，而是优先使用：
 
-- `trace_duration_bucket`
-- `trace_duration_count`
-- `trace_duration_sum`
+- `TailSamplingProcessor`
 
-### 2.4 派生指标默认窗口时间为 15 秒
+原因是它现在已经负责了两件事：
 
-如果派生指标构造成 `AggregationBatch` 时缺少窗口时间，统一使用：
+1. 驱动 `GlobalSampler`
+2. 在 ingest / decision 两个阶段收集派生指标 record
 
-- `15s`
+### 3.1 最简单初始化方式
 
-这个值应作为默认值存在，不依赖外部额外配置。
+当前最直接的初始化入口是：
 
-## 3. 现在真正需要解决的问题
+```go
+processor := aggregate.NewDefaultTailSamplingProcessor(shardCount, waitTime)
+```
 
-### 3.1 指标统计应该分两个阶段
+这个默认入口会同时初始化：
 
-结合尾采样流程，内置派生指标不应该只在一个时刻统计。
+- `GlobalSampler`
+- `DerivedMetricCollector`
+- 默认 builtin 指标集合 `DefaultTailSamplingBuiltinMetrics()`
 
-至少应区分两类：
+其中：
 
-1. **进入采样器后的原始统计**
-   用于描述流量、原始 point 数、原始 group 数、原始错误数。
+- 默认派生指标 flush 窗口是 `15s`
+- collector flush 输出的是 `point.Point`
+- 输出 measurement 固定为 `tail_sampling`
 
-2. **pipeline 决策后的结果统计**
-   用于描述保留数、丢弃数、保留后的 point 数、保留后的 group 数。
+### 3.2 自定义初始化方式
 
-如果只做决策后的指标，会丢失采样前的真实流量基线。
-如果只做采样前的指标，又无法体现 tail sampling 的过滤效果。
+如果调用方想自己控制依赖，也可以手动组装：
 
-所以后续代码设计上，应该显式支持这两类统计。
+```go
+sampler := aggregate.NewGlobalSampler(shardCount, waitTime)
+collector := aggregate.NewDerivedMetricCollector(30 * time.Second)
+metrics := aggregate.DefaultTailSamplingBuiltinMetrics()
 
-> 注意： 流量、个数、过滤后的各种指标可能作为收费的参考点。
+processor := aggregate.NewTailSamplingProcessor(sampler, collector, metrics)
+```
 
-### 3.2 分布式部署下，指标要按“本地先聚合，再中心汇总”的思路来设计
+如果还要下发配置：
 
-尾采样器是分布式部署的，因此 builtin 指标不应该依赖中心节点去重新理解一遍原始 trace/logging/RUM。
+```go
+processor.UpdateConfig(token, cfg)
+```
 
-更合理的思路是：
+## 4. 当前调用顺序
 
-1. 尾采样器本地把 builtin 指标先转成 `AggregationBatch`
-2. 本地窗口聚合
-3. 聚合结果再发往中心
-4. 中心如果需要，只做更高层的 sum / merge
+外部项目里建议按下面顺序使用。
 
-这样做的好处是：
+### 4.1 数据进入时
 
-- 尾采样器本地可观察
-- 分布式下每个 sampler 的工作量是闭环的
-- 中心只处理结果，不重新参与 tail sampling 语义判断
+先组包，再进入 processor：
 
-## 4. 推荐的代码抽象
+```go
+for _, packet := range packets {
+    processor.IngestPacket(packet)
+}
+```
 
-### 4.1 不再围绕“生成 point”设计，而是围绕“生成 batch”设计
+这里会同时做两件事：
 
-现在最核心的抽象不应该是：
+1. 记录 ingest 阶段的派生指标 record
+2. 把 packet 送进 `GlobalSampler`
 
-- `DataPacket -> Point`
+### 4.2 时间轮推进时
 
-而应该是：
+```go
+expired := processor.AdvanceTime()
+kept := processor.TailSamplingData(expired)
+```
 
-- `DataPacket -> AggregationBatch`
+这里会同时做两件事：
 
-因为 tail sampling 的目标不是“临时产出一个指标点”，而是“把它继续接到聚合链路里”。
+1. 触发 `GlobalSampler.TailSamplingData()`
+2. 根据结果为每个 packet 记录 decision 阶段的 record
 
-### 4.2 为内置派生指标定义统一接口
+返回值 `kept` 仍然是原来的尾采样保留结果：
 
-文档建议后续引入一个统一接口，类似：
+- `map[uint64]*DataPacket`
 
-- 输入：`DataPacket`
-- 输出：`[]*AggregationBatch`
+### 4.3 派生指标 flush 时
 
-这个接口的职责是：
+```go
+pts := processor.FlushDerivedMetrics(time.Now())
+```
 
-- 判断当前 builtin 是否适用于这个 `DataPacket`
-- 提取所需字段
-- 生成可直接进入聚合模块的 batch
+当前返回的是：
 
-这样 `trace_total_count`、`span_total_count`、`trace_error_count`、`logging_total_count` 等内置指标都走同一套抽象。
+```go
+[]*aggregate.DerivedMetricPoints
+```
 
-### 4.3 建议按“事件阶段”拆 builtin 处理器
+也就是按 token 分组后的 point 列表：
 
-后续实现上，builtin 处理器建议按两个阶段拆：
+```go
+type DerivedMetricPoints struct {
+    Token string
+    PTS   []*point.Point
+}
+```
 
-1. `OnIngest`
-   数据刚进入采样器时触发，负责原始流量统计。
+这意味着外部项目可以直接按 token 把这些 point 发往中心，而不需要再走 `AggregationBatch`。
 
-2. `OnDecision`
-   pipeline 决策完成后触发，负责保留/丢弃结果统计。
+## 5. 当前 builtin 指标
 
-这样后续扩展诸如：
+当前默认 builtin 指标集合由：
+
+- `DefaultTailSamplingBuiltinMetrics()`
+
+提供。
+
+第一批已经接通的计数类指标有：
+
+### trace
 
 - `trace_total_count`
+- `trace_error_count`
+- `span_total_count`
 - `trace_kept_count`
 - `trace_dropped_count`
+
+### logging
+
 - `logging_total_count`
+- `logging_error_count`
 - `logging_kept_count`
+- `logging_dropped_count`
 
-都会比较自然。
+### rum
 
-## 5. `DataPacket` 层应该承担的职责
+- `rum_total_count`
+- `rum_kept_count`
+- `rum_dropped_count`
 
-`DataPacket` 不应只是 point 容器，它还应该承载 packet 级摘要信息，供 builtin 指标直接使用。
+## 6. 当前数据模型约束
 
-至少包括：
+### 6.1 `DataPacket` 当前摘要字段
+
+当前代码已经准备好的 packet 级信息：
+
+### trace
 
 - `HasError`
 - `PointCount`
 - `TraceStartTimeUnixNano`
 - `TraceEndTimeUnixNano`
 
-这些字段应该在组包阶段尽早填好，而不是等 builtin 指标处理时再重新扫一遍 points。
+### logging / rum
 
-这样做的好处：
+- `HasError`
+- `PointCount`
+- `GroupKey`
 
-- pipeline 可以直接使用 packet 级事实
-- builtin 指标可以直接使用 packet 级事实
-- 逻辑不会在多个阶段重复扫描 points
+这里要特别说明：
 
-## 6. 关于内置派生指标的分类建议
+- logging / RUM 当前不补 trace 风格起止时间
+- 这是当前设计选择，不是遗漏
 
-下一步代码改造时，建议先把 builtin 分成几类：
+### 6.2 record 到 point 的规则
 
-### 6.1 计数类
+当前 flush 成 point 时遵循：
 
-例如：
+1. measurement 固定为 `tail_sampling`
+2. field key 是具体指标名
+3. field value 是聚合后的数值
+4. `stage` / `decision` 作为 tag 输出
+5. token 不放在 point 里，而是通过 `DerivedMetricPoints.Token` 单独返回
 
-- `trace_total_count`
-- `trace_error_count`
-- `span_total_count`
-- `logging_total_count`
-- `logging_error_count`
-- `rum_total_count`
+## 7. 当前设计为什么不再依赖 `AggregationBatch`
 
-这类最容易先稳定下来，应优先完成。
+现在派生指标已经明确和聚合模块解耦：
 
-### 6.2 比率类
+- 不走 `AggregatorConfigure`
+- 不走 `PickPoints()`
+- 不走 `AggregationBatch`
 
-例如：
+改成：
 
-- `trace_error_rate`
+- `DataPacket/Event -> DerivedMetricRecord`
+- `DerivedMetricRecord -> Collector`
+- `Collector Flush -> point`
+- `point 直接发送中心`
 
-这类通常依赖计数类结果，建议明确它是：
+这样做的原因：
 
-- 直接生成原始 0/1 样本再交给聚合模块算 AVG
+1. 尾采样代码不需要额外依赖聚合规则
+2. 外部项目不需要为了派生指标再准备一套 `AggregatorConfigure`
+3. 高频路径对象更轻
+4. 语义更适合“尾采样本地统计，中心直接消费 point”
 
-而不是在 tail sampling 阶段直接算最终比率。
+## 8. 当前还没做完的地方
 
-### 6.3 分布类
+当前代码还没有完成的点主要是：
 
-例如：
+1. builtin 指标还不是配置驱动，当前是默认集合
+2. 分布类指标还没接入
+3. 自定义 `derived_metrics` 还没实现
+4. 文档里的更大目标仍然包括继续压缩对象创建和完善 flush/发送链路
 
-- `trace_duration_summary`
-- `trace_size_distribution`
+## 9. 下一步建议
 
-这类要特别小心：
+如果在别的项目里继续推进，我建议顺序是：
 
-- histogram / quantile 的表达形式必须和“固定 measurement + field 为指标名”模型一致
-- 不要一边要求固定 measurement，一边又把 bucket/count/sum 塞回 measurement 名称
-
-## 7. 当前文档建议的改码顺序
-
-后续建议按下面顺序推进，而不是一次性大改：
-
-1. 先稳定 `DataPacket` 的摘要字段
-2. 再稳定 builtin 指标的统一接口
-3. 先完成计数类 builtin
-4. 再处理比率类
-5.  histogram / quantile 这类分布指标先写对象，方法内部 使用 `// todo` 即可
-
-
-这样可以减少“为了支持复杂指标，把整个框架一起搅乱”的风险。
-
-## 8. 当前不建议做的事
-
-1. 不要让尾采样逻辑依赖 `AggregatorConfigure`。
-2. 不要再通过 `PickPoints()` 把派生指标接回聚合模块。
-3. 不要把 measurement 当成具体派生指标名。
-4. 不要同时推进 builtin 和自定义指标，两条线会互相干扰。
-
-## 9. 下一步代码改造的目标
-
-如果按本文档继续改，下一步代码应达到以下目标：
-
-1. 内置派生指标都能直接输出 `AggregationBatch`
-2. batch 默认窗口为 `15s`
-3. measurement 固定为统一指标集
-4. field 才是真正指标名
-5. 先支持 ingest 阶段与 decision 阶段两类 builtin 统计
-6. 自定义 `derived_metrics` 继续保留 TODO，不在本轮实现
+1. 先把 `TailSamplingProcessor` 作为唯一入口接进去
+2. 先消费当前默认 builtin 的 point 输出
+3. 再把 builtin 指标改成配置驱动启用
+4. 最后再考虑分布类指标和自定义指标
 
 ## 10. 一句话总结
 
-后续尾采样改造的核心，不是“再多写一些 if/else 生成指标”，而是把内置派生指标抽象成一套以 `DataPacket -> AggregationBatch` 为中心的稳定模型，并明确 measurement 与 field 的职责边界。
+当前最合理的理解是：
+
+- `GlobalSampler` 仍然是尾采样核心
+- `TailSamplingProcessor` 是新的对外入口
+- 派生指标现在走的是 `record -> collector -> point` 链路
+- 它已经不再依赖 `AggregationBatch`
