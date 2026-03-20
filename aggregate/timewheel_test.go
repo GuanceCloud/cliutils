@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GuanceCloud/cliutils/point"
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 )
@@ -45,7 +46,7 @@ func TestGlobalSampler_AdvanceTime(t *testing.T) { //nolint
 		Token:       "TokenA",
 		DataType:    "tracing",
 	}
-	cKey := HashToken(packet.Token, packet.GroupIdHash)
+	cKey := tailSamplingGroupMapKey(packet)
 	// 这里我们需要模拟 GetConfig 返回 2s 的 TTL
 	// 假设我们在 Ingest 内部已经根据当前指针计算好了位置
 	// 当前指针为 0，TTL 为 2，预期的过期槽位是 2
@@ -66,6 +67,57 @@ func TestGlobalSampler_AdvanceTime(t *testing.T) { //nolint
 	shard := sampler.shards[tidHash%uint64(shardCount)]
 	_, exists := shard.activeMap[cKey]
 	assert.False(t, exists, "过期后数据应从 activeMap 中删除")
+}
+
+func TestGlobalSampler_IngestKeepsDifferentDataTypeSeparate(t *testing.T) {
+	shardCount := 1
+	sampler := &GlobalSampler{
+		shardCount: shardCount,
+		shards:     make([]*Shard, shardCount),
+		configMap: map[string]*TailSamplingConfigs{
+			"TokenA": {
+				Tracing: &TraceTailSampling{DataTTL: 2 * time.Second},
+				Logging: &LoggingTailSampling{DataTTL: 2 * time.Second},
+			},
+		},
+	}
+	for i := 0; i < shardCount; i++ {
+		sampler.shards[i] = &Shard{activeMap: make(map[uint64]*DataGroup)}
+		for j := 0; j < 3600; j++ {
+			sampler.shards[i].slots[j] = list.New()
+		}
+	}
+
+	tracePacket := &DataPacket{
+		GroupIdHash: 100,
+		RawGroupId:  "same-id",
+		Token:       "TokenA",
+		DataType:    point.STracing,
+		GroupKey:    "trace_id",
+		Points:      []*point.PBPoint{{}},
+		PointCount:  1,
+	}
+	loggingPacket := &DataPacket{
+		GroupIdHash: 100,
+		RawGroupId:  "same-id",
+		Token:       "TokenA",
+		DataType:    point.SLogging,
+		GroupKey:    "service",
+		Points:      []*point.PBPoint{{}},
+		PointCount:  1,
+	}
+
+	sampler.Ingest(tracePacket)
+	sampler.Ingest(loggingPacket)
+
+	shard := sampler.shards[0]
+	assert.Len(t, shard.activeMap, 2)
+
+	traceKey := tailSamplingGroupMapKey(tracePacket)
+	loggingKey := tailSamplingGroupMapKey(loggingPacket)
+	assert.NotEqual(t, traceKey, loggingKey)
+	assert.Equal(t, point.STracing, shard.activeMap[traceKey].td.DataType)
+	assert.Equal(t, point.SLogging, shard.activeMap[loggingKey].td.DataType)
 }
 
 type MockSampler struct {

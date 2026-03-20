@@ -5,8 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GuanceCloud/cliutils"
 	"github.com/GuanceCloud/cliutils/logger"
 	"github.com/GuanceCloud/cliutils/point"
+	"github.com/cespare/xxhash/v2"
 )
 
 var twl = logger.DefaultSLogger("aggregate.timewheel")
@@ -86,6 +88,13 @@ func NewGlobalSampler(shardCount int, waitTime time.Duration) *GlobalSampler {
 	return sampler
 }
 
+func tailSamplingGroupMapKey(packet *DataPacket) uint64 {
+	key := HashToken(packet.Token, packet.GroupIdHash)
+	key = HashCombine(key, xxhash.Sum64(cliutils.ToUnsafeBytes(packet.DataType)))
+	key = HashCombine(key, xxhash.Sum64(cliutils.ToUnsafeBytes(packet.GroupKey)))
+	return key
+}
+
 func (s *GlobalSampler) Ingest(packet *DataPacket) {
 	// 1. 路由到对应的 Shard
 	shard := s.shards[packet.GroupIdHash%uint64(s.shardCount)]
@@ -147,7 +156,7 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 	twl.Debugf("expirePos is %d", expirePos)
 
 	// 创建组合键
-	key := HashToken(packet.Token, packet.GroupIdHash)
+	key := tailSamplingGroupMapKey(packet)
 
 	if old, exists := shard.activeMap[key]; exists {
 		// --- 场景 A：老 Trace 更新 ---
@@ -221,7 +230,7 @@ func (s *GlobalSampler) AdvanceTime() map[uint64]*DataGroup {
 
 func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) map[uint64]*TailSamplingOutcome {
 	outcomes := make(map[uint64]*TailSamplingOutcome, len(dataGroups))
-	for _, dg := range dataGroups {
+	for key, dg := range dataGroups {
 		decision := DerivedMetricDecisionDropped
 		var keptPacket *DataPacket
 		matchedPipeline := false
@@ -348,7 +357,7 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 		twl.Infof("tail sampling outcome: decision=%s, token=%s, data_type=%s, group_id=%s, group_key=%s, kept=%t",
 			decision, dg.td.Token, dg.td.DataType, dg.td.RawGroupId, dg.td.GroupKey, keptPacket != nil)
 
-		outcomes[dg.td.GroupIdHash] = &TailSamplingOutcome{
+		outcomes[key] = &TailSamplingOutcome{
 			Packet:       keptPacket,
 			SourcePacket: dg.td,
 			Decision:     decision,
