@@ -56,6 +56,8 @@ func (sp *SamplingPipeline) Apply() error {
 
 func (sp *SamplingPipeline) DoAction(td *DataPacket) (bool, *DataPacket) {
 	if sp.conds == nil { // condition are required to do actions.
+		l.Debugf("pipeline=%q skipped: nil conditions, token=%s, data_type=%s, group_id=%s",
+			sp.Name, td.Token, td.DataType, td.RawGroupId)
 		return false, td
 	}
 	ptw := &ptWrap{}
@@ -64,7 +66,8 @@ func (sp *SamplingPipeline) DoAction(td *DataPacket) (bool, *DataPacket) {
 			for _, span := range td.Points {
 				ptw.Point = point.FromPB(span)
 				if _, has := ptw.Get(key); has {
-					l.Debugf("matched 'hasKey' has key =%s", key)
+					l.Debugf("pipeline=%q matched hash key=%q, keep packet token=%s, data_type=%s, group_id=%s",
+						sp.Name, key, td.Token, td.DataType, td.RawGroupId)
 					return true, td
 				}
 			}
@@ -78,32 +81,46 @@ func (sp *SamplingPipeline) DoAction(td *DataPacket) (bool, *DataPacket) {
 		if x := sp.conds.Eval(ptw); x < 0 {
 			continue
 		} // else: matched, fall through...
-		l.Debugf("matched condition =%s", sp.Condition)
+		l.Debugf("pipeline=%q matched condition=%q, token=%s, data_type=%s, group_id=%s",
+			sp.Name, sp.Condition, td.Token, td.DataType, td.RawGroupId)
 		matched = true
 
 		switch sp.Type {
 		case PipelineTypeSampling:
 			if sp.Rate > 0.0 {
 				arg := td.GroupIdHash % sampleRange
-				l.Debugf("sampling rate=%f", arg)
-				if arg < uint64(math.Floor(sp.Rate*float64(sampleRange))) {
+				threshold := uint64(math.Floor(sp.Rate * float64(sampleRange)))
+				l.Debugf("pipeline=%q sampling check: hash_mod=%d threshold=%d rate=%f token=%s data_type=%s group_id=%s",
+					sp.Name, arg, threshold, sp.Rate, td.Token, td.DataType, td.RawGroupId)
+				if arg < threshold {
+					l.Infof("pipeline=%q keep packet by probabilistic sampling, token=%s, data_type=%s, group_id=%s",
+						sp.Name, td.Token, td.DataType, td.RawGroupId)
 					return true, td // keep
 				}
-				// sp.dropped++
+				l.Infof("pipeline=%q drop packet by probabilistic sampling, token=%s, data_type=%s, group_id=%s",
+					sp.Name, td.Token, td.DataType, td.RawGroupId)
 				return true, nil
 			}
 		case PipelineTypeCondition:
 			// check on action
 			switch sp.Action {
 			case PipelineActionDrop:
-				// r.dropped++
+				l.Infof("pipeline=%q drop packet by condition, token=%s, data_type=%s, group_id=%s",
+					sp.Name, td.Token, td.DataType, td.RawGroupId)
 				return true, nil
 			case PipelineActionKeep:
+				l.Infof("pipeline=%q keep packet by condition, token=%s, data_type=%s, group_id=%s",
+					sp.Name, td.Token, td.DataType, td.RawGroupId)
 				return true, td
 			}
 		default:
 			l.Warnf("Unsupported pipeline-type %s", sp.Type)
 		}
+	}
+
+	if !matched {
+		l.Debugf("pipeline=%q no match, token=%s, data_type=%s, group_id=%s",
+			sp.Name, td.Token, td.DataType, td.RawGroupId)
 	}
 
 	return matched, td
