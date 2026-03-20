@@ -6,6 +6,33 @@ import (
 	"github.com/GuanceCloud/cliutils/point"
 )
 
+func traceBuiltinMetricNames() []string {
+	return []string{
+		"trace_total_count",
+		"trace_kept_count",
+		"trace_dropped_count",
+		"trace_error_count",
+		"span_total_count",
+	}
+}
+
+func loggingBuiltinMetricNames() []string {
+	return []string{
+		"logging_total_count",
+		"logging_error_count",
+		"logging_kept_count",
+		"logging_dropped_count",
+	}
+}
+
+func rumBuiltinMetricNames() []string {
+	return []string{
+		"rum_total_count",
+		"rum_kept_count",
+		"rum_dropped_count",
+	}
+}
+
 type countBuiltinDerivedMetric struct {
 	name       string
 	onIngest   func(packet *DataPacket) (float64, bool)

@@ -1,6 +1,10 @@
 package aggregate
 
-import "time"
+import (
+	"time"
+
+	"github.com/GuanceCloud/cliutils/point"
+)
 
 type TailSamplingBuiltinMetric interface {
 	Name() string
@@ -87,7 +91,7 @@ func (r *TailSamplingProcessor) IngestPacket(packet *DataPacket) {
 	}
 
 	if r.collector != nil && len(r.metrics) > 0 {
-		r.collector.Add(r.metrics.OnIngest(packet))
+		r.collector.Add(r.filterBuiltinRecords(packet, r.metrics.OnIngest(packet)))
 	}
 
 	if r.sampler != nil {
@@ -128,7 +132,7 @@ func (r *TailSamplingProcessor) TailSamplingData(dataGroups map[uint64]*DataGrou
 
 		packetForMetrics := outcome.SourcePacket
 		if packetForMetrics != nil {
-			r.collector.Add(r.metrics.OnDecision(packetForMetrics, outcome.Decision))
+			r.collector.Add(r.filterBuiltinRecords(packetForMetrics, r.metrics.OnDecision(packetForMetrics, outcome.Decision)))
 		}
 
 		if outcome.Packet != nil {
@@ -144,7 +148,7 @@ func (r *TailSamplingProcessor) RecordDecision(packet *DataPacket, decision Deri
 		return
 	}
 
-	r.collector.Add(r.metrics.OnDecision(packet, decision))
+	r.collector.Add(r.filterBuiltinRecords(packet, r.metrics.OnDecision(packet, decision)))
 }
 
 func (r *TailSamplingProcessor) FlushDerivedMetrics(now time.Time) []*DerivedMetricPoints {
@@ -153,4 +157,65 @@ func (r *TailSamplingProcessor) FlushDerivedMetrics(now time.Time) []*DerivedMet
 	}
 
 	return r.collector.Flush(now)
+}
+
+func (r *TailSamplingProcessor) filterBuiltinRecords(packet *DataPacket, records []DerivedMetricRecord) []DerivedMetricRecord {
+	if len(records) == 0 || packet == nil {
+		return records
+	}
+
+	filtered := make([]DerivedMetricRecord, 0, len(records))
+	for _, record := range records {
+		if r.isBuiltinMetricEnabled(packet.Token, packet.DataType, record.MetricName) {
+			filtered = append(filtered, record)
+		}
+	}
+
+	return filtered
+}
+
+func (r *TailSamplingProcessor) isBuiltinMetricEnabled(token, dataType, metricName string) bool {
+	if r == nil || r.sampler == nil {
+		return true
+	}
+
+	var cfgs []*BuiltinMetricCfg
+
+	switch dataType {
+	case point.STracing:
+		traceCfg := r.sampler.GetTraceConfig(token)
+		if traceCfg == nil {
+			return true
+		}
+		cfgs = traceCfg.BuiltinMetrics
+	case point.SLogging:
+		loggingCfg := r.sampler.GetLoggingConfig(token)
+		if loggingCfg == nil {
+			return true
+		}
+		cfgs = loggingCfg.BuiltinMetrics
+	case point.SRUM:
+		rumCfg := r.sampler.GetRUMConfig(token)
+		if rumCfg == nil {
+			return true
+		}
+		cfgs = rumCfg.BuiltinMetrics
+	default:
+		return true
+	}
+
+	if len(cfgs) == 0 {
+		return true
+	}
+
+	for _, cfg := range cfgs {
+		if cfg == nil {
+			continue
+		}
+		if cfg.Name == metricName {
+			return cfg.Enabled
+		}
+	}
+
+	return true
 }

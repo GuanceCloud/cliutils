@@ -176,6 +176,7 @@ func PickTrace(source string, pts []*point.Point, version int64) map[uint64]*Dat
 type TraceTailSampling struct {
 	DataTTL        time.Duration       `toml:"data_ttl" json:"data_ttl"`
 	DerivedMetrics []*DerivedMetric    `toml:"derived_metrics" json:"derived_metrics"`
+	BuiltinMetrics []*BuiltinMetricCfg `toml:"builtin_metrics" json:"builtin_metrics"`
 	Pipelines      []*SamplingPipeline `toml:"sampling_pipeline" json:"pipelines"`
 	Version        int64               `toml:"version" json:"version"`
 
@@ -188,6 +189,11 @@ type TailSamplingConfigs struct {
 	Logging *LoggingTailSampling `toml:"logging" json:"logging"`
 	RUM     *RUMTailSampling     `toml:"rum" json:"rum"`
 	Version int64                `toml:"version" json:"version"`
+}
+
+type BuiltinMetricCfg struct {
+	Name    string `toml:"name" json:"name"`
+	Enabled bool   `toml:"enabled" json:"enabled"`
 }
 
 func (t *TailSamplingConfigs) ToString() string {
@@ -206,6 +212,7 @@ func (t *TailSamplingConfigs) ToString() string {
 			pipelineNames(t.Tracing.Pipelines),
 			derivedMetricNames(t.Tracing.DerivedMetrics),
 		)
+		fmt.Fprintf(&b, ", trace_builtin_metrics=%s", builtinMetricNames(t.Tracing.BuiltinMetrics))
 	}
 
 	if t.Logging != nil {
@@ -214,6 +221,7 @@ func (t *TailSamplingConfigs) ToString() string {
 			t.Logging.Version,
 			loggingGroupStrings(t.Logging.GroupDimensions),
 		)
+		fmt.Fprintf(&b, ", logging_builtin_metrics=%s", builtinMetricNames(t.Logging.BuiltinMetrics))
 	}
 
 	if t.RUM != nil {
@@ -222,6 +230,7 @@ func (t *TailSamplingConfigs) ToString() string {
 			t.RUM.Version,
 			rumGroupStrings(t.RUM.GroupDimensions),
 		)
+		fmt.Fprintf(&b, ", rum_builtin_metrics=%s", builtinMetricNames(t.RUM.BuiltinMetrics))
 	}
 
 	b.WriteString("}")
@@ -241,6 +250,7 @@ func (t *TailSamplingConfigs) Init() {
 				l.Errorf("failed to apply sampling pipeline: %s", err)
 			}
 		}
+		t.Tracing.BuiltinMetrics = initBuiltinMetricCfgs(t.Tracing.BuiltinMetrics, traceBuiltinMetricNames())
 	}
 
 	if t.Logging != nil {
@@ -257,6 +267,7 @@ func (t *TailSamplingConfigs) Init() {
 				}
 			}
 		}
+		t.Logging.BuiltinMetrics = initBuiltinMetricCfgs(t.Logging.BuiltinMetrics, loggingBuiltinMetricNames())
 	}
 
 	if t.RUM != nil {
@@ -273,12 +284,15 @@ func (t *TailSamplingConfigs) Init() {
 				}
 			}
 		}
+		t.RUM.BuiltinMetrics = initBuiltinMetricCfgs(t.RUM.BuiltinMetrics, rumBuiltinMetricNames())
 	}
 }
 
 type LoggingTailSampling struct {
 	DataTTL time.Duration `toml:"data_ttl" json:"data_ttl"`
 	Version int64         `toml:"version" json:"version"`
+	// 内置指标配置，默认全开
+	BuiltinMetrics []*BuiltinMetricCfg `toml:"builtin_metrics" json:"builtin_metrics"`
 
 	// 按分组维度配置（不再是全局管道）
 	GroupDimensions []*LoggingGroupDimension `toml:"group_dimensions" json:"group_dimensions"`
@@ -346,6 +360,8 @@ func pickByGroupKey(groupKey string, source string, pts []*point.Point, category
 type RUMTailSampling struct {
 	DataTTL time.Duration `toml:"data_ttl" json:"data_ttl"`
 	Version int64         `toml:"version" json:"version"`
+	// 内置指标配置，默认全开
+	BuiltinMetrics []*BuiltinMetricCfg `toml:"builtin_metrics" json:"builtin_metrics"`
 
 	// RUM可能也有多个分组维度
 	GroupDimensions []*RUMGroupDimension `toml:"group_dimensions" json:"group_dimensions"`
@@ -425,6 +441,60 @@ func derivedMetricNames(metrics []*DerivedMetric) string {
 	}
 
 	return "[" + strings.Join(items, ", ") + "]"
+}
+
+func builtinMetricNames(metrics []*BuiltinMetricCfg) string {
+	if len(metrics) == 0 {
+		return "[]"
+	}
+
+	items := make([]string, 0, len(metrics))
+	for _, metric := range metrics {
+		if metric == nil {
+			items = append(items, "<nil>")
+			continue
+		}
+		items = append(items, fmt.Sprintf("{name=%q,enabled=%v}", metric.Name, metric.Enabled))
+	}
+
+	return "[" + strings.Join(items, ", ") + "]"
+}
+
+func initBuiltinMetricCfgs(cfgs []*BuiltinMetricCfg, defaults []string) []*BuiltinMetricCfg {
+	if len(defaults) == 0 {
+		return cfgs
+	}
+
+	if len(cfgs) == 0 {
+		res := make([]*BuiltinMetricCfg, 0, len(defaults))
+		for _, name := range defaults {
+			res = append(res, &BuiltinMetricCfg{
+				Name:    name,
+				Enabled: true,
+			})
+		}
+		return res
+	}
+
+	set := make(map[string]struct{}, len(cfgs))
+	for _, cfg := range cfgs {
+		if cfg == nil || cfg.Name == "" {
+			continue
+		}
+		set[cfg.Name] = struct{}{}
+	}
+
+	for _, name := range defaults {
+		if _, ok := set[name]; ok {
+			continue
+		}
+		cfgs = append(cfgs, &BuiltinMetricCfg{
+			Name:    name,
+			Enabled: true,
+		})
+	}
+
+	return cfgs
 }
 
 func loggingGroupStrings(groups []*LoggingGroupDimension) string {
