@@ -10,7 +10,8 @@ import (
 
 func TestDerivedMetricCollector_Flush(t *testing.T) {
 	collector := NewDerivedMetricCollector(15 * time.Second)
-	baseTime := time.Unix(1700000000, 0)
+	baseTime := time.Unix(1700000001, 0)
+	expectedTS := AlignNextWallTime(baseTime, 15*time.Second) * int64(time.Second)
 
 	collector.Add([]DerivedMetricRecord{
 		{
@@ -64,6 +65,7 @@ func TestDerivedMetricCollector_Flush(t *testing.T) {
 	assert.Equal(t, TailSamplingDerivedMeasurement, ptA.Name())
 	assert.Equal(t, "ingest", ptA.GetTag("stage"))
 	assert.Equal(t, "checkout", ptA.GetTag("service"))
+	assert.Equal(t, expectedTS, ptA.Time().UnixNano())
 
 	require.Len(t, grouped["token-b"].PTS, 1)
 	ptB := grouped["token-b"].PTS[0]
@@ -72,4 +74,5 @@ func TestDerivedMetricCollector_Flush(t *testing.T) {
 	assert.Equal(t, 1.0, valueB)
 	assert.Equal(t, TailSamplingDerivedMeasurement, ptB.Name())
 	assert.Equal(t, "ingest", ptB.GetTag("stage"))
+	assert.Equal(t, expectedTS, ptB.Time().UnixNano())
 }

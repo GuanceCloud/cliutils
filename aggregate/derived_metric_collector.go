@@ -28,7 +28,6 @@ type derivedMetricValue struct {
 	decision    DerivedMetricDecision
 	tags        map[string]string
 	sum         float64
-	maxTS       int64
 }
 
 type DerivedMetricCollector struct {
@@ -74,9 +73,6 @@ func (c *DerivedMetricCollector) Add(records []DerivedMetricRecord) {
 
 		if current, ok := bucket[key]; ok {
 			current.sum += record.Value
-			if timestamp.UnixNano() > current.maxTS {
-				current.maxTS = timestamp.UnixNano()
-			}
 			continue
 		}
 
@@ -88,7 +84,6 @@ func (c *DerivedMetricCollector) Add(records []DerivedMetricRecord) {
 			decision:    record.Decision,
 			tags:        cloneTags(record.Tags),
 			sum:         record.Value,
-			maxTS:       timestamp.UnixNano(),
 		}
 	}
 }
@@ -106,7 +101,7 @@ func (c *DerivedMetricCollector) Flush(now time.Time) []*DerivedMetricPoints {
 		}
 
 		for _, val := range bucket {
-			grouped[val.token] = append(grouped[val.token], val.toPoint())
+			grouped[val.token] = append(grouped[val.token], val.toPoint(exp))
 		}
 
 		delete(c.buckets, exp)
@@ -134,7 +129,7 @@ func newDerivedMetricKey(record DerivedMetricRecord) derivedMetricKey {
 	}
 }
 
-func (v *derivedMetricValue) toPoint() *point.Point {
+func (v *derivedMetricValue) toPoint(exp int64) *point.Point {
 	kvs := point.KVs{}
 	kvs = kvs.Add(v.metricName, v.sum)
 
@@ -151,7 +146,7 @@ func (v *derivedMetricValue) toPoint() *point.Point {
 		kvs = kvs.AddTag(key, v.tags[key])
 	}
 
-	return point.NewPoint(v.measurement, kvs, point.WithTimestamp(v.maxTS))
+	return point.NewPoint(v.measurement, kvs, point.WithTimestamp(exp*int64(time.Second)))
 }
 
 func hashDerivedMetricTags(tags map[string]string) uint64 {

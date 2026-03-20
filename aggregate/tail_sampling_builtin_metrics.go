@@ -184,14 +184,35 @@ func packetTime(packet *DataPacket) time.Time {
 		return time.Now()
 	}
 
+	maxPointTS := packetMaxPointTimeUnixNano(packet)
+	if maxPointTS > 0 {
+		return time.Unix(0, maxPointTS)
+	}
+
 	switch {
 	case packet.TraceEndTimeUnixNano > 0:
 		return time.Unix(0, packet.TraceEndTimeUnixNano)
-	case len(packet.Points) > 0:
-		return point.FromPB(packet.Points[0]).Time()
 	default:
 		return time.Now()
 	}
+}
+
+func packetMaxPointTimeUnixNano(packet *DataPacket) int64 {
+	if packet == nil || len(packet.Points) == 0 {
+		return 0
+	}
+
+	var maxTS int64
+	for _, pb := range packet.Points {
+		if pb == nil {
+			continue
+		}
+		if pb.Time > maxTS {
+			maxTS = pb.Time
+		}
+	}
+
+	return maxTS
 }
 
 func builtinRecordTags(packet *DataPacket) map[string]string {
