@@ -168,7 +168,7 @@ func newDerivedMetricRecord(
 ) DerivedMetricRecord {
 	return DerivedMetricRecord{
 		Token:       packet.Token,
-		DataType:    packet.DataType,
+		DataType:    point.SMetric,
 		MetricName:  metricName,
 		Stage:       stage,
 		Decision:    decision,

@@ -1,9 +1,11 @@
 package aggregate
 
 import (
+	"fmt"
 	"hash/fnv"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	fp "github.com/GuanceCloud/cliutils/filter"
@@ -79,17 +81,18 @@ func (sp *SamplingPipeline) DoAction(td *DataPacket) (bool, *DataPacket) {
 		l.Debugf("matched condition =%s", sp.Condition)
 		matched = true
 
-		if sp.Type == PipelineTypeSampling {
+		switch sp.Type {
+		case PipelineTypeSampling:
 			if sp.Rate > 0.0 {
-				if td.GroupIdHash%sampleRange < uint64(math.Floor(sp.Rate*float64(sampleRange))) {
+				arg := td.GroupIdHash % sampleRange
+				l.Debugf("sampling rate=%f", arg)
+				if arg < uint64(math.Floor(sp.Rate*float64(sampleRange))) {
 					return true, td // keep
 				}
 				// sp.dropped++
 				return true, nil
 			}
-		}
-
-		if sp.Type == PipelineTypeCondition {
+		case PipelineTypeCondition:
 			// check on action
 			switch sp.Action {
 			case PipelineActionDrop:
@@ -98,6 +101,8 @@ func (sp *SamplingPipeline) DoAction(td *DataPacket) (bool, *DataPacket) {
 			case PipelineActionKeep:
 				return true, td
 			}
+		default:
+			l.Warnf("Unsupported pipeline-type %s", sp.Type)
 		}
 	}
 
@@ -166,6 +171,44 @@ type TailSamplingConfigs struct {
 	Logging *LoggingTailSampling `toml:"logging" json:"logging"`
 	RUM     *RUMTailSampling     `toml:"rum" json:"rum"`
 	Version int64                `toml:"version" json:"version"`
+}
+
+func (t *TailSamplingConfigs) ToString() string {
+	if t == nil {
+		return "<nil>"
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "TailSamplingConfigs{version=%d", t.Version)
+
+	if t.Tracing != nil {
+		fmt.Fprintf(&b, ", trace={ttl=%s, version=%d, group_key=%q, pipelines=%s, derived_metrics=%s}",
+			t.Tracing.DataTTL,
+			t.Tracing.Version,
+			t.Tracing.GroupKey,
+			pipelineNames(t.Tracing.Pipelines),
+			derivedMetricNames(t.Tracing.DerivedMetrics),
+		)
+	}
+
+	if t.Logging != nil {
+		fmt.Fprintf(&b, ", logging={ttl=%s, version=%d, group_dimensions=%s}",
+			t.Logging.DataTTL,
+			t.Logging.Version,
+			loggingGroupStrings(t.Logging.GroupDimensions),
+		)
+	}
+
+	if t.RUM != nil {
+		fmt.Fprintf(&b, ", rum={ttl=%s, version=%d, group_dimensions=%s}",
+			t.RUM.DataTTL,
+			t.RUM.Version,
+			rumGroupStrings(t.RUM.GroupDimensions),
+		)
+	}
+
+	b.WriteString("}")
+	return b.String()
 }
 
 func (t *TailSamplingConfigs) Init() {
@@ -329,4 +372,76 @@ func fieldToString(field any) string {
 	default: // other types are ignored
 		return ""
 	}
+}
+
+func pipelineNames(pipelines []*SamplingPipeline) string {
+	if len(pipelines) == 0 {
+		return "[]"
+	}
+
+	items := make([]string, 0, len(pipelines))
+	for _, pipeline := range pipelines {
+		if pipeline == nil {
+			items = append(items, "<nil>")
+			continue
+		}
+		items = append(items, fmt.Sprintf("{name=%q,type=%q,condition=%q,action=%q,rate=%v,hash_keys=%v}",
+			pipeline.Name, pipeline.Type, pipeline.Condition, pipeline.Action, pipeline.Rate, pipeline.HashKeys))
+	}
+
+	return "[" + strings.Join(items, ", ") + "]"
+}
+
+func derivedMetricNames(metrics []*DerivedMetric) string {
+	if len(metrics) == 0 {
+		return "[]"
+	}
+
+	items := make([]string, 0, len(metrics))
+	for _, metric := range metrics {
+		if metric == nil {
+			items = append(items, "<nil>")
+			continue
+		}
+		items = append(items, fmt.Sprintf("{name=%q,type=%q,condition=%q,group_by=%v}",
+			metric.Name, metric.Type.String(), metric.Condition, metric.Groupby))
+	}
+
+	return "[" + strings.Join(items, ", ") + "]"
+}
+
+func loggingGroupStrings(groups []*LoggingGroupDimension) string {
+	if len(groups) == 0 {
+		return "[]"
+	}
+
+	items := make([]string, 0, len(groups))
+	for _, group := range groups {
+		if group == nil {
+			items = append(items, "<nil>")
+			continue
+		}
+		items = append(items, fmt.Sprintf("{group_key=%q,pipelines=%s,derived_metrics=%s}",
+			group.GroupKey, pipelineNames(group.Pipelines), derivedMetricNames(group.DerivedMetrics)))
+	}
+
+	return "[" + strings.Join(items, ", ") + "]"
+}
+
+func rumGroupStrings(groups []*RUMGroupDimension) string {
+	if len(groups) == 0 {
+		return "[]"
+	}
+
+	items := make([]string, 0, len(groups))
+	for _, group := range groups {
+		if group == nil {
+			items = append(items, "<nil>")
+			continue
+		}
+		items = append(items, fmt.Sprintf("{group_key=%q,pipelines=%s,derived_metrics=%s}",
+			group.GroupKey, pipelineNames(group.Pipelines), derivedMetricNames(group.DerivedMetrics)))
+	}
+
+	return "[" + strings.Join(items, ", ") + "]"
 }
