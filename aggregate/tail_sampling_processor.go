@@ -9,6 +9,7 @@ import (
 type TailSamplingBuiltinMetric interface {
 	Name() string
 	OnIngest(packet *DataPacket) []DerivedMetricRecord
+	OnPreDecision(packet *DataPacket) []DerivedMetricRecord
 	OnDecision(packet *DataPacket, decision DerivedMetricDecision) []DerivedMetricRecord
 }
 
@@ -26,6 +27,14 @@ func (ms TailSamplingBuiltinMetrics) OnDecision(packet *DataPacket, decision Der
 	var records []DerivedMetricRecord
 	for _, metric := range ms {
 		records = append(records, metric.OnDecision(packet, decision)...)
+	}
+	return records
+}
+
+func (ms TailSamplingBuiltinMetrics) OnPreDecision(packet *DataPacket) []DerivedMetricRecord {
+	var records []DerivedMetricRecord
+	for _, metric := range ms {
+		records = append(records, metric.OnPreDecision(packet)...)
 	}
 	return records
 }
@@ -110,6 +119,15 @@ func (r *TailSamplingProcessor) AdvanceTime() map[uint64]*DataGroup {
 func (r *TailSamplingProcessor) TailSamplingData(dataGroups map[uint64]*DataGroup) map[uint64]*DataPacket {
 	if r == nil || r.sampler == nil {
 		return nil
+	}
+
+	if r.collector != nil && len(r.metrics) > 0 {
+		for _, dg := range dataGroups {
+			if dg == nil || dg.td == nil {
+				continue
+			}
+			r.collector.Add(r.filterBuiltinRecords(dg.td, r.metrics.OnPreDecision(dg.td)))
+		}
 	}
 
 	outcomes := r.sampler.TailSamplingOutcomes(dataGroups)

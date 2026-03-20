@@ -76,3 +76,65 @@ func TestDerivedMetricCollector_Flush(t *testing.T) {
 	assert.Equal(t, "ingest", ptB.GetTag("stage"))
 	assert.Equal(t, expectedTS, ptB.Time().UnixNano())
 }
+
+func TestDerivedMetricCollector_FlushHistogram(t *testing.T) {
+	collector := NewDerivedMetricCollector(30 * time.Second)
+	baseTime := time.Unix(1700000001, 0)
+	expectedTS := AlignNextWallTime(baseTime, 30*time.Second) * int64(time.Second)
+
+	collector.Add([]DerivedMetricRecord{
+		{
+			Token:      "token-a",
+			MetricName: "trace_duration",
+			Kind:       DerivedMetricKindHistogram,
+			Stage:      DerivedMetricStagePreDecision,
+			Tags: map[string]string{
+				"data_type": "tracing",
+			},
+			Value:   12,
+			Buckets: []float64{1, 10, 20},
+			Time:    baseTime,
+		},
+		{
+			Token:      "token-a",
+			MetricName: "trace_duration",
+			Kind:       DerivedMetricKindHistogram,
+			Stage:      DerivedMetricStagePreDecision,
+			Tags: map[string]string{
+				"data_type": "tracing",
+			},
+			Value:   25,
+			Buckets: []float64{1, 10, 20},
+			Time:    baseTime.Add(2 * time.Second),
+		},
+	})
+
+	res := collector.Flush(baseTime.Add(30 * time.Second))
+	require.Len(t, res, 1)
+	require.Len(t, res[0].PTS, 6) // 4 buckets + sum + count
+
+	var (
+		foundSum   bool
+		foundCount bool
+		foundLE20  bool
+	)
+	for _, pt := range res[0].PTS {
+		assert.Equal(t, expectedTS, pt.Time().UnixNano())
+		if v, ok := pt.GetF("trace_duration_sum"); ok {
+			foundSum = true
+			assert.Equal(t, 37.0, v)
+		}
+		if v, ok := pt.GetF("trace_duration_count"); ok {
+			foundCount = true
+			assert.Equal(t, 2.0, v)
+		}
+		if v, ok := pt.GetF("trace_duration_bucket"); ok && pt.GetTag("le") == "20" {
+			foundLE20 = true
+			assert.Equal(t, 1.0, v)
+		}
+	}
+
+	assert.True(t, foundSum)
+	assert.True(t, foundCount)
+	assert.True(t, foundLE20)
+}

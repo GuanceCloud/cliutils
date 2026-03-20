@@ -13,6 +13,7 @@ func traceBuiltinMetricNames() []string {
 		"trace_dropped_count",
 		"trace_error_count",
 		"span_total_count",
+		"trace_duration",
 	}
 }
 
@@ -69,6 +70,57 @@ func (m *countBuiltinDerivedMetric) OnDecision(packet *DataPacket, decision Deri
 	return []DerivedMetricRecord{newDerivedMetricRecord(packet, m.name, DerivedMetricStageDecision, decision, value)}
 }
 
+func (m *countBuiltinDerivedMetric) OnPreDecision(packet *DataPacket) []DerivedMetricRecord {
+	return nil
+}
+
+type histogramBuiltinDerivedMetric struct {
+	name       string
+	buckets    []float64
+	onObserve  func(packet *DataPacket) (float64, bool)
+	recordTags func(packet *DataPacket) map[string]string
+}
+
+func (m *histogramBuiltinDerivedMetric) Name() string {
+	return m.name
+}
+
+func (m *histogramBuiltinDerivedMetric) OnIngest(packet *DataPacket) []DerivedMetricRecord {
+	return nil
+}
+
+func (m *histogramBuiltinDerivedMetric) OnDecision(packet *DataPacket, decision DerivedMetricDecision) []DerivedMetricRecord {
+	return nil
+}
+
+func (m *histogramBuiltinDerivedMetric) OnPreDecision(packet *DataPacket) []DerivedMetricRecord {
+	if m == nil || packet == nil || m.onObserve == nil {
+		return nil
+	}
+
+	val, ok := m.onObserve(packet)
+	if !ok {
+		return nil
+	}
+
+	tags := builtinRecordTags(packet)
+	if m.recordTags != nil {
+		tags = m.recordTags(packet)
+	}
+
+	return []DerivedMetricRecord{newHistogramDerivedMetricRecord(
+		packet,
+		m.name,
+		DerivedMetricStagePreDecision,
+		DerivedMetricDecisionUnknown,
+		val,
+		tags,
+		m.buckets,
+	)}
+}
+
+var defaultTraceDurationBucketsMS = []float64{1, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000}
+
 func DefaultTailSamplingBuiltinMetrics() TailSamplingBuiltinMetrics {
 	return TailSamplingBuiltinMetrics{
 		&countBuiltinDerivedMetric{
@@ -117,6 +169,20 @@ func DefaultTailSamplingBuiltinMetrics() TailSamplingBuiltinMetrics {
 					return float64(len(packet.Points)), true
 				}
 				return 0, false
+			},
+		},
+		&histogramBuiltinDerivedMetric{
+			name:    "trace_duration",
+			buckets: defaultTraceDurationBucketsMS,
+			onObserve: func(packet *DataPacket) (float64, bool) {
+				if packet == nil || packet.DataType != point.STracing {
+					return 0, false
+				}
+				if packet.TraceEndTimeUnixNano <= packet.TraceStartTimeUnixNano {
+					return 0, false
+				}
+				durationMS := float64(packet.TraceEndTimeUnixNano-packet.TraceStartTimeUnixNano) / float64(time.Millisecond)
+				return durationMS, true
 			},
 		},
 		&countBuiltinDerivedMetric{
@@ -197,11 +263,36 @@ func newDerivedMetricRecord(
 		Token:       packet.Token,
 		DataType:    point.SMetric,
 		MetricName:  metricName,
+		Kind:        DerivedMetricKindSum,
 		Stage:       stage,
 		Decision:    decision,
 		Measurement: TailSamplingDerivedMeasurement,
 		Tags:        builtinRecordTags(packet),
 		Value:       value,
+		Time:        packetTime(packet),
+	}
+}
+
+func newHistogramDerivedMetricRecord(
+	packet *DataPacket,
+	metricName string,
+	stage DerivedMetricStage,
+	decision DerivedMetricDecision,
+	value float64,
+	tags map[string]string,
+	buckets []float64,
+) DerivedMetricRecord {
+	return DerivedMetricRecord{
+		Token:       packet.Token,
+		DataType:    point.SMetric,
+		MetricName:  metricName,
+		Kind:        DerivedMetricKindHistogram,
+		Stage:       stage,
+		Decision:    decision,
+		Measurement: TailSamplingDerivedMeasurement,
+		Tags:        tags,
+		Value:       value,
+		Buckets:     append([]float64(nil), buckets...),
 		Time:        packetTime(packet),
 	}
 }

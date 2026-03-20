@@ -11,8 +11,16 @@ const TailSamplingDerivedMeasurement = "tail_sampling"
 type DerivedMetricStage string
 
 const (
-	DerivedMetricStageIngest   DerivedMetricStage = "ingest"
-	DerivedMetricStageDecision DerivedMetricStage = "decision"
+	DerivedMetricStageIngest      DerivedMetricStage = "ingest"
+	DerivedMetricStagePreDecision DerivedMetricStage = "pre_decision"
+	DerivedMetricStageDecision    DerivedMetricStage = "decision"
+)
+
+type DerivedMetricKind string
+
+const (
+	DerivedMetricKindSum       DerivedMetricKind = "sum"
+	DerivedMetricKindHistogram DerivedMetricKind = "histogram"
 )
 
 type DerivedMetricDecision string
@@ -28,11 +36,13 @@ type DerivedMetricRecord struct {
 	Token       string
 	DataType    string
 	MetricName  string
+	Kind        DerivedMetricKind
 	Stage       DerivedMetricStage
 	Decision    DerivedMetricDecision
 	Measurement string
 	Tags        map[string]string
 	Value       float64
+	Buckets     []float64
 	Time        time.Time
 }
 
