@@ -20,4 +20,12 @@ protoc $INCLUDES \
     aggregate/aggrbatch.proto \
     aggregate/tsdata.proto
 
+if [ -f aggrbatch.pb.go ]; then
+    mv aggrbatch.pb.go aggregate/aggrbatch.pb.go
+fi
+
+if [ -f tsdata.pb.go ]; then
+    mv tsdata.pb.go aggregate/tsdata.pb.go
+fi
+
 echo "Done."

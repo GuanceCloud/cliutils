@@ -20,12 +20,12 @@
 
 1. 指标聚合主链路是当前可用能力。
 2. 尾采样主链路是当前可用能力。
-3. 尾采样派生指标处于“旧实现已删除，新实现待重做”的状态。
+3. 尾采样 builtin 派生指标已经接入，自定义 `derived_metrics` 仍待实现。
 
 因此：
 
 - 文档里凡是描述 `Cache`、`Windows`、`PickTrace()`、`GlobalSampler`、`TailSamplingData()` 的部分，默认都在描述当前代码现状。
-- 文档里凡是描述“15 秒批量转 `AggregationBatch` 的派生指标方案”的部分，默认都在描述下一步设计方向，而不是当前运行时行为。
+- 文档里凡是描述 builtin 派生指标的部分，需要以 `TailSamplingProcessor -> DerivedMetricCollector -> point` 这条链路理解。
 
 ---
 
@@ -80,13 +80,13 @@
 
 1. `aggregate/codex_read.md`
 2. `aggregate/tail-sampling.md`
-3. `aggregate/docs/config.md`
+3. `aggregate/docs/feature-overview.md`
 
 原因是：
 
 - `codex_read.md` 负责解释当前代码怎么工作。
-- `tail-sampling.md` 负责解释尾采样派生指标接下来准备怎么重做。
-- `config.md` 负责解释外部项目实际需要提供什么配置。
+- `tail-sampling.md` 负责解释尾采样处理器和派生指标链路。
+- `feature-overview.md` 负责给开发和测试人员一份当前实现总览。
 
 ---
 
@@ -197,14 +197,14 @@
 - `QUANTILES`
 - `STDEV`
 - `COUNT_DISTINCT`
-
-协议里虽然也有：
-
-- `EXPO_HISTOGRAM`
 - `LAST`
 - `FIRST`
 
-但在 `newCalculators()` 里仍是 `TODO`，当前没有落地实现。
+协议里还有：
+
+- `EXPO_HISTOGRAM`
+
+但它在 `newCalculators()` 里仍是 `TODO`，当前没有落地实现。
 
 ### 4.4.1 当前聚合实现里要特别记住的风险
 
@@ -212,7 +212,7 @@
 
 1. `QUANTILES` 当前实现仍值得怀疑，尤其是 merge 和 `_count` 语义。
 2. `SUM` 等算法输出里的 `<field>_count` 是否等于样本数，要结合业务预期复核，不要直接盲信。
-3. `EXPO_HISTOGRAM` / `LAST` / `FIRST` 仍未实现，协议存在不代表可以直接配置使用。
+3. `EXPO_HISTOGRAM` 仍未实现，协议存在不代表可以直接配置使用。
 
 ## 4.5 窗口与缓存结构
 
@@ -358,8 +358,10 @@
 
 当前配置模型要记住：
 
-- trace / logging / RUM 目前都只保留 `derived_metrics` 配置位
-- `derived_metrics` 仍未实现，尾采样运行时暂时只保留 TODO
+- trace / logging / RUM 都有 `builtin_metrics`
+- trace / logging / RUM 仍保留 `derived_metrics` 配置位
+- `builtin_metrics` 当前已经接入运行时
+- 自定义 `derived_metrics` 仍未实现
 
 ## 6.4 采样管道
 
@@ -441,11 +443,11 @@
   - 取 trace config
   - 顺序执行 pipelines
   - 命中保留则写入返回的 `DataPacket` map
-  - 派生指标逻辑当前已清空，只保留 `TODO: 生成派生指标`
+  - builtin 派生指标由 `TailSamplingProcessor` 在 pre-decision / decision 阶段记录
 - logging:
   - 找到匹配 `GroupKey` 的维度配置
   - 执行 pipelines
-  - 派生指标逻辑当前已清空，只保留 `TODO: 生成派生指标`
+  - builtin 派生指标由 `TailSamplingProcessor` 记录
 - RUM:
   - 同 logging
 
@@ -456,20 +458,18 @@
 
 ## 7.2 当前状态
 
-此前做过一轮内置派生指标实现和 sink 闭环尝试，但这部分代码已经全部删除，准备按新的 15 秒批量转 `AggregationBatch` 方案重做。
-
-后续理解这块时，应以 [tail-sampling.md](/home/songlq/gopath/src/github.com/GuanceCloud/cliutils/aggregate/tail-sampling.md) 的最新设计为准，不要再参考旧的 builtin/sink 接口。
+当前应以 `TailSamplingProcessor -> DerivedMetricCollector -> point` 这条链路理解 builtin 派生指标，不要再按历史上的 “回灌 AggregationBatch” 方案理解。
 
 ## 7.3 当前派生指标实现和设计文档的差异
 
 这是本模块最重要的注意项之一：
 
-1. 当前运行时代码里已经没有 builtin 派生指标，也没有 sink 闭环。
-2. `TailSamplingData()` 只在采样决策后留了 `TODO: 生成派生指标`。
-3. `PickTrace()` 已经在填充 `TraceStartTimeUnixNano` 和 `TraceEndTimeUnixNano`，这是后续重做派生指标时可直接复用的 packet 级事实。
-4. logging / RUM 这侧目前只有 `HasError` 和原始 `Points` 汇总，后续是否补时间摘要，要跟新的 15 秒批量方案一起设计。
+1. 当前 builtin 派生指标已经存在，且由 `TailSamplingProcessor` 驱动。
+2. `TailSamplingData()` 本身负责采样决策，不直接生成 point。
+3. `PickTrace()` 已经在填充 `TraceStartTimeUnixNano` 和 `TraceEndTimeUnixNano`，这也是 `trace_duration` builtin 指标的重要输入。
+4. logging / RUM 这侧当前仍没有 trace 风格的起止时间摘要。
 
-这几个点叠加起来，说明“派生指标处于拆除后的重设计阶段”，不要再按旧文档理解成已经闭环。
+这几个点叠加起来，说明当前状态是“builtin 已闭环，自定义派生指标仍未闭环”。
 
 ---
 
@@ -524,7 +524,7 @@
 
 ## 9.1 `aggrbatch.proto`
 
-聚合算法枚举已经定义得比较全：
+`aggrbatch.proto` 中的聚合方法当前按字符串字段 `method` 传递，支持的方法名已经定义得比较全：
 
 - `SUM`
 - `AVG`
@@ -605,7 +605,7 @@
 4. logging / RUM 尾采样不是按 trace_id，而是按配置的 `group_key`.
 5. logging / RUM 缺少分组键的数据会直接旁路，不进入采样缓存。
 6. 尾采样的 pipeline 是顺序短路执行，第一条决定结果的规则获胜。
-7. 当前派生指标运行时代码已经全部删除，`TailSamplingData()` 里只保留了 TODO。
+7. 当前 builtin 派生指标已经接入，但自定义 `derived_metrics` 仍未实现。
 8. trace 侧已经有 packet 级摘要字段，后续重做不要再回退成逐点重复计算。
 9. 聚合算法里仍有几个实现层风险，尤其是 `quantiles` 和部分 `_count` 语义。
 10. proto 里定义的算法不等于都已实现，落地能力要看 `newCalculators()`.
@@ -617,7 +617,7 @@
 我建议的阅读顺序是：
 
 1. `aggregate/codex_read.md`
-2. `aggregate/docs/config.md`
+2. `aggregate/docs/feature-overview.md`
 3. `aggregate/aggr.go`
 4. `aggregate/calculator.go`
 5. `aggregate/windows.go`
@@ -649,9 +649,9 @@
 - 多数据类型支持
 - 时间轮缓存
 - 规则驱动决策
-- 派生指标重设计入口
+- builtin 派生指标闭环
 
-但派生指标目前处在“旧实现已删、新实现未接入”的阶段，下一步要按 15 秒批量转 `AggregationBatch` 的思路重做。
+当前真正还没闭环的是自定义 `derived_metrics`，而不是整个派生指标子系统。
 
 ---
 

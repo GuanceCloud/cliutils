@@ -61,18 +61,6 @@ func (sp *SamplingPipeline) DoAction(td *DataPacket) (bool, *DataPacket) {
 		return false, td
 	}
 	ptw := &ptWrap{}
-	if len(sp.HashKeys) > 0 {
-		for _, key := range sp.HashKeys {
-			for _, span := range td.Points {
-				ptw.Point = point.FromPB(span)
-				if _, has := ptw.Get(key); has {
-					l.Debugf("pipeline=%q matched hash key=%q, keep packet token=%s, data_type=%s, group_id=%s",
-						sp.Name, key, td.Token, td.DataType, td.RawGroupId)
-					return true, td
-				}
-			}
-		}
-	}
 
 	matched := false
 
@@ -142,6 +130,7 @@ func PickTrace(source string, pts []*point.Point, version int64) map[uint64]*Dat
 					Source:        source,
 					ConfigVersion: version,
 					Points:        []*point.PBPoint{},
+					GroupKey:      "",
 				}
 				traceDatas[id] = traceData
 			}
@@ -180,7 +169,6 @@ type TraceTailSampling struct {
 	Pipelines      []*SamplingPipeline `toml:"sampling_pipeline" json:"pipelines"`
 	Version        int64               `toml:"version" json:"version"`
 
-	// 链路特有配置
 	GroupKey string `toml:"group_key" json:"group_key"` // 链路固定为 "trace_id"
 }
 

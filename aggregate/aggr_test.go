@@ -68,14 +68,14 @@ func TestHTTPPostBatch(t *T.T) {
 					},
 					Algorithms: map[string]*AggregationAlgo{
 						"f1": {
-							Method:      SUM,
+							Method:      string(SUM),
 							SourceField: "f1",
 							AddTags: map[string]string{
 								"extra_tag_1": "some_value",
 							},
 						},
 						"f1_max": {
-							Method:      MAX,
+							Method:      string(MAX),
 							SourceField: "f1",
 							AddTags: map[string]string{
 								"extra_tag_1": "some_value",
@@ -147,7 +147,7 @@ func TestHTTPPostBatch(t *T.T) {
 					},
 					Algorithms: map[string]*AggregationAlgo{
 						"otel.histograms": {
-							Method:      HISTOGRAM,
+							Method:      string(HISTOGRAM),
 							SourceField: "http.server.duration_bucket",
 							Options: &AggregationAlgo_HistogramOpts{
 								HistogramOpts: &HistogramOptions{
@@ -231,7 +231,7 @@ func TestBatch(t *T.T) {
 					},
 					Algorithms: map[string]*AggregationAlgo{
 						"f1": {
-							Method:      SUM,
+							Method:      string(SUM),
 							SourceField: "f1",
 							AddTags: map[string]string{
 								"extra_tag_1": "some_value",
@@ -483,14 +483,14 @@ func TestOTEL(t *T.T) {
 				},
 				Algorithms: map[string]*AggregationAlgo{
 					"jvm.buffer.memory.used.avg": {
-						Method:      AVG,
+						Method:      string(AVG),
 						SourceField: "jvm.buffer.memory.used",
 						AddTags: map[string]string{
 							"extra_tag_1": "some_value",
 						},
 					},
 					"jvm.buffer.memory.used.max": {
-						Method:      MAX,
+						Method:      string(MAX),
 						SourceField: "jvm.buffer.memory.used",
 						AddTags: map[string]string{
 							"extra_tag_1": "some_value",
@@ -509,7 +509,7 @@ func TestOTEL(t *T.T) {
 				},
 				Algorithms: map[string]*AggregationAlgo{
 					"client_ip_count": {
-						Method:      COUNT_DISTINCT,
+						Method:      string(COUNT_DISTINCT),
 						SourceField: "client_ip",
 					},
 				},

@@ -24,25 +24,14 @@ message AggregationBatch {
   uint64 pick_key=6;
 }
 
-enum AlgoMethod {
-  METHOD_UNSPECIFIED = 0;
-  SUM               = 1;
-  AVG               = 2;
-  COUNT             = 3;
-  MIN               = 4;
-  MAX               = 5;
-  HISTOGRAM         = 6;
-  EXPO_HISTOGRAM    = 7;
-  STDEV             = 8;
-  QUANTILES         = 9;
-  COUNT_DISTINCT    = 10;
-  LAST              = 11;
-  FIRST             = 12;
-}
-
 message AggregationAlgo {
   // 1. which algorithm to apply for specific field?
-  AlgoMethod method=1;
+  // Use a readable string such as:
+  //   method = "sum"
+  //   method = "count"
+  //   method = "quantiles"
+  // Supported values are defined by the package-level AlgoMethod constants.
+  string method=1;
 
   // 2. what the origin field name of the data?
   string source_field=2;

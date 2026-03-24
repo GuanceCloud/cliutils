@@ -67,13 +67,4 @@ type (
 		posBucketCounts []uint64
 		bounds []*explicitBounds
 	}
-
-	algoCountLast struct {
-		MetricBase
-		// TODO
-	}
-	algoCountFirst struct {
-		MetricBase
-		// TODO
-	}
 )

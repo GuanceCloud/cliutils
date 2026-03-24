@@ -79,13 +79,13 @@ processor := aggregate.NewDefaultTailSamplingProcessor(16, 5*time.Minute)
 默认值：
 
 - 尾采样等待时间：由 `waitTime` 决定
-- 派生指标 flush 窗口：`15s`
+- 派生指标 flush 窗口：`30s`
 
 如果想手动组装，也可以：
 
 ```go
 sampler := aggregate.NewGlobalSampler(16, 5*time.Minute)
-collector := aggregate.NewDerivedMetricCollector(15 * time.Second)
+collector := aggregate.NewDerivedMetricCollector(30 * time.Second)
 metrics := aggregate.DefaultTailSamplingBuiltinMetrics()
 
 processor := aggregate.NewTailSamplingProcessor(sampler, collector, metrics)
@@ -284,9 +284,9 @@ tags        = stage=ingest, service=checkout, data_type=tracing
 
 当前还没完成的主要是：
 
-1. builtin 指标还不是配置驱动启用
-2. 自定义 `derived_metrics` 还没实现
-3. 更复杂的分布类指标还没接入
+1. 自定义 `derived_metrics` 还没实现
+2. 更复杂的分布类指标还没接入
+3. 文档和配置样例还需要继续收敛
 
 所以现在最准确的理解是：
 
@@ -303,7 +303,7 @@ tags        = stage=ingest, service=checkout, data_type=tracing
 3. 业务侧先组包
 4. packet 进入 `processor.IngestPacket()`
 5. 每秒调一次 `AdvanceTime()` + `TailSamplingData()`
-6. 每 15 秒调一次 `FlushDerivedMetrics()`
+6. 每 30 秒调一次 `FlushDerivedMetrics()`
 7. 把：
    - `kept DataPacket`
    - `DerivedMetricPoints`

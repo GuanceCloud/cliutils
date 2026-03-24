@@ -351,7 +351,7 @@ func builtinRecordTags(packet *DataPacket) map[string]string {
 	}
 
 	pt := point.FromPB(packet.Points[0])
-	for _, key := range []string{"service", "service_name", "resource", "span_name", "span_kind", "app_id", "session_type"} {
+	for _, key := range []string{"service"} {
 		if value := pt.GetTag(key); value != "" {
 			tags[key] = value
 			continue

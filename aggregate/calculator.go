@@ -205,13 +205,14 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 				nextWallTime: AlignNextWallTime(ptwrap.Time(), time.Second*time.Duration(algo.Window)),
 				window:       algo.Window,
 			}
+			method := NormalizeAlgoMethod(algo.Method)
 			f64, ok := val.(float64)
 			if !ok {
 				if i64, ok := val.(int64); !ok {
-					if algo.Method == COUNT_DISTINCT || algo.Method == COUNT {
+					if method == COUNT_DISTINCT || method == COUNT {
 						// 这两种类型可以不转换成 float64
 					} else {
-						l.Warnf("key %s non-numeric type(%s) for algorithm %s, ignored", keyName, reflect.TypeOf(val), algo.Method)
+						l.Warnf("key %s non-numeric type(%s) for method %s, ignored", keyName, reflect.TypeOf(val), method)
 						continue
 					}
 				} else {
@@ -219,7 +220,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 				}
 			}
 			// we get the kv for current algorithm.
-			switch algo.Method {
+			switch method {
 			case MAX:
 				calc := &algoMax{
 					count:      1,
@@ -318,9 +319,27 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 				calc.doHash(batch.RoutingKey)
 				res = append(res, calc)
 
-			case EXPO_HISTOGRAM,
-				LAST,
-				FIRST: // TODO
+			case LAST:
+				calc := &algoCountLast{
+					MetricBase: mb,
+					last:       f64,
+					lastTime:   ptwrap.Time().UnixNano(),
+					count:      1,
+				}
+				calc.doHash(batch.RoutingKey)
+				res = append(res, calc)
+
+			case FIRST:
+				calc := &algoCountFirst{
+					MetricBase: mb,
+					first:      f64,
+					firstTime:  ptwrap.Time().UnixNano(),
+					count:      1,
+				}
+				calc.doHash(batch.RoutingKey)
+				res = append(res, calc)
+
+			case EXPO_HISTOGRAM: // TODO
 			default: // pass
 			}
 		}
