@@ -12,7 +12,6 @@ import (
 type algoQuantiles struct {
 	maxTime int64
 	MetricBase
-	delta     float64
 	all       []float64
 	count     int64
 	quantiles []float64
@@ -20,11 +19,8 @@ type algoQuantiles struct {
 
 func (a *algoQuantiles) Add(x any) {
 	if inst, ok := x.(*algoQuantiles); ok {
-		a.count++
-		if a.all == nil {
-			a.all = make([]float64, a.count)
-		}
-		a.all = append(a.all, inst.delta)
+		a.count += inst.count
+		a.all = append(a.all, inst.all...)
 
 		if inst.maxTime > a.maxTime {
 			a.maxTime = inst.maxTime
@@ -76,7 +72,6 @@ func (a *algoQuantiles) Aggr() ([]*point.Point, error) {
 
 func (a *algoQuantiles) Reset() {
 	a.maxTime = 0
-	a.delta = 0
 	a.all = []float64{}
 	a.count = 0
 }

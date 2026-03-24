@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"go.uber.org/zap/zapcore"
@@ -74,13 +75,28 @@ type RuleSelector struct {
 
 // Setup initializes the aggregator configuration, validates rules, and prepares calculators.
 func (ac *AggregatorConfigure) Setup() error {
+	switch ac.DefaultAction {
+	case "", ActionPassThrough, ActionDrop:
+	default:
+		return fmt.Errorf("invalid action: %s", ac.DefaultAction)
+	}
+
 	for _, ar := range ac.AggregateRules {
+		if ar == nil {
+			return fmt.Errorf("aggregate rule is nil")
+		}
+		if ar.Selector == nil {
+			return fmt.Errorf("aggregate rule %q missing selector", ar.Name)
+		}
 		if err := ar.Selector.Setup(); err != nil {
 			return err
 		}
 
 		// set default window
-		for _, algo := range ar.Algorithms {
+		for key, algo := range ar.Algorithms {
+			if err := validateAggregationAlgo(key, algo); err != nil {
+				return fmt.Errorf("aggregate rule %q: %w", ar.Name, err)
+			}
 			if algo.Window <= 10 {
 				algo.Window = int64(ac.DefaultWindow)
 			}
@@ -92,6 +108,40 @@ func (ac *AggregatorConfigure) Setup() error {
 
 	ac.doHash()
 	ac.calcs = map[uint64]Calculator{}
+
+	return nil
+}
+
+func validateAggregationAlgo(key string, algo *AggregationAlgo) error {
+	if strings.TrimSpace(key) == "" {
+		return fmt.Errorf("algorithm name is empty")
+	}
+	if algo == nil {
+		return fmt.Errorf("algorithm %q is nil", key)
+	}
+
+	method := NormalizeAlgoMethod(algo.Method)
+	switch method {
+	case SUM, AVG, COUNT, MIN, MAX, HISTOGRAM, STDEV, QUANTILES, COUNT_DISTINCT, LAST, FIRST:
+	case EXPO_HISTOGRAM:
+		return fmt.Errorf("algorithm %q: method %q is not supported", key, algo.Method)
+	case METHOD_UNSPECIFIED:
+		return fmt.Errorf("algorithm %q missing method", key)
+	default:
+		return fmt.Errorf("algorithm %q has unknown method %q", key, algo.Method)
+	}
+
+	if method == QUANTILES {
+		opt, ok := algo.Options.(*AggregationAlgo_QuantileOpts)
+		if !ok || opt == nil || opt.QuantileOpts == nil || len(opt.QuantileOpts.Percentiles) == 0 {
+			return fmt.Errorf("algorithm %q: quantiles requires quantile_opts.percentiles", key)
+		}
+		for _, percentile := range opt.QuantileOpts.Percentiles {
+			if percentile < 0 || percentile > 1 {
+				return fmt.Errorf("algorithm %q: percentile %v out of range [0,1]", key, percentile)
+			}
+		}
+	}
 
 	return nil
 }

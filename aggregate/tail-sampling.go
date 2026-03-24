@@ -225,18 +225,25 @@ func (t *TailSamplingConfigs) ToString() string {
 	return b.String()
 }
 
-func (t *TailSamplingConfigs) Init() {
+func (t *TailSamplingConfigs) Init() error {
+	var errs []string
+
 	if t.Tracing != nil {
 		if t.Tracing.DataTTL == 0 {
 			t.Tracing.DataTTL = 5 * time.Minute
 		}
 		if t.Tracing.GroupKey == "" {
 			t.Tracing.GroupKey = "trace_id"
+		} else if t.Tracing.GroupKey != "trace_id" {
+			errs = append(errs, fmt.Sprintf("invalid trace group key %q: trace tail sampling only supports \"trace_id\"", t.Tracing.GroupKey))
 		}
 		for _, pipeline := range t.Tracing.Pipelines {
-			if err := pipeline.Apply(); err != nil {
-				l.Errorf("failed to apply sampling pipeline: %s", err)
+			if err := validateSamplingPipeline(pipeline); err != nil {
+				errs = append(errs, fmt.Sprintf("trace pipeline: %s", err))
 			}
+		}
+		if len(t.Tracing.DerivedMetrics) > 0 {
+			errs = append(errs, "trace derived_metrics is not supported yet")
 		}
 		t.Tracing.BuiltinMetrics = initBuiltinMetricCfgs(t.Tracing.BuiltinMetrics, traceBuiltinMetricNames())
 	}
@@ -245,14 +252,21 @@ func (t *TailSamplingConfigs) Init() {
 		if t.Logging.DataTTL == 0 {
 			t.Logging.DataTTL = 1 * time.Minute
 		}
-		for _, group := range t.Logging.GroupDimensions {
+		for idx, group := range t.Logging.GroupDimensions {
+			if group == nil {
+				errs = append(errs, fmt.Sprintf("logging group_dimensions[%d] is nil", idx))
+				continue
+			}
 			if group.GroupKey == "" {
-				l.Errorf("invalid logging group key")
+				errs = append(errs, fmt.Sprintf("logging group_dimensions[%d] missing group_key", idx))
 			}
 			for _, pipeline := range group.Pipelines {
-				if err := pipeline.Apply(); err != nil {
-					l.Errorf("failed to apply sampling pipeline: %s", err)
+				if err := validateSamplingPipeline(pipeline); err != nil {
+					errs = append(errs, fmt.Sprintf("logging group %q pipeline: %s", group.GroupKey, err))
 				}
+			}
+			if len(group.DerivedMetrics) > 0 {
+				errs = append(errs, fmt.Sprintf("logging group %q derived_metrics is not supported yet", group.GroupKey))
 			}
 		}
 		t.Logging.BuiltinMetrics = initBuiltinMetricCfgs(t.Logging.BuiltinMetrics, loggingBuiltinMetricNames())
@@ -262,18 +276,61 @@ func (t *TailSamplingConfigs) Init() {
 		if t.RUM.DataTTL == 0 {
 			t.RUM.DataTTL = 1 * time.Minute
 		}
-		for _, group := range t.RUM.GroupDimensions {
+		for idx, group := range t.RUM.GroupDimensions {
+			if group == nil {
+				errs = append(errs, fmt.Sprintf("rum group_dimensions[%d] is nil", idx))
+				continue
+			}
 			if group.GroupKey == "" {
-				l.Errorf("invalid rum group key")
+				errs = append(errs, fmt.Sprintf("rum group_dimensions[%d] missing group_key", idx))
 			}
 			for _, pipeline := range group.Pipelines {
-				if err := pipeline.Apply(); err != nil {
-					l.Errorf("failed to apply sampling pipeline: %s", err)
+				if err := validateSamplingPipeline(pipeline); err != nil {
+					errs = append(errs, fmt.Sprintf("rum group %q pipeline: %s", group.GroupKey, err))
 				}
+			}
+			if len(group.DerivedMetrics) > 0 {
+				errs = append(errs, fmt.Sprintf("rum group %q derived_metrics is not supported yet", group.GroupKey))
 			}
 		}
 		t.RUM.BuiltinMetrics = initBuiltinMetricCfgs(t.RUM.BuiltinMetrics, rumBuiltinMetricNames())
 	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf(strings.Join(errs, "; "))
+	}
+
+	return nil
+}
+
+func validateSamplingPipeline(pipeline *SamplingPipeline) error {
+	if pipeline == nil {
+		return fmt.Errorf("pipeline is nil")
+	}
+
+	switch pipeline.Type {
+	case PipelineTypeCondition:
+		if pipeline.Action != PipelineActionKeep && pipeline.Action != PipelineActionDrop {
+			return fmt.Errorf("pipeline %q has invalid action %q", pipeline.Name, pipeline.Action)
+		}
+	case PipelineTypeSampling:
+		if pipeline.Rate < 0 || pipeline.Rate > 1 {
+			return fmt.Errorf("pipeline %q has invalid sampling rate %v", pipeline.Name, pipeline.Rate)
+		}
+	default:
+		return fmt.Errorf("pipeline %q has invalid type %q", pipeline.Name, pipeline.Type)
+	}
+
+	if pipeline.Condition == "" {
+		pipeline.conds = nil
+		return nil
+	}
+
+	if err := pipeline.Apply(); err != nil {
+		return fmt.Errorf("pipeline %q invalid condition: %w", pipeline.Name, err)
+	}
+
+	return nil
 }
 
 type LoggingTailSampling struct {

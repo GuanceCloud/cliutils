@@ -365,7 +365,7 @@ func TestTailSamplingConfigs_Init(t *testing.T) {
 					},
 				},
 			},
-			wantErr: true, // 应该会记录错误但不会返回错误
+			wantErr: true,
 		},
 		{
 			name: "empty config",
@@ -396,6 +396,42 @@ func TestTailSamplingConfigs_Init(t *testing.T) {
 				},
 			},
 			wantErr: false,
+		},
+		{
+			name: "config with missing logging group key",
+			config: &TailSamplingConfigs{
+				Version: 1,
+				Logging: &LoggingTailSampling{
+					GroupDimensions: []*LoggingGroupDimension{
+						{
+							Pipelines: []*SamplingPipeline{
+								{
+									Name:      "keep_errors",
+									Type:      PipelineTypeCondition,
+									Condition: `{ level = "error" }`,
+									Action:    PipelineActionKeep,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "config with unsupported derived metrics",
+			config: &TailSamplingConfigs{
+				Version: 1,
+				Tracing: &TraceTailSampling{
+					DerivedMetrics: []*DerivedMetric{
+						{
+							Name: "trace_total_count",
+							Type: SUM,
+						},
+					},
+				},
+			},
+			wantErr: true,
 		},
 		{
 			name: "config with mixed data types",
@@ -458,16 +494,17 @@ func TestTailSamplingConfigs_Init(t *testing.T) {
 			SetLogging(logger.DefaultSLogger("test"))
 
 			// 调用 Init 方法
-			tt.config.Init()
+			err := tt.config.Init()
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 
 			// 验证管道是否已应用
 			if tt.config.Tracing != nil {
 				for _, pipeline := range tt.config.Tracing.Pipelines {
-					if tt.wantErr && pipeline.Condition == `{ invalid syntax }` {
-						// 对于无效条件，我们期望 Apply() 会记录错误但不会 panic
-						// 这里我们只是验证配置没有崩溃
-						assert.NotNil(t, pipeline)
-					} else if pipeline.Condition != "" {
+					if pipeline.Condition != "" && (!tt.wantErr || pipeline.Condition != `{ invalid syntax }`) {
 						// 对于有效条件，验证 conds 是否已设置
 						assert.NotNil(t, pipeline.conds, "Pipeline conditions should be parsed")
 					}

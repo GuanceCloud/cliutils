@@ -383,9 +383,13 @@ func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[u
 	return packets
 }
 
-func (s *GlobalSampler) UpdateConfig(token string, ts *TailSamplingConfigs) {
+func (s *GlobalSampler) UpdateConfig(token string, ts *TailSamplingConfigs) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	if ts == nil {
+		return nil
+	}
 	// 设置各数据类型的默认 TTL
 	if ts.Tracing != nil && ts.Tracing.DataTTL == 0 {
 		ts.Tracing.DataTTL = s.waitTime
@@ -398,12 +402,18 @@ func (s *GlobalSampler) UpdateConfig(token string, ts *TailSamplingConfigs) {
 	}
 
 	if tsO, ok := s.configMap[token]; !ok {
-		ts.Init()
+		if err := ts.Init(); err != nil {
+			return err
+		}
 		s.configMap[token] = ts
 	} else if tsO.Version != ts.Version {
-		ts.Init()
+		if err := ts.Init(); err != nil {
+			return err
+		}
 		s.configMap[token] = ts
 	}
+
+	return nil
 }
 
 func (s *GlobalSampler) GetTraceConfig(token string) *TraceTailSampling {

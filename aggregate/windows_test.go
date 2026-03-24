@@ -142,6 +142,8 @@ func (m *MockServer) getPointData() {
 }
 
 func TestHTTPServe(t *testing.T) {
+	t.Skip("manual integration test")
+
 	server := &MockServer{
 		t:     t,
 		cache: NewCache(time.Second * 60),

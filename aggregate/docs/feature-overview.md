@@ -26,9 +26,10 @@
 - 指标聚合主链路已可用
 - 尾采样主链路已可用
 - 尾采样 builtin 派生指标已可用
-- 自定义 `derived_metrics` 配置结构仍保留，但当前运行时还没有实现
-- `expo_histogram` 仍未实现
+- 自定义 `derived_metrics` 配置结构仍保留，但当前运行时还没有实现，初始化阶段会直接报错
+- `expo_histogram` 不会实现，当前会在配置校验阶段直接报错
 - `last` / `first` 已实现，但当前仍走聚合器的数值路径，不是通用“任意类型取首尾值”
+- `quantiles` 当前按样本集合做线性插值计算，且配置会校验 `percentiles` 必须落在 `[0,1]`
 
 ## 3. 目录和入口
 
@@ -195,8 +196,8 @@ cfg := &aggregate.AggregatorConfigure{
 其中：
 
 - `merge_histogram` 会在运行时被归一化成 `histogram`
-- `expo_histogram` 目前仍未实现
-- 未识别的方法名会进入工厂默认分支，最终不会创建算子
+- `expo_histogram` 当前会在 `Setup()` 阶段直接报错
+- 未识别的方法名在正常配置路径下会被 `Setup()` 直接拒绝；如果绕过 `Setup()`，工厂默认分支仍不会创建算子
 
 ### 4.5 当前已实现的聚合方法
 
@@ -217,6 +218,15 @@ cfg := &aggregate.AggregatorConfigure{
 当前仍未落地：
 
 - `expo_histogram`
+
+### 4.5.1 当前配置校验会拦哪些错误
+
+聚合侧现在会在 `AggregatorConfigure.Setup()` 里直接拒绝这些配置：
+
+- 未知 `method`
+- `method = "expo_histogram"`
+- `method = "quantiles"` 但没配 `quantile_opts.percentiles`
+- `quantile_opts.percentiles` 中出现不在 `[0,1]` 的值
 
 ### 4.6 选择器的真实语义
 
@@ -547,13 +557,13 @@ point 的通用特点：
 
 当前仍未完成的是：
 
-- 用户自定义 `derived_metrics`
+- 用户自定义 `derived_metrics` 运行时
 - 更复杂的自定义分布型指标产品化能力
 
 所以现在最准确的理解是：
 
 - builtin 指标已闭环
-- 自定义 `derived_metrics` 仍是 TODO
+- 自定义 `derived_metrics` 仍是 TODO，且配置初始化会直接拒绝这类配置
 
 ### 5.14 尾采样侧最值得测试的地方
 
@@ -575,14 +585,15 @@ point 的通用特点：
 - 当前真实配置字段叫 `algorithms`，不是旧文档里的 `aggregate`
 - `action` 是顶层字符串，不是 `[action]` table
 - `last` / `first` 虽然已实现，但还不是“任意类型首尾值”
-- `quantiles` 的结果语义仍建议结合测试和业务预期复核
+- `quantiles` 只接受 `[0,1]` 范围内的百分位配置
+- `expo_histogram` 不是“暂时没测”，而是当前明确不支持
 
 ### 6.2 尾采样侧
 
 - 只用 `GlobalSampler` 不会自动得到 builtin 指标
 - `hash_keys` 的语义是“存在即保留”，不是“参与 hash”
 - logging / RUM 缺少分组键的数据会直接旁路
-- custom `derived_metrics` 结构存在，不代表运行时已接入
+- custom `derived_metrics` 结构存在，但当前配置会被直接拒绝
 
 ## 7. 建议的阅读顺序
 

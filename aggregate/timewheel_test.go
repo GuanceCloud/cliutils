@@ -120,6 +120,27 @@ func TestGlobalSampler_IngestKeepsDifferentDataTypeSeparate(t *testing.T) {
 	assert.Equal(t, point.SLogging, shard.activeMap[loggingKey].td.DataType)
 }
 
+func TestGlobalSamplerUpdateConfigRejectsInvalidConfig(t *testing.T) {
+	sampler := NewGlobalSampler(1, time.Minute)
+	cfg := &TailSamplingConfigs{
+		Version: 1,
+		Tracing: &TraceTailSampling{
+			Pipelines: []*SamplingPipeline{
+				{
+					Name:      "broken",
+					Type:      PipelineTypeCondition,
+					Condition: `{ invalid syntax }`,
+					Action:    PipelineActionKeep,
+				},
+			},
+		},
+	}
+
+	err := sampler.UpdateConfig("token-a", cfg)
+	assert.Error(t, err)
+	assert.Nil(t, sampler.GetTraceConfig("token-a"))
+}
+
 type MockSampler struct {
 	sampler *GlobalSampler
 	t       *testing.T

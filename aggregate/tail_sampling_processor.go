@@ -86,12 +86,12 @@ func (r *TailSamplingProcessor) BuiltinMetrics() TailSamplingBuiltinMetrics {
 	return r.metrics
 }
 
-func (r *TailSamplingProcessor) UpdateConfig(token string, cfg *TailSamplingConfigs) {
+func (r *TailSamplingProcessor) UpdateConfig(token string, cfg *TailSamplingConfigs) error {
 	if r == nil || r.sampler == nil || cfg == nil {
-		return
+		return nil
 	}
 
-	r.sampler.UpdateConfig(token, cfg)
+	return r.sampler.UpdateConfig(token, cfg)
 }
 
 func (r *TailSamplingProcessor) IngestPacket(packet *DataPacket) {

@@ -256,7 +256,7 @@ func TestBatch(t *T.T) {
 		}
 
 		batches := a.AggregateRules[0].GroupbyBatch(&a, groups[0])
-		assert.Len(t, batches, 3)
+		assert.Len(t, batches, npts)
 
 		// build protobuf
 		var pbs [][]byte

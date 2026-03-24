@@ -96,7 +96,9 @@ processor := aggregate.NewTailSamplingProcessor(sampler, collector, metrics)
 ### 4.1 下发配置
 
 ```go
-processor.UpdateConfig(token, cfg)
+if err := processor.UpdateConfig(token, cfg); err != nil {
+    return err
+}
 ```
 
 这里 `cfg` 类型是：
@@ -293,6 +295,7 @@ tags        = stage=ingest, service=checkout, data_type=tracing
 - 尾采样主链路已完成
 - 派生指标最小闭环已完成
 - 派生指标能力还没完全产品化
+- 自定义 `derived_metrics` 当前会在配置初始化阶段被直接拒绝
 
 ## 11. 别的项目里推荐的最小接入方式
 

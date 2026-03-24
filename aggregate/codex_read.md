@@ -505,7 +505,7 @@
 典型调用顺序：
 
 1. 初始化 `sampler := aggregate.NewGlobalSampler(...)`
-2. 为每个 token 调 `sampler.UpdateConfig(token, cfg)`
+2. 为每个 token 调 `sampler.UpdateConfig(token, cfg)`，并处理返回错误
 3. 业务侧先调用 `PickTrace()` / `PickLogging()` / `PickRUM()` 完成组包
 4. 把 `DataPacket` 送进 `sampler.Ingest()`
 5. 定时调用 `AdvanceTime()`
@@ -606,9 +606,11 @@
 5. logging / RUM 缺少分组键的数据会直接旁路，不进入采样缓存。
 6. 尾采样的 pipeline 是顺序短路执行，第一条决定结果的规则获胜。
 7. 当前 builtin 派生指标已经接入，但自定义 `derived_metrics` 仍未实现。
+   当前配置初始化会直接拒绝带 `derived_metrics` 的尾采样配置。
 8. trace 侧已经有 packet 级摘要字段，后续重做不要再回退成逐点重复计算。
-9. 聚合算法里仍有几个实现层风险，尤其是 `quantiles` 和部分 `_count` 语义。
+9. 聚合侧已经补上了 `quantiles` 的样本合并和百分位校验，但 `_count` 语义仍要结合具体算法分别看。
 10. proto 里定义的算法不等于都已实现，落地能力要看 `newCalculators()`.
+   `expo_histogram` 当前会在配置校验阶段直接被拒绝。
 
 ---
 
@@ -639,7 +641,7 @@
 - 路由和窗口管理明确
 - 算法扩展点明确
 
-但实现细节里仍有值得复核的地方，尤其是 `quantiles` 和部分 `_count` 语义。
+但实现细节里仍有值得复核的地方，尤其是不同算法的 `_count` 语义。
 
 ### 尾采样模块
 
