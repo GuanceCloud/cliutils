@@ -73,6 +73,10 @@ func DefaultSLogger(name string) *Logger {
 	return &Logger{zsl: slogger(name, 1)}
 }
 
+func DefaultSloggerSkipN(name string, callerSkip int) *Logger {
+	return &Logger{zsl: slogger(name, callerSkip)}
+}
+
 func TotalSLoggers() int64 {
 	return atomic.LoadInt64(&totalSloggers)
 }
