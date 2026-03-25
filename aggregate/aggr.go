@@ -2,21 +2,11 @@ package aggregate
 
 import (
 	"bytes"
-	"encoding/json"
-	"fmt"
 	"net/http"
-	"sort"
 	"strconv"
-	"strings"
-	"time"
 
-	"go.uber.org/zap/zapcore"
-
-	"github.com/GuanceCloud/cliutils"
-	fp "github.com/GuanceCloud/cliutils/filter"
 	"github.com/GuanceCloud/cliutils/logger"
 	"github.com/GuanceCloud/cliutils/point"
-	"github.com/cespare/xxhash/v2"
 )
 
 type (
@@ -30,129 +20,6 @@ const (
 	ActionPassThrough = "passthrough"
 	ActionDrop        = "drop"
 )
-
-// AggregatorConfigure is the top-level aggregator configure on single workspace.
-type AggregatorConfigure struct {
-	DefaultWindow    time.Duration    `toml:"default_window" json:"default_window"`
-	AggregateRules   []*AggregateRule `toml:"aggregate_rules" json:"aggregate_rules"`
-	DefaultAction    Action           `toml:"action" json:"action"`
-	DeleteRulesPoint bool             `toml:"delete_rules_point" json:"delete_rules_point"`
-
-	hash  uint64
-	raw   []byte
-	calcs map[uint64]Calculator
-}
-
-func (ac *AggregatorConfigure) doHash() {
-	if j, err := json.Marshal(ac); err != nil {
-		return
-	} else {
-		ac.raw = j
-		ac.hash = xxhash.Sum64(j)
-	}
-}
-
-// AggregateRule configured a specific aggregate rule.
-type AggregateRule struct {
-	Name       string                      `toml:"name" json:"name"`
-	Selector   *RuleSelector               `toml:"select" json:"select"`
-	Groupby    []string                    `toml:"group_by" json:"group_by"`
-	Algorithms map[string]*AggregationAlgo `toml:"algorithms" json:"algorithms"`
-}
-
-// ruleSelector is the selector to select measurements and fields among points.
-type RuleSelector struct {
-	Category     string   `toml:"category" json:"category"`
-	Measurements []string `toml:"measurements" json:"measurements"`
-	MetricName   []string `toml:"metric_name" json:"metric_name"`
-	Condition    string   `toml:"condition" json:"condition"`
-
-	measurementsWhitelist []*cliutils.WhiteListItem
-	fieldsWhitelist       []*cliutils.WhiteListItem
-	conds                 fp.WhereConditions
-	delSelectKey          bool
-}
-
-// Setup initializes the aggregator configuration, validates rules, and prepares calculators.
-func (ac *AggregatorConfigure) Setup() error {
-	switch ac.DefaultAction {
-	case "", ActionPassThrough, ActionDrop:
-	default:
-		return fmt.Errorf("invalid action: %s", ac.DefaultAction)
-	}
-
-	for _, ar := range ac.AggregateRules {
-		if ar == nil {
-			return fmt.Errorf("aggregate rule is nil")
-		}
-		if ar.Selector == nil {
-			return fmt.Errorf("aggregate rule %q missing selector", ar.Name)
-		}
-		if err := ar.Selector.Setup(); err != nil {
-			return err
-		}
-
-		// set default window
-		for key, algo := range ar.Algorithms {
-			if err := validateAggregationAlgo(key, algo); err != nil {
-				return fmt.Errorf("aggregate rule %q: %w", ar.Name, err)
-			}
-			if algo.Window <= 10 {
-				algo.Window = int64(ac.DefaultWindow)
-			}
-		}
-
-		// make the group by tags sorted for point hash.
-		sort.Strings(ar.Groupby)
-	}
-
-	ac.doHash()
-	ac.calcs = map[uint64]Calculator{}
-
-	return nil
-}
-
-func validateAggregationAlgo(key string, algo *AggregationAlgo) error {
-	if strings.TrimSpace(key) == "" {
-		return fmt.Errorf("algorithm name is empty")
-	}
-	if algo == nil {
-		return fmt.Errorf("algorithm %q is nil", key)
-	}
-
-	method := NormalizeAlgoMethod(algo.Method)
-	switch method {
-	case SUM, AVG, COUNT, MIN, MAX, HISTOGRAM, STDEV, QUANTILES, COUNT_DISTINCT, LAST, FIRST:
-	case EXPO_HISTOGRAM:
-		return fmt.Errorf("algorithm %q: method %q is not supported", key, algo.Method)
-	case METHOD_UNSPECIFIED:
-		return fmt.Errorf("algorithm %q missing method", key)
-	default:
-		return fmt.Errorf("algorithm %q has unknown method %q", key, algo.Method)
-	}
-
-	if method == QUANTILES {
-		opt, ok := algo.Options.(*AggregationAlgo_QuantileOpts)
-		if !ok || opt == nil || opt.QuantileOpts == nil || len(opt.QuantileOpts.Percentiles) == 0 {
-			return fmt.Errorf("algorithm %q: quantiles requires quantile_opts.percentiles", key)
-		}
-		for _, percentile := range opt.QuantileOpts.Percentiles {
-			if percentile < 0 || percentile > 1 {
-				return fmt.Errorf("algorithm %q: percentile %v out of range [0,1]", key, percentile)
-			}
-		}
-	}
-
-	return nil
-}
-
-// SelectPoints selects points from the input slice based on aggregate rules.
-func (ac *AggregatorConfigure) SelectPoints(pts []*point.Point) (groups [][]*point.Point) {
-	for _, ar := range ac.AggregateRules {
-		groups = append(groups, ar.SelectPoints(pts))
-	}
-	return
-}
 
 // PickPoints organizes points into batches based on aggregation rules and grouping keys.
 // 多种 category:M,L,RUM,T 类型的数据都可以筛选，返回的一定是指标类型。
@@ -180,48 +47,6 @@ func (ac *AggregatorConfigure) PickPoints(category string, pts []*point.Point) m
 	return batchs
 }
 
-// Setup initializes the rule selector with validation and prepares whitelists.
-func (rs *RuleSelector) Setup() error {
-	switch point.CatString(rs.Category) { // category required
-	case point.Metric,
-		point.Network,
-		point.KeyEvent,
-		point.Object,
-		point.ObjectChange,
-		point.CustomObject,
-		point.Logging,
-		point.Tracing,
-		point.RUM,
-		point.Security,
-		point.Profiling,
-		point.DialTesting:
-	default:
-		return fmt.Errorf("invalid category: %s", rs.Category)
-	}
-
-	if rs.Condition != "" {
-		ast, err := fp.GetConds(rs.Condition)
-		if err != nil {
-			return err
-		}
-		rs.conds = ast
-	}
-
-	if len(rs.Measurements) > 0 {
-		for _, m := range rs.Measurements {
-			rs.measurementsWhitelist = append(rs.measurementsWhitelist, cliutils.NewWhiteListItem(m))
-		}
-	}
-
-	if len(rs.MetricName) > 0 {
-		for _, f := range rs.MetricName {
-			rs.fieldsWhitelist = append(rs.fieldsWhitelist, cliutils.NewWhiteListItem(f))
-		}
-	}
-
-	return nil
-}
-
 // SelectPoints filters points based on the rule's selector criteria.
 func (ar *AggregateRule) SelectPoints(pts []*point.Point) []*point.Point {
 	return ar.Selector.doSelect(ar.Groupby, pts)
@@ -247,7 +72,7 @@ func (ar *AggregateRule) GroupbyBatch(ac *AggregatorConfigure, pts []*point.Poin
 			RoutingKey:      h,
 			ConfigHash:      ac.hash,
 			PickKey:         pickKey,
-			AggregationOpts: ar.Algorithms,
+			AggregationOpts: ar.aggregationOpts,
 			Points:          &point.PBPoints{Arr: []*point.PBPoint{pt.PBPoint()}},
 		}
 		batches = append(batches, b)
@@ -273,107 +98,6 @@ func batchRequest(ab *AggregationBatch, url string) (*http.Request, error) {
 		return nil, err
 	}
 
-	// add routine header
 	req.Header.Set(GuanceRoutingKey, strconv.FormatUint(ab.RoutingKey, 10))
 	return req, nil
-}
-
-func (s *RuleSelector) doSelect(groupby []string, pts []*point.Point) (res []*point.Point) {
-	ptwrapper := &ptWrap{}
-
-	for _, pt := range pts {
-		ptname := pt.Name()
-
-		if len(s.measurementsWhitelist) > 0 {
-			if !cliutils.WhiteListMatched(ptname, s.measurementsWhitelist) {
-				continue
-			}
-		}
-
-		if len(s.conds) > 0 {
-			ptwrapper.Point = pt
-			if x := s.conds.Eval(ptwrapper); x < 0 {
-				l.Debugf("condition skip measurement %q", ptname)
-				continue // ignore the point
-			}
-		}
-
-		// fork 1 or more points from pt, each forked points got only 1 non-tag field.
-		forkedPts := s.selectKVS(false, pt)
-
-		// NOTE: we may have selected multiple non-tag field from this point,
-		// and we should build a new point on each of these non-tag field.
-		if len(forkedPts) > 0 {
-			l.Debugf("add %d tags to new points", len(groupby))
-
-			for _, tagKey := range groupby {
-				if v := pt.GetTag(tagKey); v != "" {
-					for i := range forkedPts { // each point attach these tags
-						forkedPts[i].SetTag(tagKey, v)
-					}
-				}
-				// histogram 'le' 和 'bucket' 关联，不能拆分，需要放进去
-				if v := pt.Get(tagKey); v != nil {
-					for i := range forkedPts { // each point attach these tags
-						forkedPts[i].Add(tagKey, v)
-					}
-				}
-			}
-			for i := range forkedPts {
-				if l.Level() == zapcore.DebugLevel {
-					l.Debugf("tagged point: %s", forkedPts[i].Pretty())
-				}
-			}
-
-			res = append(res, forkedPts...)
-		}
-	}
-
-	return res
-}
-
-func (s *RuleSelector) selectKVS(delKey bool, pt *point.Point) []*point.Point {
-	var pts []*point.Point
-	// select specific aggregate fields
-	if len(s.fieldsWhitelist) > 0 {
-		for _, kv := range pt.KVs() {
-			if !cliutils.WhiteListMatched(kv.Key, s.fieldsWhitelist) {
-				continue
-			}
-
-			if kv.IsTag {
-				continue
-			}
-			var kvs point.KVs
-			switch v := kv.Val.(type) {
-			case *point.Field_F:
-				kvs = kvs.Add(kv.Key, v.F)
-			case *point.Field_I:
-				kvs = kvs.Add(kv.Key, float64(v.I)) // convert all into float
-			case *point.Field_U:
-				kvs = kvs.Add(kv.Key, float64(v.U)) // convert all into float
-
-			// for category logging-like, we may need to check if tag/field exist/first/last
-			case *point.Field_S:
-				kvs = kvs.Add(kv.Key, v.S)
-			case *point.Field_D:
-				kvs = kvs.Add(kv.Key, v.D)
-			case *point.Field_B:
-				kvs = kvs.Add(kv.Key, v.B)
-
-			default:
-				// pass: aggregate fields should only be int/float
-				l.Debugf("skip non-numbermic field %q", kv.Key)
-			}
-			if len(kvs) > 0 {
-				l.Debugf("fork kv %q as new point", kv.Key)
-				if delKey { // 如果挑选结束需要删除，则删除
-					pt.Del(kv.Key)
-				}
-				pts = append(pts, point.NewPoint(pt.Name(), kvs, point.WithTime(pt.Time())))
-			}
-		}
-	}
-
-	return pts
 }

@@ -6,12 +6,9 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils"
-	"github.com/GuanceCloud/cliutils/logger"
 	"github.com/GuanceCloud/cliutils/point"
 	"github.com/cespare/xxhash/v2"
 )
-
-var twl = logger.DefaultSLogger("aggregate.timewheel")
 
 var dataGroupPool = sync.Pool{
 	New: func() interface{} {
@@ -118,7 +115,7 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 	case point.STracing:
 		traceConfig := s.GetTraceConfig(packet.Token)
 		if traceConfig == nil {
-			twl.Errorf("no tail sampling config for token: %s, data type: %s", packet.Token, packet.DataType)
+			l.Errorf("no tail sampling config for token: %s, data type: %s", packet.Token, packet.DataType)
 			return
 		}
 
@@ -126,7 +123,7 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 	case point.SLogging:
 		loggingConfig := s.GetLoggingConfig(packet.Token)
 		if loggingConfig == nil {
-			twl.Errorf("no tail sampling config for token: %s, data type: %s", packet.Token, packet.DataType)
+			l.Errorf("no tail sampling config for token: %s, data type: %s", packet.Token, packet.DataType)
 			return
 		}
 
@@ -134,26 +131,26 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 	case point.SRUM:
 		rumConfig := s.GetRUMConfig(packet.Token)
 		if rumConfig == nil {
-			twl.Errorf("no tail sampling config for token: %s, data type: %s", packet.Token, packet.DataType)
+			l.Errorf("no tail sampling config for token: %s, data type: %s", packet.Token, packet.DataType)
 			return
 		}
 		ttlSec = int(rumConfig.DataTTL.Seconds())
 	default:
-		twl.Errorf("unsupported data type: %s", packet.DataType)
+		l.Errorf("unsupported data type: %s", packet.DataType)
 		return
 	}
 
 	if ttlSec <= 0 {
-		twl.Errorf("invalid ttl for data type: %s", packet.DataType)
+		l.Errorf("invalid ttl for data type: %s", packet.DataType)
 		return
 	}
 	if ttlSec >= 3600 {
 		ttlSec = 3599
 	}
-	twl.Debugf("ttl is %d for data type: %s", ttlSec, packet.DataType)
+	l.Debugf("ttl is %d for data type: %s", ttlSec, packet.DataType)
 	// 计算时间轮槽位
 	expirePos := (shard.currentPos + ttlSec) % 3600
-	twl.Debugf("expirePos is %d", expirePos)
+	l.Debugf("expirePos is %d", expirePos)
 
 	// 创建组合键
 	key := tailSamplingGroupMapKey(packet)
@@ -239,7 +236,7 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 		case point.STracing:
 			config := s.GetTraceConfig(dg.td.Token)
 			if config == nil {
-				twl.Infof("tail sampling drop trace: missing trace config, token=%s, group_id=%s",
+				l.Infof("tail sampling drop trace: missing trace config, token=%s, group_id=%s",
 					dg.td.Token, dg.td.RawGroupId)
 			} else {
 				for _, pipeline := range config.Pipelines {
@@ -248,28 +245,28 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 						matchedPipeline = true
 						// 匹配到了规则
 						if packet != nil {
-							twl.Debugf("matched trace, traceId: %s", packet.RawGroupId)
+							l.Debugf("matched trace, traceId: %s", packet.RawGroupId)
 							keptPacket = packet
 							decision = DerivedMetricDecisionKept
 						} else {
-							twl.Infof("tail sampling drop trace by pipeline=%q, token=%s, group_id=%s",
+							l.Infof("tail sampling drop trace by pipeline=%q, token=%s, group_id=%s",
 								pipeline.Name, dg.td.Token, dg.td.RawGroupId)
 						}
 						break
 					}
 				}
 				if !matchedPipeline {
-					twl.Infof("tail sampling drop trace: no pipeline matched, token=%s, group_id=%s",
+					l.Infof("tail sampling drop trace: no pipeline matched, token=%s, group_id=%s",
 						dg.td.Token, dg.td.RawGroupId)
 				}
 				if len(config.DerivedMetrics) > 0 {
-					twl.Debugf("custom derived metrics for %s are TODO, token=%s", dg.dataType, dg.td.Token)
+					l.Debugf("custom derived metrics for %s are TODO, token=%s", dg.dataType, dg.td.Token)
 				}
 			}
 		case point.SLogging:
 			config := s.GetLoggingConfig(dg.td.Token)
 			if config == nil {
-				twl.Infof("tail sampling drop logging: missing logging config, token=%s, group_id=%s, group_key=%s",
+				l.Infof("tail sampling drop logging: missing logging config, token=%s, group_id=%s, group_key=%s",
 					dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
 			} else {
 				// 查找对应的分组维度配置
@@ -283,35 +280,35 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 								matchedPipeline = true
 								// 匹配到了规则
 								if packet != nil {
-									twl.Debugf("matched logging, groupId: %s", packet.RawGroupId)
+									l.Debugf("matched logging, groupId: %s", packet.RawGroupId)
 									keptPacket = packet
 									decision = DerivedMetricDecisionKept
 								} else {
-									twl.Infof("tail sampling drop logging by pipeline=%q, token=%s, group_id=%s, group_key=%s",
+									l.Infof("tail sampling drop logging by pipeline=%q, token=%s, group_id=%s, group_key=%s",
 										pipeline.Name, dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
 								}
 								break
 							}
 						}
 						if !matchedPipeline {
-							twl.Infof("tail sampling drop logging: no pipeline matched, token=%s, group_id=%s, group_key=%s",
+							l.Infof("tail sampling drop logging: no pipeline matched, token=%s, group_id=%s, group_key=%s",
 								dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
 						}
 						if len(groupDim.DerivedMetrics) > 0 {
-							twl.Debugf("custom derived metrics for %s are TODO, token=%s, group_key=%s", dg.dataType, dg.td.Token, groupDim.GroupKey)
+							l.Debugf("custom derived metrics for %s are TODO, token=%s, group_key=%s", dg.dataType, dg.td.Token, groupDim.GroupKey)
 						}
 						break
 					}
 				}
 				if !groupMatched {
-					twl.Infof("tail sampling drop logging: no group dimension matched, token=%s, group_id=%s, group_key=%s",
+					l.Infof("tail sampling drop logging: no group dimension matched, token=%s, group_id=%s, group_key=%s",
 						dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
 				}
 			}
 		case point.SRUM:
 			config := s.GetRUMConfig(dg.td.Token)
 			if config == nil {
-				twl.Infof("tail sampling drop rum: missing rum config, token=%s, group_id=%s, group_key=%s",
+				l.Infof("tail sampling drop rum: missing rum config, token=%s, group_id=%s, group_key=%s",
 					dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
 			} else {
 				// 查找对应的分组维度配置
@@ -325,36 +322,36 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 								matchedPipeline = true
 								// 匹配到了规则
 								if packet != nil {
-									twl.Debugf("matched RUM, groupId: %s", packet.RawGroupId)
+									l.Debugf("matched RUM, groupId: %s", packet.RawGroupId)
 									keptPacket = packet
 									decision = DerivedMetricDecisionKept
 								} else {
-									twl.Infof("tail sampling drop rum by pipeline=%q, token=%s, group_id=%s, group_key=%s",
+									l.Infof("tail sampling drop rum by pipeline=%q, token=%s, group_id=%s, group_key=%s",
 										pipeline.Name, dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
 								}
 								break
 							}
 						}
 						if !matchedPipeline {
-							twl.Infof("tail sampling drop rum: no pipeline matched, token=%s, group_id=%s, group_key=%s",
+							l.Infof("tail sampling drop rum: no pipeline matched, token=%s, group_id=%s, group_key=%s",
 								dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
 						}
 						if len(groupDim.DerivedMetrics) > 0 {
-							twl.Debugf("custom derived metrics for %s are TODO, token=%s, group_key=%s", dg.dataType, dg.td.Token, groupDim.GroupKey)
+							l.Debugf("custom derived metrics for %s are TODO, token=%s, group_key=%s", dg.dataType, dg.td.Token, groupDim.GroupKey)
 						}
 						break
 					}
 				}
 				if !groupMatched {
-					twl.Infof("tail sampling drop rum: no group dimension matched, token=%s, group_id=%s, group_key=%s",
+					l.Infof("tail sampling drop rum: no group dimension matched, token=%s, group_id=%s, group_key=%s",
 						dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
 				}
 			}
 		default:
-			twl.Errorf("unsupported data type in tail sampling: %s", dg.dataType)
+			l.Errorf("unsupported data type in tail sampling: %s", dg.dataType)
 		}
 
-		twl.Infof("tail sampling outcome: decision=%s, token=%s, data_type=%s, group_id=%s, group_key=%s, kept=%t",
+		l.Infof("tail sampling outcome: decision=%s, token=%s, data_type=%s, group_id=%s, group_key=%s, kept=%t",
 			decision, dg.td.Token, dg.td.DataType, dg.td.RawGroupId, dg.td.GroupKey, keptPacket != nil)
 
 		outcomes[key] = &TailSamplingOutcome{

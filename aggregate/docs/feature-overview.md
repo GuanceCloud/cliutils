@@ -75,10 +75,10 @@
 
 ```go
 type AggregateRule struct {
-    Name       string                      `toml:"name" json:"name"`
-    Selector   *RuleSelector               `toml:"select" json:"select"`
-    Groupby    []string                    `toml:"group_by" json:"group_by"`
-    Algorithms map[string]*AggregationAlgo `toml:"algorithms" json:"algorithms"`
+    Name       string                            `toml:"name" json:"name"`
+    Selector   *RuleSelector                     `toml:"select" json:"select"`
+    Groupby    []string                          `toml:"group_by" json:"group_by"`
+    Algorithms map[string]*AggregationAlgoConfig `toml:"algorithms" json:"algorithms"`
 }
 ```
 
@@ -155,7 +155,7 @@ cfg := &aggregate.AggregatorConfigure{
                 },
                 Condition: `{ fields.status_code >= 200 AND fields.status_code < 300 }`,
             },
-            Algorithms: map[string]*aggregate.AggregationAlgo{
+            Algorithms: map[string]*aggregate.AggregationAlgoConfig{
                 "request_count": {
                     Method: "count",
                 },
@@ -172,6 +172,7 @@ cfg := &aggregate.AggregatorConfigure{
     },
 }
 ```
+`Setup()` 会把这里的配置层 `Algorithms` 转成运行时使用的 protobuf `AggregationAlgo`。
 
 ### 4.4 `method` 怎么写
 

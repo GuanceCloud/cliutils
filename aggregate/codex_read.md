@@ -149,6 +149,7 @@
 - 校验 `Category`
 - 解析条件表达式
 - 编译 measurement / field 白名单
+- 把配置层 `Algorithms` 转成运行时 protobuf 算子配置
 - 给算法补默认窗口
 - 对 `Groupby` 排序，保证 hash 稳定
 

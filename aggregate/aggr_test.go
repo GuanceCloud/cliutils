@@ -66,7 +66,7 @@ func TestHTTPPostBatch(t *T.T) {
 						Condition:             "",
 						conds:                 nil,
 					},
-					Algorithms: map[string]*AggregationAlgo{
+					Algorithms: map[string]*AggregationAlgoConfig{
 						"f1": {
 							Method:      string(SUM),
 							SourceField: "f1",
@@ -145,14 +145,12 @@ func TestHTTPPostBatch(t *T.T) {
 						Category:   point.Metric.String(),
 						MetricName: []string{"http.server.duration_bucket"},
 					},
-					Algorithms: map[string]*AggregationAlgo{
+					Algorithms: map[string]*AggregationAlgoConfig{
 						"otel.histograms": {
 							Method:      string(HISTOGRAM),
 							SourceField: "http.server.duration_bucket",
-							Options: &AggregationAlgo_HistogramOpts{
-								HistogramOpts: &HistogramOptions{
-									Buckets: []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
-								},
+							HistogramOpts: &HistogramOptions{
+								Buckets: []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 							},
 						},
 					},
@@ -229,7 +227,7 @@ func TestBatch(t *T.T) {
 						Category:   point.Metric.String(),
 						MetricName: []string{"f1"},
 					},
-					Algorithms: map[string]*AggregationAlgo{
+					Algorithms: map[string]*AggregationAlgoConfig{
 						"f1": {
 							Method:      string(SUM),
 							SourceField: "f1",
@@ -481,7 +479,7 @@ func TestOTEL(t *T.T) {
 					MetricName: []string{"jvm.buffer.memory.used"},
 					Condition:  "",
 				},
-				Algorithms: map[string]*AggregationAlgo{
+				Algorithms: map[string]*AggregationAlgoConfig{
 					"jvm.buffer.memory.used.avg": {
 						Method:      string(AVG),
 						SourceField: "jvm.buffer.memory.used",
@@ -507,7 +505,7 @@ func TestOTEL(t *T.T) {
 					MetricName:   []string{"client_ip"},
 					Condition:    `{ 1 = 1 }`,
 				},
-				Algorithms: map[string]*AggregationAlgo{
+				Algorithms: map[string]*AggregationAlgoConfig{
 					"client_ip_count": {
 						Method:      string(COUNT_DISTINCT),
 						SourceField: "client_ip",
