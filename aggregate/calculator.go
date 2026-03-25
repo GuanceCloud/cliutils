@@ -138,6 +138,7 @@ type Calculator interface {
 	Aggr() ([]*point.Point, error)
 	Reset()
 	Base() *MetricBase
+	ToString() string
 }
 
 func AlignNextWallTime(t time.Time, align time.Duration) int64 {

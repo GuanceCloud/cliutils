@@ -119,9 +119,11 @@ func (c *Cache) GetExpWidows() []*Window {
 	defer c.lock.Unlock()
 	now := time.Now().Unix()
 	for t, ws := range c.WindowsBuckets {
-		l.Debugf("now:%d exptime %d", now, t)
 		if t <= now {
 			for _, w := range ws.WS {
+				for _, algo := range w.cache {
+					l.Debugf("widows now:%d algo:%d", now, algo)
+				}
 				wss = append(wss, w)
 			}
 			delete(c.WindowsBuckets, t)

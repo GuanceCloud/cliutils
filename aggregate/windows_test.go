@@ -28,6 +28,10 @@ func (m *MockCalculator) Base() *MetricBase {
 	return &m.MetricBase
 }
 
+func (m *MockCalculator) ToString() string {
+	return fmt.Sprintf("MockCalculator{%s}", formatMetricBaseForCalc(&m.MetricBase))
+}
+
 func TestCache_Concurrency(t *testing.T) {
 	cache := NewCache(25 * time.Second)
 
