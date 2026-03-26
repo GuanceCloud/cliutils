@@ -148,7 +148,7 @@ const (
 	CS         = "S"
 	CP         = "P"
 	CDT        = "DT"
-	EL         = "EL"
+	CEL        = "EL"
 	CLlm       = "LLM"
 )
 
@@ -191,7 +191,7 @@ var (
 		Security:          CS,
 		Profiling:         CP,
 		DialTesting:       CDT,
-		ExecutionLog:      EL,
+		ExecutionLog:      CEL,
 		LLM:               CLlm,
 		UnknownCategory:   CUnknown,
 		DynamicDWCategory: CDynamicDW,
