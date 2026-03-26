@@ -6,6 +6,7 @@
 package point
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,8 @@ func TestURL(t *testing.T) {
 		{c: "/v1/write/keyevent", expect: KeyEvent},
 		{c: "/v1/write/tracing", expect: Tracing},
 		{c: "/v1/write/dynamic_dw", expect: DynamicDWCategory},
+		{c: "/v1/write/siem_logging", expect: ExecutionLog},
+		{c: "/v1/write/langfuse-v2", expect: LLM},
 	}
 
 	for _, tc := range cases {
@@ -52,6 +55,8 @@ func TestAlias(t *testing.T) {
 		{c: "P", expect: Profiling},
 		{c: "E", expect: KeyEvent},
 		{c: "T", expect: Tracing},
+		{c: "EL", expect: ExecutionLog},
+		{c: "LLM", expect: LLM},
 		{c: "Dynamic_dw", expect: UnknownCategory},
 	}
 
@@ -79,6 +84,8 @@ func TestString(t *testing.T) {
 		{c: "keyevent", expect: KeyEvent},
 		{c: "tracing", expect: Tracing},
 		{c: "dynamic_dw", expect: DynamicDWCategory},
+		{c: "execution_log", expect: ExecutionLog},
+		{c: "llm", expect: LLM},
 	}
 
 	for _, tc := range cases {
@@ -86,4 +93,11 @@ func TestString(t *testing.T) {
 			assert.Equal(t, tc.expect, CatString(tc.c))
 		})
 	}
+}
+
+func TestAllCategoriesIncludesNewCategories(t *testing.T) {
+	all := AllCategories()
+
+	assert.True(t, slices.Contains(all, ExecutionLog))
+	assert.True(t, slices.Contains(all, LLM))
 }
