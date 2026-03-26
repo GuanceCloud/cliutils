@@ -523,6 +523,26 @@ func TestBasic(t *T.T) {
 	})
 }
 
+func TestDefaultSloggerSkipNUsesDistinctCacheKey(t *testing.T) {
+	Reset()
+
+	opt := &Option{
+		Path:  "stdout",
+		Level: DEBUG,
+		Flags: OPT_ENC_CONSOLE | OPT_SHORT_CALLER,
+	}
+
+	require.NoError(t, InitRoot(opt))
+
+	base := DefaultSLogger("same-name")
+	withSkip := DefaultSloggerSkipN("same-name", 3)
+
+	require.NotNil(t, base.Sugar())
+	require.NotNil(t, withSkip.Sugar())
+	assert.NotSame(t, base.Sugar(), withSkip.Sugar())
+	assert.Equal(t, int64(2), TotalSLoggers())
+}
+
 type BufferSync struct {
 	io.ReadWriter
 }
