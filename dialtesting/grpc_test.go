@@ -539,7 +539,7 @@ func TestGRPCTask_OtherMethods(t *T.T) {
 	})
 
 	t.Run("getResults with ssl certificate fields", func(t *T.T) {
-		notAfter := time.Now().Add(time.Hour).Unix()
+		notAfter := time.Now().Add(time.Hour).UnixMicro()
 		task := &GRPCTask{
 			Task: &Task{
 				Name: "grpc-ssl",
@@ -554,6 +554,7 @@ func TestGRPCTask_OtherMethods(t *T.T) {
 
 		assert.Equal(t, "OK", tags["status"])
 		assert.Equal(t, notAfter, fields["ssl_cert_not_after"])
+		assert.Greater(t, fields["ssl_cert_expires_in"].(int64), int64(0))
 	})
 
 	t.Run("extractSSLCertificateValidity", func(t *T.T) {

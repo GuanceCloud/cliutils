@@ -218,6 +218,7 @@ func (t *WebsocketTask) getResults() (tags map[string]string, fields map[string]
 	// add SSL certificate validity dates
 	if t.sslCertNotAfter > 0 {
 		fields[`ssl_cert_not_after`] = t.sslCertNotAfter
+		fields[`ssl_cert_expires_in`] = t.sslCertNotAfter - time.Now().UnixMicro()
 	}
 
 	for k, v := range t.Tags {
@@ -279,6 +280,7 @@ func (t *WebsocketTask) metricName() string {
 
 func (t *WebsocketTask) clear() {
 	t.reqCost = 0
+	t.reqDNSCost = 0
 	t.reqError = ""
 	t.sslCertNotBefore = 0
 	t.sslCertNotAfter = 0
@@ -304,6 +306,7 @@ func (t *WebsocketTask) run() error {
 	defer cancel()
 
 	hostIP := net.ParseIP(t.hostname)
+	dialTarget := t.parsedURL.Host
 
 	if hostIP == nil { // host name
 		start := time.Now()
@@ -318,6 +321,7 @@ func (t *WebsocketTask) run() error {
 			} else {
 				t.reqDNSCost = time.Since(start)
 				hostIP = ips[0] // TODO: support mutiple ip for one host
+				dialTarget = net.JoinHostPort(hostIP.String(), t.parsedURL.Port())
 			}
 		}
 	}
@@ -329,14 +333,17 @@ func (t *WebsocketTask) run() error {
 		header.Add("Host", t.hostname)
 	}
 
-	t.parsedURL.Host = net.JoinHostPort(hostIP.String(), t.parsedURL.Port())
-
 	// Create a dialer with appropriate TLS configuration
 	dialer := *websocket.DefaultDialer // Create a copy to avoid modifying the global default
+	dialer.NetDialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, network, dialTarget)
+	}
+
 	// For wss scheme, we need to set InsecureSkipVerify to true for self-signed certificates
 	if t.parsedURL.Scheme == "wss" {
 		dialer.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true, // nolint:gosec
+			ServerName:         t.hostname,
 		}
 	}
 

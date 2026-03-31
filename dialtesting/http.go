@@ -189,6 +189,7 @@ func (t *HTTPTask) getResults() (tags map[string]string, fields map[string]inter
 
 	if t.sslCertNotAfter > 0 {
 		fields[`ssl_cert_not_after`] = t.sslCertNotAfter
+		fields[`ssl_cert_expires_in`] = t.sslCertNotAfter - time.Now().UnixMicro()
 	}
 
 	message["status"] = tags["status"]
