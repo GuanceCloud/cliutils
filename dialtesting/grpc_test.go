@@ -6,6 +6,9 @@
 package dialtesting
 
 import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"os"
 	T "testing"
@@ -414,17 +417,32 @@ func TestGRPCTask_OtherMethods(t *T.T) {
 		assert.NotNil(t, task.Task)
 	})
 
+	t.Run("certCaptureTransportCredentials handshake with nil credentials", func(t *T.T) {
+		creds := &certCaptureTransportCredentials{}
+
+		conn, authInfo, err := creds.ClientHandshake(context.Background(), "localhost", nil)
+
+		assert.Nil(t, conn)
+		assert.Nil(t, authInfo)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no underlying credentials")
+	})
+
 	t.Run("clear", func(t *T.T) {
 		task := &GRPCTask{
-			result:   []byte("test"),
-			reqError: "error",
-			reqCost:  100 * time.Millisecond,
+			result:           []byte("test"),
+			reqError:         "error",
+			reqCost:          100 * time.Millisecond,
+			sslCertNotBefore: 100,
+			sslCertNotAfter:  200,
 		}
 		task.clear()
 
 		assert.Nil(t, task.result)
 		assert.Empty(t, task.reqError)
 		assert.Equal(t, time.Duration(0), task.reqCost)
+		assert.Zero(t, task.sslCertNotBefore)
+		assert.Zero(t, task.sslCertNotAfter)
 	})
 
 	t.Run("checkResult", func(t *T.T) {
@@ -518,6 +536,45 @@ func TestGRPCTask_OtherMethods(t *T.T) {
 			_, err := task.getHostName()
 			assert.Error(t, err)
 		})
+	})
+
+	t.Run("getResults with ssl certificate fields", func(t *T.T) {
+		notBefore := time.Now().Add(-time.Hour).Unix()
+		notAfter := time.Now().Add(time.Hour).Unix()
+		task := &GRPCTask{
+			Task: &Task{
+				Name: "grpc-ssl",
+			},
+			Server:           "localhost:50051",
+			result:           []byte(`{"message":"ok"}`),
+			reqCost:          10 * time.Millisecond,
+			sslCertNotBefore: notBefore,
+			sslCertNotAfter:  notAfter,
+		}
+
+		tags, fields := task.getResults()
+
+		assert.Equal(t, "OK", tags["status"])
+		assert.Equal(t, notBefore, fields["ssl_cert_not_before"])
+		assert.Equal(t, notAfter, fields["ssl_cert_not_after"])
+	})
+
+	t.Run("extractSSLCertificateValidity", func(t *T.T) {
+		notBefore := time.Now().Add(-time.Hour)
+		notAfter := time.Now().Add(time.Hour)
+		task := &GRPCTask{}
+
+		task.extractSSLCertificateValidity(tls.ConnectionState{
+			PeerCertificates: []*x509.Certificate{
+				{
+					NotBefore: notBefore,
+					NotAfter:  notAfter,
+				},
+			},
+		})
+
+		assert.Equal(t, notBefore.Unix(), task.sslCertNotBefore)
+		assert.Equal(t, notAfter.Unix(), task.sslCertNotAfter)
 	})
 
 	t.Run("getVariableValue", func(t *T.T) {
