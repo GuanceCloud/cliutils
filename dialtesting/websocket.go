@@ -291,7 +291,7 @@ func (t *WebsocketTask) extractCertificateInfo(conn net.Conn) {
 		// Get the TLS connection state
 		state := tlsConn.ConnectionState()
 		// Extract certificate information from the connection state
-		if state.PeerCertificates != nil && len(state.PeerCertificates) > 0 {
+		if len(state.PeerCertificates) > 0 {
 			cert := state.PeerCertificates[0] // first certificate in the chain is the server's certificate
 			t.sslCertNotBefore = cert.NotBefore.UnixMicro()
 			t.sslCertNotAfter = cert.NotAfter.UnixMicro()
