@@ -164,7 +164,7 @@ func TestHTTPSWithRealCertificate(t *testing.T) {
 
 	// Verify the extracted values are valid timestamps
 	var notAfter int64
-	var expiresIn int64
+	var expiresIn float64
 	hasValidValues := false
 	if na, ok := fields["ssl_cert_not_after"].(int64); ok {
 		notAfter = na
@@ -178,18 +178,18 @@ func TestHTTPSWithRealCertificate(t *testing.T) {
 	} else {
 		t.Error("ssl_cert_not_after is not an int64")
 	}
-	if v, ok := fields["ssl_cert_expires_in"].(int64); ok {
+	if v, ok := fields["ssl_cert_expires_in"].(float64); ok {
 		expiresIn = v
 		hasValidValues = true
 		if expiresIn <= 0 {
 			t.Error("Invalid SSL certificate remaining validity")
 		}
 	} else {
-		t.Error("ssl_cert_expires_in is not an int64")
+		t.Error("ssl_cert_expires_in is not a float64")
 	}
 
 	if hasValidValues {
-		t.Logf("HTTP real certificate expiry: notAfter=%d, expiresIn=%d", notAfter, expiresIn)
+		t.Logf("HTTP real certificate expiry: notAfter=%d, expiresIn=%.6f", notAfter, expiresIn)
 	}
 }
 
@@ -286,7 +286,7 @@ func TestWebSocketWithRealCertificate(t *testing.T) {
 
 	// Verify the extracted values are valid timestamps
 	var notAfter int64
-	var expiresIn int64
+	var expiresIn float64
 	hasValidValues := false
 	if na, ok := fields["ssl_cert_not_after"].(int64); ok {
 		notAfter = na
@@ -300,18 +300,18 @@ func TestWebSocketWithRealCertificate(t *testing.T) {
 	} else {
 		t.Error("ssl_cert_not_after is not an int64")
 	}
-	if v, ok := fields["ssl_cert_expires_in"].(int64); ok {
+	if v, ok := fields["ssl_cert_expires_in"].(float64); ok {
 		expiresIn = v
 		hasValidValues = true
 		if expiresIn <= 0 {
 			t.Error("Invalid SSL certificate remaining validity")
 		}
 	} else {
-		t.Error("ssl_cert_expires_in is not an int64")
+		t.Error("ssl_cert_expires_in is not a float64")
 	}
 
 	if hasValidValues {
-		t.Logf("WebSocket real certificate expiry: notAfter=%d, expiresIn=%d", notAfter, expiresIn)
+		t.Logf("WebSocket real certificate expiry: notAfter=%d, expiresIn=%.6f", notAfter, expiresIn)
 	}
 }
 
@@ -401,7 +401,7 @@ func TestGRPCWithRealCertificate(t *testing.T) {
 
 	// Verify the extracted values are valid timestamps
 	var notAfter int64
-	var expiresIn int64
+	var expiresIn float64
 	hasValidValues := false
 	if na, ok := fields["ssl_cert_not_after"].(int64); ok {
 		notAfter = na
@@ -415,17 +415,17 @@ func TestGRPCWithRealCertificate(t *testing.T) {
 	} else {
 		t.Error("ssl_cert_not_after is not an int64")
 	}
-	if v, ok := fields["ssl_cert_expires_in"].(int64); ok {
+	if v, ok := fields["ssl_cert_expires_in"].(float64); ok {
 		expiresIn = v
 		hasValidValues = true
 		if expiresIn <= 0 {
 			t.Error("Invalid SSL certificate remaining validity")
 		}
 	} else {
-		t.Error("ssl_cert_expires_in is not an int64")
+		t.Error("ssl_cert_expires_in is not a float64")
 	}
 
 	if hasValidValues {
-		t.Logf("gRPC real certificate expiry: notAfter=%d, expiresIn=%d", notAfter, expiresIn)
+		t.Logf("gRPC real certificate expiry: notAfter=%d, expiresIn=%.6f", notAfter, expiresIn)
 	}
 }

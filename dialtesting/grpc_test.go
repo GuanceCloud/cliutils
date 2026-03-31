@@ -554,7 +554,7 @@ func TestGRPCTask_OtherMethods(t *T.T) {
 
 		assert.Equal(t, "OK", tags["status"])
 		assert.Equal(t, notAfter, fields["ssl_cert_not_after"])
-		assert.Greater(t, fields["ssl_cert_expires_in"].(int64), int64(0))
+		assert.Greater(t, fields["ssl_cert_expires_in"].(float64), float64(0))
 	})
 
 	t.Run("extractSSLCertificateValidity", func(t *T.T) {
