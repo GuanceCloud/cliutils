@@ -106,7 +106,7 @@ func pointAggrTags(pt *point.Point, sortedKeys []string) [][2]string {
 	return kvs
 }
 
-// getTime 原始单位是微妙，返回单位用纳秒
+// getTime 原始单位是微妙，返回单位用纳秒.
 func getTime(pt *point.Point) (startTime int64, duration int64) {
 	var has bool
 	startTime, has = pt.GetI("start_time")

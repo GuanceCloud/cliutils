@@ -109,7 +109,7 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 
 	// 2. 获取配置
 	var ttlSec int
-	//var config interface{}
+
 
 	switch packet.DataType {
 	case point.STracing:

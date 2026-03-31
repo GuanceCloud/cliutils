@@ -9,9 +9,7 @@ import (
 type algoHistogram struct {
 	MetricBase
 	count int64
-
-	//buckets []uint64
-	val float64
+	val   float64
 	// tag:"le" 固定tag,存储："0":0,"10":1,"20":5
 	// 使用le和指标的值 一一对应。
 	leBucket map[string]float64
