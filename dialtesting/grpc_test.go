@@ -573,8 +573,8 @@ func TestGRPCTask_OtherMethods(t *T.T) {
 			},
 		})
 
-		assert.Equal(t, notBefore.Unix(), task.sslCertNotBefore)
-		assert.Equal(t, notAfter.Unix(), task.sslCertNotAfter)
+		assert.Equal(t, notBefore.UnixMicro(), task.sslCertNotBefore)
+		assert.Equal(t, notAfter.UnixMicro(), task.sslCertNotAfter)
 	})
 
 	t.Run("getVariableValue", func(t *T.T) {

@@ -810,8 +810,8 @@ func (t *GRPCTask) getResults() (tags map[string]string, fields map[string]inter
 func (t *GRPCTask) extractSSLCertificateValidity(cs tls.ConnectionState) {
 	if len(cs.PeerCertificates) > 0 {
 		cert := cs.PeerCertificates[0]
-		t.sslCertNotBefore = cert.NotBefore.Unix()
-		t.sslCertNotAfter = cert.NotAfter.Unix()
+		t.sslCertNotBefore = cert.NotBefore.UnixMicro()
+		t.sslCertNotAfter = cert.NotAfter.UnixMicro()
 	}
 }
 

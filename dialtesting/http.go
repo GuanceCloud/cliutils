@@ -903,7 +903,7 @@ func (t *HTTPTask) setReqError(err string) {
 func (t *HTTPTask) extractSSLCertificateValidity(cs tls.ConnectionState) {
 	if len(cs.PeerCertificates) > 0 {
 		cert := cs.PeerCertificates[0] // Use the first certificate in the chain (server certificate)
-		t.sslCertNotBefore = cert.NotBefore.Unix()
-		t.sslCertNotAfter = cert.NotAfter.Unix()
+		t.sslCertNotBefore = cert.NotBefore.UnixMicro()
+		t.sslCertNotAfter = cert.NotAfter.UnixMicro()
 	}
 }

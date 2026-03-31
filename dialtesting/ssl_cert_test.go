@@ -102,8 +102,8 @@ func TestHTTPSWithRealCertificate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse certificate: %v", err)
 	}
-	expectedNotBefore := parsedCert.NotBefore.Unix()
-	expectedNotAfter := parsedCert.NotAfter.Unix()
+	expectedNotBefore := parsedCert.NotBefore.UnixMicro()
+	expectedNotAfter := parsedCert.NotAfter.UnixMicro()
 
 	// Create a TLS server with the self-signed certificate
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -214,8 +214,8 @@ func TestWebSocketWithRealCertificate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse certificate: %v", err)
 	}
-	expectedNotBefore := parsedCert.NotBefore.Unix()
-	expectedNotAfter := parsedCert.NotAfter.Unix()
+	expectedNotBefore := parsedCert.NotBefore.UnixMicro()
+	expectedNotAfter := parsedCert.NotAfter.UnixMicro()
 
 	// Create a WebSocket server with TLS
 	upgrader := websocket.Upgrader{}
@@ -340,8 +340,8 @@ func TestGRPCWithRealCertificate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse certificate: %v", err)
 	}
-	expectedNotBefore := parsedCert.NotBefore.Unix()
-	expectedNotAfter := parsedCert.NotAfter.Unix()
+	expectedNotBefore := parsedCert.NotBefore.UnixMicro()
+	expectedNotAfter := parsedCert.NotAfter.UnixMicro()
 
 	// Create a TLS gRPC server with the self-signed certificate
 	lis, err := net.Listen("tcp", "127.0.0.1:0")

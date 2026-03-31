@@ -294,8 +294,8 @@ func (t *WebsocketTask) extractCertificateInfo(conn net.Conn) {
 		// Extract certificate information from the connection state
 		if state.PeerCertificates != nil && len(state.PeerCertificates) > 0 {
 			cert := state.PeerCertificates[0] // first certificate in the chain is the server's certificate
-			t.sslCertNotBefore = cert.NotBefore.Unix()
-			t.sslCertNotAfter = cert.NotAfter.Unix()
+			t.sslCertNotBefore = cert.NotBefore.UnixMicro()
+			t.sslCertNotAfter = cert.NotAfter.UnixMicro()
 		}
 	}
 }
