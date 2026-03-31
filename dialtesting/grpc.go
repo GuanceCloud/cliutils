@@ -745,8 +745,7 @@ func (t *GRPCTask) getResults() (tags map[string]string, fields map[string]inter
 		"success":       int64(-1),
 	}
 
-	if t.sslCertNotBefore > 0 && t.sslCertNotAfter > 0 {
-		fields["ssl_cert_not_before"] = t.sslCertNotBefore
+	if t.sslCertNotAfter > 0 {
 		fields["ssl_cert_not_after"] = t.sslCertNotAfter
 	}
 

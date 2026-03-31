@@ -216,8 +216,7 @@ func (t *WebsocketTask) getResults() (tags map[string]string, fields map[string]
 	}
 
 	// add SSL certificate validity dates
-	if t.sslCertNotBefore > 0 && t.sslCertNotAfter > 0 {
-		fields[`ssl_cert_not_before`] = t.sslCertNotBefore
+	if t.sslCertNotAfter > 0 {
 		fields[`ssl_cert_not_after`] = t.sslCertNotAfter
 	}
 

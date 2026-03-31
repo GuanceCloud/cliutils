@@ -102,7 +102,6 @@ func TestHTTPSWithRealCertificate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse certificate: %v", err)
 	}
-	expectedNotBefore := parsedCert.NotBefore.UnixMicro()
 	expectedNotAfter := parsedCert.NotAfter.UnixMicro()
 
 	// Create a TLS server with the self-signed certificate
@@ -156,44 +155,29 @@ func TestHTTPSWithRealCertificate(t *testing.T) {
 
 	// Get results and check if SSL certificate validity information is included
 	_, fields := task.GetResults()
-	if _, ok := fields["ssl_cert_not_before"]; !ok {
-		t.Error("ssl_cert_not_before not found in results")
-	}
 	if _, ok := fields["ssl_cert_not_after"]; !ok {
 		t.Error("ssl_cert_not_after not found in results")
 	}
 
 	// Verify the extracted values are valid timestamps
-	var notBefore, notAfter int64
+	var notAfter int64
 	hasValidValues := false
-	if nb, ok := fields["ssl_cert_not_before"].(int64); ok {
-		if na, ok := fields["ssl_cert_not_after"].(int64); ok {
-			notBefore = nb
-			notAfter = na
-			hasValidValues = true
-			if notBefore <= 0 || notAfter <= 0 {
-				t.Error("Invalid SSL certificate validity timestamps")
-			}
-			if notAfter <= notBefore {
-				t.Error("Invalid SSL certificate validity period: notAfter <= notBefore")
-			}
+	if na, ok := fields["ssl_cert_not_after"].(int64); ok {
+		notAfter = na
+		hasValidValues = true
+		if notAfter <= 0 {
+			t.Error("Invalid SSL certificate validity timestamp")
+		}
 
-			// Verify the extracted values match the actual certificate validity dates
-			if notBefore != expectedNotBefore {
-				t.Errorf("ssl_cert_not_before mismatch: expected %d, got %d", expectedNotBefore, notBefore)
-			}
-			if notAfter != expectedNotAfter {
-				t.Errorf("ssl_cert_not_after mismatch: expected %d, got %d", expectedNotAfter, notAfter)
-			}
-		} else {
-			t.Error("ssl_cert_not_after is not an int64")
+		if notAfter != expectedNotAfter {
+			t.Errorf("ssl_cert_not_after mismatch: expected %d, got %d", expectedNotAfter, notAfter)
 		}
 	} else {
-		t.Error("ssl_cert_not_before is not an int64")
+		t.Error("ssl_cert_not_after is not an int64")
 	}
 
 	if hasValidValues {
-		t.Logf("HTTP real certificate validity: notBefore=%d, notAfter=%d", notBefore, notAfter)
+		t.Logf("HTTP real certificate expiry: notAfter=%d", notAfter)
 	}
 }
 
@@ -214,7 +198,6 @@ func TestWebSocketWithRealCertificate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse certificate: %v", err)
 	}
-	expectedNotBefore := parsedCert.NotBefore.UnixMicro()
 	expectedNotAfter := parsedCert.NotAfter.UnixMicro()
 
 	// Create a WebSocket server with TLS
@@ -282,44 +265,29 @@ func TestWebSocketWithRealCertificate(t *testing.T) {
 
 	// Get results and check if SSL certificate validity information is included
 	_, fields := task.GetResults()
-	if _, ok := fields["ssl_cert_not_before"]; !ok {
-		t.Error("ssl_cert_not_before not found in results")
-	}
 	if _, ok := fields["ssl_cert_not_after"]; !ok {
 		t.Error("ssl_cert_not_after not found in results")
 	}
 
 	// Verify the extracted values are valid timestamps
-	var notBefore, notAfter int64
+	var notAfter int64
 	hasValidValues := false
-	if nb, ok := fields["ssl_cert_not_before"].(int64); ok {
-		if na, ok := fields["ssl_cert_not_after"].(int64); ok {
-			notBefore = nb
-			notAfter = na
-			hasValidValues = true
-			if notBefore <= 0 || notAfter <= 0 {
-				t.Error("Invalid SSL certificate validity timestamps")
-			}
-			if notAfter <= notBefore {
-				t.Error("Invalid SSL certificate validity period: notAfter <= notBefore")
-			}
+	if na, ok := fields["ssl_cert_not_after"].(int64); ok {
+		notAfter = na
+		hasValidValues = true
+		if notAfter <= 0 {
+			t.Error("Invalid SSL certificate validity timestamp")
+		}
 
-			// Verify the extracted values match the actual certificate validity dates
-			if notBefore != expectedNotBefore {
-				t.Errorf("ssl_cert_not_before mismatch: expected %d, got %d", expectedNotBefore, notBefore)
-			}
-			if notAfter != expectedNotAfter {
-				t.Errorf("ssl_cert_not_after mismatch: expected %d, got %d", expectedNotAfter, notAfter)
-			}
-		} else {
-			t.Error("ssl_cert_not_after is not an int64")
+		if notAfter != expectedNotAfter {
+			t.Errorf("ssl_cert_not_after mismatch: expected %d, got %d", expectedNotAfter, notAfter)
 		}
 	} else {
-		t.Error("ssl_cert_not_before is not an int64")
+		t.Error("ssl_cert_not_after is not an int64")
 	}
 
 	if hasValidValues {
-		t.Logf("WebSocket real certificate validity: notBefore=%d, notAfter=%d", notBefore, notAfter)
+		t.Logf("WebSocket real certificate expiry: notAfter=%d", notAfter)
 	}
 }
 
@@ -340,7 +308,6 @@ func TestGRPCWithRealCertificate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse certificate: %v", err)
 	}
-	expectedNotBefore := parsedCert.NotBefore.UnixMicro()
 	expectedNotAfter := parsedCert.NotAfter.UnixMicro()
 
 	// Create a TLS gRPC server with the self-signed certificate
@@ -401,43 +368,28 @@ func TestGRPCWithRealCertificate(t *testing.T) {
 
 	// Get results and check if SSL certificate validity information is included
 	_, fields := task.GetResults()
-	if _, ok := fields["ssl_cert_not_before"]; !ok {
-		t.Error("ssl_cert_not_before not found in results")
-	}
 	if _, ok := fields["ssl_cert_not_after"]; !ok {
 		t.Error("ssl_cert_not_after not found in results")
 	}
 
 	// Verify the extracted values are valid timestamps
-	var notBefore, notAfter int64
+	var notAfter int64
 	hasValidValues := false
-	if nb, ok := fields["ssl_cert_not_before"].(int64); ok {
-		if na, ok := fields["ssl_cert_not_after"].(int64); ok {
-			notBefore = nb
-			notAfter = na
-			hasValidValues = true
-			if notBefore <= 0 || notAfter <= 0 {
-				t.Error("Invalid SSL certificate validity timestamps")
-			}
-			if notAfter <= notBefore {
-				t.Error("Invalid SSL certificate validity period: notAfter <= notBefore")
-			}
+	if na, ok := fields["ssl_cert_not_after"].(int64); ok {
+		notAfter = na
+		hasValidValues = true
+		if notAfter <= 0 {
+			t.Error("Invalid SSL certificate validity timestamp")
+		}
 
-			// Verify the extracted values match the actual certificate validity dates
-			if notBefore != expectedNotBefore {
-				t.Errorf("ssl_cert_not_before mismatch: expected %d, got %d", expectedNotBefore, notBefore)
-			}
-			if notAfter != expectedNotAfter {
-				t.Errorf("ssl_cert_not_after mismatch: expected %d, got %d", expectedNotAfter, notAfter)
-			}
-		} else {
-			t.Error("ssl_cert_not_after is not an int64")
+		if notAfter != expectedNotAfter {
+			t.Errorf("ssl_cert_not_after mismatch: expected %d, got %d", expectedNotAfter, notAfter)
 		}
 	} else {
-		t.Error("ssl_cert_not_before is not an int64")
+		t.Error("ssl_cert_not_after is not an int64")
 	}
 
 	if hasValidValues {
-		t.Logf("gRPC real certificate validity: notBefore=%d, notAfter=%d", notBefore, notAfter)
+		t.Logf("gRPC real certificate expiry: notAfter=%d", notAfter)
 	}
 }

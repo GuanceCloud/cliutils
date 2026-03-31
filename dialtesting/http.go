@@ -187,8 +187,7 @@ func (t *HTTPTask) getResults() (tags map[string]string, fields map[string]inter
 	fields[`response_ttfb`] = t.ttfbTime
 	fields[`response_download`] = t.downloadTime
 
-	if t.sslCertNotBefore > 0 && t.sslCertNotAfter > 0 {
-		fields[`ssl_cert_not_before`] = t.sslCertNotBefore
+	if t.sslCertNotAfter > 0 {
 		fields[`ssl_cert_not_after`] = t.sslCertNotAfter
 	}
 

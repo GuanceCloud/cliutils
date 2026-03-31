@@ -539,23 +539,20 @@ func TestGRPCTask_OtherMethods(t *T.T) {
 	})
 
 	t.Run("getResults with ssl certificate fields", func(t *T.T) {
-		notBefore := time.Now().Add(-time.Hour).Unix()
 		notAfter := time.Now().Add(time.Hour).Unix()
 		task := &GRPCTask{
 			Task: &Task{
 				Name: "grpc-ssl",
 			},
-			Server:           "localhost:50051",
-			result:           []byte(`{"message":"ok"}`),
-			reqCost:          10 * time.Millisecond,
-			sslCertNotBefore: notBefore,
-			sslCertNotAfter:  notAfter,
+			Server:          "localhost:50051",
+			result:          []byte(`{"message":"ok"}`),
+			reqCost:         10 * time.Millisecond,
+			sslCertNotAfter: notAfter,
 		}
 
 		tags, fields := task.getResults()
 
 		assert.Equal(t, "OK", tags["status"])
-		assert.Equal(t, notBefore, fields["ssl_cert_not_before"])
 		assert.Equal(t, notAfter, fields["ssl_cert_not_after"])
 	})
 
