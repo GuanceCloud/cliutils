@@ -203,7 +203,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 				aggrTags: extraTags,
 				// align to next wall-time
 				// XXX: what if the point reach too late?
-				nextWallTime: AlignNextWallTime(ptwrap.Time(), time.Second*time.Duration(algo.Window)),
+				nextWallTime: AlignNextWallTime(ptwrap.Time(), time.Duration(algo.Window)),
 				window:       algo.Window,
 			}
 			method := NormalizeAlgoMethod(algo.Method)

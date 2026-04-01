@@ -27,7 +27,7 @@ func formatMetricBaseForCalc(mb *MetricBase) string {
 		mb.name,
 		mb.key,
 		mb.hash,
-		time.Second*time.Duration(mb.window),
+		time.Duration(mb.window),
 		nextWallTime,
 		mb.heapIdx,
 		strings.Join(tagParts, ", "),

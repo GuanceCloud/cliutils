@@ -93,3 +93,29 @@ func TestNewCalculatorsQuantiles(t *T.T) {
 	assert.Equal(t, []float64{42}, q.all)
 	assert.Equal(t, []float64{0.5, 0.9}, q.quantiles)
 }
+
+func TestNewCalculatorsWindowUsesNanoseconds(t *T.T) {
+	pt := point.NewPoint(
+		"demo",
+		point.KVs{}.Add("duration", 42.0),
+		point.WithTime(time.Unix(1700000001, 0)),
+	)
+
+	batch := &AggregationBatch{
+		AggregationOpts: map[string]*AggregationAlgo{
+			"duration": {
+				Method:      string(SUM),
+				SourceField: "duration",
+				Window:      int64(10 * time.Second),
+			},
+		},
+		Points: &point.PBPoints{Arr: []*point.PBPoint{pt.PBPoint()}},
+	}
+
+	calcs := newCalculators(batch)
+	require.Len(t, calcs, 1)
+
+	mb := calcs[0].Base()
+	require.Equal(t, int64(10*time.Second), mb.window)
+	require.Equal(t, int64(1700000010), mb.nextWallTime)
+}
