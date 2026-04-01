@@ -3,8 +3,6 @@ package aggregate
 import (
 	"fmt"
 
-	"go.uber.org/zap/zapcore"
-
 	"github.com/GuanceCloud/cliutils"
 	fp "github.com/GuanceCloud/cliutils/filter"
 	"github.com/GuanceCloud/cliutils/point"
@@ -80,15 +78,12 @@ func (s *RuleSelector) doSelect(groupby []string, pts []*point.Point) (res []*po
 		if len(s.conds) > 0 {
 			ptwrapper.Point = pt
 			if x := s.conds.Eval(ptwrapper); x < 0 {
-				l.Debugf("condition skip measurement %q", ptname)
 				continue
 			}
 		}
 
 		forkedPts := s.selectKVS(false, pt)
 		if len(forkedPts) > 0 {
-			l.Debugf("add %d tags to new points", len(groupby))
-
 			for _, tagKey := range groupby {
 				if v := pt.GetTag(tagKey); v != "" {
 					for i := range forkedPts {
@@ -100,11 +95,6 @@ func (s *RuleSelector) doSelect(groupby []string, pts []*point.Point) (res []*po
 					for i := range forkedPts {
 						forkedPts[i].Add(tagKey, v)
 					}
-				}
-			}
-			for i := range forkedPts {
-				if l.Level() == zapcore.DebugLevel {
-					l.Debugf("tagged point: %s", forkedPts[i].Pretty())
 				}
 			}
 
@@ -140,11 +130,8 @@ func (s *RuleSelector) selectKVS(delKey bool, pt *point.Point) []*point.Point {
 				kvs = kvs.Add(kv.Key, v.D)
 			case *point.Field_B:
 				kvs = kvs.Add(kv.Key, v.B)
-			default:
-				l.Debugf("skip non-numbermic field %q", kv.Key)
 			}
 			if len(kvs) > 0 {
-				l.Debugf("fork kv %q as new point", kv.Key)
 				if delKey {
 					pt.Del(kv.Key)
 				}

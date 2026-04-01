@@ -29,11 +29,9 @@ func (w *Window) AddCal(cal Calculator) {
 	calcHash := cal.Base().hash
 	if calc, ok := w.cache[calcHash]; ok {
 		calc.Add(cal)
-		//		l.Debugf("append to instance %s, heap size %d", cal.Base())
 	} else {
 		cal.Base().build()
 		w.cache[calcHash] = cal
-		//		l.Debugf("create new instance %s, heap size %d", cal.Base())
 	}
 }
 
@@ -121,9 +119,6 @@ func (c *Cache) GetExpWidows() []*Window {
 	for t, ws := range c.WindowsBuckets {
 		if t <= now {
 			for _, w := range ws.WS {
-				for _, algo := range w.cache {
-					l.Debugf("widows now:%d algo:%d", now, algo)
-				}
 				wss = append(wss, w)
 			}
 			delete(c.WindowsBuckets, t)

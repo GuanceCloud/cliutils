@@ -110,7 +110,6 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 	// 2. 获取配置
 	var ttlSec int
 
-
 	switch packet.DataType {
 	case point.STracing:
 		traceConfig := s.GetTraceConfig(packet.Token)
@@ -147,10 +146,8 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 	if ttlSec >= 3600 {
 		ttlSec = 3599
 	}
-	l.Debugf("ttl is %d for data type: %s", ttlSec, packet.DataType)
 	// 计算时间轮槽位
 	expirePos := (shard.currentPos + ttlSec) % 3600
-	l.Debugf("expirePos is %d", expirePos)
 
 	// 创建组合键
 	key := tailSamplingGroupMapKey(packet)
@@ -230,129 +227,68 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 	for key, dg := range dataGroups {
 		decision := DerivedMetricDecisionDropped
 		var keptPacket *DataPacket
-		matchedPipeline := false
 
 		switch dg.dataType {
 		case point.STracing:
 			config := s.GetTraceConfig(dg.td.Token)
-			if config == nil {
-				l.Infof("tail sampling drop trace: missing trace config, token=%s, group_id=%s",
-					dg.td.Token, dg.td.RawGroupId)
-			} else {
+			if config != nil {
 				for _, pipeline := range config.Pipelines {
 					match, packet := pipeline.DoAction(dg.td)
 					if match {
-						matchedPipeline = true
 						// 匹配到了规则
 						if packet != nil {
-							l.Debugf("matched trace, traceId: %s", packet.RawGroupId)
 							keptPacket = packet
 							decision = DerivedMetricDecisionKept
-						} else {
-							l.Infof("tail sampling drop trace by pipeline=%q, token=%s, group_id=%s",
-								pipeline.Name, dg.td.Token, dg.td.RawGroupId)
 						}
 						break
 					}
-				}
-				if !matchedPipeline {
-					l.Infof("tail sampling drop trace: no pipeline matched, token=%s, group_id=%s",
-						dg.td.Token, dg.td.RawGroupId)
-				}
-				if len(config.DerivedMetrics) > 0 {
-					l.Debugf("custom derived metrics for %s are TODO, token=%s", dg.dataType, dg.td.Token)
 				}
 			}
 		case point.SLogging:
 			config := s.GetLoggingConfig(dg.td.Token)
-			if config == nil {
-				l.Infof("tail sampling drop logging: missing logging config, token=%s, group_id=%s, group_key=%s",
-					dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
-			} else {
+			if config != nil {
 				// 查找对应的分组维度配置
-				groupMatched := false
 				for _, groupDim := range config.GroupDimensions {
 					if groupDim.GroupKey == dg.td.GroupKey {
-						groupMatched = true
 						for _, pipeline := range groupDim.Pipelines {
 							match, packet := pipeline.DoAction(dg.td)
 							if match {
-								matchedPipeline = true
 								// 匹配到了规则
 								if packet != nil {
-									l.Debugf("matched logging, groupId: %s", packet.RawGroupId)
 									keptPacket = packet
 									decision = DerivedMetricDecisionKept
-								} else {
-									l.Infof("tail sampling drop logging by pipeline=%q, token=%s, group_id=%s, group_key=%s",
-										pipeline.Name, dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
 								}
 								break
 							}
 						}
-						if !matchedPipeline {
-							l.Infof("tail sampling drop logging: no pipeline matched, token=%s, group_id=%s, group_key=%s",
-								dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
-						}
-						if len(groupDim.DerivedMetrics) > 0 {
-							l.Debugf("custom derived metrics for %s are TODO, token=%s, group_key=%s", dg.dataType, dg.td.Token, groupDim.GroupKey)
-						}
 						break
 					}
-				}
-				if !groupMatched {
-					l.Infof("tail sampling drop logging: no group dimension matched, token=%s, group_id=%s, group_key=%s",
-						dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
 				}
 			}
 		case point.SRUM:
 			config := s.GetRUMConfig(dg.td.Token)
-			if config == nil {
-				l.Infof("tail sampling drop rum: missing rum config, token=%s, group_id=%s, group_key=%s",
-					dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
-			} else {
+			if config != nil {
 				// 查找对应的分组维度配置
-				groupMatched := false
 				for _, groupDim := range config.GroupDimensions {
 					if groupDim.GroupKey == dg.td.GroupKey {
-						groupMatched = true
 						for _, pipeline := range groupDim.Pipelines {
 							match, packet := pipeline.DoAction(dg.td)
 							if match {
-								matchedPipeline = true
 								// 匹配到了规则
 								if packet != nil {
-									l.Debugf("matched RUM, groupId: %s", packet.RawGroupId)
 									keptPacket = packet
 									decision = DerivedMetricDecisionKept
-								} else {
-									l.Infof("tail sampling drop rum by pipeline=%q, token=%s, group_id=%s, group_key=%s",
-										pipeline.Name, dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
 								}
 								break
 							}
 						}
-						if !matchedPipeline {
-							l.Infof("tail sampling drop rum: no pipeline matched, token=%s, group_id=%s, group_key=%s",
-								dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
-						}
-						if len(groupDim.DerivedMetrics) > 0 {
-							l.Debugf("custom derived metrics for %s are TODO, token=%s, group_key=%s", dg.dataType, dg.td.Token, groupDim.GroupKey)
-						}
 						break
 					}
-				}
-				if !groupMatched {
-					l.Infof("tail sampling drop rum: no group dimension matched, token=%s, group_id=%s, group_key=%s",
-						dg.td.Token, dg.td.RawGroupId, dg.td.GroupKey)
 				}
 			}
 		default:
 			l.Errorf("unsupported data type in tail sampling: %s", dg.dataType)
 		}
-
-		l.Infof("tail sampling outcome: decision=%s, token=%s, data_type=%s, group_id=%s, group_key=%s, kept=%t",
-			decision, dg.td.Token, dg.td.DataType, dg.td.RawGroupId, dg.td.GroupKey, keptPacket != nil)
 
 		outcomes[key] = &TailSamplingOutcome{
 			Packet:       keptPacket,

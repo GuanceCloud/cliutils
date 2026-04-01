@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils/point"
-	"go.uber.org/zap/zapcore"
 )
 
 /*
@@ -33,14 +32,12 @@ func (cc *CaculatorCache) AddBatches(batches ...*AggregationBatch) {
 
 			if calc, ok := cc.cache[calcHash]; ok {
 				calc.Add(c)
-				l.Debugf("append to instance %s, heap size %d", c.Base(), len(cc.heap))
 			} else {
 				c.Base().build()
 
 				cc.cache[calcHash] = c
 				heap.Push(cc, c)
 
-				l.Debugf("create new instance %s, heap size %d", c.Base(), len(cc.heap))
 			}
 		}
 	}
@@ -89,12 +86,6 @@ func (cc *CaculatorCache) Less(i, j int) bool {
 	// smallest nextWallTime pop first.
 	less := cc.heap[i].Base().nextWallTime < cc.heap[j].Base().nextWallTime
 
-	l.Debugf("compare [%d]%s <-> [%d]%s => %v",
-		i,
-		time.Duration(cc.heap[i].Base().nextWallTime),
-		j,
-		time.Duration(cc.heap[j].Base().nextWallTime), less)
-
 	return less
 }
 
@@ -102,8 +93,6 @@ func (cc *CaculatorCache) Swap(i, j int) {
 	if len(cc.heap) == 0 {
 		return
 	}
-
-	l.Debugf("swap %s <-> %s, len: %d", cc.heap[i].Base(), cc.heap[j].Base(), len(cc.heap))
 
 	cc.heap[i], cc.heap[j] = cc.heap[j], cc.heap[i]
 	cc.heap[i].Base().heapIdx = i
@@ -190,9 +179,6 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 			}
 
 			if keyName == "" {
-				if l.Level() == zapcore.DebugLevel {
-					l.Debugf("ignore point %s", ptwrap.Pretty())
-				}
 				continue
 			}
 
