@@ -16,10 +16,10 @@ var dataGroupPool = sync.Pool{
 	},
 }
 
-// DataGroup 是时间轮中的 entry，V2 仅持有原始 point 二进制切片，避免长期持有展开对象图。
+// DataGroup 是时间轮中的 entry， 仅持有原始 point 二进制切片，避免长期持有展开对象图。
 type DataGroup struct {
 	dataType    string
-	packet      *DataPacketV2
+	packet      *DataPacket
 	FirstSeen   time.Time
 	ExpiredTime int64
 	slotIndex   int
@@ -95,14 +95,6 @@ func tailSamplingGroupMapKey(packet *DataPacket) uint64 {
 	return tailSamplingGroupMapKeyByFields(packet.Token, packet.GroupIdHash, packet.DataType, packet.GroupKey)
 }
 
-func tailSamplingGroupMapKeyV2(packet *DataPacketV2) uint64 {
-	if packet == nil {
-		return 0
-	}
-
-	return tailSamplingGroupMapKeyByFields(packet.Token, packet.GroupIdHash, packet.DataType, packet.GroupKey)
-}
-
 func tailSamplingGroupMapKeyByFields(token string, groupIDHash uint64, dataType, groupKey string) uint64 {
 	key := HashToken(token, groupIDHash)
 	key = HashCombine(key, xxhash.Sum64(cliutils.ToUnsafeBytes(dataType)))
@@ -110,7 +102,7 @@ func tailSamplingGroupMapKeyByFields(token string, groupIDHash uint64, dataType,
 	return key
 }
 
-func (s *GlobalSampler) IngestV2(packet *DataPacketV2) {
+func (s *GlobalSampler) Ingest(packet *DataPacket) {
 	if s == nil || packet == nil || s.shardCount == 0 {
 		return
 	}
@@ -172,9 +164,9 @@ func (s *GlobalSampler) IngestV2(packet *DataPacketV2) {
 	expirePos := (shard.currentPos + ttlSec) % 3600
 
 	// 创建组合键
-	key := tailSamplingGroupMapKeyV2(packet)
+	key := tailSamplingGroupMapKey(packet)
 
-	pointCount := packetV2PointCount(packet)
+	pointCount := packetPointCount(packet)
 
 	if old, exists := shard.activeMap[key]; exists {
 		// --- 场景 A：老分组更新 ---
@@ -270,21 +262,13 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 			continue
 		}
 
-		sourcePacket, err := dg.packet.ToDataPacket()
-		if err != nil {
-			l.Errorf("decode datapacket v2 failed, token=%s data_type=%s group=%s: %v", dg.packet.Token, dg.packet.DataType, dg.packet.RawGroupId, err)
-			sourcePacket = dg.packet.ToDataPacketMeta()
-		}
+		sourcePacket := dg.packet
 
 		decision := DerivedMetricDecisionDropped
 		var keptPacket *DataPacket
 
 		token := dg.packet.Token
 		groupKey := dg.packet.GroupKey
-		if sourcePacket != nil {
-			token = sourcePacket.Token
-			groupKey = sourcePacket.GroupKey
-		}
 
 		switch dg.dataType {
 		case point.STracing:

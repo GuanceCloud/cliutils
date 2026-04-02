@@ -65,7 +65,7 @@ func TestSamplingPipeline_DoAction1(t *testing.T) {
 	for _, packet := range packages {
 		isKeep, td := pip.DoAction(packet)
 		assert.True(t, isKeep)
-		assert.Len(t, td.Points, 1)
+		assert.Equal(t, int32(1), packetPointCount(td))
 	}
 }
 
@@ -104,7 +104,7 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 					Source:        "ddtrace",
 					ConfigVersion: 1,
 					HasError:      false,
-					Points:        MockTrace(),
+					RawPoints:     MockTrace(),
 				},
 			},
 			want:    true,
@@ -126,7 +126,7 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 					Source:        "ddtrace",
 					ConfigVersion: 1,
 					HasError:      false,
-					Points:        MockTrace(),
+					RawPoints:     MockTrace(),
 				},
 			},
 			want:    true,
@@ -149,7 +149,7 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 					Source:        "ddtrace",
 					ConfigVersion: 1,
 					HasError:      false,
-					Points:        MockTrace(),
+					RawPoints:     MockTrace(),
 				},
 			},
 			want:    true,
@@ -171,7 +171,7 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 					Source:        "ddtrace",
 					ConfigVersion: 1,
 					HasError:      false,
-					Points:        MockTrace(),
+					RawPoints:     MockTrace(),
 				},
 			},
 			want:    true,
@@ -192,7 +192,7 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 					Source:        "ddtrace",
 					ConfigVersion: 1,
 					HasError:      false,
-					Points:        MockTrace(),
+					RawPoints:     MockTrace(),
 				},
 			},
 			want:    true,
@@ -220,8 +220,8 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 	}
 }
 
-func MockTrace() []*point.PBPoint {
-	var pbs []*point.PBPoint
+func MockTrace() [][]byte {
+	var raws [][]byte
 	now := time.Now()
 	pt1 := point.NewPoint("ddtrace", point.NewKVs(map[string]interface{}{
 		"http.server.requests_bucket": float64(10),
@@ -279,10 +279,14 @@ func MockTrace() []*point.PBPoint {
 	pt5.SetTime(now)
 
 	for _, p := range []*point.Point{pt1, pt2, pt3, pt4, pt5} {
-		pbs = append(pbs, p.PBPoint())
+		raw, err := p.PBPoint().Marshal()
+		if err != nil {
+			continue
+		}
+		raws = append(raws, raw)
 	}
 
-	return pbs
+	return raws
 }
 
 // TestTailSamplingConfigs_Init 测试配置初始化

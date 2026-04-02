@@ -87,6 +87,8 @@ func TestGlobalSampler_IngestKeepsDifferentDataTypeSeparate(t *testing.T) {
 			sampler.shards[i].slots[j] = list.New()
 		}
 	}
+	raw, err := (&point.PBPoint{Name: "span"}).Marshal()
+	assert.NoError(t, err)
 
 	tracePacket := &DataPacket{
 		GroupIdHash: 100,
@@ -94,7 +96,7 @@ func TestGlobalSampler_IngestKeepsDifferentDataTypeSeparate(t *testing.T) {
 		Token:       "TokenA",
 		DataType:    point.STracing,
 		GroupKey:    "trace_id",
-		Points:      []*point.PBPoint{{}},
+		RawPoints:   [][]byte{raw},
 		PointCount:  1,
 	}
 	loggingPacket := &DataPacket{
@@ -103,7 +105,7 @@ func TestGlobalSampler_IngestKeepsDifferentDataTypeSeparate(t *testing.T) {
 		Token:       "TokenA",
 		DataType:    point.SLogging,
 		GroupKey:    "service",
-		Points:      []*point.PBPoint{{}},
+		RawPoints:   [][]byte{raw},
 		PointCount:  1,
 	}
 
@@ -183,13 +185,13 @@ func (m *MockSampler) getTrace() {
 			if len(traces) > 0 {
 				for _, trace := range traces {
 					if trace.packet != nil {
-						packet, err := trace.packet.ToDataPacket()
+						spans, err := trace.packet.DecodePBPoints()
 						if err != nil {
 							m.t.Logf("decode trace failed: %v", err)
 							continue
 						}
-						m.t.Logf("trace:%v", packet.RawGroupId)
-						for _, span := range packet.Points {
+						m.t.Logf("trace:%v", trace.packet.RawGroupId)
+						for _, span := range spans {
 							m.t.Logf("span:%v", span.String())
 						}
 					}

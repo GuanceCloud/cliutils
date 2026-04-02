@@ -58,38 +58,59 @@ func (sp *SamplingPipeline) DoAction(td *DataPacket) (bool, *DataPacket) {
 	if sp.conds == nil { // condition are required to do actions.
 		return false, td
 	}
+	if td == nil {
+		return false, nil
+	}
+
 	ptw := &ptWrap{}
-
 	matched := false
+	decided := false
+	keep := false
 
-	for _, span := range td.Points {
-		ptw.Point = point.FromPB(span)
+	if err := td.WalkPoints(func(pt *point.Point) bool {
+		ptw.Point = pt
 		if x := sp.conds.Eval(ptw); x < 0 {
-			continue
-		} // else: matched, fall through...
+			return true
+		}
+
 		matched = true
 
 		switch sp.Type {
 		case PipelineTypeSampling:
-			if sp.Rate > 0.0 {
-				arg := td.GroupIdHash % sampleRange
-				threshold := uint64(math.Floor(sp.Rate * float64(sampleRange)))
-				if arg < threshold {
-					return true, td // keep
-				}
-				return true, nil
+			if sp.Rate <= 0.0 {
+				return true
 			}
+			arg := td.GroupIdHash % sampleRange
+			threshold := uint64(math.Floor(sp.Rate * float64(sampleRange)))
+			keep = arg < threshold
+			decided = true
+			return false
 		case PipelineTypeCondition:
-			// check on action
 			switch sp.Action {
 			case PipelineActionDrop:
-				return true, nil
+				keep = false
+				decided = true
+				return false
 			case PipelineActionKeep:
-				return true, td
+				keep = true
+				decided = true
+				return false
+			default:
+				return true
 			}
 		default:
 			l.Warnf("Unsupported pipeline-type %s", sp.Type)
+			return true
 		}
+	}); err != nil {
+		l.Errorf("walk datapacket points failed: %v", err)
+	}
+
+	if decided {
+		if keep {
+			return true, td
+		}
+		return true, nil
 	}
 
 	return matched, td
@@ -97,54 +118,6 @@ func (sp *SamplingPipeline) DoAction(td *DataPacket) (bool, *DataPacket) {
 
 func PickTrace(source string, pts []*point.Point, version int64) map[uint64]*DataPacket {
 	traceDatas := make(map[uint64]*DataPacket)
-	for _, pt := range pts {
-		v := pt.Get("trace_id")
-		if tid, ok := v.(string); ok {
-			id := hashTraceID(tid)
-			traceData, ok := traceDatas[id]
-			if !ok {
-				traceData = &DataPacket{
-					GroupIdHash:   id,
-					RawGroupId:    tid,
-					Token:         "", // 在pick调用处添加。
-					DataType:      point.Tracing.String(),
-					Source:        source,
-					ConfigVersion: version,
-					Points:        []*point.PBPoint{},
-					GroupKey:      "",
-				}
-				traceDatas[id] = traceData
-			}
-			traceData.Points = append(traceData.Points, pt.PBPoint())
-
-			status := pt.GetTag("status")
-			if status == "error" {
-				traceData.HasError = true
-			}
-			traceData.PointCount++
-			start, duration := getTime(pt)
-			if traceData.TraceStartTimeUnixNano == 0 {
-				traceData.TraceStartTimeUnixNano = start
-			}
-			if traceData.TraceStartTimeUnixNano > start {
-				traceData.TraceStartTimeUnixNano = start
-			}
-			if traceData.TraceEndTimeUnixNano == 0 {
-				traceData.TraceEndTimeUnixNano = start + duration
-			}
-			if traceData.TraceEndTimeUnixNano < start+duration {
-				traceData.TraceEndTimeUnixNano = start + duration
-			}
-		} else {
-			l.Errorf("invalid trace_id:%v", v)
-		}
-	}
-
-	return traceDatas
-}
-
-func PickTraceV2(source string, pts []*point.Point, version int64) map[uint64]*DataPacketV2 {
-	traceDatas := make(map[uint64]*DataPacketV2)
 	for _, pt := range pts {
 		v := pt.Get("trace_id")
 		tid, ok := v.(string)
@@ -156,7 +129,7 @@ func PickTraceV2(source string, pts []*point.Point, version int64) map[uint64]*D
 		id := hashTraceID(tid)
 		traceData, ok := traceDatas[id]
 		if !ok {
-			traceData = &DataPacketV2{
+			traceData = &DataPacket{
 				GroupIdHash:   id,
 				RawGroupId:    tid,
 				Token:         "", // 在pick调用处添加。
@@ -394,10 +367,6 @@ func (logGroup *LoggingGroupDimension) PickLogging(source string, pts []*point.P
 	return pickByGroupKey(logGroup.GroupKey, source, pts, point.Logging)
 }
 
-func (logGroup *LoggingGroupDimension) PickLoggingV2(source string, pts []*point.Point) (map[uint64]*DataPacketV2, []*point.Point) {
-	return pickByGroupKeyV2(logGroup.GroupKey, source, pts, point.Logging)
-}
-
 func pickByGroupKey(groupKey string, source string, pts []*point.Point, category point.Category) (map[uint64]*DataPacket, []*point.Point) {
 	traceDatas := make(map[uint64]*DataPacket)
 	passedThrough := make([]*point.Point, 0)
@@ -417,48 +386,6 @@ func pickByGroupKey(groupKey string, source string, pts []*point.Point, category
 		traceData, ok := traceDatas[id]
 		if !ok {
 			traceData = &DataPacket{
-				GroupIdHash: id,
-				RawGroupId:  tid,
-				Token:       "",
-				Source:      source,
-				DataType:    category.String(),
-				//	ConfigVersion: version,
-				Points:   []*point.PBPoint{},
-				GroupKey: groupKey,
-			}
-			traceDatas[id] = traceData
-		}
-		traceData.PointCount++
-		traceData.Points = append(traceData.Points, pt.PBPoint())
-
-		status := pt.GetTag("status")
-		if status == "error" {
-			traceData.HasError = true
-		}
-	}
-
-	return traceDatas, passedThrough
-}
-
-func pickByGroupKeyV2(groupKey string, source string, pts []*point.Point, category point.Category) (map[uint64]*DataPacketV2, []*point.Point) {
-	traceDatas := make(map[uint64]*DataPacketV2)
-	passedThrough := make([]*point.Point, 0)
-	for _, pt := range pts {
-		v := pt.Get(groupKey) // string float int64...
-		if v == nil {
-			passedThrough = append(passedThrough, pt)
-			continue
-		}
-
-		tid := fieldToString(v)
-		if tid == "" {
-			passedThrough = append(passedThrough, pt)
-			continue
-		}
-		id := hashTraceID(tid)
-		traceData, ok := traceDatas[id]
-		if !ok {
-			traceData = &DataPacketV2{
 				GroupIdHash: id,
 				RawGroupId:  tid,
 				Token:       "",
@@ -505,10 +432,6 @@ type RUMGroupDimension struct {
 
 func (rumGroup *RUMGroupDimension) PickRUM(source string, pts []*point.Point) (map[uint64]*DataPacket, []*point.Point) {
 	return pickByGroupKey(rumGroup.GroupKey, source, pts, point.RUM)
-}
-
-func (rumGroup *RUMGroupDimension) PickRUMV2(source string, pts []*point.Point) (map[uint64]*DataPacketV2, []*point.Point) {
-	return pickByGroupKeyV2(rumGroup.GroupKey, source, pts, point.RUM)
 }
 
 func SetLogging(log *logger.Logger) {

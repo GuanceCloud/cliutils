@@ -165,8 +165,8 @@ func DefaultTailSamplingBuiltinMetrics() TailSamplingBuiltinMetrics {
 				if packet.PointCount > 0 {
 					return float64(packet.PointCount), true
 				}
-				if len(packet.Points) > 0 {
-					return float64(len(packet.Points)), true
+				if len(packet.RawPoints) > 0 {
+					return float64(len(packet.RawPoints)), true
 				}
 				return 0, false
 			},
@@ -316,12 +316,17 @@ func packetTime(packet *DataPacket) time.Time {
 }
 
 func packetMaxPointTimeUnixNano(packet *DataPacket) int64 {
-	if packet == nil || len(packet.Points) == 0 {
+	if packet == nil || len(packet.RawPoints) == 0 {
 		return 0
 	}
 
 	var maxTS int64
-	for _, pb := range packet.Points {
+	for idx, raw := range packet.RawPoints {
+		pb, err := decodeRawPBPoint(raw)
+		if err != nil {
+			l.Errorf("decode raw point failed: idx=%d err=%v", idx, err)
+			continue
+		}
 		if pb == nil {
 			continue
 		}
@@ -344,10 +349,6 @@ func builtinRecordTags(packet *DataPacket) map[string]string {
 
 	if packet.GroupKey != "" {
 		tags["group_key"] = packet.GroupKey
-	}
-
-	if len(packet.Points) == 0 {
-		return tags
 	}
 
 	return tags

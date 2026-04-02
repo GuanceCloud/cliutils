@@ -6,7 +6,7 @@ import (
 	"github.com/GuanceCloud/cliutils/point"
 )
 
-func packetV2PointCount(packet *DataPacketV2) int32 {
+func packetPointCount(packet *DataPacket) int32 {
 	if packet == nil {
 		return 0
 	}
@@ -18,91 +18,90 @@ func packetV2PointCount(packet *DataPacketV2) int32 {
 	return int32(len(packet.RawPoints))
 }
 
-func (packet *DataPacketV2) ToDataPacketMeta() *DataPacket {
-	if packet == nil {
-		return nil
+func decodeRawPBPoint(raw []byte) (*point.PBPoint, error) {
+	if len(raw) == 0 {
+		return nil, nil
 	}
 
-	return &DataPacket{
-		GroupIdHash:            packet.GroupIdHash,
-		RawGroupId:             packet.RawGroupId,
-		Token:                  packet.Token,
-		Source:                 packet.Source,
-		DataType:               packet.DataType,
-		ConfigVersion:          packet.ConfigVersion,
-		HasError:               packet.HasError,
-		GroupKey:               packet.GroupKey,
-		PointCount:             packetV2PointCount(packet),
-		TraceStartTimeUnixNano: packet.TraceStartTimeUnixNano,
-		TraceEndTimeUnixNano:   packet.TraceEndTimeUnixNano,
+	pb := &point.PBPoint{}
+	if err := pb.Unmarshal(raw); err != nil {
+		return nil, err
 	}
+
+	return pb, nil
 }
 
-func (packet *DataPacketV2) ToDataPacket() (*DataPacket, error) {
-	meta := packet.ToDataPacketMeta()
-	if meta == nil {
+func (packet *DataPacket) DecodePBPoints() ([]*point.PBPoint, error) {
+	if packet == nil {
 		return nil, nil
 	}
 
 	if len(packet.RawPoints) == 0 {
-		return meta, nil
-	}
-
-	meta.Points = make([]*point.PBPoint, 0, len(packet.RawPoints))
-	for idx, raw := range packet.RawPoints {
-		if len(raw) == 0 {
-			continue
-		}
-
-		pb := &point.PBPoint{}
-		if err := pb.Unmarshal(raw); err != nil {
-			return nil, fmt.Errorf("decode raw_points[%d]: %w", idx, err)
-		}
-		meta.Points = append(meta.Points, pb)
-	}
-
-	if meta.PointCount == 0 {
-		meta.PointCount = int32(len(meta.Points))
-	}
-
-	return meta, nil
-}
-
-func NewDataPacketV2FromDataPacket(packet *DataPacket) (*DataPacketV2, error) {
-	if packet == nil {
 		return nil, nil
 	}
 
-	rawPoints := make([][]byte, 0, len(packet.Points))
-	for idx, pb := range packet.Points {
+	points := make([]*point.PBPoint, 0, len(packet.RawPoints))
+	for idx, raw := range packet.RawPoints {
+		pb, err := decodeRawPBPoint(raw)
+		if err != nil {
+			return nil, fmt.Errorf("decode raw_points[%d]: %w", idx, err)
+		}
+		if pb == nil {
+			continue
+		}
+		points = append(points, pb)
+	}
+
+	return points, nil
+}
+
+func (packet *DataPacket) DecodePoints() ([]*point.Point, error) {
+	pbPoints, err := packet.DecodePBPoints()
+	if err != nil {
+		return nil, err
+	}
+	if len(pbPoints) == 0 {
+		return nil, nil
+	}
+
+	pts := make([]*point.Point, 0, len(pbPoints))
+	for idx, pb := range pbPoints {
 		if pb == nil {
 			continue
 		}
 
-		raw, err := pb.Marshal()
-		if err != nil {
-			return nil, fmt.Errorf("encode points[%d]: %w", idx, err)
+		pt := point.FromPB(pb)
+		if pt == nil {
+			return nil, fmt.Errorf("decode raw_points[%d]: convert to point failed", idx)
 		}
-		rawPoints = append(rawPoints, raw)
+		pts = append(pts, pt)
 	}
 
-	pointCount := packet.PointCount
-	if pointCount == 0 {
-		pointCount = int32(len(rawPoints))
+	return pts, nil
+}
+
+func (packet *DataPacket) WalkPoints(fn func(*point.Point) bool) error {
+	if packet == nil || fn == nil {
+		return nil
 	}
 
-	return &DataPacketV2{
-		GroupIdHash:            packet.GroupIdHash,
-		RawGroupId:             packet.RawGroupId,
-		Token:                  packet.Token,
-		Source:                 packet.Source,
-		DataType:               packet.DataType,
-		ConfigVersion:          packet.ConfigVersion,
-		HasError:               packet.HasError,
-		GroupKey:               packet.GroupKey,
-		PointCount:             pointCount,
-		TraceStartTimeUnixNano: packet.TraceStartTimeUnixNano,
-		TraceEndTimeUnixNano:   packet.TraceEndTimeUnixNano,
-		RawPoints:              rawPoints,
-	}, nil
+	for idx, raw := range packet.RawPoints {
+		pb, err := decodeRawPBPoint(raw)
+		if err != nil {
+			return fmt.Errorf("decode raw_points[%d]: %w", idx, err)
+		}
+		if pb == nil {
+			continue
+		}
+
+		pt := point.FromPB(pb)
+		if pt == nil {
+			continue
+		}
+		if !fn(pt) {
+			return nil
+		}
+	}
+
+	return nil
 }

@@ -94,18 +94,17 @@ func (r *TailSamplingProcessor) UpdateConfig(token string, cfg *TailSamplingConf
 	return r.sampler.UpdateConfig(token, cfg)
 }
 
-func (r *TailSamplingProcessor) IngestPacketV2(packet *DataPacketV2) {
+func (r *TailSamplingProcessor) IngestPacket(packet *DataPacket) {
 	if r == nil || packet == nil {
 		return
 	}
 
 	if r.collector != nil && len(r.metrics) > 0 {
-		meta := packet.ToDataPacketMeta()
-		r.collector.Add(r.filterBuiltinRecords(meta, r.metrics.OnIngest(meta)))
+		r.collector.Add(r.filterBuiltinRecords(packet, r.metrics.OnIngest(packet)))
 	}
 
 	if r.sampler != nil {
-		r.sampler.IngestV2(packet)
+		r.sampler.Ingest(packet)
 	}
 }
 
@@ -127,8 +126,7 @@ func (r *TailSamplingProcessor) TailSamplingData(dataGroups map[uint64]*DataGrou
 			if dg == nil || dg.packet == nil {
 				continue
 			}
-			meta := dg.packet.ToDataPacketMeta()
-			r.collector.Add(r.filterBuiltinRecords(meta, r.metrics.OnPreDecision(meta)))
+			r.collector.Add(r.filterBuiltinRecords(dg.packet, r.metrics.OnPreDecision(dg.packet)))
 		}
 	}
 
@@ -158,33 +156,6 @@ func (r *TailSamplingProcessor) TailSamplingData(dataGroups map[uint64]*DataGrou
 		if outcome.Packet != nil {
 			keptPackets[key] = outcome.Packet
 		}
-	}
-
-	return keptPackets
-}
-
-func (r *TailSamplingProcessor) TailSamplingDataV2(dataGroups map[uint64]*DataGroup) map[uint64]*DataPacketV2 {
-	packets := r.TailSamplingData(dataGroups)
-	if len(packets) == 0 {
-		return nil
-	}
-
-	keptPackets := make(map[uint64]*DataPacketV2, len(packets))
-	for key, packet := range packets {
-		if packet == nil {
-			continue
-		}
-
-		packetV2, err := NewDataPacketV2FromDataPacket(packet)
-		if err != nil {
-			l.Errorf("convert kept packet to v2 failed: %v", err)
-			continue
-		}
-		if packetV2 == nil {
-			continue
-		}
-
-		keptPackets[key] = packetV2
 	}
 
 	return keptPackets
