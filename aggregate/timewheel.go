@@ -110,20 +110,6 @@ func tailSamplingGroupMapKeyByFields(token string, groupIDHash uint64, dataType,
 	return key
 }
 
-func (s *GlobalSampler) Ingest(packet *DataPacket) {
-	if packet == nil {
-		return
-	}
-
-	packetV2, err := NewDataPacketV2FromDataPacket(packet)
-	if err != nil {
-		l.Errorf("convert datapacket to v2 failed: %v", err)
-		return
-	}
-
-	s.IngestV2(packetV2)
-}
-
 func (s *GlobalSampler) IngestV2(packet *DataPacketV2) {
 	if s == nil || packet == nil || s.shardCount == 0 {
 		return

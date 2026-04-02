@@ -143,6 +143,61 @@ func PickTrace(source string, pts []*point.Point, version int64) map[uint64]*Dat
 	return traceDatas
 }
 
+func PickTraceV2(source string, pts []*point.Point, version int64) map[uint64]*DataPacketV2 {
+	traceDatas := make(map[uint64]*DataPacketV2)
+	for _, pt := range pts {
+		v := pt.Get("trace_id")
+		tid, ok := v.(string)
+		if !ok {
+			l.Errorf("invalid trace_id:%v", v)
+			continue
+		}
+
+		id := hashTraceID(tid)
+		traceData, ok := traceDatas[id]
+		if !ok {
+			traceData = &DataPacketV2{
+				GroupIdHash:   id,
+				RawGroupId:    tid,
+				Token:         "", // 在pick调用处添加。
+				DataType:      point.Tracing.String(),
+				Source:        source,
+				ConfigVersion: version,
+				RawPoints:     make([][]byte, 0, 8),
+				GroupKey:      "",
+			}
+			traceDatas[id] = traceData
+		}
+
+		raw, ok := pointRawBytes(pt)
+		if !ok {
+			continue
+		}
+		traceData.RawPoints = append(traceData.RawPoints, raw)
+
+		status := pt.GetTag("status")
+		if status == "error" {
+			traceData.HasError = true
+		}
+		traceData.PointCount++
+		start, duration := getTime(pt)
+		if traceData.TraceStartTimeUnixNano == 0 {
+			traceData.TraceStartTimeUnixNano = start
+		}
+		if traceData.TraceStartTimeUnixNano > start {
+			traceData.TraceStartTimeUnixNano = start
+		}
+		if traceData.TraceEndTimeUnixNano == 0 {
+			traceData.TraceEndTimeUnixNano = start + duration
+		}
+		if traceData.TraceEndTimeUnixNano < start+duration {
+			traceData.TraceEndTimeUnixNano = start + duration
+		}
+	}
+
+	return traceDatas
+}
+
 type TraceTailSampling struct {
 	DataTTL        time.Duration       `toml:"data_ttl" json:"data_ttl"`
 	DerivedMetrics []*DerivedMetric    `toml:"derived_metrics" json:"derived_metrics"`
@@ -339,6 +394,10 @@ func (logGroup *LoggingGroupDimension) PickLogging(source string, pts []*point.P
 	return pickByGroupKey(logGroup.GroupKey, source, pts, point.Logging)
 }
 
+func (logGroup *LoggingGroupDimension) PickLoggingV2(source string, pts []*point.Point) (map[uint64]*DataPacketV2, []*point.Point) {
+	return pickByGroupKeyV2(logGroup.GroupKey, source, pts, point.Logging)
+}
+
 func pickByGroupKey(groupKey string, source string, pts []*point.Point, category point.Category) (map[uint64]*DataPacket, []*point.Point) {
 	traceDatas := make(map[uint64]*DataPacket)
 	passedThrough := make([]*point.Point, 0)
@@ -381,6 +440,52 @@ func pickByGroupKey(groupKey string, source string, pts []*point.Point, category
 	return traceDatas, passedThrough
 }
 
+func pickByGroupKeyV2(groupKey string, source string, pts []*point.Point, category point.Category) (map[uint64]*DataPacketV2, []*point.Point) {
+	traceDatas := make(map[uint64]*DataPacketV2)
+	passedThrough := make([]*point.Point, 0)
+	for _, pt := range pts {
+		v := pt.Get(groupKey) // string float int64...
+		if v == nil {
+			passedThrough = append(passedThrough, pt)
+			continue
+		}
+
+		tid := fieldToString(v)
+		if tid == "" {
+			passedThrough = append(passedThrough, pt)
+			continue
+		}
+		id := hashTraceID(tid)
+		traceData, ok := traceDatas[id]
+		if !ok {
+			traceData = &DataPacketV2{
+				GroupIdHash: id,
+				RawGroupId:  tid,
+				Token:       "",
+				Source:      source,
+				DataType:    category.String(),
+				RawPoints:   make([][]byte, 0, 8),
+				GroupKey:    groupKey,
+			}
+			traceDatas[id] = traceData
+		}
+
+		raw, ok := pointRawBytes(pt)
+		if !ok {
+			continue
+		}
+		traceData.PointCount++
+		traceData.RawPoints = append(traceData.RawPoints, raw)
+
+		status := pt.GetTag("status")
+		if status == "error" {
+			traceData.HasError = true
+		}
+	}
+
+	return traceDatas, passedThrough
+}
+
 // RUM尾采样配置.
 type RUMTailSampling struct {
 	DataTTL time.Duration `toml:"data_ttl" json:"data_ttl"`
@@ -400,6 +505,10 @@ type RUMGroupDimension struct {
 
 func (rumGroup *RUMGroupDimension) PickRUM(source string, pts []*point.Point) (map[uint64]*DataPacket, []*point.Point) {
 	return pickByGroupKey(rumGroup.GroupKey, source, pts, point.RUM)
+}
+
+func (rumGroup *RUMGroupDimension) PickRUMV2(source string, pts []*point.Point) (map[uint64]*DataPacketV2, []*point.Point) {
+	return pickByGroupKeyV2(rumGroup.GroupKey, source, pts, point.RUM)
 }
 
 func SetLogging(log *logger.Logger) {
@@ -430,6 +539,20 @@ func fieldToString(field any) string {
 	default: // other types are ignored
 		return ""
 	}
+}
+
+func pointRawBytes(pt *point.Point) ([]byte, bool) {
+	if pt == nil {
+		return nil, false
+	}
+
+	raw, err := pt.PBPoint().Marshal()
+	if err != nil {
+		l.Errorf("marshal point to raw bytes failed: %v", err)
+		return nil, false
+	}
+
+	return raw, true
 }
 
 func pipelineNames(pipelines []*SamplingPipeline) string {
