@@ -61,7 +61,7 @@ func TestGlobalSampler_AdvanceTime(t *testing.T) { //nolint
 	assert.Equal(t, 1, len(expired), "在第 2 秒应该拿到过期数据")
 	assert.NotNil(t, expired[cKey])
 	t.Logf("data :=%v", expired[cKey])
-	assert.Equal(t, tidHash, expired[cKey].td.GroupIdHash)
+	assert.Equal(t, tidHash, expired[cKey].packet.GroupIdHash)
 
 	// 检查 activeMap 是否已清理
 	shard := sampler.shards[tidHash%uint64(shardCount)]
@@ -116,8 +116,8 @@ func TestGlobalSampler_IngestKeepsDifferentDataTypeSeparate(t *testing.T) {
 	traceKey := tailSamplingGroupMapKey(tracePacket)
 	loggingKey := tailSamplingGroupMapKey(loggingPacket)
 	assert.NotEqual(t, traceKey, loggingKey)
-	assert.Equal(t, point.STracing, shard.activeMap[traceKey].td.DataType)
-	assert.Equal(t, point.SLogging, shard.activeMap[loggingKey].td.DataType)
+	assert.Equal(t, point.STracing, shard.activeMap[traceKey].packet.DataType)
+	assert.Equal(t, point.SLogging, shard.activeMap[loggingKey].packet.DataType)
 }
 
 func TestGlobalSamplerUpdateConfigRejectsInvalidConfig(t *testing.T) {
@@ -182,9 +182,14 @@ func (m *MockSampler) getTrace() {
 			traces := m.sampler.AdvanceTime()
 			if len(traces) > 0 {
 				for _, trace := range traces {
-					if trace.td != nil {
-						m.t.Logf("trace:%v", trace.td.RawGroupId)
-						for _, span := range trace.td.Points {
+					if trace.packet != nil {
+						packet, err := trace.packet.ToDataPacket()
+						if err != nil {
+							m.t.Logf("decode trace failed: %v", err)
+							continue
+						}
+						m.t.Logf("trace:%v", packet.RawGroupId)
+						for _, span := range packet.Points {
 							m.t.Logf("span:%v", span.String())
 						}
 					}

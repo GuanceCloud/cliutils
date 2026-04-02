@@ -108,6 +108,21 @@ func (r *TailSamplingProcessor) IngestPacket(packet *DataPacket) {
 	}
 }
 
+func (r *TailSamplingProcessor) IngestPacketV2(packet *DataPacketV2) {
+	if r == nil || packet == nil {
+		return
+	}
+
+	if r.collector != nil && len(r.metrics) > 0 {
+		meta := packet.ToDataPacketMeta()
+		r.collector.Add(r.filterBuiltinRecords(meta, r.metrics.OnIngest(meta)))
+	}
+
+	if r.sampler != nil {
+		r.sampler.IngestV2(packet)
+	}
+}
+
 func (r *TailSamplingProcessor) AdvanceTime() map[uint64]*DataGroup {
 	if r == nil || r.sampler == nil {
 		return nil
@@ -123,10 +138,11 @@ func (r *TailSamplingProcessor) TailSamplingData(dataGroups map[uint64]*DataGrou
 
 	if r.collector != nil && len(r.metrics) > 0 {
 		for _, dg := range dataGroups {
-			if dg == nil || dg.td == nil {
+			if dg == nil || dg.packet == nil {
 				continue
 			}
-			r.collector.Add(r.filterBuiltinRecords(dg.td, r.metrics.OnPreDecision(dg.td)))
+			meta := dg.packet.ToDataPacketMeta()
+			r.collector.Add(r.filterBuiltinRecords(meta, r.metrics.OnPreDecision(meta)))
 		}
 	}
 

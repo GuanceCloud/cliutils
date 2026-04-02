@@ -31,8 +31,33 @@ message DataPacket {
   repeated point.PBPoint points = 12;  // 重命名：spans -> points
 }
 
+// V2 数据包：不在解码阶段展开 point.PBPoint，减少常驻对象数量。
+message DataPacketV2 {
+  uint64 group_id_hash = 1;
+  string raw_group_id  = 2;
+  string token         = 3;
+  string source        = 4;
+  string data_type     = 5;
+
+  int64 config_version = 6;
+  bool has_error       = 7;
+
+  string group_key     = 8;
+  int32 point_count    = 9;
+
+  int64 trace_start_time_unix_nano = 10;
+  int64 trace_end_time_unix_nano  = 11;
+
+  repeated bytes raw_points = 12;
+}
+
 // batch packages
 message DataBatch {
   string collector_id = 1;
   repeated DataPacket packets = 2;
+}
+
+message DataBatchV2 {
+  string collector_id = 1;
+  repeated DataPacketV2 packets = 2;
 }

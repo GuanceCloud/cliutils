@@ -16,10 +16,10 @@ var dataGroupPool = sync.Pool{
 	},
 }
 
-// 1. 定义 DataGroup 结构.
+// DataGroup 是时间轮中的 entry，V2 仅持有原始 point 二进制切片，避免长期持有展开对象图。
 type DataGroup struct {
 	dataType    string
-	td          *DataPacket
+	packet      *DataPacketV2
 	FirstSeen   time.Time
 	ExpiredTime int64
 	slotIndex   int
@@ -28,13 +28,15 @@ type DataGroup struct {
 
 // Reset 清理函数.
 func (dg *DataGroup) Reset() {
-	dg.td = nil // 断开对网络包的引用，方便 GC
+	dg.dataType = ""
+	dg.packet = nil
+	dg.FirstSeen = time.Time{}
 	dg.element = nil
 	dg.slotIndex = 0
 	dg.ExpiredTime = 0
 }
 
-// 2. 定义分段桶 (Shard).
+// Shard 定义分段桶.
 type Shard struct {
 	mu        sync.Mutex
 	activeMap map[uint64]*DataGroup
@@ -45,7 +47,7 @@ type Shard struct {
 	currentPos int // 当前指针指向的槽位下标
 }
 
-// 3. 全局管理器.
+// GlobalSampler 全局管理器.
 type GlobalSampler struct {
 	shards     []*Shard
 	shardCount int
@@ -86,13 +88,47 @@ func NewGlobalSampler(shardCount int, waitTime time.Duration) *GlobalSampler {
 }
 
 func tailSamplingGroupMapKey(packet *DataPacket) uint64 {
-	key := HashToken(packet.Token, packet.GroupIdHash)
-	key = HashCombine(key, xxhash.Sum64(cliutils.ToUnsafeBytes(packet.DataType)))
-	key = HashCombine(key, xxhash.Sum64(cliutils.ToUnsafeBytes(packet.GroupKey)))
+	if packet == nil {
+		return 0
+	}
+
+	return tailSamplingGroupMapKeyByFields(packet.Token, packet.GroupIdHash, packet.DataType, packet.GroupKey)
+}
+
+func tailSamplingGroupMapKeyV2(packet *DataPacketV2) uint64 {
+	if packet == nil {
+		return 0
+	}
+
+	return tailSamplingGroupMapKeyByFields(packet.Token, packet.GroupIdHash, packet.DataType, packet.GroupKey)
+}
+
+func tailSamplingGroupMapKeyByFields(token string, groupIDHash uint64, dataType, groupKey string) uint64 {
+	key := HashToken(token, groupIDHash)
+	key = HashCombine(key, xxhash.Sum64(cliutils.ToUnsafeBytes(dataType)))
+	key = HashCombine(key, xxhash.Sum64(cliutils.ToUnsafeBytes(groupKey)))
 	return key
 }
 
 func (s *GlobalSampler) Ingest(packet *DataPacket) {
+	if packet == nil {
+		return
+	}
+
+	packetV2, err := NewDataPacketV2FromDataPacket(packet)
+	if err != nil {
+		l.Errorf("convert datapacket to v2 failed: %v", err)
+		return
+	}
+
+	s.IngestV2(packetV2)
+}
+
+func (s *GlobalSampler) IngestV2(packet *DataPacketV2) {
+	if s == nil || packet == nil || s.shardCount == 0 {
+		return
+	}
+
 	// 1. 路由到对应的 Shard
 	shard := s.shards[packet.GroupIdHash%uint64(s.shardCount)]
 
@@ -150,24 +186,38 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 	expirePos := (shard.currentPos + ttlSec) % 3600
 
 	// 创建组合键
-	key := tailSamplingGroupMapKey(packet)
+	key := tailSamplingGroupMapKeyV2(packet)
+
+	pointCount := packetV2PointCount(packet)
 
 	if old, exists := shard.activeMap[key]; exists {
-		// --- 场景 A：老 Trace 更新 ---
-		// 合并 Span 数据 (packet.Spans 是 proto 生成的 []*point.PBPoint)
-		old.td.Points = append(old.td.Points, packet.Points...)
-		old.td.HasError = old.td.HasError || packet.HasError
-		old.td.PointCount += packet.PointCount
+		// --- 场景 A：老分组更新 ---
+		old.packet.RawPoints = append(old.packet.RawPoints, packet.RawPoints...)
+		old.packet.HasError = old.packet.HasError || packet.HasError
+		old.packet.PointCount += pointCount
 
-		if packet.TraceStartTimeUnixNano < old.td.TraceStartTimeUnixNano {
-			old.td.TraceStartTimeUnixNano = packet.TraceStartTimeUnixNano
+		if packet.TraceStartTimeUnixNano > 0 {
+			if old.packet.TraceStartTimeUnixNano == 0 || packet.TraceStartTimeUnixNano < old.packet.TraceStartTimeUnixNano {
+				old.packet.TraceStartTimeUnixNano = packet.TraceStartTimeUnixNano
+			}
 		}
-		if packet.TraceEndTimeUnixNano > old.td.TraceEndTimeUnixNano {
-			old.td.TraceEndTimeUnixNano = packet.TraceEndTimeUnixNano
+		if packet.TraceEndTimeUnixNano > old.packet.TraceEndTimeUnixNano {
+			old.packet.TraceEndTimeUnixNano = packet.TraceEndTimeUnixNano
+		}
+		if old.packet.RawGroupId == "" {
+			old.packet.RawGroupId = packet.RawGroupId
+		}
+		if packet.ConfigVersion > old.packet.ConfigVersion {
+			old.packet.ConfigVersion = packet.ConfigVersion
+		}
+		if old.packet.Source == "" {
+			old.packet.Source = packet.Source
 		}
 
 		// 时间轮迁移：从旧格子移到新格子
-		shard.slots[old.slotIndex].Remove(old.element)
+		if old.element != nil {
+			shard.slots[old.slotIndex].Remove(old.element)
+		}
 		old.slotIndex = expirePos
 		old.element = shard.slots[expirePos].PushBack(key)
 		old.ExpiredTime = time.Now().Unix() + int64(ttlSec)
@@ -176,7 +226,11 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 		// 从 Pool 中获取对象
 		dg := dataGroupPool.Get().(*DataGroup) //nolint:forcetypeassert
 		dg.dataType = packet.DataType
-		dg.td = packet // 直接引用解析好的 proto 对象
+		dg.packet = packet
+		if dg.packet.PointCount == 0 {
+			dg.packet.PointCount = pointCount
+		}
+		dg.FirstSeen = time.Now()
 
 		dg.slotIndex = expirePos
 		dg.ExpiredTime = time.Now().Unix() + int64(ttlSec)
@@ -225,15 +279,33 @@ func (s *GlobalSampler) AdvanceTime() map[uint64]*DataGroup {
 func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) map[uint64]*TailSamplingOutcome {
 	outcomes := make(map[uint64]*TailSamplingOutcome, len(dataGroups))
 	for key, dg := range dataGroups {
+		if dg == nil || dg.packet == nil {
+			outcomes[key] = &TailSamplingOutcome{Decision: DerivedMetricDecisionDropped}
+			continue
+		}
+
+		sourcePacket, err := dg.packet.ToDataPacket()
+		if err != nil {
+			l.Errorf("decode datapacket v2 failed, token=%s data_type=%s group=%s: %v", dg.packet.Token, dg.packet.DataType, dg.packet.RawGroupId, err)
+			sourcePacket = dg.packet.ToDataPacketMeta()
+		}
+
 		decision := DerivedMetricDecisionDropped
 		var keptPacket *DataPacket
 
+		token := dg.packet.Token
+		groupKey := dg.packet.GroupKey
+		if sourcePacket != nil {
+			token = sourcePacket.Token
+			groupKey = sourcePacket.GroupKey
+		}
+
 		switch dg.dataType {
 		case point.STracing:
-			config := s.GetTraceConfig(dg.td.Token)
-			if config != nil {
+			config := s.GetTraceConfig(token)
+			if config != nil && sourcePacket != nil {
 				for _, pipeline := range config.Pipelines {
-					match, packet := pipeline.DoAction(dg.td)
+					match, packet := pipeline.DoAction(sourcePacket)
 					if match {
 						// 匹配到了规则
 						if packet != nil {
@@ -245,13 +317,13 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 				}
 			}
 		case point.SLogging:
-			config := s.GetLoggingConfig(dg.td.Token)
-			if config != nil {
+			config := s.GetLoggingConfig(token)
+			if config != nil && sourcePacket != nil {
 				// 查找对应的分组维度配置
 				for _, groupDim := range config.GroupDimensions {
-					if groupDim.GroupKey == dg.td.GroupKey {
+					if groupDim.GroupKey == groupKey {
 						for _, pipeline := range groupDim.Pipelines {
-							match, packet := pipeline.DoAction(dg.td)
+							match, packet := pipeline.DoAction(sourcePacket)
 							if match {
 								// 匹配到了规则
 								if packet != nil {
@@ -266,13 +338,13 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 				}
 			}
 		case point.SRUM:
-			config := s.GetRUMConfig(dg.td.Token)
-			if config != nil {
+			config := s.GetRUMConfig(token)
+			if config != nil && sourcePacket != nil {
 				// 查找对应的分组维度配置
 				for _, groupDim := range config.GroupDimensions {
-					if groupDim.GroupKey == dg.td.GroupKey {
+					if groupDim.GroupKey == groupKey {
 						for _, pipeline := range groupDim.Pipelines {
-							match, packet := pipeline.DoAction(dg.td)
+							match, packet := pipeline.DoAction(sourcePacket)
 							if match {
 								// 匹配到了规则
 								if packet != nil {
@@ -292,7 +364,7 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 
 		outcomes[key] = &TailSamplingOutcome{
 			Packet:       keptPacket,
-			SourcePacket: dg.td,
+			SourcePacket: sourcePacket,
 			Decision:     decision,
 		}
 
