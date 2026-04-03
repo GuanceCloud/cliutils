@@ -87,26 +87,25 @@ func TestGlobalSampler_IngestKeepsDifferentDataTypeSeparate(t *testing.T) {
 			sampler.shards[i].slots[j] = list.New()
 		}
 	}
-	raw, err := (&point.PBPoint{Name: "span"}).Marshal()
-	assert.NoError(t, err)
+	payload := point.AppendPBPointToPBPointsPayload(nil, &point.PBPoint{Name: "span"})
 
 	tracePacket := &DataPacket{
-		GroupIdHash: 100,
-		RawGroupId:  "same-id",
-		Token:       "TokenA",
-		DataType:    point.STracing,
-		GroupKey:    "trace_id",
-		RawPoints:   [][]byte{raw},
-		PointCount:  1,
+		GroupIdHash:   100,
+		RawGroupId:    "same-id",
+		Token:         "TokenA",
+		DataType:      point.STracing,
+		GroupKey:      "trace_id",
+		PointsPayload: payload,
+		PointCount:    1,
 	}
 	loggingPacket := &DataPacket{
-		GroupIdHash: 100,
-		RawGroupId:  "same-id",
-		Token:       "TokenA",
-		DataType:    point.SLogging,
-		GroupKey:    "service",
-		RawPoints:   [][]byte{raw},
-		PointCount:  1,
+		GroupIdHash:   100,
+		RawGroupId:    "same-id",
+		Token:         "TokenA",
+		DataType:      point.SLogging,
+		GroupKey:      "service",
+		PointsPayload: payload,
+		PointCount:    1,
 	}
 
 	sampler.Ingest(tracePacket)
@@ -185,14 +184,16 @@ func (m *MockSampler) getTrace() {
 			if len(traces) > 0 {
 				for _, trace := range traces {
 					if trace.packet != nil {
-						spans, err := trace.packet.DecodePBPoints()
+						dec := point.GetDecoder(point.WithDecEncoding(point.Protobuf))
+						spans, err := dec.Decode(trace.packet.PointsPayload)
+						point.PutDecoder(dec)
 						if err != nil {
 							m.t.Logf("decode trace failed: %v", err)
 							continue
 						}
 						m.t.Logf("trace:%v", trace.packet.RawGroupId)
 						for _, span := range spans {
-							m.t.Logf("span:%v", span.String())
+							m.t.Logf("span:%v", span.Pretty())
 						}
 					}
 				}

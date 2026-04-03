@@ -104,7 +104,8 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 					Source:        "ddtrace",
 					ConfigVersion: 1,
 					HasError:      false,
-					RawPoints:     MockTrace(),
+					PointCount:    5,
+					PointsPayload: MockTrace(),
 				},
 			},
 			want:    true,
@@ -126,7 +127,8 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 					Source:        "ddtrace",
 					ConfigVersion: 1,
 					HasError:      false,
-					RawPoints:     MockTrace(),
+					PointCount:    5,
+					PointsPayload: MockTrace(),
 				},
 			},
 			want:    true,
@@ -149,7 +151,8 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 					Source:        "ddtrace",
 					ConfigVersion: 1,
 					HasError:      false,
-					RawPoints:     MockTrace(),
+					PointCount:    5,
+					PointsPayload: MockTrace(),
 				},
 			},
 			want:    true,
@@ -171,7 +174,8 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 					Source:        "ddtrace",
 					ConfigVersion: 1,
 					HasError:      false,
-					RawPoints:     MockTrace(),
+					PointCount:    5,
+					PointsPayload: MockTrace(),
 				},
 			},
 			want:    true,
@@ -192,7 +196,8 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 					Source:        "ddtrace",
 					ConfigVersion: 1,
 					HasError:      false,
-					RawPoints:     MockTrace(),
+					PointCount:    5,
+					PointsPayload: MockTrace(),
 				},
 			},
 			want:    true,
@@ -220,8 +225,8 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 	}
 }
 
-func MockTrace() [][]byte {
-	var raws [][]byte
+func MockTrace() []byte {
+	var payload []byte
 	now := time.Now()
 	pt1 := point.NewPoint("ddtrace", point.NewKVs(map[string]interface{}{
 		"http.server.requests_bucket": float64(10),
@@ -279,14 +284,10 @@ func MockTrace() [][]byte {
 	pt5.SetTime(now)
 
 	for _, p := range []*point.Point{pt1, pt2, pt3, pt4, pt5} {
-		raw, err := p.PBPoint().Marshal()
-		if err != nil {
-			continue
-		}
-		raws = append(raws, raw)
+		payload = point.AppendPointToPBPointsPayload(payload, p)
 	}
 
-	return raws
+	return payload
 }
 
 // TestTailSamplingConfigs_Init 测试配置初始化

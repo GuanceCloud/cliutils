@@ -1,6 +1,8 @@
 package aggregate
 
 import (
+	"fmt"
+
 	"github.com/GuanceCloud/cliutils"
 	"github.com/GuanceCloud/cliutils/point"
 	"github.com/cespare/xxhash/v2"
@@ -8,35 +10,73 @@ import (
 
 // ptWrap implements fp.KVs.
 type ptWrap struct {
-	*point.Point
+	Point *point.Point
+	pb    point.PBPoint
 }
 
-func newptWrap(pt *point.PBPoint) *ptWrap {
-	return &ptWrap{point.FromPB(pt)}
+func (d *ptWrap) Reset(raw []byte) error {
+	d.Point = nil
+	d.pb.Reset()
+	if len(raw) == 0 {
+		return nil
+	}
+
+	if err := d.pb.Unmarshal(raw); err != nil {
+		return fmt.Errorf("unmarshal pb point: %w", err)
+	}
+
+	return nil
 }
 
 func (d *ptWrap) Get(k string) (any, bool) {
-	v := d.KVs().Get(k)
-	if v == nil {
-		return nil, false
+	if d.Point != nil {
+		v := d.Point.KVs().Get(k)
+		if v == nil {
+			return nil, false
+		}
+
+		switch x := v.GetVal().(type) {
+		case *point.Field_F:
+			return x.F, true
+		case *point.Field_I:
+			return x.I, true
+		case *point.Field_U:
+			return x.U, true
+		case *point.Field_S:
+			return x.S, true
+		case *point.Field_D:
+			return x.D, true
+		case *point.Field_B:
+			return x.B, true
+		default: // other types are ignored
+			return nil, true
+		}
 	}
 
-	switch x := v.GetVal().(type) {
-	case *point.Field_F:
-		return x.F, true
-	case *point.Field_I:
-		return x.I, true
-	case *point.Field_U:
-		return x.U, true
-	case *point.Field_S:
-		return x.S, true
-	case *point.Field_D:
-		return x.D, true
-	case *point.Field_B:
-		return x.B, true
-	default: // other types are ignored
-		return nil, true
+	for _, v := range d.pb.Fields {
+		if v == nil || v.Key != k {
+			continue
+		}
+
+		switch x := v.GetVal().(type) {
+		case *point.Field_F:
+			return x.F, true
+		case *point.Field_I:
+			return x.I, true
+		case *point.Field_U:
+			return x.U, true
+		case *point.Field_S:
+			return x.S, true
+		case *point.Field_D:
+			return x.D, true
+		case *point.Field_B:
+			return x.B, true
+		default: // other types are ignored
+			return nil, true
+		}
 	}
+
+	return nil, false
 }
 
 const (

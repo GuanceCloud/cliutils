@@ -55,65 +55,93 @@ func (sp *SamplingPipeline) Apply() error {
 }
 
 func (sp *SamplingPipeline) DoAction(td *DataPacket) (bool, *DataPacket) {
-	if sp.conds == nil { // condition are required to do actions.
+	if sp == nil || sp.conds == nil { // condition are required to do actions.
 		return false, td
 	}
 	if td == nil {
 		return false, nil
 	}
 
+	matched, packet := evaluatePipelines(td, []*SamplingPipeline{sp})
+	if !matched {
+		return false, td
+	}
+
+	return true, packet
+}
+
+func evaluatePipelines(td *DataPacket, pipelines []*SamplingPipeline) (bool, *DataPacket) {
+	if td == nil || len(pipelines) == 0 {
+		return false, nil
+	}
+
 	ptw := &ptWrap{}
 	matched := false
-	decided := false
-	keep := false
+	var keptPacket *DataPacket
 
-	if err := td.WalkPoints(func(pt *point.Point) bool {
-		ptw.Point = pt
-		if x := sp.conds.Eval(ptw); x < 0 {
-			return true
-		}
-
-		matched = true
-
-		switch sp.Type {
-		case PipelineTypeSampling:
-			if sp.Rate <= 0.0 {
-				return true
-			}
-			arg := td.GroupIdHash % sampleRange
-			threshold := uint64(math.Floor(sp.Rate * float64(sampleRange)))
-			keep = arg < threshold
-			decided = true
+	walkErr := td.WalkRawPBPoints(func(raw []byte) bool {
+		if err := ptw.Reset(raw); err != nil {
+			l.Errorf("decode datapacket point failed: %v", err)
+			keptPacket = nil
+			matched = false
 			return false
-		case PipelineTypeCondition:
-			switch sp.Action {
-			case PipelineActionDrop:
-				keep = false
-				decided = true
-				return false
-			case PipelineActionKeep:
-				keep = true
-				decided = true
-				return false
-			default:
-				return true
+		}
+
+		for _, pipeline := range pipelines {
+			if pipeline == nil || pipeline.conds == nil {
+				continue
 			}
+
+			if x := pipeline.conds.Eval(ptw); x < 0 {
+				continue
+			}
+
+			matched = true
+			keptPacket = pipelineMatchedPacket(td, pipeline)
+			return false
+		}
+
+		return true
+	})
+	if walkErr != nil {
+		l.Errorf("walk datapacket payload failed: %v", walkErr)
+		return false, nil
+	}
+
+	return matched, keptPacket
+}
+
+func pipelineMatchedPacket(td *DataPacket, pipeline *SamplingPipeline) *DataPacket {
+	if td == nil || pipeline == nil {
+		return nil
+	}
+
+	switch pipeline.Type {
+	case PipelineTypeSampling:
+		if pipeline.Rate <= 0.0 {
+			return td
+		}
+
+		arg := td.GroupIdHash % sampleRange
+		threshold := uint64(math.Floor(pipeline.Rate * float64(sampleRange)))
+		if arg < threshold {
+			return td
+		}
+
+		return nil
+	case PipelineTypeCondition:
+		switch pipeline.Action {
+		case PipelineActionDrop:
+			return nil
+		case PipelineActionKeep:
+			return td
 		default:
-			l.Warnf("Unsupported pipeline-type %s", sp.Type)
-			return true
+			return td
 		}
-	}); err != nil {
-		l.Errorf("walk datapacket points failed: %v", err)
+	default:
+		l.Warnf("unsupported pipeline-type %s", pipeline.Type)
+		return td
 	}
-
-	if decided {
-		if keep {
-			return true, td
-		}
-		return true, nil
-	}
-
-	return matched, td
 }
 
 func PickTrace(source string, pts []*point.Point, version int64) map[uint64]*DataPacket {
@@ -136,23 +164,20 @@ func PickTrace(source string, pts []*point.Point, version int64) map[uint64]*Dat
 				DataType:      point.Tracing.String(),
 				Source:        source,
 				ConfigVersion: version,
-				RawPoints:     make([][]byte, 0, 8),
+				PointsPayload: make([]byte, 0, 256),
 				GroupKey:      "",
 			}
 			traceDatas[id] = traceData
 		}
 
-		raw, ok := pointRawBytes(pt)
-		if !ok {
+		if !appendPointPayload(traceData, pt) {
 			continue
 		}
-		traceData.RawPoints = append(traceData.RawPoints, raw)
 
 		status := pt.GetTag("status")
 		if status == "error" {
 			traceData.HasError = true
 		}
-		traceData.PointCount++
 		start, duration := getTime(pt)
 		if traceData.TraceStartTimeUnixNano == 0 {
 			traceData.TraceStartTimeUnixNano = start
@@ -386,23 +411,20 @@ func pickByGroupKey(groupKey string, source string, pts []*point.Point, category
 		traceData, ok := traceDatas[id]
 		if !ok {
 			traceData = &DataPacket{
-				GroupIdHash: id,
-				RawGroupId:  tid,
-				Token:       "",
-				Source:      source,
-				DataType:    category.String(),
-				RawPoints:   make([][]byte, 0, 8),
-				GroupKey:    groupKey,
+				GroupIdHash:   id,
+				RawGroupId:    tid,
+				Token:         "",
+				Source:        source,
+				DataType:      category.String(),
+				PointsPayload: make([]byte, 0, 256),
+				GroupKey:      groupKey,
 			}
 			traceDatas[id] = traceData
 		}
 
-		raw, ok := pointRawBytes(pt)
-		if !ok {
+		if !appendPointPayload(traceData, pt) {
 			continue
 		}
-		traceData.PointCount++
-		traceData.RawPoints = append(traceData.RawPoints, raw)
 
 		status := pt.GetTag("status")
 		if status == "error" {
@@ -464,18 +486,20 @@ func fieldToString(field any) string {
 	}
 }
 
-func pointRawBytes(pt *point.Point) ([]byte, bool) {
-	if pt == nil {
-		return nil, false
+func appendPointPayload(packet *DataPacket, pt *point.Point) bool {
+	if packet == nil || pt == nil {
+		return false
 	}
 
-	raw, err := pt.PBPoint().Marshal()
-	if err != nil {
-		l.Errorf("marshal point to raw bytes failed: %v", err)
-		return nil, false
+	packet.PointsPayload = point.AppendPointToPBPointsPayload(packet.PointsPayload, pt)
+	packet.PointCount++
+
+	ts := pt.Time().UnixNano()
+	if ts > packet.MaxPointTimeUnixNano {
+		packet.MaxPointTimeUnixNano = ts
 	}
 
-	return raw, true
+	return true
 }
 
 func pipelineNames(pipelines []*SamplingPipeline) string {

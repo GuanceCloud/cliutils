@@ -170,7 +170,7 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 
 	if old, exists := shard.activeMap[key]; exists {
 		// --- 场景 A：老分组更新 ---
-		old.packet.RawPoints = append(old.packet.RawPoints, packet.RawPoints...)
+		old.packet.PointsPayload = append(old.packet.PointsPayload, packet.PointsPayload...)
 		old.packet.HasError = old.packet.HasError || packet.HasError
 		old.packet.PointCount += pointCount
 
@@ -181,6 +181,9 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 		}
 		if packet.TraceEndTimeUnixNano > old.packet.TraceEndTimeUnixNano {
 			old.packet.TraceEndTimeUnixNano = packet.TraceEndTimeUnixNano
+		}
+		if packet.MaxPointTimeUnixNano > old.packet.MaxPointTimeUnixNano {
+			old.packet.MaxPointTimeUnixNano = packet.MaxPointTimeUnixNano
 		}
 		if old.packet.RawGroupId == "" {
 			old.packet.RawGroupId = packet.RawGroupId
@@ -274,15 +277,11 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 		case point.STracing:
 			config := s.GetTraceConfig(token)
 			if config != nil && sourcePacket != nil {
-				for _, pipeline := range config.Pipelines {
-					match, packet := pipeline.DoAction(sourcePacket)
-					if match {
-						// 匹配到了规则
-						if packet != nil {
-							keptPacket = packet
-							decision = DerivedMetricDecisionKept
-						}
-						break
+				match, packet := evaluatePipelines(sourcePacket, config.Pipelines)
+				if match {
+					if packet != nil {
+						keptPacket = packet
+						decision = DerivedMetricDecisionKept
 					}
 				}
 			}
@@ -292,15 +291,11 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 				// 查找对应的分组维度配置
 				for _, groupDim := range config.GroupDimensions {
 					if groupDim.GroupKey == groupKey {
-						for _, pipeline := range groupDim.Pipelines {
-							match, packet := pipeline.DoAction(sourcePacket)
-							if match {
-								// 匹配到了规则
-								if packet != nil {
-									keptPacket = packet
-									decision = DerivedMetricDecisionKept
-								}
-								break
+						match, packet := evaluatePipelines(sourcePacket, groupDim.Pipelines)
+						if match {
+							if packet != nil {
+								keptPacket = packet
+								decision = DerivedMetricDecisionKept
 							}
 						}
 						break
@@ -313,15 +308,11 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 				// 查找对应的分组维度配置
 				for _, groupDim := range config.GroupDimensions {
 					if groupDim.GroupKey == groupKey {
-						for _, pipeline := range groupDim.Pipelines {
-							match, packet := pipeline.DoAction(sourcePacket)
-							if match {
-								// 匹配到了规则
-								if packet != nil {
-									keptPacket = packet
-									decision = DerivedMetricDecisionKept
-								}
-								break
+						match, packet := evaluatePipelines(sourcePacket, groupDim.Pipelines)
+						if match {
+							if packet != nil {
+								keptPacket = packet
+								decision = DerivedMetricDecisionKept
 							}
 						}
 						break

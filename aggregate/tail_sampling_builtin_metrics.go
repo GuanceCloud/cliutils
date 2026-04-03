@@ -162,13 +162,10 @@ func DefaultTailSamplingBuiltinMetrics() TailSamplingBuiltinMetrics {
 				if packet == nil || packet.DataType != point.STracing {
 					return 0, false
 				}
-				if packet.PointCount > 0 {
-					return float64(packet.PointCount), true
+				if packet.PointCount <= 0 {
+					return 0, false
 				}
-				if len(packet.RawPoints) > 0 {
-					return float64(len(packet.RawPoints)), true
-				}
-				return 0, false
+				return float64(packet.PointCount), true
 			},
 		},
 		&histogramBuiltinDerivedMetric{
@@ -302,7 +299,7 @@ func packetTime(packet *DataPacket) time.Time {
 		return time.Now()
 	}
 
-	maxPointTS := packetMaxPointTimeUnixNano(packet)
+	maxPointTS := packet.MaxPointTimeUnixNano
 	if maxPointTS > 0 {
 		return time.Unix(0, maxPointTS)
 	}
@@ -313,29 +310,6 @@ func packetTime(packet *DataPacket) time.Time {
 	default:
 		return time.Now()
 	}
-}
-
-func packetMaxPointTimeUnixNano(packet *DataPacket) int64 {
-	if packet == nil || len(packet.RawPoints) == 0 {
-		return 0
-	}
-
-	var maxTS int64
-	for idx, raw := range packet.RawPoints {
-		pb, err := decodeRawPBPoint(raw)
-		if err != nil {
-			l.Errorf("decode raw point failed: idx=%d err=%v", idx, err)
-			continue
-		}
-		if pb == nil {
-			continue
-		}
-		if pb.Time > maxTS {
-			maxTS = pb.Time
-		}
-	}
-
-	return maxTS
 }
 
 func builtinRecordTags(packet *DataPacket) map[string]string {
