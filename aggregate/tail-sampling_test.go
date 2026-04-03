@@ -182,6 +182,27 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 			tdIsNil: true,
 		},
 		{
+			name: "test_fallback_rate",
+			fields: fields{
+				Name: "fallback sample",
+				Type: PipelineTypeSampling,
+				Rate: 1.0,
+			},
+			args: args{
+				td: &DataPacket{
+					GroupIdHash:   123123123123123,
+					RawGroupId:    "123456789",
+					Source:        "ddtrace",
+					ConfigVersion: 1,
+					HasError:      false,
+					PointCount:    5,
+					PointsPayload: MockTrace(),
+				},
+			},
+			want:    true,
+			tdIsNil: false,
+		},
+		{
 			name: "test_drop_resource",
 			fields: fields{
 				Name:      "drop resource",
@@ -491,6 +512,28 @@ func TestTailSamplingConfigs_Init(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "drop zero rate probabilistic pipelines",
+			config: &TailSamplingConfigs{
+				Version: 1,
+				Tracing: &TraceTailSampling{
+					Pipelines: []*SamplingPipeline{
+						{
+							Name: "fallback_zero_rate",
+							Type: PipelineTypeSampling,
+							Rate: 0,
+						},
+						{
+							Name:      "keep_errors",
+							Type:      PipelineTypeCondition,
+							Condition: `{ error = true }`,
+							Action:    PipelineActionKeep,
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -508,6 +551,10 @@ func TestTailSamplingConfigs_Init(t *testing.T) {
 
 			// 验证管道是否已应用
 			if tt.config.Tracing != nil {
+				if tt.name == "drop zero rate probabilistic pipelines" {
+					assert.Len(t, tt.config.Tracing.Pipelines, 1)
+					assert.Equal(t, "keep_errors", tt.config.Tracing.Pipelines[0].Name)
+				}
 				for _, pipeline := range tt.config.Tracing.Pipelines {
 					if pipeline.Condition != "" && (!tt.wantErr || pipeline.Condition != `{ invalid syntax }`) {
 						// 对于有效条件，验证 conds 是否已设置

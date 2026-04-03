@@ -46,6 +46,14 @@ type SamplingPipeline struct {
 }
 
 func (sp *SamplingPipeline) Apply() error {
+	if sp == nil {
+		return nil
+	}
+	if sp.Condition == "" {
+		sp.conds = nil
+		return nil
+	}
+
 	if ast, err := fp.GetConds(sp.Condition); err != nil {
 		return err
 	} else {
@@ -55,7 +63,7 @@ func (sp *SamplingPipeline) Apply() error {
 }
 
 func (sp *SamplingPipeline) DoAction(td *DataPacket) (bool, *DataPacket) {
-	if sp == nil || sp.conds == nil { // condition are required to do actions.
+	if sp == nil || (sp.conds == nil && !sp.isMatchAllSampling()) {
 		return false, td
 	}
 	if td == nil {
@@ -88,11 +96,21 @@ func evaluatePipelines(td *DataPacket, pipelines []*SamplingPipeline) (bool, *Da
 		}
 
 		for _, pipeline := range pipelines {
-			if pipeline == nil || pipeline.conds == nil {
+			if pipeline == nil {
 				continue
 			}
 
-			if x := pipeline.conds.Eval(ptw); x < 0 {
+			if pipeline.conds == nil && !pipeline.isMatchAllSampling() {
+				continue
+			}
+
+			if pipeline.conds != nil {
+				if x := pipeline.conds.Eval(ptw); x < 0 {
+					continue
+				}
+			}
+
+			if pipeline.Type == PipelineTypeSampling && pipeline.Rate <= 0 {
 				continue
 			}
 
@@ -109,6 +127,10 @@ func evaluatePipelines(td *DataPacket, pipelines []*SamplingPipeline) (bool, *Da
 	}
 
 	return matched, keptPacket
+}
+
+func (sp *SamplingPipeline) isMatchAllSampling() bool {
+	return sp != nil && sp.Type == PipelineTypeSampling && sp.Condition == "" && sp.Rate > 0
 }
 
 func pipelineMatchedPacket(td *DataPacket, pipeline *SamplingPipeline) *DataPacket {
@@ -266,6 +288,7 @@ func (t *TailSamplingConfigs) Init() error {
 		if t.Tracing.DataTTL == 0 {
 			t.Tracing.DataTTL = 5 * time.Minute
 		}
+		t.Tracing.Pipelines = normalizeSamplingPipelines(t.Tracing.Pipelines)
 		if t.Tracing.GroupKey == "" {
 			t.Tracing.GroupKey = "trace_id"
 		} else if t.Tracing.GroupKey != "trace_id" {
@@ -294,6 +317,7 @@ func (t *TailSamplingConfigs) Init() error {
 			if group.GroupKey == "" {
 				errs = append(errs, fmt.Sprintf("logging group_dimensions[%d] missing group_key", idx))
 			}
+			group.Pipelines = normalizeSamplingPipelines(group.Pipelines)
 			for _, pipeline := range group.Pipelines {
 				if err := validateSamplingPipeline(pipeline); err != nil {
 					errs = append(errs, fmt.Sprintf("logging group %q pipeline: %s", group.GroupKey, err))
@@ -318,6 +342,7 @@ func (t *TailSamplingConfigs) Init() error {
 			if group.GroupKey == "" {
 				errs = append(errs, fmt.Sprintf("rum group_dimensions[%d] missing group_key", idx))
 			}
+			group.Pipelines = normalizeSamplingPipelines(group.Pipelines)
 			for _, pipeline := range group.Pipelines {
 				if err := validateSamplingPipeline(pipeline); err != nil {
 					errs = append(errs, fmt.Sprintf("rum group %q pipeline: %s", group.GroupKey, err))
@@ -335,6 +360,23 @@ func (t *TailSamplingConfigs) Init() error {
 	}
 
 	return nil
+}
+
+func normalizeSamplingPipelines(pipelines []*SamplingPipeline) []*SamplingPipeline {
+	if len(pipelines) == 0 {
+		return pipelines
+	}
+
+	normalized := make([]*SamplingPipeline, 0, len(pipelines))
+	for _, pipeline := range pipelines {
+		if pipeline != nil && pipeline.Type == PipelineTypeSampling && pipeline.Rate <= 0 {
+			l.Warnf("drop probabilistic pipeline %q: rate must be greater than zero", pipeline.Name)
+			continue
+		}
+		normalized = append(normalized, pipeline)
+	}
+
+	return normalized
 }
 
 func validateSamplingPipeline(pipeline *SamplingPipeline) error {
