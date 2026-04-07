@@ -265,6 +265,15 @@ cfg := &aggregate.AggregatorConfigure{
 - 如果 `group_by` 中的 key 在原 point 上是 tag，就会作为 tag 附到新点
 - 如果它在原 point 上是 field，也会被附回去
 
+聚合侧有两个容易混淆的 hash：
+
+- `hash(pt, groupby)`
+  用 measurement、group by tag 值和第一个非 tag field 计算，决定真正的聚合实例
+- `pickHash(pt, groupby)`
+  用 measurement 和 group by tag key 计算，不带 tag value，作为批次 pick key
+
+通常可以把 `RoutingKey` 理解成“把同一个聚合实例路由到同一处”，把 `PickKey` 理解成“把同一类聚合需求打包”。
+
 ### 4.8 聚合方法的当前边界
 
 当前工厂里，字段值会先尝试走数值路径。
@@ -313,7 +322,20 @@ cfg := &aggregate.AggregatorConfigure{
 4. `GetExpWidows()` 取出到期窗口
 5. `WindowsToData()` 把窗口结果转成 point
 
-### 4.11 聚合侧当前最值得测试的地方
+### 4.11 指标聚合最小接入顺序
+
+如果在别的项目里只接指标聚合，典型顺序是：
+
+1. 构造 `AggregatorConfigure`
+2. 调用 `Setup()` 完成校验和运行时算法配置转换
+3. 初始化 `cache := aggregate.NewCache(...)`
+4. 把业务 point 送进 `PickPoints()`
+5. 把得到的 `AggregationBatch` 送进 `cache.AddBatchs()`
+6. 周期性调用 `GetExpWidows()` 和 `WindowsToData()` 取聚合结果
+
+注意：聚合和尾采样是两套能力，不要假设初始化一个 runtime 就能同时闭环。
+
+### 4.12 聚合侧当前最值得测试的地方
 
 如果你在改聚合逻辑，优先看这些测试：
 
@@ -344,11 +366,37 @@ cfg := &aggregate.AggregatorConfigure{
 
 直接只用 `GlobalSampler` 也能做采样决策，但拿不到 builtin 派生指标闭环。
 
+默认初始化可以用：
+
+```go
+processor := aggregate.NewDefaultTailSamplingProcessor(shardCount, waitTime)
+```
+
+如果需要手动组装，可以用：
+
+```go
+sampler := aggregate.NewGlobalSampler(16, 5*time.Minute)
+collector := aggregate.NewDerivedMetricCollector(30 * time.Second)
+metrics := aggregate.DefaultTailSamplingBuiltinMetrics()
+
+processor := aggregate.NewTailSamplingProcessor(sampler, collector, metrics)
+```
+
 ### 5.2 尾采样整体流程
 
 整体流程：
 
 `point -> PickTrace/PickLogging/PickRUM -> DataPacket -> TailSamplingProcessor.IngestPacket() -> GlobalSampler -> AdvanceTime() -> TailSamplingData() -> kept packets + derived metric points`
+
+最小调用顺序：
+
+1. 初始化 `TailSamplingProcessor`
+2. 为每个 token 调用 `processor.UpdateConfig(token, cfg)`
+3. 业务侧用 `PickTrace()` / `PickLogging()` / `PickRUM()` 组包
+4. packet 进入 `processor.IngestPacket()`
+5. 每秒调用一次 `AdvanceTime()` 和 `TailSamplingData()`
+6. 每 30 秒左右调用一次 `FlushDerivedMetrics()`
+7. 分别消费保留的 `DataPacket` 和 `DerivedMetricPoints`
 
 ### 5.3 三类数据的分组方式
 
@@ -359,6 +407,12 @@ cfg := &aggregate.AggregatorConfigure{
 logging / RUM 有一个非常实际的行为：
 
 - 如果点上缺少 `group_key` 对应字段，它不会进入采样缓存，而是被 `PickLogging()` / `PickRUM()` 作为 `passedThrough` 返回
+
+当前 `DataPacket` 摘要字段的真实语义：
+
+- trace 会补 `HasError`、`PointCount`、`TraceStartTimeUnixNano`、`TraceEndTimeUnixNano`
+- logging / RUM 会补 `HasError`、`PointCount`、`GroupKey`
+- logging / RUM 当前不补 trace 风格起止时间，这是当前设计选择，不是遗漏
 
 ### 5.4 尾采样配置结构
 
@@ -596,7 +650,37 @@ point 的通用特点：
 - logging / RUM 缺少分组键的数据会直接旁路
 - custom `derived_metrics` 结构存在，但当前配置会被直接拒绝
 
-## 7. 建议的阅读顺序
+## 7. 协议和成熟度
+
+### 7.1 协议文件
+
+`aggregate/aggrbatch.proto` 定义聚合批次和算法配置。协议里保留的方法名比当前实现更全，所以必须和 `newCalculators()`、`AggregatorConfigure.Setup()` 对照看，不能把“协议存在”直接理解成“运行时已支持”。
+
+`aggregate/tsdata.proto` 定义尾采样 `DataPacket`。它已经被设计成 trace / logging / RUM 通用包，后续扩展更多“按 group key 延迟决策”的数据类型时可以复用这个模型。
+
+`aggregate/pb.sh` 是 protobuf 生成脚本，当前用 `gogoslick` 生成 `aggrbatch.proto` 和 `tsdata.proto` 对应代码。改协议时优先看这个脚本和生成包映射。
+
+### 7.2 当前成熟度判断
+
+聚合模块主体结构已经成型：
+
+- 配置模型明确
+- 路由和窗口管理明确
+- 算法扩展点明确
+
+但不同算法的 `_count` 语义仍要按具体实现分别复核。
+
+尾采样模块架构方向已经明确：
+
+- 通用 `DataPacket`
+- 多数据类型支持
+- 时间轮缓存
+- 规则驱动决策
+- builtin 派生指标闭环
+
+当前真正还没闭环的是自定义 `derived_metrics`，不是整个尾采样模块或 builtin 派生指标子系统。
+
+## 8. 建议的阅读顺序
 
 如果要快速建立全局理解，建议按这个顺序读：
 
@@ -609,11 +693,13 @@ point 的通用特点：
 7. `aggregate/tail_sampling_processor.go`
 8. 对应测试文件
 
-## 8. 文档整理说明
+## 9. 文档整理说明
 
 为了减少重复和冲突：
 
 - `aggregate/docs/feature-overview.md` 现在是主文档
-- 旧的 `aggregate/docs/config.md` 和 `aggregate/docs/docs.md` 不再保留
+- `aggregate/codex_read.md` 的阅读笔记内容已经合并进本文
+- `aggregate/tail-sampling.md` 的尾采样接入说明已经合并进本文
+- `aggregate/bug.md` 是问题日志占位文件，不作为正式说明文档合并
 
 如果以后发现实现变化，优先更新这份文档，再决定是否同步扩展阅读材料。
