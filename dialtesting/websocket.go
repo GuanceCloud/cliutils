@@ -283,19 +283,18 @@ func (t *WebsocketTask) run() error {
 
 	if hostIP == nil { // host name
 		start := time.Now()
-		if ips, err := net.LookupIP(t.hostname); err != nil {
+		ips, err := net.LookupIP(t.hostname)
+		if err != nil {
 			t.reqError = err.Error()
 			return nil
-		} else {
-			if len(ips) == 0 {
-				err := fmt.Errorf("invalid host: %s, found no ip record", t.hostname)
-				t.reqError = err.Error()
-				return nil
-			} else {
-				t.reqDNSCost = time.Since(start)
-				hostIP = ips[0] // TODO: support mutiple ip for one host
-			}
 		}
+		if len(ips) == 0 {
+			err := fmt.Errorf("invalid host: %s, found no ip record", t.hostname)
+			t.reqError = err.Error()
+			return nil
+		}
+		t.reqDNSCost = time.Since(start)
+		hostIP = ips[0] // TODO: support mutiple ip for one host
 	}
 
 	header := t.getHeader()
