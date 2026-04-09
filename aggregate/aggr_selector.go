@@ -8,7 +8,7 @@ import (
 	"github.com/GuanceCloud/cliutils/point"
 )
 
-// ruleSelector is the selector to select measurements and fields among points.
+// RuleSelector selects measurements and fields among points.
 type RuleSelector struct {
 	Category     string   `toml:"category" json:"category"`
 	Measurements []string `toml:"measurements" json:"measurements"`
@@ -18,7 +18,6 @@ type RuleSelector struct {
 	measurementsWhitelist []*cliutils.WhiteListItem
 	fieldsWhitelist       []*cliutils.WhiteListItem
 	conds                 fp.WhereConditions
-	delSelectKey          bool
 }
 
 // Setup initializes the rule selector with validation and prepares whitelists.
@@ -36,6 +35,12 @@ func (rs *RuleSelector) Setup() error {
 		point.Security,
 		point.Profiling,
 		point.DialTesting:
+	case point.UnknownCategory,
+		point.DynamicDWCategory,
+		point.MetricDeprecated,
+		point.ExecutionLog,
+		point.LLM:
+		return fmt.Errorf("invalid category: %s", rs.Category)
 	default:
 		return fmt.Errorf("invalid category: %s", rs.Category)
 	}
@@ -63,26 +68,26 @@ func (rs *RuleSelector) Setup() error {
 	return nil
 }
 
-func (s *RuleSelector) doSelect(groupby []string, pts []*point.Point) (res []*point.Point) {
+func (rs *RuleSelector) doSelect(groupby []string, pts []*point.Point) (res []*point.Point) {
 	ptwrapper := &ptWrap{}
 
 	for _, pt := range pts {
 		ptname := pt.Name()
 
-		if len(s.measurementsWhitelist) > 0 {
-			if !cliutils.WhiteListMatched(ptname, s.measurementsWhitelist) {
+		if len(rs.measurementsWhitelist) > 0 {
+			if !cliutils.WhiteListMatched(ptname, rs.measurementsWhitelist) {
 				continue
 			}
 		}
 
-		if len(s.conds) > 0 {
+		if len(rs.conds) > 0 {
 			ptwrapper.Point = pt
-			if x := s.conds.Eval(ptwrapper); x < 0 {
+			if x := rs.conds.Eval(ptwrapper); x < 0 {
 				continue
 			}
 		}
 
-		forkedPts := s.selectKVS(false, pt)
+		forkedPts := rs.selectKVS(false, pt)
 		if len(forkedPts) > 0 {
 			for _, tagKey := range groupby {
 				if v := pt.GetTag(tagKey); v != "" {
@@ -105,11 +110,11 @@ func (s *RuleSelector) doSelect(groupby []string, pts []*point.Point) (res []*po
 	return res
 }
 
-func (s *RuleSelector) selectKVS(delKey bool, pt *point.Point) []*point.Point {
+func (rs *RuleSelector) selectKVS(delKey bool, pt *point.Point) []*point.Point {
 	var pts []*point.Point
-	if len(s.fieldsWhitelist) > 0 {
+	if len(rs.fieldsWhitelist) > 0 {
 		for _, kv := range pt.KVs() {
-			if !cliutils.WhiteListMatched(kv.Key, s.fieldsWhitelist) {
+			if !cliutils.WhiteListMatched(kv.Key, rs.fieldsWhitelist) {
 				continue
 			}
 

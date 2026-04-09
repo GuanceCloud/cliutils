@@ -4,6 +4,7 @@ import "strings"
 
 type AlgoMethod string
 
+//nolint:stylecheck // Preserve the existing public API and config-facing names.
 const (
 	METHOD_UNSPECIFIED AlgoMethod = ""
 	SUM                AlgoMethod = "sum"

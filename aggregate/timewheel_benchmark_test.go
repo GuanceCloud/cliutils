@@ -111,8 +111,8 @@ func BenchmarkGlobalSamplerTimeWheelTailSamplingOutcomesKeepAll(b *testing.B) {
 	}
 }
 
-func newBenchmarkGlobalSampler(b testing.TB, ttl time.Duration, pipelines []*SamplingPipeline) *GlobalSampler {
-	b.Helper()
+func newBenchmarkGlobalSampler(tb testing.TB, ttl time.Duration, pipelines []*SamplingPipeline) *GlobalSampler {
+	tb.Helper()
 
 	sampler := NewGlobalSampler(16, ttl)
 	err := sampler.UpdateConfig(benchmarkTailSamplingToken, &TailSamplingConfigs{
@@ -124,7 +124,7 @@ func newBenchmarkGlobalSampler(b testing.TB, ttl time.Duration, pipelines []*Sam
 		},
 	})
 	if err != nil {
-		b.Fatalf("update tail sampling config: %v", err)
+		tb.Fatalf("update tail sampling config: %v", err)
 	}
 
 	return sampler

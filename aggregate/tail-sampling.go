@@ -477,7 +477,7 @@ func pickByGroupKey(groupKey string, source string, pts []*point.Point, category
 	return traceDatas, passedThrough
 }
 
-// RUM尾采样配置.
+// RUMTailSampling holds the RUM tail-sampling configuration.
 type RUMTailSampling struct {
 	DataTTL time.Duration `toml:"data_ttl" json:"data_ttl"`
 	Version int64         `toml:"version" json:"version"`
@@ -505,7 +505,7 @@ func SetLogging(log *logger.Logger) {
 // hashTraceID 将字符串 TraceID 转换为 uint64.
 func hashTraceID(s string) uint64 {
 	h := fnv.New64a()
-	h.Write([]byte(s))
+	_, _ = h.Write([]byte(s))
 	return h.Sum64()
 }
 
@@ -536,8 +536,7 @@ func appendPointPayload(packet *DataPacket, pt *point.Point) bool {
 	packet.PointsPayload = point.AppendPointToPBPointsPayload(packet.PointsPayload, pt)
 	packet.PointCount++
 
-	ts := pt.Time().UnixNano()
-	if ts > packet.MaxPointTimeUnixNano {
+	if ts := pt.Time().UnixNano(); ts > packet.MaxPointTimeUnixNano {
 		packet.MaxPointTimeUnixNano = ts
 	}
 

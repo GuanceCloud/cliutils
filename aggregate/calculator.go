@@ -281,9 +281,8 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 					MetricBase: mb,
 				}
 				if algo.Options != nil {
-					switch algo.Options.(type) {
+					switch opt := algo.Options.(type) {
 					case *AggregationAlgo_QuantileOpts:
-						opt := algo.Options.(*AggregationAlgo_QuantileOpts)
 						calc.addOpts(opt)
 					default: //nolint
 					}
@@ -326,6 +325,7 @@ func newCalculators(batch *AggregationBatch) (res []Calculator) {
 				calc.doHash(batch.RoutingKey)
 				res = append(res, calc)
 
+			case METHOD_UNSPECIFIED:
 			case EXPO_HISTOGRAM: // TODO
 			default: // pass
 			}

@@ -15,7 +15,6 @@ type MetricBase struct {
 	key,
 	name string
 
-	tenantHash, // not used
 	hash uint64
 
 	window,
@@ -38,7 +37,6 @@ func (mb *MetricBase) String() string {
 		fmt.Sprintf("aggrTags: %+#v", mb.aggrTags),
 		fmt.Sprintf("key: %s", mb.key),
 		fmt.Sprintf("name: %s", mb.name),
-		fmt.Sprintf("tenantHash: %d", mb.tenantHash),
 		fmt.Sprintf("hash: %d", mb.hash),
 		fmt.Sprintf("window: %s", time.Duration(mb.window)),
 		fmt.Sprintf("nextWallTime: %s", time.Unix(0, mb.nextWallTime)),
@@ -46,25 +44,3 @@ func (mb *MetricBase) String() string {
 	)
 	return strings.Join(arr, "\n")
 }
-
-// TODO ....
-
-type (
-	explicitBounds struct {
-		index  int64
-		cnt    uint64
-		lb, ub float64
-		pos    bool
-	}
-
-	algoExpoHistogram struct {
-		MetricBase
-		min, max, sum    float64
-		zeroCount, count int64
-		scale            int
-		maxTime, minTime int64
-		negBucketCounts,
-		posBucketCounts []uint64
-		bounds []*explicitBounds
-	}
-)

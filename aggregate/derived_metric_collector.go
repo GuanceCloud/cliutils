@@ -100,7 +100,7 @@ func (c *DerivedMetricCollector) Add(records []DerivedMetricRecord) {
 				bucket.hist[key] = current
 			}
 			current.observe(record.Value)
-		default:
+		case "", DerivedMetricKindSum:
 			current := bucket.sums[key]
 			if current == nil {
 				current = &derivedMetricValue{
@@ -114,6 +114,8 @@ func (c *DerivedMetricCollector) Add(records []DerivedMetricRecord) {
 				bucket.sums[key] = current
 			}
 			current.sum += record.Value
+		default:
+			continue
 		}
 	}
 }

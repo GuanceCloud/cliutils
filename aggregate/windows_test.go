@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/GuanceCloud/cliutils/point"
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 )
 
 type MockCalculator struct {
@@ -62,7 +62,6 @@ func TestCache_Concurrency(t *testing.T) {
 						aggrTags:     nil,
 						key:          "",
 						name:         "",
-						tenantHash:   0,
 						hash:         uint64(j % 10),
 						window:       10,
 						nextWallTime: time.Now().Unix(),
@@ -125,20 +124,19 @@ func (m *MockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (m *MockServer) getPointData() {
 	ticker := time.NewTicker(time.Second * 5)
-	for {
-		select {
-		case <-ticker.C:
-			// 当前时间
-			m.t.Logf("start to get expired windows")
-			ws := m.cache.GetExpWidows()
-			if len(ws) > 0 {
-				pds := WindowsToData(ws)
-				m.t.Logf("point data len:%d", len(pds))
-				for _, pd := range pds {
-					m.t.Logf("point data:%s", pd.Token)
-					for _, p := range pd.PTS {
-						m.t.Logf("point:%s", p.LineProto())
-					}
+	defer ticker.Stop()
+
+	for range ticker.C {
+		// 当前时间
+		m.t.Logf("start to get expired windows")
+		ws := m.cache.GetExpWidows()
+		if len(ws) > 0 {
+			pds := WindowsToData(ws)
+			m.t.Logf("point data len:%d", len(pds))
+			for _, pd := range pds {
+				m.t.Logf("point data:%s", pd.Token)
+				for _, p := range pd.PTS {
+					m.t.Logf("point:%s", p.LineProto())
 				}
 			}
 		}

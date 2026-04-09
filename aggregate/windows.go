@@ -118,9 +118,7 @@ func (c *Cache) GetExpWidows() []*Window {
 	now := time.Now().Unix()
 	for t, ws := range c.WindowsBuckets {
 		if t <= now {
-			for _, w := range ws.WS {
-				wss = append(wss, w)
-			}
+			wss = append(wss, ws.WS...)
 			delete(c.WindowsBuckets, t)
 		}
 	}
