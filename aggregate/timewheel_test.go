@@ -1,0 +1,207 @@
+package aggregate
+
+import (
+	"container/list"
+	"io"
+	"net/http"
+	"net/url"
+	"testing"
+	"time"
+
+	"github.com/GuanceCloud/cliutils/point"
+	"github.com/gogo/protobuf/proto"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestGlobalSampler_AdvanceTime(t *testing.T) { //nolint
+	// 1. 初始化采样器
+	shardCount := 4
+	sampler := &GlobalSampler{
+		shardCount: shardCount,
+		shards:     make([]*Shard, shardCount),
+		configMap: map[string]*TailSamplingConfigs{
+			"TokenA": {
+				Tracing: &TraceTailSampling{
+					DataTTL:        time.Second * 2,
+					DerivedMetrics: nil,
+					Pipelines:      nil,
+					Version:        0,
+				},
+			},
+		},
+	}
+	for i := 0; i < shardCount; i++ {
+		sampler.shards[i] = &Shard{
+			activeMap: make(map[uint64]*DataGroup),
+		}
+		for j := 0; j < 3600; j++ {
+			sampler.shards[i].slots[j] = list.New()
+		}
+	}
+
+	// 模拟一条数据：TokenA, TTL=2s, TraceIDHash=100
+	tidHash := uint64(100)
+	packet := &DataPacket{
+		GroupIdHash: tidHash,
+		Token:       "TokenA",
+		DataType:    "tracing",
+	}
+	cKey := tailSamplingGroupMapKey(packet)
+	// 这里我们需要模拟 GetConfig 返回 2s 的 TTL
+	// 假设我们在 Ingest 内部已经根据当前指针计算好了位置
+	// 当前指针为 0，TTL 为 2，预期的过期槽位是 2
+	sampler.Ingest(packet)
+
+	// --- 第一次拨动：从 0 到 1 ---
+	expired := sampler.AdvanceTime()
+	assert.Equal(t, 0, len(expired), "在第 1 秒不应该有数据过期")
+
+	// --- 第二次拨动：从 1 到 2 ---
+	expired = sampler.AdvanceTime()
+	assert.Equal(t, 1, len(expired), "在第 2 秒应该拿到过期数据")
+	assert.NotNil(t, expired[cKey])
+	t.Logf("data :=%v", expired[cKey])
+	assert.Equal(t, tidHash, expired[cKey].packet.GroupIdHash)
+
+	// 检查 activeMap 是否已清理
+	shard := sampler.shards[tidHash%uint64(shardCount)]
+	_, exists := shard.activeMap[cKey]
+	assert.False(t, exists, "过期后数据应从 activeMap 中删除")
+}
+
+func TestGlobalSampler_IngestKeepsDifferentDataTypeSeparate(t *testing.T) {
+	shardCount := 1
+	sampler := &GlobalSampler{
+		shardCount: shardCount,
+		shards:     make([]*Shard, shardCount),
+		configMap: map[string]*TailSamplingConfigs{
+			"TokenA": {
+				Tracing: &TraceTailSampling{DataTTL: 2 * time.Second},
+				Logging: &LoggingTailSampling{DataTTL: 2 * time.Second},
+			},
+		},
+	}
+	for i := 0; i < shardCount; i++ {
+		sampler.shards[i] = &Shard{activeMap: make(map[uint64]*DataGroup)}
+		for j := 0; j < 3600; j++ {
+			sampler.shards[i].slots[j] = list.New()
+		}
+	}
+	payload := point.AppendPBPointToPBPointsPayload(nil, &point.PBPoint{Name: "span"})
+
+	tracePacket := &DataPacket{
+		GroupIdHash:   100,
+		RawGroupId:    "same-id",
+		Token:         "TokenA",
+		DataType:      point.STracing,
+		GroupKey:      "trace_id",
+		PointsPayload: payload,
+		PointCount:    1,
+	}
+	loggingPacket := &DataPacket{
+		GroupIdHash:   100,
+		RawGroupId:    "same-id",
+		Token:         "TokenA",
+		DataType:      point.SLogging,
+		GroupKey:      "service",
+		PointsPayload: payload,
+		PointCount:    1,
+	}
+
+	sampler.Ingest(tracePacket)
+	sampler.Ingest(loggingPacket)
+
+	shard := sampler.shards[0]
+	assert.Len(t, shard.activeMap, 2)
+
+	traceKey := tailSamplingGroupMapKey(tracePacket)
+	loggingKey := tailSamplingGroupMapKey(loggingPacket)
+	assert.NotEqual(t, traceKey, loggingKey)
+	assert.Equal(t, point.STracing, shard.activeMap[traceKey].packet.DataType)
+	assert.Equal(t, point.SLogging, shard.activeMap[loggingKey].packet.DataType)
+}
+
+func TestGlobalSamplerUpdateConfigRejectsInvalidConfig(t *testing.T) {
+	sampler := NewGlobalSampler(1, time.Minute)
+	cfg := &TailSamplingConfigs{
+		Version: 1,
+		Tracing: &TraceTailSampling{
+			Pipelines: []*SamplingPipeline{
+				{
+					Name:      "broken",
+					Type:      PipelineTypeCondition,
+					Condition: `{ invalid syntax }`,
+					Action:    PipelineActionKeep,
+				},
+			},
+		},
+	}
+
+	err := sampler.UpdateConfig("token-a", cfg)
+	assert.Error(t, err)
+	assert.Nil(t, sampler.GetTraceConfig("token-a"))
+}
+
+type MockSampler struct {
+	sampler *GlobalSampler
+	t       *testing.T
+	stop    chan struct{}
+}
+
+func (m *MockSampler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	values, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		m.t.Errorf("parse query failed:%v", err)
+		w.WriteHeader(400)
+		w.Write([]byte("bad query"))
+	}
+	token := values.Get("token")
+	m.t.Logf("token:%s", token)
+	bts, err := io.ReadAll(r.Body)
+	if err != nil {
+		m.t.Errorf("read body failed:%v", err)
+		w.Write([]byte("bad body"))
+		return
+	}
+	batch := &DataPacket{}
+	err = proto.Unmarshal(bts, batch)
+	if err != nil {
+		m.t.Errorf("unmarshal failed:%v", err)
+		w.Write([]byte("bad body"))
+		return
+	}
+	batch.Token = token
+	m.sampler.Ingest(batch)
+}
+
+func (m *MockSampler) getTrace() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			traces := m.sampler.AdvanceTime()
+			if len(traces) > 0 {
+				for _, trace := range traces {
+					if trace.packet != nil {
+						dec := point.GetDecoder(point.WithDecEncoding(point.Protobuf))
+						spans, err := dec.Decode(trace.packet.PointsPayload)
+						point.PutDecoder(dec)
+						if err != nil {
+							m.t.Logf("decode trace failed: %v", err)
+							continue
+						}
+						m.t.Logf("trace:%v", trace.packet.RawGroupId)
+						for _, span := range spans {
+							m.t.Logf("span:%v", span.Pretty())
+						}
+					}
+				}
+			} else {
+				m.t.Logf("no trace")
+			}
+		case <-m.stop:
+			return
+		}
+	}
+}
