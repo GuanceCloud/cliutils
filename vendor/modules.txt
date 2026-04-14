@@ -46,6 +46,13 @@ github.com/GuanceCloud/platypus/pkg/engine/runtimev2
 github.com/GuanceCloud/platypus/pkg/errchain
 github.com/GuanceCloud/platypus/pkg/parser
 github.com/GuanceCloud/platypus/pkg/token
+# github.com/GuanceCloud/tracing-protos/opentelemetry-gen-go v0.0.0-20260408104033-ca6a8390ea4f
+## explicit; go 1.19
+github.com/GuanceCloud/tracing-protos/opentelemetry-gen-go/common/v1
+github.com/GuanceCloud/tracing-protos/opentelemetry-gen-go/logs/v1
+github.com/GuanceCloud/tracing-protos/opentelemetry-gen-go/metrics/v1
+github.com/GuanceCloud/tracing-protos/opentelemetry-gen-go/resource/v1
+github.com/GuanceCloud/tracing-protos/opentelemetry-gen-go/trace/v1
 # github.com/Microsoft/go-winio v0.6.1
 ## explicit; go 1.17
 github.com/Microsoft/go-winio
@@ -470,10 +477,10 @@ golang.org/x/tools/internal/typesinternal
 ## explicit; go 1.11
 golang.org/x/xerrors
 golang.org/x/xerrors/internal
-# google.golang.org/genproto v0.0.0-20220920201722-2b89144ce006
+# google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1
 ## explicit; go 1.19
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.51.0
+# google.golang.org/grpc v1.56.2
 ## explicit; go 1.17
 google.golang.org/grpc
 google.golang.org/grpc/attributes
