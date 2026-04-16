@@ -9,6 +9,7 @@ import (
 	"github.com/GuanceCloud/cliutils/logger"
 	"github.com/GuanceCloud/cliutils/point"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPickTrace(t *testing.T) {
@@ -203,11 +204,11 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 			tdIsNil: false,
 		},
 		{
-			name: "test_drop_resource",
+			name: "test_drop_resource_regex",
 			fields: fields{
 				Name:      "drop resource",
 				Type:      PipelineTypeCondition,
-				Condition: "{ resource = \"GET /tmall/**\" }",
+				Condition: `{ resource = re("^GET /tmall/.+$") }`,
 				Action:    PipelineActionDrop,
 			},
 			args: args{
@@ -223,6 +224,28 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 			},
 			want:    true,
 			tdIsNil: true,
+		},
+		{
+			name: "test_drop_resource_literal_is_exact_match",
+			fields: fields{
+				Name:      "drop resource literal",
+				Type:      PipelineTypeCondition,
+				Condition: `{ resource = "GET /tmall/**" }`,
+				Action:    PipelineActionDrop,
+			},
+			args: args{
+				td: &DataPacket{
+					GroupIdHash:   123123123123123,
+					RawGroupId:    "123456789",
+					Source:        "ddtrace",
+					ConfigVersion: 1,
+					HasError:      false,
+					PointCount:    5,
+					PointsPayload: MockTrace(),
+				},
+			},
+			want:    false,
+			tdIsNil: false,
 		},
 	}
 	for _, tt := range tests {
@@ -295,7 +318,7 @@ func MockTrace() []byte {
 
 	pt5 := point.NewPoint("ddtrace", point.NewKVs(map[string]interface{}{
 		"http.server.requests_bucket": float64(10),
-		"resource":                    "GET /tmall/**",
+		"resource":                    "GET /tmall/123",
 		"trace_id":                    "1000000000",
 		"span_id":                     "12345678912",
 		"status":                      "ok",
@@ -309,6 +332,66 @@ func MockTrace() []byte {
 	}
 
 	return payload
+}
+
+func TestEvaluatePipelinesTraceWideOrder(t *testing.T) {
+	t.Run("earlier pipeline wins even when a later span matches it", func(t *testing.T) {
+		packet := makeTracePacket(t,
+			map[string]interface{}{"resource": "/keep-first", "trace_id": "trace-wide", "span_id": "span-1", "start_time": time.Now().Unix(), "duration": int64(1)},
+			map[string]interface{}{"resource": "/drop-later", "trace_id": "trace-wide", "span_id": "span-2", "start_time": time.Now().Unix(), "duration": int64(1)},
+		)
+
+		pipelines := []*SamplingPipeline{
+			{Name: "drop-later-span", Type: PipelineTypeCondition, Condition: `{ resource = "/drop-later" }`, Action: PipelineActionDrop},
+			{Name: "sample-rest", Type: PipelineTypeSampling, Condition: `{ 1 = 1 }`, Rate: 1},
+		}
+		for _, pipeline := range pipelines {
+			require.NoError(t, pipeline.Apply())
+		}
+
+		matched, keptPacket := evaluatePipelines(packet, pipelines)
+		assert.True(t, matched)
+		assert.Nil(t, keptPacket)
+	})
+
+	t.Run("keep and drop conflicts follow pipeline order", func(t *testing.T) {
+		packet := makeTracePacket(t,
+			map[string]interface{}{"resource": "/normal", "trace_id": "trace-conflict", "span_id": "span-1", "status": "error", "start_time": time.Now().Unix(), "duration": int64(1)},
+			map[string]interface{}{"resource": "/drop-me", "trace_id": "trace-conflict", "span_id": "span-2", "start_time": time.Now().Unix(), "duration": int64(1)},
+		)
+
+		pipelines := []*SamplingPipeline{
+			{Name: "keep-errors", Type: PipelineTypeCondition, Condition: `{ status = "error" }`, Action: PipelineActionKeep},
+			{Name: "drop-resource", Type: PipelineTypeCondition, Condition: `{ resource = "/drop-me" }`, Action: PipelineActionDrop},
+		}
+		for _, pipeline := range pipelines {
+			require.NoError(t, pipeline.Apply())
+		}
+
+		matched, keptPacket := evaluatePipelines(packet, pipelines)
+		assert.True(t, matched)
+		assert.Same(t, packet, keptPacket)
+	})
+}
+
+func makeTracePacket(t *testing.T, spanFields ...map[string]interface{}) *DataPacket {
+	t.Helper()
+
+	var payload []byte
+	for _, fields := range spanFields {
+		pt := point.NewPoint("ddtrace", point.NewKVs(fields), point.CommonLoggingOptions()...)
+		pt.SetTime(time.Now())
+		payload = point.AppendPointToPBPointsPayload(payload, pt)
+	}
+
+	return &DataPacket{
+		GroupIdHash:   123123123123123,
+		RawGroupId:    "trace",
+		Source:        "ddtrace",
+		ConfigVersion: 1,
+		PointCount:    int32(len(spanFields)),
+		PointsPayload: payload,
+	}
 }
 
 // TestTailSamplingConfigs_Init 测试配置初始化
