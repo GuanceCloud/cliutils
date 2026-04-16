@@ -203,7 +203,7 @@ func isNil(v any) bool {
 
 	rv := reflect.ValueOf(v)
 
-	switch rv.Kind() {
+	switch rv.Kind() { // nolint
 	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
 		return rv.IsNil()
 	default:

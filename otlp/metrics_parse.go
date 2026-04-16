@@ -247,7 +247,7 @@ func metricMeasurement(metric *metrics.Metric, pointTags map[string]string, opts
 }
 
 func aggregationTemporalityName(temporality metrics.AggregationTemporality) string {
-	switch temporality {
+	switch temporality { //nolint
 	case metrics.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA:
 		return "delta"
 	case metrics.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE:
