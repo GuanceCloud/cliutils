@@ -13,12 +13,12 @@ import (
 )
 
 func TestPtCategory(t *testing.T) {
-	t.Run("agent", func(t *testing.T) {
-		assert.Equal(t, point.Agent, ptCategory(point.SAgent))
-		assert.Equal(t, point.Agent, ptCategory(point.CAgent))
+	t.Run("llm-agent", func(t *testing.T) {
+		assert.Equal(t, point.LLMAgent, ptCategory(point.SLLMAgent))
+		assert.Equal(t, point.LLMAgent, ptCategory(point.CLLMAgent))
 	})
 
 	t.Run("unknown", func(t *testing.T) {
-		assert.Equal(t, point.UnknownCategory, ptCategory("agent-x"))
+		assert.Equal(t, point.UnknownCategory, ptCategory("llm-agent-x"))
 	})
 }
