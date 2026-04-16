@@ -30,7 +30,7 @@ func TestURL(t *testing.T) {
 		{c: "/v1/write/dynamic_dw", expect: DynamicDWCategory},
 		{c: "/v1/write/siem_logging", expect: ExecutionLog},
 		{c: "/v1/write/langfuse-v2", expect: LLM},
-		{c: "/v1/write/llm_agent", expect: LLMAgent},
+		{c: "/v1/write/agent_llm", expect: AgentLLM},
 	}
 
 	for _, tc := range cases {
@@ -57,7 +57,7 @@ func TestAlias(t *testing.T) {
 		{c: "T", expect: Tracing},
 		{c: "EL", expect: ExecutionLog},
 		{c: "LLM", expect: LLM},
-		{c: "LA", expect: LLMAgent},
+		{c: "AL", expect: AgentLLM},
 		{c: "Dynamic_dw", expect: UnknownCategory},
 	}
 
@@ -87,7 +87,7 @@ func TestString(t *testing.T) {
 		{c: "dynamic_dw", expect: DynamicDWCategory},
 		{c: "execution_log", expect: ExecutionLog},
 		{c: "llm", expect: LLM},
-		{c: "llm_agent", expect: LLMAgent},
+		{c: "agent_llm", expect: AgentLLM},
 	}
 
 	for _, tc := range cases {
@@ -102,7 +102,7 @@ func TestAllCategoriesIncludesNewCategories(t *testing.T) {
 
 	assert.True(t, containsCategory(all, ExecutionLog))
 	assert.True(t, containsCategory(all, LLM))
-	assert.True(t, containsCategory(all, LLMAgent))
+	assert.True(t, containsCategory(all, AgentLLM))
 }
 
 func containsCategory(all []Category, target Category) bool {

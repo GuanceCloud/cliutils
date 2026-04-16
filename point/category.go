@@ -75,7 +75,7 @@ func AllCategories() []Category {
 		DialTesting,
 		ExecutionLog,
 		LLM,
-		LLMAgent,
+		AgentLLM,
 	}
 }
 
@@ -98,7 +98,7 @@ const (
 	DialTesting
 	ExecutionLog
 	LLM
-	LLMAgent
+	AgentLLM
 
 	SUnknownCategory   = "unknown"
 	SDynamicDWCategory = "dynamic_dw" // NOTE: not used
@@ -117,7 +117,7 @@ const (
 	SDialTesting       = "dialtesting"
 	SExecutionLog      = "execution_log"
 	SLlm               = "llm"
-	SLLMAgent          = "llm_agent"
+	SAgentLLM          = "agent_llm"
 
 	URLUnknownCategory   = "/v1/write/unknown"
 	URLDynamicDWCategory = "/v1/write/dynamic_dw" // NOTE: not used
@@ -136,7 +136,7 @@ const (
 	URLDialTesting       = "/v1/write/dialtesting" // NOTE: not used
 	URLExecutionLog      = "/v1/write/siem_logging"
 	URLLlm               = "/v1/write/langfuse-v2"
-	URLLLMAgent          = "/v1/write/llm_agent"
+	URLAgentLLM          = "/v1/write/agent_llm"
 
 	CUnknown   = "UNKNOWN"
 	CDynamicDW = "DYNAMIC_DW"
@@ -154,7 +154,7 @@ const (
 	CDT        = "DT"
 	CEL        = "EL"
 	CLlm       = "LLM"
-	CLLMAgent  = "LA"
+	CAgentLLM  = "AL"
 )
 
 var (
@@ -177,7 +177,7 @@ var (
 
 		ExecutionLog: URLExecutionLog,
 		LLM:          URLLlm,
-		LLMAgent:     URLLLMAgent,
+		AgentLLM:     URLAgentLLM,
 
 		DynamicDWCategory: URLDynamicDWCategory,
 
@@ -199,7 +199,7 @@ var (
 		DialTesting:       CDT,
 		ExecutionLog:      CEL,
 		LLM:               CLlm,
-		LLMAgent:          CLLMAgent,
+		AgentLLM:          CAgentLLM,
 		UnknownCategory:   CUnknown,
 		DynamicDWCategory: CDynamicDW,
 	}
@@ -220,7 +220,7 @@ var (
 		DialTesting:       SDialTesting,
 		ExecutionLog:      SExecutionLog,
 		LLM:               SLlm,
-		LLMAgent:          SLLMAgent,
+		AgentLLM:          SAgentLLM,
 		UnknownCategory:   SUnknownCategory,
 		DynamicDWCategory: SDynamicDWCategory,
 	}

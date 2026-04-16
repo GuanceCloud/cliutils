@@ -197,8 +197,8 @@ func ptCategory(cat string) point.Category {
 		return point.Security
 	case point.SDialTesting, point.CDT:
 		return point.DialTesting
-	case point.SLLMAgent, point.CLLMAgent:
-		return point.LLMAgent
+	case point.SAgentLLM, point.CAgentLLM:
+		return point.AgentLLM
 	}
 	return point.UnknownCategory
 }
