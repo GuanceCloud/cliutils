@@ -41,6 +41,7 @@ func TestAggregatorConfigBusinessBranches(t *testing.T) {
 	assert.Error(t, (&AggregatorConfigure{AggregateRules: []*AggregateRule{nil}}).Setup())
 	assert.Error(t, (&AggregatorConfigure{AggregateRules: []*AggregateRule{{Name: "missing-selector"}}}).Setup())
 	assert.Error(t, (&AggregatorConfigure{AggregateRules: []*AggregateRule{{Name: "bad-selector", Selector: &RuleSelector{Category: "bad"}}}}).Setup())
+	assert.NoError(t, (&RuleSelector{Category: point.AgentLLM.String()}).Setup())
 
 	tests := []struct {
 		name       string
