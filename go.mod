@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/BurntSushi/toml v1.2.1
 	github.com/GuanceCloud/pipeline-go v1.0.9-0.20250804083758-0b4dd0f48771
-	github.com/GuanceCloud/tracing-protos/opentelemetry-gen-go v0.0.0-20260408104033-ca6a8390ea4f
+	github.com/GuanceCloud/tracing-protos/opentelemetry-gen-go v0.0.0-20260414025403-ef70fe2798f7
 	github.com/VictoriaMetrics/easyproto v0.1.4
 	github.com/aliyun/aliyun-oss-go-sdk v2.1.2+incompatible
 	github.com/brianvoe/gofakeit/v6 v6.28.0
@@ -34,7 +34,7 @@ require (
 	golang.org/x/net v0.16.0
 	golang.org/x/sys v0.13.0
 	golang.org/x/time v0.3.0
-	google.golang.org/grpc v1.56.2
+	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/CodapeWild/dd-trace-go.v1 v1.35.17
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -105,7 +105,7 @@ require (
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/tools v0.14.0 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
-	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
+	google.golang.org/genproto v0.0.0-20220920201722-2b89144ce006 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/uint128 v1.2.0 // indirect
 	modernc.org/cc/v3 v3.40.0 // indirect
