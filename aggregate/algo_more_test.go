@@ -177,9 +177,9 @@ func TestHistogramAndStdevCalculators(t *testing.T) {
 	assert.Zero(t, hist.count)
 
 	stdev := &algoStdev{MetricBase: base}
-	stdev.Add(&algoStdev{data: []float64{2}, maxTime: now.UnixNano()})
-	stdev.Add(&algoStdev{data: []float64{4}, maxTime: now.Add(time.Second).UnixNano()})
-	stdev.Add(&algoStdev{data: []float64{6}, maxTime: now.Add(2 * time.Second).UnixNano()})
+	stdev.Add(newAlgoStdev(MetricBase{}, now.UnixNano(), 2))
+	stdev.Add(newAlgoStdev(MetricBase{}, now.Add(time.Second).UnixNano(), 4))
+	stdev.Add(newAlgoStdev(MetricBase{}, now.Add(2*time.Second).UnixNano(), 6))
 	stdev.Add("ignored")
 	stdev.doHash(1)
 	require.NotZero(t, stdev.Base().hash)
@@ -195,7 +195,7 @@ func TestHistogramAndStdevCalculators(t *testing.T) {
 	assert.Equal(t, int64(3), count)
 	assert.Equal(t, "test", pts[0].GetTag("env"))
 
-	_, err = (&algoStdev{data: []float64{1}}).Aggr()
+	_, err = newAlgoStdev(MetricBase{}, 0, 1).Aggr()
 	assert.Error(t, err)
 	_, err = SampleStdDev([]float64{1})
 	assert.Error(t, err)
@@ -203,7 +203,9 @@ func TestHistogramAndStdevCalculators(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1.0, got)
 	stdev.Reset()
-	assert.Nil(t, stdev.data)
+	assert.Zero(t, stdev.count)
+	assert.Zero(t, stdev.mean)
+	assert.Zero(t, stdev.m2)
 	assert.Zero(t, stdev.maxTime)
 }
 

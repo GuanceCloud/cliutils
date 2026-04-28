@@ -213,7 +213,7 @@ func TestSmallBusinessHelpersAndStrings(t *testing.T) {
 		&algoMin{MetricBase: base, min: 1, count: 1, maxTime: 1},
 		&algoHistogram{MetricBase: base, count: 1, val: 1, maxTime: 1, leBucket: map[string]float64{"1": 1}},
 		&algoQuantiles{MetricBase: base, count: 1, maxTime: 1, quantiles: []float64{0.5}, all: []float64{1}},
-		&algoStdev{MetricBase: base, maxTime: 1, data: []float64{1, 2}},
+		newAlgoStdev(base, 1, 1),
 		newAlgoCountDistinct(base, 1, "alice"),
 		&algoCountFirst{MetricBase: base, first: 1, firstTime: 1, count: 1},
 		&algoCountLast{MetricBase: base, last: 1, lastTime: 1, count: 1},

@@ -94,6 +94,15 @@ func TestNewCalculatorsQuantiles(t *T.T) {
 	assert.Equal(t, []float64{0.5, 0.9}, q.quantiles)
 }
 
+func TestNewCalculatorsSkipsInvalidBatchShape(t *T.T) {
+	assert.Empty(t, newCalculators(nil))
+	assert.Empty(t, newCalculators(&AggregationBatch{}))
+	assert.Empty(t, newCalculators(&AggregationBatch{
+		Points:          &point.PBPoints{},
+		AggregationOpts: map[string]*AggregationAlgo{"value": nil},
+	}))
+}
+
 func TestNewCalculatorsWindowUsesNanoseconds(t *T.T) {
 	pt := point.NewPoint(
 		"demo",
