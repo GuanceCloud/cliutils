@@ -1,6 +1,7 @@
 package aggregate
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -44,12 +45,12 @@ func TestCalculatorToString(t *testing.T) {
 			time.Unix(1700000001, 0).UnixNano(),
 			"alice",
 		)
-		calc.distinctValues[42] = struct{}{}
-		calc.distinctValues[true] = struct{}{}
+		calc.distinctValues[hashDistinctValue(42)] = struct{}{}
+		calc.distinctValues[hashDistinctValue(true)] = struct{}{}
 
 		assert.Equal(
 			t,
-			"algoCountDistinct{count=3 max_time=1700000001000000000 distinct_values=[bool:true, int:42, string:alice] base={name=demo key=user hash=7 window=5s next_wall_time=<zero> heap_idx=0 tags=[env=prod]}}",
+			fmt.Sprintf("algoCountDistinct{count=3 sketch=false max_time=1700000001000000000 distinct_values=%s base={name=demo key=user hash=7 window=5s next_wall_time=<zero> heap_idx=0 tags=[env=prod]}}", formatDistinctValues(calc.distinctValues)),
 			calc.ToString(),
 		)
 	})
