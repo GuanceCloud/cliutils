@@ -39,6 +39,12 @@ var (
 const (
 	MaxBodySize        = 10 * 1024
 	DefaultHTTPTimeout = 60 * time.Second
+
+	ProtocolAuto      = "auto"
+	ProtocolHTTP11    = "http/1.1"
+	ProtocolHTTP2     = "http/2"
+	ProtocolHTTP2Only = "http/2-only"
+	ProtocolHTTP3     = "http/3"
 )
 
 type HTTPTask struct {
@@ -287,19 +293,19 @@ type HTTPSecret struct {
 
 func (opt *HTTPAdvanceOption) getProtocol() string {
 	if opt == nil {
-		return "auto"
+		return ProtocolAuto
 	}
 	switch strings.ToLower(opt.Protocol) {
 	case "http/1.1", "http1.1", "1.1", "http/1.1 only":
-		return "http/1.1"
+		return ProtocolHTTP11
 	case "http/2", "http2", "2", "http/2 fallback", "http/2 fallback to http/1.1":
-		return "http/2"
+		return ProtocolHTTP2
 	case "http/2-only", "http/2 only", "http2-only":
-		return "http/2-only"
+		return ProtocolHTTP2Only
 	case "http/3", "http3", "3":
-		return "http/3"
+		return ProtocolHTTP3
 	default:
-		return "auto"
+		return ProtocolAuto
 	}
 }
 
@@ -365,7 +371,7 @@ func (t *HTTPTask) run() error {
 
 	t.req = t.req.WithContext(httptrace.WithClientTrace(t.req.Context(), trace))
 
-	if t.protocol != "http/2-only" && t.protocol != "http/3" {
+	if t.protocol != ProtocolHTTP2Only && t.protocol != ProtocolHTTP3 {
 		t.req.Header.Add("Connection", "close")
 	}
 
@@ -383,7 +389,7 @@ func (t *HTTPTask) run() error {
 		goto result
 	}
 
-	if t.protocol == "http/2-only" && t.resp.Proto != "HTTP/2.0" {
+	if t.protocol == ProtocolHTTP2Only && t.resp.Proto != "HTTP/2.0" {
 		t.reqError = fmt.Sprintf("expected HTTP/2, but got %s", t.resp.Proto)
 		goto result
 	}
@@ -601,7 +607,9 @@ func (t *HTTPTask) init() error {
 		httpTimeout = du
 	}
 
-	tlsConfig := &tls.Config{}
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
 
 	if opt != nil && opt.Certificate != nil {
 		if opt.Certificate.IgnoreServerCertificateError {
@@ -623,14 +631,14 @@ func (t *HTTPTask) init() error {
 	t.protocol = protocol
 
 	switch protocol {
-	case "http/3":
+	case ProtocolHTTP3:
 		t.cli = &http.Client{
 			Timeout: httpTimeout,
 			Transport: &http3.RoundTripper{
 				TLSClientConfig: tlsConfig,
 			},
 		}
-	case "http/2-only":
+	case ProtocolHTTP2Only:
 		if isPlainHTTP(t.URL) {
 			t.cli = &http.Client{
 				Timeout: httpTimeout,
@@ -653,7 +661,7 @@ func (t *HTTPTask) init() error {
 				},
 			}
 		}
-	case "http/2":
+	case ProtocolHTTP2:
 		t.cli = &http.Client{
 			Timeout: httpTimeout,
 			Transport: &http.Transport{
@@ -661,7 +669,7 @@ func (t *HTTPTask) init() error {
 				ForceAttemptHTTP2: true,
 			},
 		}
-	case "http/1.1":
+	case ProtocolHTTP11:
 		t.cli = &http.Client{
 			Timeout: httpTimeout,
 			Transport: &http.Transport{
@@ -700,7 +708,7 @@ func (t *HTTPTask) init() error {
 			opt.RequestBody.bodyType = opt.RequestBody.BodyType
 		}
 
-		if protocol == "http/3" && opt.Proxy != nil {
+		if protocol == ProtocolHTTP3 && opt.Proxy != nil {
 			return fmt.Errorf("HTTP/3 does not support proxy configuration")
 		}
 
