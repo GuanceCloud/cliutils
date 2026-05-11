@@ -7,10 +7,18 @@ package dialtesting
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
+	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -22,7 +30,10 @@ import (
 
 	"github.com/GuanceCloud/cliutils"
 	"github.com/gin-gonic/gin"
+	"github.com/quic-go/quic-go/http3"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 func getHttpCases(httpServer, httpsServer, proxyServer *httptest.Server) []struct {
@@ -984,4 +995,455 @@ func TestRenderTemplate(t *testing.T) {
 	assert.Equal(t, "request_body", ct.AdvanceOptions.RequestBody.Body)
 	assert.Equal(t, "form_value", ct.AdvanceOptions.RequestBody.Form["form_key"])
 	assert.Equal(t, "", ct.AdvanceOptions.RequestBody.Form["{{form_key}}"])
+}
+
+func generateSelfSignedCert() (certPEM, keyPEM []byte, err error) {
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: "localhost",
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	certPEM = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	keyPEM = pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+
+	return certPEM, keyPEM, nil
+}
+
+func TestHTTPProtocolHTTP11(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Protocol", r.Proto)
+		w.Write([]byte("HTTP/1.1 response"))
+	}))
+	defer server.Close()
+
+	task := &HTTPTask{
+		Task: &Task{
+			ExternalID: cliutils.XID("dtst_"),
+			Name:       "_test_http11",
+			Region:     "hangzhou",
+			Frequency:  "1s",
+		},
+		Method: "GET",
+		URL:    server.URL,
+		AdvanceOptions: &HTTPAdvanceOption{
+			Protocol: "http/1.1",
+		},
+		SuccessWhen: []*HTTPSuccess{
+			{
+				StatusCode: []*SuccessOption{
+					{Is: "200"},
+				},
+				Header: map[string][]*SuccessOption{
+					"X-Protocol": {
+						{Contains: "HTTP/1.1"},
+					},
+				},
+			},
+		},
+	}
+
+	task.SetChild(task)
+	err := task.Init()
+	assert.NoError(t, err)
+
+	err = task.Run()
+	assert.NoError(t, err)
+
+	tags, _ := task.GetResults()
+	assert.Equal(t, "OK", tags["status"])
+	assert.Equal(t, "HTTP/1.1", tags["proto"])
+}
+
+func TestHTTPProtocolHTTP2(t *testing.T) {
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Protocol", r.Proto)
+		w.Header().Set("X-Server", "HTTP/2")
+		w.Write([]byte("HTTP/2 response"))
+	}))
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	defer server.Close()
+
+	task := &HTTPTask{
+		Task: &Task{
+			ExternalID: cliutils.XID("dtst_"),
+			Name:       "_test_http2",
+			Region:     "hangzhou",
+			Frequency:  "1s",
+		},
+		Method: "GET",
+		URL:    server.URL,
+		AdvanceOptions: &HTTPAdvanceOption{
+			Protocol: "http/2",
+			Certificate: &HTTPOptCertificate{
+				IgnoreServerCertificateError: true,
+			},
+		},
+		SuccessWhen: []*HTTPSuccess{
+			{
+				StatusCode: []*SuccessOption{
+					{Is: "200"},
+				},
+				Header: map[string][]*SuccessOption{
+					"X-Server": {
+						{Contains: "HTTP/2"},
+					},
+				},
+			},
+		},
+	}
+
+	task.SetChild(task)
+	err := task.Init()
+	assert.NoError(t, err)
+
+	err = task.Run()
+	assert.NoError(t, err)
+
+	tags, _ := task.GetResults()
+	assert.Equal(t, "OK", tags["status"])
+	assert.Equal(t, "HTTP/2.0", tags["proto"])
+}
+
+func TestHTTPProtocolHTTP3(t *testing.T) {
+	certPEM, keyPEM, err := generateSelfSignedCert()
+	assert.NoError(t, err)
+
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	assert.NoError(t, err)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Protocol", r.Proto)
+		w.Header().Set("X-Server", "HTTP/3")
+		w.Write([]byte("HTTP/3 response"))
+	})
+
+	tlsConf := &tls.Config{
+		Certificates:       []tls.Certificate{cert},
+		InsecureSkipVerify: true,
+		NextProtos:         []string{"h3"},
+		ServerName:         "localhost",
+	}
+
+	server := &http3.Server{
+		Handler:   mux,
+		TLSConfig: tlsConf,
+	}
+
+	listener, err := net.ListenPacket("udp", "127.0.0.1:0")
+	assert.NoError(t, err)
+
+	port := listener.LocalAddr().(*net.UDPAddr).Port
+	serverURL := fmt.Sprintf("https://localhost:%d", port)
+
+	go func() {
+		_ = server.Serve(listener)
+	}()
+
+	defer server.Close()
+
+	time.Sleep(500 * time.Millisecond)
+
+	task := &HTTPTask{
+		Task: &Task{
+			ExternalID: cliutils.XID("dtst_"),
+			Name:       "_test_http3",
+			Region:     "hangzhou",
+			Frequency:  "1s",
+		},
+		Method: "GET",
+		URL:    serverURL,
+		AdvanceOptions: &HTTPAdvanceOption{
+			Protocol: "http/3",
+			Certificate: &HTTPOptCertificate{
+				IgnoreServerCertificateError: true,
+			},
+			RequestTimeout: "10s",
+		},
+		SuccessWhen: []*HTTPSuccess{
+			{
+				StatusCode: []*SuccessOption{
+					{Is: "200"},
+				},
+			},
+		},
+	}
+
+	task.SetChild(task)
+	err = task.Init()
+	assert.NoError(t, err)
+
+	err = task.Run()
+	assert.NoError(t, err)
+
+	tags, fields := task.GetResults()
+	t.Logf("tags: %+v", tags)
+	t.Logf("fields: %+v", fields)
+	assert.Equal(t, "OK", tags["status"])
+}
+
+func TestHTTPProtocolAuto(t *testing.T) {
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Protocol", r.Proto)
+		w.Write([]byte("HTTP/1.1 auto"))
+	}))
+	defer httpServer.Close()
+
+	task := &HTTPTask{
+		Task: &Task{
+			ExternalID: cliutils.XID("dtst_"),
+			Name:       "_test_auto_http",
+			Region:     "hangzhou",
+			Frequency:  "1s",
+		},
+		Method: "GET",
+		URL:    httpServer.URL,
+		AdvanceOptions: &HTTPAdvanceOption{
+			Protocol: "auto",
+		},
+		SuccessWhen: []*HTTPSuccess{
+			{
+				StatusCode: []*SuccessOption{
+					{Is: "200"},
+				},
+			},
+		},
+	}
+
+	task.SetChild(task)
+	err := task.Init()
+	assert.NoError(t, err)
+
+	err = task.Run()
+	assert.NoError(t, err)
+
+	tags, _ := task.GetResults()
+	assert.Equal(t, "OK", tags["status"])
+	assert.Equal(t, "HTTP/1.1", tags["proto"])
+}
+
+func TestHTTPProtocolInvalid(t *testing.T) {
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("OK"))
+	}))
+	defer httpServer.Close()
+
+	task := &HTTPTask{
+		Task: &Task{
+			ExternalID: cliutils.XID("dtst_"),
+			Name:       "_test_invalid_protocol",
+			Region:     "hangzhou",
+			Frequency:  "1s",
+		},
+		Method: "GET",
+		URL:    httpServer.URL,
+		AdvanceOptions: &HTTPAdvanceOption{
+			Protocol: "invalid",
+		},
+		SuccessWhen: []*HTTPSuccess{
+			{
+				StatusCode: []*SuccessOption{
+					{Is: "200"},
+				},
+			},
+		},
+	}
+
+	task.SetChild(task)
+	err := task.Init()
+	assert.NoError(t, err)
+
+	err = task.Run()
+	assert.NoError(t, err)
+
+	tags, _ := task.GetResults()
+	assert.Equal(t, "OK", tags["status"])
+}
+
+func TestHTTP3WithProxyRejected(t *testing.T) {
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("OK"))
+	}))
+	defer httpServer.Close()
+
+	task := &HTTPTask{
+		Task: &Task{
+			ExternalID: cliutils.XID("dtst_"),
+			Name:       "_test_http3_with_proxy",
+			Region:     "hangzhou",
+			Frequency:  "1s",
+		},
+		Method: "GET",
+		URL:    httpServer.URL,
+		AdvanceOptions: &HTTPAdvanceOption{
+			Protocol: "http/3",
+			Proxy: &HTTPOptProxy{
+				URL: "http://proxy.example.com:8080",
+			},
+		},
+		SuccessWhen: []*HTTPSuccess{
+			{
+				StatusCode: []*SuccessOption{
+					{Is: "200"},
+				},
+			},
+		},
+	}
+
+	task.SetChild(task)
+	err := task.Init()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "HTTP/3 does not support proxy configuration")
+}
+
+func TestHTTPProtocolHTTP2OnlyFail(t *testing.T) {
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("HTTP/1.1 response"))
+	}))
+	defer httpServer.Close()
+
+	task := &HTTPTask{
+		Task: &Task{
+			ExternalID: cliutils.XID("dtst_"),
+			Name:       "_test_http2_only_fail",
+			Region:     "hangzhou",
+			Frequency:  "1s",
+		},
+		Method: "GET",
+		URL:    httpServer.URL,
+		AdvanceOptions: &HTTPAdvanceOption{
+			Protocol:       "http/2-only",
+			RequestTimeout: "1s",
+		},
+		SuccessWhen: []*HTTPSuccess{
+			{
+				StatusCode: []*SuccessOption{
+					{Is: "200"},
+				},
+			},
+		},
+	}
+
+	task.SetChild(task)
+	err := task.Init()
+	assert.NoError(t, err)
+
+	err = task.Run()
+	assert.NoError(t, err)
+
+	tags, fields := task.GetResults()
+	assert.Equal(t, "FAIL", tags["status"])
+	assert.NotEmpty(t, fields["fail_reason"])
+}
+
+func TestHTTPProtocolHTTP2OnlyH2C(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Protocol", r.Proto)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("h2c response"))
+	})
+	httpServer := httptest.NewServer(h2c.NewHandler(handler, &http2.Server{}))
+	defer httpServer.Close()
+
+	task := &HTTPTask{
+		Task: &Task{
+			ExternalID: cliutils.XID("dtst_"),
+			Name:       "_test_http2_only_h2c",
+			Region:     "hangzhou",
+			Frequency:  "1s",
+		},
+		Method: "GET",
+		URL:    httpServer.URL,
+		AdvanceOptions: &HTTPAdvanceOption{
+			Protocol:       "http/2-only",
+			RequestTimeout: "1s",
+		},
+		SuccessWhen: []*HTTPSuccess{
+			{
+				StatusCode: []*SuccessOption{
+					{Is: "200"},
+				},
+				Header: map[string][]*SuccessOption{
+					"X-Protocol": {
+						{Is: "HTTP/2.0"},
+					},
+				},
+			},
+		},
+	}
+
+	task.SetChild(task)
+	err := task.Init()
+	assert.NoError(t, err)
+
+	err = task.Run()
+	assert.NoError(t, err)
+
+	tags, fields := task.GetResults()
+	assert.Equal(t, "HTTP/2.0", tags["proto"])
+	assert.Equal(t, "OK", tags["status"])
+	assert.Equal(t, 200, fields["status_code"])
+}
+
+func TestGetProtocolMethod(t *testing.T) {
+	testCases := []struct {
+		name     string
+		protocol string
+		expected string
+	}{
+		{"http/1.1", "http/1.1", "http/1.1"},
+		{"http1.1", "http1.1", "http/1.1"},
+		{"1.1", "1.1", "http/1.1"},
+		{"HTTP/1.1", "HTTP/1.1", "http/1.1"},
+		{"http/1.1 only", "http/1.1 only", "http/1.1"},
+		{"http/2", "http/2", "http/2"},
+		{"http2", "http2", "http/2"},
+		{"2", "2", "http/2"},
+		{"HTTP/2", "HTTP/2", "http/2"},
+		{"http/2 fallback", "http/2 fallback", "http/2"},
+		{"http/2 fallback to http/1.1", "http/2 fallback to http/1.1", "http/2"},
+		{"http/2-only", "http/2-only", "http/2-only"},
+		{"http/2 only", "http/2 only", "http/2-only"},
+		{"http2-only", "http2-only", "http/2-only"},
+		{"http/3", "http/3", "http/3"},
+		{"http3", "http3", "http/3"},
+		{"3", "3", "http/3"},
+		{"HTTP/3", "HTTP/3", "http/3"},
+		{"auto", "auto", "auto"},
+		{"empty", "", "auto"},
+		{"invalid", "invalid", "auto"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			opt := &HTTPAdvanceOption{Protocol: tc.protocol}
+			result := opt.getProtocol()
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+
+	t.Run("nil option", func(t *testing.T) {
+		var opt *HTTPAdvanceOption = nil
+		result := opt.getProtocol()
+		assert.Equal(t, "auto", result)
+	})
 }
