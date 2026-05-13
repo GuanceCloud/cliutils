@@ -73,15 +73,10 @@ func TestWindowsToDataSkipsFailedCalculator(t *testing.T) {
 	window := &Window{
 		Token: "token-a",
 		cache: map[uint64]Calculator{
-			1: &algoStdev{
-				MetricBase: MetricBase{key: "latency", name: "request"},
-				data:       []float64{1},
-			},
+			1: newAlgoStdev(MetricBase{key: "latency", name: "request"}, 0, 1),
 		},
 	}
 
 	data := WindowsToData([]*Window{window})
-	require.Len(t, data, 1)
-	assert.Equal(t, "token-a", data[0].Token)
-	assert.Empty(t, data[0].PTS)
+	assert.Empty(t, data)
 }

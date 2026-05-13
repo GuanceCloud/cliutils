@@ -48,13 +48,13 @@ func TestAlgoCountDistinct_Add(t *T.T) {
 		calc1.Add(calc4)
 
 		// 验证不重复值的数量
-		assert.Equal(t, 4, len(calc1.distinctValues))
+		assert.Equal(t, int64(4), calc1.count())
 
 		// 验证所有值都存在
-		_, hasInt := calc1.distinctValues[42]
-		_, hasFloat := calc1.distinctValues[3.14]
-		_, hasString := calc1.distinctValues["test_string"]
-		_, hasBool := calc1.distinctValues[true]
+		_, hasInt := calc1.distinctValues[hashDistinctValue(42)]
+		_, hasFloat := calc1.distinctValues[hashDistinctValue(3.14)]
+		_, hasString := calc1.distinctValues[hashDistinctValue("test_string")]
+		_, hasBool := calc1.distinctValues[hashDistinctValue(true)]
 
 		assert.True(t, hasInt, "int value should exist")
 		assert.True(t, hasFloat, "float value should exist")
@@ -71,7 +71,7 @@ func TestAlgoCountDistinct_Add(t *T.T) {
 		calc1.Add(calc5)
 
 		// 不重复值数量应该仍然是4
-		assert.Equal(t, 4, len(calc1.distinctValues))
+		assert.Equal(t, int64(4), calc1.count())
 
 		// 测试Aggr方法
 		points, err := calc1.Aggr()
@@ -115,7 +115,7 @@ func TestAlgoCountDistinct_Add(t *T.T) {
 		calc1.Add(calc2)
 
 		// 空字符串应该被视为不同的值
-		assert.Equal(t, 2, len(calc1.distinctValues))
+		assert.Equal(t, int64(2), calc1.count())
 	})
 
 	t.Run("reset-test", func(t *T.T) {
@@ -135,16 +135,16 @@ func TestAlgoCountDistinct_Add(t *T.T) {
 		calc2 := newAlgoCountDistinct(mb2, time.Now().UnixNano()+1000, 3.14)
 		calc.Add(calc2)
 
-		assert.Equal(t, 2, len(calc.distinctValues))
+		assert.Equal(t, int64(2), calc.count())
 
 		// 重置
 		calc.Reset()
 
-		assert.Equal(t, 0, len(calc.distinctValues))
+		assert.Equal(t, int64(0), calc.count())
 		assert.Equal(t, int64(0), calc.maxTime)
 
 		// 重置后应该可以重新添加值
 		calc.Add(calc2)
-		assert.Equal(t, 1, len(calc.distinctValues))
+		assert.Equal(t, int64(1), calc.count())
 	})
 }
