@@ -338,7 +338,7 @@ func (t *ICMPTask) run() error {
 	if t.EnableTraceroute {
 		hostIP := net.ParseIP(t.Host)
 		if hostIP == nil {
-			if ips, err := net.LookupIP(t.Host); err != nil {
+			if ips, err := lookupIP(t.Host); err != nil {
 				t.reqError = err.Error()
 				return nil
 			} else {
@@ -347,7 +347,7 @@ func (t *ICMPTask) run() error {
 					t.reqError = err.Error()
 					return nil
 				} else {
-					hostIP = ips[0]
+					hostIP = preferredIP(ips)
 				}
 			}
 		}

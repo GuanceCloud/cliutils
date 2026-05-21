@@ -269,10 +269,11 @@ func (t *TCPTask) run() error {
 	defer cancel()
 
 	hostIP := net.ParseIP(t.Host)
+	hostIsName := hostIP == nil
 
-	if hostIP == nil { // host name
+	if hostIsName { // host name
 		start := time.Now()
-		if ips, err := net.LookupIP(t.Host); err != nil {
+		if ips, err := lookupIP(t.Host); err != nil {
 			t.reqError = err.Error()
 			return nil
 		} else {
@@ -317,7 +318,12 @@ func (t *TCPTask) run() error {
 	}
 
 	if t.EnableTraceroute {
-		routes, err := TracerouteIP(hostIP.String(), t.TracerouteConfig)
+		tracerouteHost := hostIP.String()
+		if hostIsName {
+			tracerouteHost = t.Host
+		}
+
+		routes, err := TracerouteIP(tracerouteHost, t.TracerouteConfig)
 		if err != nil {
 			t.reqError = err.Error()
 		} else {
