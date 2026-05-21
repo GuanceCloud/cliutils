@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,6 +45,24 @@ func TestBrowserTaskRunExternalProcess(t *testing.T) {
 	assert.Equal(t, "platform", tags["owner"])
 }
 
+func TestBrowserTaskRunSetsLightpandaPath(t *testing.T) {
+	browserTask := newBrowserTaskForTest()
+	task, err := NewTask("", browserTask)
+	require.NoError(t, err)
+	task.SetOption(map[string]string{
+		optionBrowserDialPath: os.Args[0],
+		optionLightpandaPath:  "/opt/datakit/lightpanda",
+	})
+
+	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "check-lightpanda")
+	err = task.Run()
+	require.NoError(t, err)
+
+	tags, fields := task.GetResults()
+	assert.Equal(t, "OK", tags["status"])
+	assert.Equal(t, int64(1), fields["success"])
+}
+
 func TestBrowserTaskRunExternalProcessFailure(t *testing.T) {
 	browserTask := newBrowserTaskForTest()
 	task, err := NewTask("", browserTask)
@@ -61,6 +80,41 @@ func TestBrowserTaskRunExternalProcessFailure(t *testing.T) {
 	assert.Contains(t, fields["message"], "title mismatch")
 	assert.Equal(t, int64(2), fields["last_step"])
 	assert.Contains(t, fields["steps"], "title")
+}
+
+func TestBrowserTaskStopCancelsExternalProcess(t *testing.T) {
+	browserTask := newBrowserTaskForTest()
+	task, err := NewTask("", browserTask)
+	require.NoError(t, err)
+	task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
+
+	startedPath := t.TempDir() + "/started"
+	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "sleep")
+	t.Setenv("BROWSER_DIAL_HELPER_STARTED", startedPath)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- task.Run()
+	}()
+
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(startedPath)
+		return err == nil
+	}, 2*time.Second, 10*time.Millisecond)
+
+	task.Stop()
+	task.Stop()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("browser task did not stop external process")
+	}
+
+	_, fields := task.GetResults()
+	assert.Equal(t, int64(-1), fields["success"])
+	assert.NotEmpty(t, fields["message"])
 }
 
 func TestBrowserTaskRenderTemplate(t *testing.T) {
@@ -156,6 +210,18 @@ steps:
 	assert.Contains(t, raw, "user@example.com")
 }
 
+func TestBrowserTaskLightpandaPathOption(t *testing.T) {
+	task := &BrowserTask{Task: &Task{}}
+	task.SetOption(map[string]string{optionLightpandaPath: "/opt/lightpanda"})
+	assert.Equal(t, "/opt/lightpanda", task.lightpandaPath())
+
+	task.SetOption(map[string]string{optionLightpandaPathCamel: "/opt/lightpanda-camel"})
+	assert.Equal(t, "/opt/lightpanda-camel", task.lightpandaPath())
+
+	task.SetOption(map[string]string{})
+	assert.Empty(t, task.lightpandaPath())
+}
+
 func TestBrowserDialHelperProcess(t *testing.T) {
 	mode := os.Getenv("GO_WANT_BROWSER_DIAL_HELPER")
 	if mode == "" {
@@ -163,6 +229,16 @@ func TestBrowserDialHelperProcess(t *testing.T) {
 	}
 	if len(os.Args) == 0 || !strings.Contains(strings.Join(os.Args, " "), "run") {
 		os.Exit(2)
+	}
+	if mode == "check-lightpanda" && os.Getenv("LIGHTPANDA_EXECUTABLE_PATH") != "/opt/datakit/lightpanda" {
+		os.Exit(3)
+	}
+	if mode == "sleep" {
+		if startedPath := os.Getenv("BROWSER_DIAL_HELPER_STARTED"); startedPath != "" {
+			_ = os.WriteFile(startedPath, []byte("started"), 0o600)
+		}
+		time.Sleep(10 * time.Second)
+		os.Exit(0)
 	}
 
 	output := map[string]interface{}{

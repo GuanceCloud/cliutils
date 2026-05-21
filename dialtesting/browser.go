@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -31,6 +32,8 @@ const (
 
 	optionBrowserDialPath      = "browser_dial_path"
 	optionBrowserDialPathCamel = "browserDialPath"
+	optionLightpandaPath       = "lightpanda_path"
+	optionLightpandaPathCamel  = "lightpandaPath"
 )
 
 type BrowserTask struct {
@@ -43,6 +46,13 @@ type BrowserTask struct {
 	reqError string
 	stderr   string
 	rawTask  *BrowserTask
+
+	cancelMu sync.Mutex
+	cancel   *browserTaskCancel
+}
+
+type browserTaskCancel struct {
+	cancel context.CancelFunc
 }
 
 type browserConfig struct {
@@ -101,7 +111,14 @@ func (t *BrowserTask) clear() {
 	t.stderr = ""
 }
 
-func (t *BrowserTask) stop() {}
+func (t *BrowserTask) stop() {
+	t.cancelMu.Lock()
+	cancel := t.cancel
+	t.cancelMu.Unlock()
+	if cancel != nil && cancel.cancel != nil {
+		cancel.cancel()
+	}
+}
 
 func (t *BrowserTask) class() string {
 	return ClassHeadless
@@ -123,6 +140,8 @@ func (t *BrowserTask) run() error {
 	timeoutMS := t.effectiveTimeoutMS()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMS)*time.Millisecond+15*time.Second)
 	defer cancel()
+	cancelState := t.setCancel(cancel)
+	defer t.clearCancel(cancelState)
 
 	args := []string{
 		"run", path,
@@ -137,6 +156,9 @@ func (t *BrowserTask) run() error {
 	cmd := exec.CommandContext(ctx, t.executablePath(), cmdArgs...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	if lightpandaPath := t.lightpandaPath(); lightpandaPath != "" {
+		cmd.Env = append(os.Environ(), "LIGHTPANDA_EXECUTABLE_PATH="+lightpandaPath)
+	}
 
 	err = cmd.Run()
 	t.duration = time.Since(start)
@@ -159,6 +181,22 @@ func (t *BrowserTask) run() error {
 	t.exitCode = output.ExitCode
 	t.result = output.Run
 	return nil
+}
+
+func (t *BrowserTask) setCancel(cancel context.CancelFunc) *browserTaskCancel {
+	cancelState := &browserTaskCancel{cancel: cancel}
+	t.cancelMu.Lock()
+	t.cancel = cancelState
+	t.cancelMu.Unlock()
+	return cancelState
+}
+
+func (t *BrowserTask) clearCancel(cancelState *browserTaskCancel) {
+	t.cancelMu.Lock()
+	if t.cancel == cancelState {
+		t.cancel = nil
+	}
+	t.cancelMu.Unlock()
 }
 
 func executableArgs(args []string) []string {
@@ -193,6 +231,16 @@ func (t *BrowserTask) executablePath() string {
 		return value
 	}
 	return defaultBrowserDialPath
+}
+
+func (t *BrowserTask) lightpandaPath() string {
+	if value := t.GetOption()[optionLightpandaPath]; value != "" {
+		return value
+	}
+	if value := t.GetOption()[optionLightpandaPathCamel]; value != "" {
+		return value
+	}
+	return ""
 }
 
 func (t *BrowserTask) effectiveTimeoutMS() int {
