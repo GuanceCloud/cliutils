@@ -53,7 +53,7 @@ func (t *Traceroute) init() {
 	}
 
 	if t.Retry <= 0 {
-		t.Retry = 2
+		t.Retry = 3
 	} else if t.Retry > MaxRetry {
 		t.Retry = MaxRetry
 	}
@@ -383,7 +383,7 @@ func TracerouteIP(ip string, opt *TracerouteOption) (routes []*Route, err error)
 	if opt == nil {
 		opt = &TracerouteOption{
 			Hops:    30,
-			Retry:   2,
+			Retry:   3,
 			timeout: defaultTimeout,
 		}
 	} else {
