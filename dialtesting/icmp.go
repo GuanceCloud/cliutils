@@ -351,7 +351,7 @@ func (t *ICMPTask) run() error {
 				}
 			}
 		}
-		routes, err := TracerouteIP(hostIP.String(), t.TracerouteConfig)
+		routes, err := runTracerouteIP(hostIP.String(), t.TracerouteConfig)
 		if err != nil {
 			t.reqError = err.Error()
 		} else {

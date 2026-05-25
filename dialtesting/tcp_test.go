@@ -193,6 +193,77 @@ func TestTCPRunUsesFirstDNSResultForPrimaryDial(t *testing.T) {
 	assert.Equal(t, "::1", task.destIP)
 }
 
+func TestTCPRunTracerouteUsesSelectedDialIP(t *testing.T) {
+	server, err := net.Listen("tcp6", "[::1]:0")
+	if err != nil {
+		t.Skipf("IPv6 loopback is not available: %s", err)
+	}
+	defer server.Close()
+
+	go func() {
+		conn, err := server.Accept()
+		if err != nil {
+			return
+		}
+		_ = conn.Close()
+	}()
+
+	_, port, err := net.SplitHostPort(server.Addr().String())
+	assert.NoError(t, err)
+
+	oldLookupIP := lookupIP
+	lookupIP = func(host string) ([]net.IP, error) {
+		assert.Equal(t, "dual-stack.example", host)
+		return []net.IP{
+			net.ParseIP("::1"),
+			net.ParseIP("127.0.0.1"),
+		}, nil
+	}
+	defer func() {
+		lookupIP = oldLookupIP
+	}()
+
+	var tracerouteTarget string
+	oldRunTracerouteIP := runTracerouteIP
+	runTracerouteIP = func(ip string, opt *TracerouteOption) ([]*Route, error) {
+		tracerouteTarget = ip
+		return []*Route{
+			{
+				Total: 1,
+				Items: []*RouteItem{{IP: ip}},
+			},
+		}, nil
+	}
+	defer func() {
+		runTracerouteIP = oldRunTracerouteIP
+	}()
+
+	task := &TCPTask{
+		Host:             "dual-stack.example",
+		Port:             port,
+		EnableTraceroute: true,
+		SuccessWhen: []*TCPSuccess{
+			{
+				ResponseTime: []*TCPResponseTime{{
+					Target: "10s",
+				}},
+			},
+		},
+		Task: &Task{
+			ExternalID: "xxxx",
+			Frequency:  "10s",
+			Name:       "dual-stack-traceroute",
+		},
+	}
+	task.SetChild(task)
+
+	assert.NoError(t, task.Check())
+	assert.NoError(t, task.Run())
+	assert.Empty(t, task.reqError)
+	assert.Equal(t, "::1", task.destIP)
+	assert.Equal(t, task.destIP, tracerouteTarget)
+}
+
 func tcpServer() (server net.Listener, err error) {
 	server, err = net.Listen("tcp", "")
 	if err != nil {

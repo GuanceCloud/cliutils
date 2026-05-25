@@ -318,12 +318,7 @@ func (t *TCPTask) run() error {
 	}
 
 	if t.EnableTraceroute {
-		tracerouteHost := hostIP.String()
-		if hostIsName {
-			tracerouteHost = t.Host
-		}
-
-		routes, err := TracerouteIP(tracerouteHost, t.TracerouteConfig)
+		routes, err := runTracerouteIP(hostIP.String(), t.TracerouteConfig)
 		if err != nil {
 			t.reqError = err.Error()
 		} else {

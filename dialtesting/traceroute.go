@@ -18,7 +18,10 @@ const (
 	MaxRetry   = 3
 )
 
-var lookupIP = net.LookupIP
+var (
+	lookupIP        = net.LookupIP
+	runTracerouteIP = TracerouteIP
+)
 
 // TracerouteOption represent traceroute option.
 type TracerouteOption struct {
