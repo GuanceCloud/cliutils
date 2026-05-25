@@ -1294,6 +1294,92 @@ func TestHTTPProtocolHTTP3RedirectDownloadTime(t *testing.T) {
 	assert.Less(t, fields["response_download"].(float64), float64((10*time.Second)/time.Microsecond))
 }
 
+func TestHTTPProtocolHTTP3RepeatedRunKeepsTimingFields(t *testing.T) {
+	certPEM, keyPEM, err := generateSelfSignedCert()
+	assert.NoError(t, err)
+
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	assert.NoError(t, err)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("HTTP/3 response"))
+	})
+
+	tlsConf := &tls.Config{
+		Certificates:       []tls.Certificate{cert},
+		InsecureSkipVerify: true,
+		NextProtos:         []string{"h3"},
+		ServerName:         "localhost",
+	}
+
+	server := &http3.Server{
+		Handler:   mux,
+		TLSConfig: tlsConf,
+	}
+
+	listener, err := net.ListenPacket("udp", "127.0.0.1:0")
+	assert.NoError(t, err)
+
+	port := listener.LocalAddr().(*net.UDPAddr).Port
+	serverURL := fmt.Sprintf("https://localhost:%d", port)
+
+	go func() {
+		_ = server.Serve(listener)
+	}()
+
+	defer server.Close()
+
+	time.Sleep(500 * time.Millisecond)
+
+	task := &HTTPTask{
+		Task: &Task{
+			ExternalID: cliutils.XID("dtst_"),
+			Name:       "_test_http3_repeated_run_timing",
+			Region:     "hangzhou",
+			Frequency:  "1s",
+		},
+		Method: "GET",
+		URL:    serverURL,
+		AdvanceOptions: &HTTPAdvanceOption{
+			Protocol: "http/3",
+			Certificate: &HTTPOptCertificate{
+				IgnoreServerCertificateError: true,
+			},
+			RequestTimeout: "10s",
+		},
+		SuccessWhen: []*HTTPSuccess{
+			{
+				StatusCode: []*SuccessOption{
+					{Is: "200"},
+				},
+			},
+		},
+	}
+
+	task.SetChild(task)
+	err = task.Init()
+	assert.NoError(t, err)
+
+	err = task.Run()
+	assert.NoError(t, err)
+	tags, fields := task.GetResults()
+	assert.Equal(t, "OK", tags["status"])
+	assert.NotEmpty(t, tags["dest_ip"])
+	assert.Greater(t, fields["response_dns"].(float64), float64(0))
+	assert.Greater(t, fields["response_connection"].(float64), float64(0))
+	assert.GreaterOrEqual(t, fields["response_ssl"].(float64), float64(0))
+
+	err = task.Run()
+	assert.NoError(t, err)
+	tags, fields = task.GetResults()
+	assert.Equal(t, "OK", tags["status"])
+	assert.NotEmpty(t, tags["dest_ip"])
+	assert.Greater(t, fields["response_dns"].(float64), float64(0))
+	assert.Greater(t, fields["response_connection"].(float64), float64(0))
+	assert.GreaterOrEqual(t, fields["response_ssl"].(float64), float64(0))
+}
+
 func TestHTTPProtocolHTTP3HandshakeFailureReturnsQuickly(t *testing.T) {
 	certPEM, keyPEM, err := generateSelfSignedCert()
 	assert.NoError(t, err)

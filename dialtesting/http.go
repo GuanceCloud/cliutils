@@ -81,6 +81,8 @@ type HTTPTask struct {
 	sslCertNotBefore int64
 	sslCertNotAfter  int64
 	protocol         string
+	httpTimeout      time.Duration
+	tlsConfig        *tls.Config
 }
 
 func (t *HTTPTask) clear() {
@@ -97,6 +99,7 @@ func (t *HTTPTask) clear() {
 	t.reqBodyBytesBuffer = nil
 	t.sslCertNotBefore = 0
 	t.sslCertNotAfter = 0
+	t.destIP = ""
 
 	if t.reqBody != nil {
 		t.reqBody.bodyType = t.reqBody.BodyType
@@ -104,6 +107,7 @@ func (t *HTTPTask) clear() {
 }
 
 func (t *HTTPTask) stop() {
+	t.closeHTTP3Transport()
 	if t.cli != nil {
 		t.cli.CloseIdleConnections()
 	}
@@ -381,6 +385,10 @@ func (t *HTTPTask) run() error {
 		t.req.Header.Add("User-Agent", agentInfo)
 	}
 
+	if t.protocol == ProtocolHTTP3 {
+		t.resetHTTP3Client()
+	}
+
 	t.reqStart = time.Now()
 	t.resp, err = t.cli.Do(t.req)
 	if t.protocol == ProtocolHTTP3 && t.resp != nil && t1.IsZero() {
@@ -639,6 +647,8 @@ func (t *HTTPTask) init() error {
 
 	protocol := strings.ToLower(opt.getProtocol())
 	t.protocol = protocol
+	t.httpTimeout = httpTimeout
+	t.tlsConfig = tlsConfig.Clone()
 
 	switch protocol {
 	case ProtocolHTTP3:
@@ -780,6 +790,28 @@ func (t *HTTPTask) init() error {
 func isPlainHTTP(rawURL string) bool {
 	u, err := url.Parse(rawURL)
 	return err == nil && strings.EqualFold(u.Scheme, "http")
+}
+
+func (t *HTTPTask) resetHTTP3Client() {
+	t.closeHTTP3Transport()
+	t.cli = &http.Client{
+		Timeout:   t.httpTimeout,
+		Transport: t.newHTTP3RoundTripper(t.tlsConfig, t.httpTimeout),
+	}
+	if t.AdvanceOptions != nil && t.AdvanceOptions.RequestOptions != nil && !t.AdvanceOptions.RequestOptions.FollowRedirect {
+		t.cli.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
+	}
+}
+
+func (t *HTTPTask) closeHTTP3Transport() {
+	if t.protocol != ProtocolHTTP3 || t.cli == nil || t.cli.Transport == nil {
+		return
+	}
+	if closer, ok := t.cli.Transport.(interface{ Close() error }); ok {
+		_ = closer.Close()
+	}
 }
 
 func (t *HTTPTask) newHTTP3RoundTripper(tlsConfig *tls.Config, httpTimeout time.Duration) http.RoundTripper {
