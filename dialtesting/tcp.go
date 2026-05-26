@@ -269,9 +269,8 @@ func (t *TCPTask) run() error {
 	defer cancel()
 
 	hostIP := net.ParseIP(t.Host)
-	hostIsName := hostIP == nil
 
-	if hostIsName { // host name
+	if hostIsName := hostIP == nil; hostIsName { // host name
 		start := time.Now()
 		if ips, err := lookupIP(t.Host); err != nil {
 			t.reqError = err.Error()
