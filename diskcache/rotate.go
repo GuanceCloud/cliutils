@@ -34,10 +34,16 @@ func (c *DiskCache) rotate() error {
 		datafilesVec.WithLabelValues(c.path).Set(float64(len(c.dataFiles)))
 	}()
 
+	if err := c.ensureWriteFile(); err != nil {
+		return NewCacheError(OpRotate, err, "failed_to_open_write_file_before_rotate").
+			WithPath(c.path)
+	}
+
+	batchSizeBeforeEOF := c.curBatchSize
 	eof := make([]byte, dataHeaderLen)
 	binary.LittleEndian.PutUint32(eof, EOFHint)
 	if _, err := c.wfd.Write(eof); err != nil { // append EOF to file end
-		return WrapFileOperationError(OpWrite, err, c.path, c.wfd.Name()).
+		return WrapFileOperationError(OpWrite, err, c.path, c.writeFileName()).
 			WithDetails("failed_to_write_eof_marker_during_rotate")
 	}
 
@@ -69,13 +75,28 @@ func (c *DiskCache) rotate() error {
 
 	// close current writing file
 	if err := c.wfd.Close(); err != nil {
-		return WrapFileOperationError(OpClose, err, c.path, c.wfd.Name()).
+		return WrapFileOperationError(OpClose, err, c.path, c.writeFileName()).
 			WithDetails("failed_to_close_write_file_during_rotate")
 	}
 	c.wfd = nil
 
 	// rename data -> data.0004
 	if err := os.Rename(c.curWriteFile, newfile); err != nil {
+		if fi, statErr := os.Stat(c.curWriteFile); statErr == nil && !fi.IsDir() {
+			if truncErr := os.Truncate(c.curWriteFile, batchSizeBeforeEOF); truncErr != nil {
+				return NewCacheError(OpRotate, WrapRotateError(err, c.path, c.curWriteFile, newfile),
+					fmt.Sprintf("failed_to_restore_write_file_size_after_rename_failure: size=%d, error=%v",
+						batchSizeBeforeEOF, truncErr)).
+					WithPath(c.path)
+			}
+		}
+
+		if openErr := c.openWriteFile(); openErr != nil {
+			return NewCacheError(OpRotate, WrapRotateError(err, c.path, c.curWriteFile, newfile),
+				fmt.Sprintf("failed_to_restore_write_file_after_rename_failure: %v", openErr)).
+				WithPath(c.path)
+		}
+
 		return WrapRotateError(err, c.path, c.curWriteFile, newfile).
 			WithDetails("failed_to_rename_file_during_rotate")
 	}
@@ -116,7 +137,7 @@ func (c *DiskCache) removeCurrentReadingFile() error {
 
 	if c.rfd != nil {
 		if err := c.rfd.Close(); err != nil {
-			return WrapFileOperationError(OpClose, err, c.path, c.rfd.Name()).
+			return WrapFileOperationError(OpClose, err, c.path, c.readFileName()).
 				WithDetails("failed_to_close_read_file_during_removal")
 		}
 		c.rfd = nil

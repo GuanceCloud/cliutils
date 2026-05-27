@@ -164,7 +164,7 @@ func (c *DiskCache) Pretty() string {
 	}
 
 	if c.rfd != nil {
-		arr = append(arr, "cur-read: "+c.rfd.Name())
+		arr = append(arr, "cur-read: "+c.readFileName())
 	} else {
 		arr = append(arr, "no-Get()")
 	}
