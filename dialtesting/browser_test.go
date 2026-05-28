@@ -42,6 +42,7 @@ func TestBrowserTaskRunExternalProcess(t *testing.T) {
 	assert.Equal(t, int64(1), fields["last_step"])
 	assert.Equal(t, "trace-1", fields["trace_id"])
 	assert.Contains(t, fields["steps"], "open")
+	assert.Contains(t, fields["steps"], "/tmp/browser-dial/run-1-step-1.png")
 	assert.Equal(t, "https://example.com", tags["url"])
 	assert.Equal(t, "platform", tags["owner"])
 	assert.Equal(t, "1920x1080", tags["viewport"])
@@ -152,6 +153,61 @@ func TestBrowserTaskCheckBrowserConfig(t *testing.T) {
 	assert.EqualError(t, task.check(), "browser_config steps should not be empty")
 }
 
+func TestBrowserTaskCheckBrowserConfigTimeoutLimits(t *testing.T) {
+	task := newBrowserTaskForTest()
+	task.BrowserConfig = "name: homepage\ntarget: https://example.com\ntimeout_ms: 300001\nsteps:\n  - action: goto\n"
+	assert.EqualError(t, task.check(), "browser_config timeout_ms should not exceed 300000")
+
+	task.BrowserConfig = "name: homepage\ntarget: https://example.com\nsteps:\n  - action: goto\n    timeout_ms: 60001\n"
+	assert.EqualError(t, task.check(), "browser_config steps 1 timeout_ms should not exceed 60000")
+
+	task.BrowserConfig = "name: homepage\ntarget: https://example.com\nauth:\n  mode: form\n  steps:\n    - action: goto\n      timeout_ms: 60001\nsteps:\n  - action: goto\n"
+	assert.EqualError(t, task.check(), "browser_config auth.steps 1 timeout_ms should not exceed 60000")
+}
+
+func TestBrowserTaskNormalizeBrowserConfigTimeouts(t *testing.T) {
+	config := `name: homepage
+target: https://example.com
+auth:
+  mode: form
+  steps:
+    - action: goto
+steps:
+  - action: goto
+  - action: assert_title
+    timeout_ms: 1000
+`
+	normalized, err := normalizeBrowserConfigTimeouts(config)
+	require.NoError(t, err)
+	assert.Contains(t, normalized, "timeout_ms: 300000")
+	assert.Contains(t, normalized, "timeout_ms: 60000")
+	assert.Contains(t, normalized, "timeout_ms: 1000")
+
+	task := &BrowserTask{BrowserConfig: config}
+	path, err := task.writeScriptFile()
+	require.NoError(t, err)
+	defer os.Remove(path) //nolint:errcheck
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "timeout_ms: 300000")
+	assert.Contains(t, string(data), "timeout_ms: 60000")
+}
+
+func TestBrowserTaskNormalizeBrowserConfigTimeoutErrors(t *testing.T) {
+	_, err := normalizeBrowserConfigTimeouts("name: [")
+	assert.Error(t, err)
+
+	normalized, err := normalizeBrowserConfigTimeouts("- item")
+	require.NoError(t, err)
+	assert.Equal(t, "- item", normalized)
+
+	_, err = normalizeBrowserConfigTimeouts("name: homepage\ntimeout_ms: 300001\nsteps:\n  - action: goto\n")
+	assert.EqualError(t, err, "browser_config timeout_ms should not exceed 300000")
+
+	_, err = normalizeBrowserConfigTimeouts("name: homepage\nsteps:\n  - action: goto\n    timeout_ms: 60001\n")
+	assert.EqualError(t, err, "browser_config steps 1 timeout_ms should not exceed 60000")
+}
+
 func TestBrowserTaskParseNewFields(t *testing.T) {
 	taskJSON := `{
 		"external_id": "bd-homepage",
@@ -223,6 +279,9 @@ func TestBrowserTaskDefaultViewport(t *testing.T) {
 func TestBrowserTaskDefaultEngine(t *testing.T) {
 	task := newBrowserTaskForTest()
 	assert.Equal(t, "chrome", task.effectiveEngine())
+
+	task.AdvanceOptions = &BrowserAdvanceOption{Engine: "lightpanda"}
+	assert.Equal(t, "lightpanda", task.effectiveEngine())
 }
 
 func TestBrowserTaskCheckInvalidRetry(t *testing.T) {
@@ -537,7 +596,10 @@ func TestBrowserDialHelperProcess(t *testing.T) {
 			"success":     true,
 			"duration_us": 12345,
 			"steps": []map[string]interface{}{
-				{"seq": 1, "name": "open", "status": "OK", "duration_us": 1000, "url": "https://example.com", "title": "Example"},
+				{
+					"seq": 1, "name": "open", "status": "OK", "duration_us": 1000,
+					"url": "https://example.com", "title": "Example", "screenshot": "/tmp/browser-dial/run-1-step-1.png",
+				},
 			},
 			"trace_ids": []string{"trace-1"},
 		},

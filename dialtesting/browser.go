@@ -28,9 +28,11 @@ var (
 
 const (
 	defaultBrowserDialPath    = "browser-dial"
-	defaultBrowserDialTimeout = 30_000
+	defaultBrowserDialTimeout = 300_000
 	defaultBrowserWidth       = 1920
 	defaultBrowserHeight      = 1080
+	maxBrowserTotalTimeoutMS  = 300_000
+	maxBrowserStepTimeoutMS   = 60_000
 
 	optionBrowserDialPath      = "browser_dial_path"
 	optionBrowserDialPathCamel = "browserDialPath"
@@ -109,12 +111,18 @@ type browserConfig struct {
 	TimeoutMS  int                 `yaml:"timeout_ms"`
 	Tags       map[string]string   `yaml:"tags"`
 	ConfigVars []ConfigVar         `yaml:"config_vars"`
+	Auth       browserConfigAuth   `yaml:"auth"`
 	Steps      []browserConfigStep `yaml:"steps"`
 }
 
+type browserConfigAuth struct {
+	Steps []browserConfigStep `yaml:"steps"`
+}
+
 type browserConfigStep struct {
-	Action string `yaml:"action"`
-	URL    string `yaml:"url"`
+	Action    string `yaml:"action"`
+	URL       string `yaml:"url"`
+	TimeoutMS int    `yaml:"timeout_ms"`
 }
 
 type browserDialOutput struct {
@@ -142,6 +150,7 @@ type browserDialStep struct {
 	DurationUS int64             `json:"duration_us"`
 	URL        string            `json:"url,omitempty"`
 	Title      string            `json:"title,omitempty"`
+	Screenshot string            `json:"screenshot,omitempty"`
 	Error      *browserDialError `json:"error,omitempty"`
 }
 
@@ -337,7 +346,12 @@ func (t *BrowserTask) writeScriptFile() (string, error) {
 	}
 	defer file.Close() //nolint:errcheck
 
-	if _, err := file.WriteString(t.BrowserConfig); err != nil {
+	config, err := normalizeBrowserConfigTimeouts(t.BrowserConfig)
+	if err != nil {
+		os.Remove(file.Name()) //nolint:errcheck
+		return "", err
+	}
+	if _, err := file.WriteString(config); err != nil {
 		os.Remove(file.Name()) //nolint:errcheck
 		return "", err
 	}
@@ -483,6 +497,9 @@ func (t *BrowserTask) check() error {
 	if len(cfg.Steps) == 0 {
 		return errors.New("browser_config steps should not be empty")
 	}
+	if err := checkBrowserConfigTimeouts(cfg); err != nil {
+		return err
+	}
 	t.applyDefaultBrowserWindow()
 	if err := t.checkBrowserWindow(); err != nil {
 		return err
@@ -609,6 +626,68 @@ func (t *BrowserTask) parseBrowserConfig() (browserConfig, error) {
 		return cfg, err
 	}
 	return cfg, nil
+}
+
+func checkBrowserConfigTimeouts(cfg browserConfig) error {
+	if cfg.TimeoutMS > maxBrowserTotalTimeoutMS {
+		return fmt.Errorf("browser_config timeout_ms should not exceed %d", maxBrowserTotalTimeoutMS)
+	}
+	for index, step := range cfg.Auth.Steps {
+		if step.TimeoutMS > maxBrowserStepTimeoutMS {
+			return fmt.Errorf("browser_config auth.steps %d timeout_ms should not exceed %d", index+1, maxBrowserStepTimeoutMS)
+		}
+	}
+	for index, step := range cfg.Steps {
+		if step.TimeoutMS > maxBrowserStepTimeoutMS {
+			return fmt.Errorf("browser_config steps %d timeout_ms should not exceed %d", index+1, maxBrowserStepTimeoutMS)
+		}
+	}
+	return nil
+}
+
+func normalizeBrowserConfigTimeouts(config string) (string, error) {
+	var node yaml.Node
+	if err := yaml.Unmarshal([]byte(config), &node); err != nil {
+		return "", err
+	}
+	if len(node.Content) == 0 || node.Content[0].Kind != yaml.MappingNode {
+		return config, nil
+	}
+	root := node.Content[0]
+	if timeout, ok := getYAMLMapInt(root, "timeout_ms"); ok && timeout > maxBrowserTotalTimeoutMS {
+		return "", fmt.Errorf("browser_config timeout_ms should not exceed %d", maxBrowserTotalTimeoutMS)
+	}
+	setYAMLMapIntIfMissingOrZero(root, "timeout_ms", maxBrowserTotalTimeoutMS)
+	if err := normalizeBrowserStepTimeouts(root, "steps", "browser_config steps"); err != nil {
+		return "", err
+	}
+	if auth := yamlMapValue(root, "auth"); auth != nil && auth.Kind == yaml.MappingNode {
+		if err := normalizeBrowserStepTimeouts(auth, "steps", "browser_config auth.steps"); err != nil {
+			return "", err
+		}
+	}
+	data, err := yaml.Marshal(&node)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func normalizeBrowserStepTimeouts(parent *yaml.Node, key string, label string) error {
+	steps := yamlMapValue(parent, key)
+	if steps == nil || steps.Kind != yaml.SequenceNode {
+		return nil
+	}
+	for index, step := range steps.Content {
+		if step == nil || step.Kind != yaml.MappingNode {
+			continue
+		}
+		if timeout, ok := getYAMLMapInt(step, "timeout_ms"); ok && timeout > maxBrowserStepTimeoutMS {
+			return fmt.Errorf("%s %d timeout_ms should not exceed %d", label, index+1, maxBrowserStepTimeoutMS)
+		}
+		setYAMLMapIntIfMissingOrZero(step, "timeout_ms", maxBrowserStepTimeoutMS)
+	}
+	return nil
 }
 
 func (t *BrowserTask) applyDefaultBrowserWindow() {
@@ -784,6 +863,49 @@ func yamlMapBoolValue(node *yaml.Node, key string) bool {
 		}
 	}
 	return false
+}
+
+func yamlMapValue(node *yaml.Node, key string) *yaml.Node {
+	if node == nil || node.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value == key {
+			return node.Content[i+1]
+		}
+	}
+	return nil
+}
+
+func getYAMLMapInt(node *yaml.Node, key string) (int, bool) {
+	value := yamlMapValue(node, key)
+	if value == nil {
+		return 0, false
+	}
+	var out int
+	if err := value.Decode(&out); err != nil {
+		return 0, false
+	}
+	return out, true
+}
+
+func setYAMLMapIntIfMissingOrZero(node *yaml.Node, key string, value int) {
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value == key {
+			current, ok := getYAMLMapInt(node, key)
+			if ok && current > 0 {
+				return
+			}
+			node.Content[i+1].Kind = yaml.ScalarNode
+			node.Content[i+1].Tag = "!!int"
+			node.Content[i+1].Value = fmt.Sprintf("%d", value)
+			return
+		}
+	}
+	node.Content = append(node.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: fmt.Sprintf("%d", value)},
+	)
 }
 
 func setYAMLMapValue(node *yaml.Node, key string, value string) {
