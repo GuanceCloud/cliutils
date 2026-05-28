@@ -410,6 +410,96 @@ func TestBrowserTaskLightpandaPathOption(t *testing.T) {
 	assert.Empty(t, task.lightpandaPath())
 }
 
+func TestBrowserTaskExecutablePathOption(t *testing.T) {
+	task := &BrowserTask{Task: &Task{}}
+	task.SetOption(map[string]string{optionBrowserDialPath: "/opt/browser-dial"})
+	assert.Equal(t, "/opt/browser-dial", task.executablePath())
+
+	task.SetOption(map[string]string{optionBrowserDialPathCamel: "/opt/browser-dial-camel"})
+	assert.Equal(t, "/opt/browser-dial-camel", task.executablePath())
+
+	task.SetOption(map[string]string{})
+	t.Setenv("BROWSER_DIAL_PATH", "/env/browser-dial")
+	assert.Equal(t, "/env/browser-dial", task.executablePath())
+
+	t.Setenv("BROWSER_DIAL_PATH", "")
+	assert.Equal(t, defaultBrowserDialPath, task.executablePath())
+}
+
+func TestBrowserTaskResultFallbacks(t *testing.T) {
+	task := newBrowserTaskForTest()
+	task.stderr = "stderr failure"
+	reasons, ok := task.checkResult()
+	assert.False(t, ok)
+	assert.Equal(t, []string{"stderr failure"}, reasons)
+
+	task.stderr = ""
+	reasons, ok = task.checkResult()
+	assert.False(t, ok)
+	assert.Equal(t, []string{"browser dial failed"}, reasons)
+
+	task.setReqError("before run failed")
+	reasons, ok = task.checkResult()
+	assert.False(t, ok)
+	assert.Equal(t, []string{"before run failed"}, reasons)
+}
+
+func TestBrowserTaskHostNameErrors(t *testing.T) {
+	task := &BrowserTask{BrowserConfig: "name: homepage\nsteps:\n  - action: click\n"}
+	_, err := task.getHostName()
+	assert.EqualError(t, err, "browser_config target or goto url should not be empty")
+
+	task.BrowserConfig = "name: homepage\ntarget: http://[::1\nsteps:\n  - action: goto\n"
+	_, err = task.getHostName()
+	assert.Error(t, err)
+}
+
+func TestBrowserTaskRetryHelpers(t *testing.T) {
+	task := &BrowserTask{RetryOptions: &BrowserRetryOption{Enabled: true, Count: 1, IntervalSec: 1}}
+	assert.Equal(t, 5*time.Second, task.retryInterval())
+
+	task.RetryOptions.IntervalSec = 301
+	assert.Equal(t, 300*time.Second, task.retryInterval())
+
+	task.RetryOptions.Enabled = false
+	assert.Equal(t, time.Duration(0), task.retryInterval())
+
+	assert.Equal(t, 0, clampBrowserRetryCount(-1))
+	assert.Equal(t, 3, clampBrowserRetryCount(4))
+}
+
+func TestBrowserTaskSanitizeBrowserConfigFallbacks(t *testing.T) {
+	assert.Equal(t, "", sanitizeBrowserConfig(""))
+
+	invalid := "name: ["
+	assert.Equal(t, invalid, sanitizeBrowserConfig(invalid))
+
+	sanitized := sanitizeBrowserConfig(`name: homepage
+target: https://example.com
+config_vars:
+  - name: LOGIN_PASSWORD
+    secure: true
+steps:
+  - action: goto
+`)
+	assert.Contains(t, sanitized, "LOGIN_PASSWORD")
+	assert.Contains(t, sanitized, "value: \"\"")
+}
+
+func TestBrowserTaskSmallHelpers(t *testing.T) {
+	task := &BrowserTask{}
+	_, err := task.getVariableValue(Variable{})
+	assert.EqualError(t, err, "not support")
+
+	task.initTask()
+	require.NotNil(t, task.Task)
+	assert.Equal(t, []BrowserViewport{{Width: 1920, Height: 1080}}, task.BrowserWindow.Viewports)
+
+	assert.Equal(t, []string{"example.com"}, dedupBrowserHostNames([]string{"example.com", "", "example.com"}))
+	assert.Equal(t, []string{}, dedupBrowserHostNames(nil))
+	assert.Equal(t, []string{}, dedupBrowserHostNames([]string{"", ""}))
+}
+
 func TestBrowserDialHelperProcess(t *testing.T) {
 	mode := os.Getenv("GO_WANT_BROWSER_DIAL_HELPER")
 	if mode == "" {
