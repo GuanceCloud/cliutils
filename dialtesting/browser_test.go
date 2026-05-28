@@ -8,6 +8,7 @@ package dialtesting
 import (
 	"encoding/json"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -43,6 +44,10 @@ func TestBrowserTaskRunExternalProcess(t *testing.T) {
 	assert.Contains(t, fields["steps"], "open")
 	assert.Equal(t, "https://example.com", tags["url"])
 	assert.Equal(t, "platform", tags["owner"])
+	assert.Equal(t, "1920x1080", tags["viewport"])
+	assert.Equal(t, int64(1920), fields["viewport_width"])
+	assert.Equal(t, int64(1080), fields["viewport_height"])
+	assert.Equal(t, int64(0), fields["retry_count"])
 }
 
 func TestBrowserTaskRunSetsLightpandaPath(t *testing.T) {
@@ -147,6 +152,189 @@ func TestBrowserTaskCheckBrowserConfig(t *testing.T) {
 	assert.EqualError(t, task.check(), "browser_config steps should not be empty")
 }
 
+func TestBrowserTaskParseNewFields(t *testing.T) {
+	taskJSON := `{
+		"external_id": "bd-homepage",
+		"name": "homepage",
+		"frequency": "1m",
+		"browser_config": "name: homepage\ntarget: https://example.com\nsteps:\n  - action: goto\n",
+		"browser_window": {"viewports": [{"width": 1920, "height": 1080}]},
+		"advance_options": {
+			"engine": "chrome",
+			"screenshot_on_failure": true,
+			"headers": {"X-Test": "ok"},
+			"cookies": [{"name": "sid", "value": "abc"}],
+			"ignore_https_errors": true,
+			"proxy_url": "http://127.0.0.1:7897"
+		},
+		"retry_options": {"enabled": true, "count": 2, "interval_sec": 10}
+	}`
+	child, err := CreateTaskChild(ClassHeadless)
+	require.NoError(t, err)
+	task, err := NewTask(taskJSON, child)
+	require.NoError(t, err)
+	browserTask := task.(*BrowserTask) //nolint:forcetypeassert
+	require.NoError(t, task.Check())
+	assert.Len(t, browserTask.BrowserWindow.Viewports, 1)
+	assert.Equal(t, "chrome", browserTask.AdvanceOptions.Engine)
+	assert.True(t, browserTask.AdvanceOptions.ScreenshotOnFailure)
+	assert.Equal(t, "ok", browserTask.AdvanceOptions.Headers["X-Test"])
+	assert.Equal(t, "sid", browserTask.AdvanceOptions.Cookies[0].Name)
+	assert.True(t, browserTask.AdvanceOptions.IgnoreHTTPSErrors)
+	assert.Equal(t, "http://127.0.0.1:7897", browserTask.AdvanceOptions.ProxyURL)
+	assert.Equal(t, 2, browserTask.RetryOptions.Count)
+}
+
+func TestBrowserTaskCheckInvalidEngine(t *testing.T) {
+	task := newBrowserTaskForTest()
+	task.AdvanceOptions = &BrowserAdvanceOption{Engine: "firefox"}
+	assert.EqualError(t, task.check(), "advance_options engine should be chrome or lightpanda")
+}
+
+func TestBrowserTaskCheckInvalidViewport(t *testing.T) {
+	task := newBrowserTaskForTest()
+	task.BrowserWindow = &BrowserWindowOption{Viewports: []BrowserViewport{{Width: 0, Height: 1080}}}
+	assert.EqualError(t, task.check(), "browser_window viewport width and height should be greater than 0")
+}
+
+func TestBrowserTaskCheckMultipleViewports(t *testing.T) {
+	task := newBrowserTaskForTest()
+	task.BrowserWindow = &BrowserWindowOption{Viewports: []BrowserViewport{
+		{Width: 1920, Height: 1080},
+		{Width: 1366, Height: 768},
+	}}
+	assert.EqualError(t, task.check(), "browser_window.viewports currently supports at most one viewport")
+}
+
+func TestBrowserTaskDefaultViewport(t *testing.T) {
+	task := newBrowserTaskForTest()
+	task.BrowserWindow = nil
+	require.NoError(t, task.check())
+	require.NotNil(t, task.BrowserWindow)
+	require.Len(t, task.BrowserWindow.Viewports, 1)
+	assert.Equal(t, BrowserViewport{Width: 1920, Height: 1080}, task.BrowserWindow.Viewports[0])
+
+	task.BrowserWindow = &BrowserWindowOption{}
+	require.NoError(t, task.check())
+	require.Len(t, task.BrowserWindow.Viewports, 1)
+	assert.Equal(t, BrowserViewport{Width: 1920, Height: 1080}, task.BrowserWindow.Viewports[0])
+}
+
+func TestBrowserTaskDefaultEngine(t *testing.T) {
+	task := newBrowserTaskForTest()
+	assert.Equal(t, "chrome", task.effectiveEngine())
+}
+
+func TestBrowserTaskCheckInvalidRetry(t *testing.T) {
+	task := newBrowserTaskForTest()
+	task.RetryOptions = &BrowserRetryOption{Enabled: true, Count: 4, IntervalSec: 10}
+	assert.EqualError(t, task.check(), "retry_options count should be between 0 and 3")
+
+	task.RetryOptions = &BrowserRetryOption{Enabled: true, Count: 1, IntervalSec: 4}
+	assert.EqualError(t, task.check(), "retry_options interval_sec should be between 5 and 300")
+}
+
+func TestBrowserTaskCheckInvalidHeaderAndCookie(t *testing.T) {
+	task := newBrowserTaskForTest()
+	task.AdvanceOptions = &BrowserAdvanceOption{Headers: map[string]string{"": "value"}}
+	assert.EqualError(t, task.check(), "advance_options headers key should not be empty")
+
+	task.AdvanceOptions = &BrowserAdvanceOption{Cookies: []BrowserCookie{{Value: "value"}}}
+	assert.EqualError(t, task.check(), "advance_options cookie name should not be empty")
+}
+
+func TestBrowserTaskRunSingleViewport(t *testing.T) {
+	browserTask := newBrowserTaskForTest()
+	browserTask.BrowserWindow = &BrowserWindowOption{Viewports: []BrowserViewport{{Width: 1366, Height: 768}}}
+	task, err := NewTask("", browserTask)
+	require.NoError(t, err)
+	task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
+
+	argsPath := t.TempDir() + "/args.log"
+	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "success")
+	t.Setenv("BROWSER_DIAL_HELPER_ARGS", argsPath)
+	require.NoError(t, task.Run())
+
+	lines := readHelperArgs(t, argsPath)
+	require.Len(t, lines, 1)
+	assert.Contains(t, lines[0], "--viewport-width 1366 --viewport-height 768")
+
+	tags, fields := task.GetResults()
+	assert.Equal(t, "1366x768", tags["viewport"])
+	assert.Equal(t, int64(1366), fields["viewport_width"])
+	assert.Equal(t, int64(768), fields["viewport_height"])
+}
+
+func TestBrowserTaskRunAdvanceOptions(t *testing.T) {
+	browserTask := newBrowserTaskForTest()
+	browserTask.AdvanceOptions = &BrowserAdvanceOption{
+		Engine:              "chrome",
+		ScreenshotOnFailure: true,
+		Headers:             map[string]string{"X-Test": "ok"},
+		Cookies:             []BrowserCookie{{Name: "sid", Value: "abc"}},
+		IgnoreHTTPSErrors:   true,
+		ProxyURL:            "http://127.0.0.1:7897",
+	}
+	task, err := NewTask("", browserTask)
+	require.NoError(t, err)
+	task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
+
+	argsPath := t.TempDir() + "/args.log"
+	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "success")
+	t.Setenv("BROWSER_DIAL_HELPER_ARGS", argsPath)
+	require.NoError(t, task.Run())
+
+	line := readHelperArgs(t, argsPath)[0]
+	assert.Contains(t, line, "--engine chrome")
+	assert.Contains(t, line, "--screenshot-on-failure")
+	assert.Contains(t, line, "--header X-Test=ok")
+	assert.Contains(t, line, "--cookie sid=abc")
+	assert.Contains(t, line, "--ignore-https-errors")
+	assert.Contains(t, line, "--proxy-url http://127.0.0.1:7897")
+}
+
+func TestBrowserTaskRetryStopsAfterSuccess(t *testing.T) {
+	oldSleep := browserRetrySleep
+	browserRetrySleep = func(time.Duration) {}
+	defer func() { browserRetrySleep = oldSleep }()
+
+	browserTask := newBrowserTaskForTest()
+	browserTask.RetryOptions = &BrowserRetryOption{Enabled: true, Count: 2, IntervalSec: 5}
+	task, err := NewTask("", browserTask)
+	require.NoError(t, err)
+	task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
+
+	dir := t.TempDir()
+	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "fail-once")
+	t.Setenv("BROWSER_DIAL_HELPER_COUNT", dir+"/count")
+	t.Setenv("BROWSER_DIAL_HELPER_ARGS", dir+"/args.log")
+	require.NoError(t, task.Run())
+
+	tags, fields := task.GetResults()
+	assert.Equal(t, "OK", tags["status"])
+	assert.Equal(t, int64(1), fields["retry_count"])
+	assert.Len(t, readHelperArgs(t, dir+"/args.log"), 2)
+}
+
+func TestBrowserTaskParseFailureDoesNotRetry(t *testing.T) {
+	browserTask := newBrowserTaskForTest()
+	browserTask.BrowserConfig = "name: ["
+	browserTask.RetryOptions = &BrowserRetryOption{Enabled: true, Count: 2, IntervalSec: 5}
+	task, err := NewTask("", browserTask)
+	require.NoError(t, err)
+	task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
+
+	argsPath := t.TempDir() + "/args.log"
+	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "success")
+	t.Setenv("BROWSER_DIAL_HELPER_ARGS", argsPath)
+	require.NoError(t, task.Run())
+
+	_, err = os.Stat(argsPath)
+	assert.True(t, os.IsNotExist(err))
+	_, fields := task.GetResults()
+	assert.Contains(t, fields["message"], "parse browser_config failed")
+}
+
 func TestBrowserTaskGetHostNameFromGotoURL(t *testing.T) {
 	task := &BrowserTask{
 		BrowserConfig: `name: homepage
@@ -230,6 +418,14 @@ func TestBrowserDialHelperProcess(t *testing.T) {
 	if len(os.Args) == 0 || !strings.Contains(strings.Join(os.Args, " "), "run") {
 		os.Exit(2)
 	}
+	if argsPath := os.Getenv("BROWSER_DIAL_HELPER_ARGS"); argsPath != "" {
+		file, err := os.OpenFile(argsPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			os.Exit(4)
+		}
+		_, _ = file.WriteString(strings.Join(os.Args, " ") + "\n")
+		_ = file.Close()
+	}
 	if mode == "check-lightpanda" && os.Getenv("LIGHTPANDA_EXECUTABLE_PATH") != "/opt/datakit/lightpanda" {
 		os.Exit(3)
 	}
@@ -257,6 +453,9 @@ func TestBrowserDialHelperProcess(t *testing.T) {
 		},
 	}
 	exitCode := 0
+	if mode == "fail-once" && incrementHelperCount(os.Getenv("BROWSER_DIAL_HELPER_COUNT")) == 1 {
+		mode = "failure"
+	}
 	if mode == "failure" {
 		output["exit_code"] = 1
 		output["run"] = map[string]interface{}{
@@ -301,4 +500,24 @@ func mustJSON(t *testing.T, value interface{}) string {
 	data, err := json.Marshal(value)
 	require.NoError(t, err)
 	return string(data)
+}
+
+func readHelperArgs(t *testing.T, path string) []string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return strings.Split(strings.TrimSpace(string(data)), "\n")
+}
+
+func incrementHelperCount(path string) int {
+	if path == "" {
+		return 1
+	}
+	count := 0
+	if data, err := os.ReadFile(path); err == nil {
+		count, _ = strconv.Atoi(strings.TrimSpace(string(data)))
+	}
+	count++
+	_ = os.WriteFile(path, []byte(strconv.Itoa(count)), 0o600)
+	return count
 }
