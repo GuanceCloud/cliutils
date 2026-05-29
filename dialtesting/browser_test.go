@@ -150,6 +150,43 @@ func TestBrowserTaskRenderTemplate(t *testing.T) {
 	assert.Contains(t, task.BrowserConfig, "contains: Example")
 }
 
+func TestBrowserTaskResultIncludesBrowserConfigVars(t *testing.T) {
+	task := &BrowserTask{
+		Task: &Task{Name: "browser"},
+		BrowserConfig: `name: browser
+config_vars:
+  - name: username
+    value: admin@example.com
+  - name: password
+    value: secret-value
+    secure: true
+steps:
+  - action: goto
+`,
+	}
+	itask, err := NewTask("", task)
+	require.NoError(t, err)
+
+	_, fields := itask.GetResults()
+	raw, ok := fields["browser_config_vars"].(string)
+	require.True(t, ok)
+
+	var vars []browserConfigResultVar
+	require.NoError(t, json.Unmarshal([]byte(raw), &vars))
+	require.Len(t, vars, 2)
+
+	assert.Equal(t, "username", vars[0].Name)
+	assert.Equal(t, "text", vars[0].Type)
+	assert.Equal(t, "admin@example.com", vars[0].Value)
+	assert.False(t, vars[0].Secure)
+
+	assert.Equal(t, "password", vars[1].Name)
+	assert.Equal(t, "secret", vars[1].Type)
+	assert.Empty(t, vars[1].Value)
+	assert.True(t, vars[1].Secure)
+	assert.NotContains(t, raw, "secret-value")
+}
+
 func TestBrowserTaskCheckBrowserConfig(t *testing.T) {
 	task := newBrowserTaskForTest()
 	require.NoError(t, task.check())

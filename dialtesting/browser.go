@@ -175,6 +175,13 @@ type browserPerformanceMetrics struct {
 	LoadEventEndMS     int64   `json:"load_event_end_ms,omitempty"`
 }
 
+type browserConfigResultVar struct {
+	Name   string `json:"name"`
+	Type   string `json:"type,omitempty"`
+	Value  string `json:"value,omitempty"`
+	Secure bool   `json:"secure"`
+}
+
 type browserDialError struct {
 	Name    string `json:"name"`
 	Message string `json:"message"`
@@ -502,8 +509,36 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 	if steps, err := json.Marshal(t.result.Steps); err == nil {
 		fields["steps"] = string(steps)
 	}
+	if vars := browserConfigResultVars(cfg.ConfigVars); len(vars) > 0 {
+		if data, err := json.Marshal(vars); err == nil {
+			fields["browser_config_vars"] = string(data)
+		}
+	}
 
 	return tags, fields
+}
+
+func browserConfigResultVars(configVars []ConfigVar) []browserConfigResultVar {
+	vars := make([]browserConfigResultVar, 0, len(configVars))
+	for _, v := range configVars {
+		result := browserConfigResultVar{
+			Name:   v.Name,
+			Type:   v.Type,
+			Secure: v.Secure,
+		}
+		if result.Type == "" {
+			if v.Secure {
+				result.Type = "secret"
+			} else {
+				result.Type = "text"
+			}
+		}
+		if !v.Secure {
+			result.Value = v.Value
+		}
+		vars = append(vars, result)
+	}
+	return vars
 }
 
 func addBrowserPerformanceFields(fields map[string]interface{}, metrics *browserPerformanceMetrics) {
