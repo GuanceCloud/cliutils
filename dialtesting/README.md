@@ -24,7 +24,8 @@ existing reporting path.
 Browser tasks require these binaries on the dial node:
 
 - `browser-dial`
-- Lightpanda, resolved by `browser-dial`
+- Chrome/Chromium, resolved by `browser-dial` when `engine=chrome`
+- Lightpanda, resolved by `browser-dial` when `engine=lightpanda`
 
 `dialtesting` resolves `browser-dial` in this order:
 
@@ -35,6 +36,8 @@ Browser tasks require these binaries on the dial node:
 
 Lightpanda is not configured in task JSON. Configure it in the node environment,
 for example with `LIGHTPANDA_EXECUTABLE_PATH`, or make it available from `PATH`.
+Chrome can be configured by `Task.SetOption()["chrome_path"]`; `dialtesting`
+passes it to `browser-dial` as `CHROME_EXECUTABLE_PATH`.
 
 ## Task Fields
 
@@ -71,6 +74,7 @@ Do not put these browser script fields at the outer task level:
 - `success_when`
 - `success_when_logic`
 - `browser_dial_path`
+- `chrome_path`
 - `lightpanda_path`
 
 Success rules belong in `browser_config.steps` as browser assertions such as

@@ -38,6 +38,8 @@ const (
 	optionBrowserDialPathCamel = "browserDialPath"
 	optionLightpandaPath       = "lightpanda_path"
 	optionLightpandaPathCamel  = "lightpandaPath"
+	optionChromePath           = "chrome_path"
+	optionChromePathCamel      = "chromePath"
 )
 
 type BrowserTask struct {
@@ -280,9 +282,14 @@ func (t *BrowserTask) runBrowserDial(path string, viewport BrowserViewport) brow
 	cmd := exec.CommandContext(ctx, t.executablePath(), cmdArgs...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	env := os.Environ()
 	if lightpandaPath := t.lightpandaPath(); lightpandaPath != "" {
-		cmd.Env = append(os.Environ(), "LIGHTPANDA_EXECUTABLE_PATH="+lightpandaPath)
+		env = setEnv(env, "LIGHTPANDA_EXECUTABLE_PATH", lightpandaPath)
 	}
+	if chromePath := t.chromePath(); chromePath != "" {
+		env = setEnv(env, "CHROME_EXECUTABLE_PATH", chromePath)
+	}
+	cmd.Env = env
 
 	err := cmd.Run()
 	result.duration = time.Since(start)
@@ -367,6 +374,17 @@ func executableArgs(args []string) []string {
 	return append([]string{"-test.run=TestBrowserDialHelperProcess", "--"}, args...)
 }
 
+func setEnv(env []string, key string, value string) []string {
+	prefix := key + "="
+	for index, item := range env {
+		if strings.HasPrefix(item, prefix) {
+			env[index] = prefix + value
+			return env
+		}
+	}
+	return append(env, prefix+value)
+}
+
 func (t *BrowserTask) writeScriptFile() (string, error) {
 	file, err := os.CreateTemp("", "dialtesting-browser-*.yaml")
 	if err != nil {
@@ -404,6 +422,16 @@ func (t *BrowserTask) lightpandaPath() string {
 		return value
 	}
 	if value := t.GetOption()[optionLightpandaPathCamel]; value != "" {
+		return value
+	}
+	return ""
+}
+
+func (t *BrowserTask) chromePath() string {
+	if value := t.GetOption()[optionChromePath]; value != "" {
+		return value
+	}
+	if value := t.GetOption()[optionChromePathCamel]; value != "" {
 		return value
 	}
 	return ""

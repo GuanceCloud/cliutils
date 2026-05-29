@@ -76,6 +76,24 @@ func TestBrowserTaskRunSetsLightpandaPath(t *testing.T) {
 	assert.Equal(t, int64(1), fields["success"])
 }
 
+func TestBrowserTaskRunSetsChromePath(t *testing.T) {
+	browserTask := newBrowserTaskForTest()
+	task, err := NewTask("", browserTask)
+	require.NoError(t, err)
+	task.SetOption(map[string]string{
+		optionBrowserDialPath: os.Args[0],
+		optionChromePath:      "/opt/datakit-browser/chrome/chrome",
+	})
+
+	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "check-chrome")
+	err = task.Run()
+	require.NoError(t, err)
+
+	tags, fields := task.GetResults()
+	assert.Equal(t, "OK", tags["status"])
+	assert.Equal(t, int64(1), fields["success"])
+}
+
 func TestBrowserTaskRunExternalProcessFailure(t *testing.T) {
 	browserTask := newBrowserTaskForTest()
 	task, err := NewTask("", browserTask)
@@ -515,6 +533,26 @@ func TestBrowserTaskLightpandaPathOption(t *testing.T) {
 	assert.Empty(t, task.lightpandaPath())
 }
 
+func TestBrowserTaskChromePathOption(t *testing.T) {
+	task := &BrowserTask{Task: &Task{}}
+	task.SetOption(map[string]string{optionChromePath: "/opt/chrome"})
+	assert.Equal(t, "/opt/chrome", task.chromePath())
+
+	task.SetOption(map[string]string{optionChromePathCamel: "/opt/chrome-camel"})
+	assert.Equal(t, "/opt/chrome-camel", task.chromePath())
+
+	task.SetOption(map[string]string{})
+	assert.Empty(t, task.chromePath())
+}
+
+func TestSetEnvOverridesExistingValue(t *testing.T) {
+	env := setEnv([]string{"A=1", "CHROME_EXECUTABLE_PATH=/old/chrome"}, "CHROME_EXECUTABLE_PATH", "/new/chrome")
+	assert.Equal(t, []string{"A=1", "CHROME_EXECUTABLE_PATH=/new/chrome"}, env)
+
+	env = setEnv([]string{"A=1"}, "CHROME_EXECUTABLE_PATH", "/new/chrome")
+	assert.Equal(t, []string{"A=1", "CHROME_EXECUTABLE_PATH=/new/chrome"}, env)
+}
+
 func TestBrowserTaskExecutablePathOption(t *testing.T) {
 	task := &BrowserTask{Task: &Task{}}
 	task.SetOption(map[string]string{optionBrowserDialPath: "/opt/browser-dial"})
@@ -622,6 +660,9 @@ func TestBrowserDialHelperProcess(t *testing.T) {
 		_ = file.Close()
 	}
 	if mode == "check-lightpanda" && os.Getenv("LIGHTPANDA_EXECUTABLE_PATH") != "/opt/datakit/lightpanda" {
+		os.Exit(3)
+	}
+	if mode == "check-chrome" && os.Getenv("CHROME_EXECUTABLE_PATH") != "/opt/datakit-browser/chrome/chrome" {
 		os.Exit(3)
 	}
 	if mode == "sleep" {
