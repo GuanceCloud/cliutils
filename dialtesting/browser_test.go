@@ -39,9 +39,12 @@ func TestBrowserTaskRunExternalProcess(t *testing.T) {
 	assert.Equal(t, "browser_dial_testing", task.MetricName())
 	assert.Equal(t, int64(1), fields["success"])
 	assert.Equal(t, int64(12345), fields["response_time"])
-	assert.Equal(t, int64(1), fields["last_step"])
+	assert.Equal(t, int64(2), fields["last_step"])
 	assert.Equal(t, "trace-1", fields["trace_id"])
 	assert.Contains(t, fields["steps"], "open")
+	assert.Contains(t, fields["steps"], "assert_text")
+	assert.Contains(t, fields["steps"], "main")
+	assert.Contains(t, fields["steps"], "Example Domain")
 	assert.Contains(t, fields["steps"], "/tmp/browser-dial/run-1-step-1.png")
 	assert.Equal(t, "https://example.com", tags["url"])
 	assert.Equal(t, "platform", tags["owner"])
@@ -49,6 +52,10 @@ func TestBrowserTaskRunExternalProcess(t *testing.T) {
 	assert.Equal(t, int64(1920), fields["viewport_width"])
 	assert.Equal(t, int64(1080), fields["viewport_height"])
 	assert.Equal(t, int64(0), fields["retry_count"])
+	assert.Equal(t, int64(12), fields["ttfb"])
+	assert.Equal(t, int64(123), fields["loading_time"])
+	assert.Equal(t, int64(98), fields["lcp"])
+	assert.Equal(t, 0.03, fields["cls"])
 }
 
 func TestBrowserTaskRunSetsLightpandaPath(t *testing.T) {
@@ -83,6 +90,7 @@ func TestBrowserTaskRunExternalProcessFailure(t *testing.T) {
 	assert.Equal(t, "FAIL", tags["status"])
 	assert.Equal(t, int64(-1), fields["success"])
 	assert.Contains(t, fields["fail_reason"], "step_error")
+	assert.Equal(t, "assertion_failed", fields["failure_type"])
 	assert.Contains(t, fields["message"], "title mismatch")
 	assert.Equal(t, int64(2), fields["last_step"])
 	assert.Contains(t, fields["steps"], "title")
@@ -370,8 +378,9 @@ func TestBrowserTaskRetryStopsAfterSuccess(t *testing.T) {
 	require.NoError(t, task.Run())
 
 	tags, fields := task.GetResults()
-	assert.Equal(t, "OK", tags["status"])
+	assert.Equal(t, "RETRY_OK", tags["status"])
 	assert.Equal(t, int64(1), fields["retry_count"])
+	assert.Equal(t, int64(1), fields["success"])
 	assert.Len(t, readHelperArgs(t, dir+"/args.log"), 2)
 }
 
@@ -597,9 +606,21 @@ func TestBrowserDialHelperProcess(t *testing.T) {
 			"duration_us": 12345,
 			"steps": []map[string]interface{}{
 				{
-					"seq": 1, "name": "open", "status": "OK", "duration_us": 1000,
+					"seq": 1, "name": "open", "action": "goto", "status": "OK", "duration_us": 1000,
 					"url": "https://example.com", "title": "Example", "screenshot": "/tmp/browser-dial/run-1-step-1.png",
 				},
+				{
+					"seq": 2, "name": "assert body", "action": "assert_text", "selector": "main", "expected": "Example Domain",
+					"status": "OK", "duration_us": 2000, "url": "https://example.com", "title": "Example",
+				},
+			},
+			"performance": map[string]interface{}{
+				"ttfb_ms":               12,
+				"loading_time_ms":       123,
+				"lcp_ms":                98,
+				"cls":                   0.03,
+				"dom_content_loaded_ms": 88,
+				"load_event_end_ms":     123,
 			},
 			"trace_ids": []string{"trace-1"},
 		},
@@ -611,13 +632,14 @@ func TestBrowserDialHelperProcess(t *testing.T) {
 	if mode == "failure" {
 		output["exit_code"] = 1
 		output["run"] = map[string]interface{}{
-			"run_id":      "run-2",
-			"name":        "homepage",
-			"target":      "https://example.com",
-			"status":      "FAIL",
-			"success":     false,
-			"duration_us": 54321,
-			"fail_reason": "step_error",
+			"run_id":       "run-2",
+			"name":         "homepage",
+			"target":       "https://example.com",
+			"status":       "FAIL",
+			"success":      false,
+			"duration_us":  54321,
+			"fail_reason":  "step_error",
+			"failure_type": "assertion_failed",
 			"error": map[string]interface{}{
 				"name":    "assertion",
 				"message": "title mismatch",

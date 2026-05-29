@@ -119,6 +119,12 @@ When `browser-dial` returns `run.success=true`:
 - tag `status=OK`
 - field `success=1`
 
+When `browser-dial` succeeds after retry:
+
+- tag `status=RETRY_OK`
+- field `success=1`
+- field `retry_count` greater than 0
+
 When `browser-dial` returns `run.success=false`:
 
 - tag `status=FAIL`
@@ -132,8 +138,13 @@ Common result fields include:
 - `browser_run_id`
 - `exit_code`
 - `message`
+- `failure_type`
 - `page_url`
 - `page_title`
 - `trace_id`
 - `trace_ids`
+- `ttfb`
+- `loading_time`
+- `lcp`
+- `cls`
 - `steps`

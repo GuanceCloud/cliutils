@@ -131,27 +131,48 @@ type browserDialOutput struct {
 }
 
 type browserDialRun struct {
-	RunID      string            `json:"run_id"`
-	Name       string            `json:"name"`
-	Target     string            `json:"target,omitempty"`
-	Status     string            `json:"status"`
-	Success    bool              `json:"success"`
-	DurationUS int64             `json:"duration_us"`
-	Steps      []browserDialStep `json:"steps"`
-	TraceIDs   []string          `json:"trace_ids,omitempty"`
-	Error      *browserDialError `json:"error,omitempty"`
-	FailReason string            `json:"fail_reason,omitempty"`
+	RunID       string                     `json:"run_id"`
+	Name        string                     `json:"name"`
+	Target      string                     `json:"target,omitempty"`
+	Status      string                     `json:"status"`
+	Success     bool                       `json:"success"`
+	DurationUS  int64                      `json:"duration_us"`
+	Steps       []browserDialStep          `json:"steps"`
+	TraceIDs    []string                   `json:"trace_ids,omitempty"`
+	Performance *browserPerformanceMetrics `json:"performance,omitempty"`
+	Error       *browserDialError          `json:"error,omitempty"`
+	FailReason  string                     `json:"fail_reason,omitempty"`
+	FailureType string                     `json:"failure_type,omitempty"`
 }
 
 type browserDialStep struct {
-	Seq        int               `json:"seq"`
-	Name       string            `json:"name"`
-	Status     string            `json:"status"`
-	DurationUS int64             `json:"duration_us"`
-	URL        string            `json:"url,omitempty"`
-	Title      string            `json:"title,omitempty"`
-	Screenshot string            `json:"screenshot,omitempty"`
-	Error      *browserDialError `json:"error,omitempty"`
+	Seq          int               `json:"seq"`
+	Name         string            `json:"name"`
+	Action       string            `json:"action,omitempty"`
+	Selector     string            `json:"selector,omitempty"`
+	InputDisplay string            `json:"input_display,omitempty"`
+	ValueFrom    string            `json:"value_from,omitempty"`
+	Expected     string            `json:"expected,omitempty"`
+	TimeoutMS    int               `json:"timeout_ms,omitempty"`
+	Auth         bool              `json:"auth,omitempty"`
+	Status       string            `json:"status"`
+	StartedAt    string            `json:"started_at,omitempty"`
+	EndedAt      string            `json:"ended_at,omitempty"`
+	DurationUS   int64             `json:"duration_us"`
+	URL          string            `json:"url,omitempty"`
+	Title        string            `json:"title,omitempty"`
+	Screenshot   string            `json:"screenshot,omitempty"`
+	SkipReason   string            `json:"skip_reason,omitempty"`
+	Error        *browserDialError `json:"error,omitempty"`
+}
+
+type browserPerformanceMetrics struct {
+	TTFBMS             int64   `json:"ttfb_ms,omitempty"`
+	LoadingTimeMS      int64   `json:"loading_time_ms,omitempty"`
+	LCPMS              int64   `json:"lcp_ms,omitempty"`
+	CLS                float64 `json:"cls,omitempty"`
+	DOMContentLoadedMS int64   `json:"dom_content_loaded_ms,omitempty"`
+	LoadEventEndMS     int64   `json:"load_event_end_ms,omitempty"`
 }
 
 type browserDialError struct {
@@ -453,13 +474,18 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 	}
 
 	if t.reqError == "" && t.result.Success {
-		tags["status"] = "OK"
+		if result.attempts > 1 {
+			tags["status"] = "RETRY_OK"
+		} else {
+			tags["status"] = "OK"
+		}
 		fields["success"] = int64(1)
 		fields["message"] = "success"
 	} else {
 		reasons, _ := t.checkResult()
 		fields["fail_reason"] = strings.Join(reasons, ";")
 		fields["message"] = strings.Join(reasons, ";")
+		fields["failure_type"] = t.result.FailureType
 	}
 	if len(t.result.Steps) > 0 {
 		last := t.result.Steps[len(t.result.Steps)-1]
@@ -472,11 +498,39 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 			fields["trace_ids"] = string(traceIDs)
 		}
 	}
+	addBrowserPerformanceFields(fields, t.result.Performance)
 	if steps, err := json.Marshal(t.result.Steps); err == nil {
 		fields["steps"] = string(steps)
 	}
 
 	return tags, fields
+}
+
+func addBrowserPerformanceFields(fields map[string]interface{}, metrics *browserPerformanceMetrics) {
+	if metrics == nil {
+		return
+	}
+	if metrics.TTFBMS > 0 {
+		fields["ttfb"] = metrics.TTFBMS
+		fields["ttfb_ms"] = metrics.TTFBMS
+	}
+	if metrics.LoadingTimeMS > 0 {
+		fields["loading_time"] = metrics.LoadingTimeMS
+		fields["loading_time_ms"] = metrics.LoadingTimeMS
+	}
+	if metrics.LCPMS > 0 {
+		fields["lcp"] = metrics.LCPMS
+		fields["lcp_ms"] = metrics.LCPMS
+	}
+	if metrics.CLS > 0 {
+		fields["cls"] = metrics.CLS
+	}
+	if metrics.DOMContentLoadedMS > 0 {
+		fields["dom_content_loaded_ms"] = metrics.DOMContentLoadedMS
+	}
+	if metrics.LoadEventEndMS > 0 {
+		fields["load_event_end_ms"] = metrics.LoadEventEndMS
+	}
 }
 
 func lastBrowserStep(steps []browserDialStep) int {
