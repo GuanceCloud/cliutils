@@ -44,6 +44,7 @@ const (
 
 type BrowserTask struct {
 	*Task
+	URL           string `json:"url,omitempty"`
 	BrowserConfig string `json:"browser_config"`
 
 	BrowserWindow  *BrowserWindowOption  `json:"browser_window,omitempty"`
@@ -471,7 +472,7 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 	cfg, _ := t.parseBrowserConfig()
 	result := t.lastViewportResult()
 	name := firstNonEmpty(t.result.Name, cfg.Name, t.Name)
-	target := firstNonEmpty(t.result.Target, cfg.Target)
+	target := firstNonEmpty(t.URL, t.result.Target, cfg.Target)
 	tags = map[string]string{
 		"name":           name,
 		"url":            target,
@@ -695,6 +696,12 @@ func (t *BrowserTask) renderTemplate(fm template.FuncMap) error {
 		return fmt.Errorf("render browser_config failed: %w", err)
 	}
 	t.BrowserConfig = browserConfig
+
+	url, err := t.GetParsedString(t.rawTask.URL, fm)
+	if err != nil {
+		return fmt.Errorf("render url failed: %w", err)
+	}
+	t.URL = url
 	return nil
 }
 

@@ -158,14 +158,35 @@ func TestBrowserTaskRenderTemplate(t *testing.T) {
 				{Name: "title", Value: "Example"},
 			},
 		},
+		URL:           "https://{{host}}/display",
 		BrowserConfig: "name: browser\ntarget: https://{{host}}\nsteps:\n  - action: goto\n  - action: assert_title\n    contains: {{title}}\n",
 	}
 	itask, err := NewTask("", task)
 	require.NoError(t, err)
 	require.NoError(t, itask.RenderTemplateAndInit(nil))
 
+	assert.Equal(t, "https://example.com/display", task.URL)
 	assert.Contains(t, task.BrowserConfig, "target: https://example.com")
 	assert.Contains(t, task.BrowserConfig, "contains: Example")
+}
+
+func TestBrowserTaskURLIsDisplayOnlyResultTag(t *testing.T) {
+	task := &BrowserTask{
+		Task: &Task{Name: "browser"},
+		URL:  "https://display.example.com",
+		BrowserConfig: strings.Join([]string{
+			"name: browser",
+			"target: https://runtime.example.com",
+			"steps:",
+			"  - action: goto",
+			"",
+		}, "\n"),
+	}
+	itask, err := NewTask("", task)
+	require.NoError(t, err)
+
+	tags, _ := itask.GetResults()
+	assert.Equal(t, "https://display.example.com", tags["url"])
 }
 
 func TestBrowserTaskResultIncludesBrowserConfigVars(t *testing.T) {
