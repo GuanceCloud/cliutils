@@ -11,6 +11,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -36,6 +38,10 @@ const (
 
 	optionBrowserDialPath      = "browser_dial_path"
 	optionBrowserDialPathCamel = "browserDialPath"
+	optionBrowserDialMode      = "browser_dial_mode"
+	optionBrowserDialModeCamel = "browserDialMode"
+	optionBrowserDialURL       = "browser_dial_url"
+	optionBrowserDialURLCamel  = "browserDialURL"
 	optionLightpandaPath       = "lightpanda_path"
 	optionLightpandaPathCamel  = "lightpandaPath"
 	optionChromePath           = "chrome_path"
@@ -131,6 +137,22 @@ type browserConfigStep struct {
 type browserDialOutput struct {
 	ExitCode int            `json:"exit_code"`
 	Run      browserDialRun `json:"run"`
+}
+
+type browserDialDaemonRequest struct {
+	Script              string            `json:"script"`
+	Name                string            `json:"name,omitempty"`
+	Engine              string            `json:"engine,omitempty"`
+	TimeoutMS           int               `json:"timeout_ms,omitempty"`
+	ChromePath          string            `json:"chrome_path,omitempty"`
+	LightpandaPath      string            `json:"lightpanda_path,omitempty"`
+	ScreenshotOnFailure bool              `json:"screenshot_on_failure,omitempty"`
+	ViewportWidth       int               `json:"viewport_width,omitempty"`
+	ViewportHeight      int               `json:"viewport_height,omitempty"`
+	Headers             map[string]string `json:"headers,omitempty"`
+	Cookies             []BrowserCookie   `json:"cookies,omitempty"`
+	IgnoreHTTPSErrors   bool              `json:"ignore_https_errors,omitempty"`
+	ProxyURL            string            `json:"proxy_url,omitempty"`
 }
 
 type browserDialRun struct {
@@ -261,6 +283,10 @@ func (t *BrowserTask) runViewport(path string, viewport BrowserViewport) browser
 }
 
 func (t *BrowserTask) runBrowserDial(path string, viewport BrowserViewport) browserViewportResult {
+	if t.useBrowserDialDaemon() {
+		return t.runBrowserDialDaemon(path, viewport)
+	}
+
 	start := time.Now()
 	timeoutMS := t.effectiveTimeoutMS()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMS)*time.Millisecond+15*time.Second)
@@ -308,6 +334,84 @@ func (t *BrowserTask) runBrowserDial(path string, viewport BrowserViewport) brow
 		if result.stderr != "" {
 			result.reqError += ": " + result.stderr
 		}
+		return result
+	}
+	result.exitCode = output.ExitCode
+	result.result = output.Run
+	return result
+}
+
+func (t *BrowserTask) runBrowserDialDaemon(path string, viewport BrowserViewport) browserViewportResult {
+	start := time.Now()
+	timeoutMS := t.effectiveTimeoutMS()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMS)*time.Millisecond+15*time.Second)
+	defer cancel()
+	cancelState := t.setCancel(cancel)
+	defer t.clearCancel(cancelState)
+
+	result := browserViewportResult{viewport: viewport}
+	if t.browserDialURL() == "" {
+		result.reqError = "browser_dial_url should not be empty when browser_dial_mode is daemon"
+		return result
+	}
+	script, err := os.ReadFile(path)
+	if err != nil {
+		result.reqError = err.Error()
+		return result
+	}
+
+	payload := browserDialDaemonRequest{
+		Script:         string(script),
+		Name:           t.Name,
+		Engine:         t.effectiveEngine(),
+		TimeoutMS:      timeoutMS,
+		ChromePath:     t.chromePath(),
+		LightpandaPath: t.lightpandaPath(),
+		ViewportWidth:  viewport.Width,
+		ViewportHeight: viewport.Height,
+	}
+	if t.AdvanceOptions != nil {
+		payload.ScreenshotOnFailure = t.AdvanceOptions.ScreenshotOnFailure
+		payload.Headers = t.AdvanceOptions.Headers
+		payload.Cookies = t.AdvanceOptions.Cookies
+		payload.IgnoreHTTPSErrors = t.AdvanceOptions.IgnoreHTTPSErrors
+		payload.ProxyURL = t.AdvanceOptions.ProxyURL
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		result.reqError = err.Error()
+		return result
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(t.browserDialURL(), "/")+"/v1/run", bytes.NewReader(body))
+	if err != nil {
+		result.reqError = err.Error()
+		return result
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	result.duration = time.Since(start)
+	if err != nil {
+		result.reqError = err.Error()
+		return result
+	}
+	defer resp.Body.Close() //nolint:errcheck
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
+	if err != nil {
+		result.reqError = err.Error()
+		return result
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		result.exitCode = 1
+		result.reqError = fmt.Sprintf("browser-dial daemon returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+		return result
+	}
+
+	var output browserDialOutput
+	if decodeErr := json.Unmarshal(respBody, &output); decodeErr != nil {
+		result.reqError = fmt.Sprintf("parse browser-dial daemon output failed: %s", decodeErr)
 		return result
 	}
 	result.exitCode = output.ExitCode
@@ -416,6 +520,30 @@ func (t *BrowserTask) executablePath() string {
 		return value
 	}
 	return defaultBrowserDialPath
+}
+
+func (t *BrowserTask) browserDialMode() string {
+	if value := t.GetOption()[optionBrowserDialMode]; value != "" {
+		return strings.ToLower(strings.TrimSpace(value))
+	}
+	if value := t.GetOption()[optionBrowserDialModeCamel]; value != "" {
+		return strings.ToLower(strings.TrimSpace(value))
+	}
+	return "exec"
+}
+
+func (t *BrowserTask) browserDialURL() string {
+	if value := t.GetOption()[optionBrowserDialURL]; value != "" {
+		return strings.TrimSpace(value)
+	}
+	if value := t.GetOption()[optionBrowserDialURLCamel]; value != "" {
+		return strings.TrimSpace(value)
+	}
+	return ""
+}
+
+func (t *BrowserTask) useBrowserDialDaemon() bool {
+	return t.browserDialMode() == "daemon" || t.browserDialURL() != ""
 }
 
 func (t *BrowserTask) lightpandaPath() string {
@@ -627,6 +755,15 @@ func (t *BrowserTask) check() error {
 	}
 	if err := t.checkBrowserRetryOptions(); err != nil {
 		return err
+	}
+	switch t.browserDialMode() {
+	case "exec":
+	case "daemon":
+		if t.browserDialURL() == "" {
+			return errors.New("browser_dial_url should not be empty when browser_dial_mode is daemon")
+		}
+	default:
+		return errors.New("browser_dial_mode should be exec or daemon")
 	}
 	return nil
 }

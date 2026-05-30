@@ -7,6 +7,8 @@ package dialtesting
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strconv"
 	"strings"
@@ -56,6 +58,95 @@ func TestBrowserTaskRunExternalProcess(t *testing.T) {
 	assert.Equal(t, int64(123), fields["loading_time"])
 	assert.Equal(t, int64(98), fields["lcp"])
 	assert.Equal(t, 0.03, fields["cls"])
+}
+
+func TestBrowserTaskRunDaemon(t *testing.T) {
+	browserTask := newBrowserTaskForTest()
+	browserTask.BrowserWindow = &BrowserWindowOption{Viewports: []BrowserViewport{{Width: 1366, Height: 768}}}
+	browserTask.AdvanceOptions = &BrowserAdvanceOption{
+		Engine:              "chrome",
+		ScreenshotOnFailure: true,
+		Headers:             map[string]string{"X-Test": "ok"},
+		Cookies:             []BrowserCookie{{Name: "sid", Value: "abc"}},
+		IgnoreHTTPSErrors:   true,
+		ProxyURL:            "http://127.0.0.1:7897",
+	}
+
+	var got browserDialDaemonRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/v1/run", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+		assert.Contains(t, got.Script, "name: homepage")
+		assert.Equal(t, "homepage", got.Name)
+		assert.Equal(t, "chrome", got.Engine)
+		assert.Equal(t, 1000, got.TimeoutMS)
+		assert.Equal(t, "/opt/datakit-browser/chrome/chrome", got.ChromePath)
+		assert.Equal(t, 1366, got.ViewportWidth)
+		assert.Equal(t, 768, got.ViewportHeight)
+		assert.True(t, got.ScreenshotOnFailure)
+		assert.Equal(t, "ok", got.Headers["X-Test"])
+		assert.Equal(t, []BrowserCookie{{Name: "sid", Value: "abc"}}, got.Cookies)
+		assert.True(t, got.IgnoreHTTPSErrors)
+		assert.Equal(t, "http://127.0.0.1:7897", got.ProxyURL)
+
+		_ = json.NewEncoder(w).Encode(browserDialOutput{
+			ExitCode: 0,
+			Run: browserDialRun{
+				RunID:      "run-daemon",
+				Name:       "homepage",
+				Target:     "https://example.com",
+				Status:     "OK",
+				Success:    true,
+				DurationUS: 23456,
+				Steps: []browserDialStep{{
+					Seq:        1,
+					Name:       "open",
+					Action:     "goto",
+					Status:     "OK",
+					DurationUS: 1000,
+				}},
+			},
+		})
+	}))
+	defer server.Close()
+
+	task, err := NewTask("", browserTask)
+	require.NoError(t, err)
+	task.SetOption(map[string]string{
+		optionBrowserDialMode: "daemon",
+		optionBrowserDialURL:  server.URL,
+		optionChromePath:      "/opt/datakit-browser/chrome/chrome",
+	})
+
+	require.NoError(t, task.Run())
+
+	tags, fields := task.GetResults()
+	assert.Equal(t, "OK", tags["status"])
+	assert.Equal(t, "1366x768", tags["viewport"])
+	assert.Equal(t, int64(1), fields["success"])
+	assert.Equal(t, int64(23456), fields["response_time"])
+	assert.Equal(t, "run-daemon", fields["browser_run_id"])
+}
+
+func TestBrowserTaskRunDaemonFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "busy", http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	browserTask := newBrowserTaskForTest()
+	task, err := NewTask("", browserTask)
+	require.NoError(t, err)
+	task.SetOption(map[string]string{
+		optionBrowserDialMode: "daemon",
+		optionBrowserDialURL:  server.URL,
+	})
+
+	require.NoError(t, task.Run())
+	_, fields := task.GetResults()
+	assert.Equal(t, int64(-1), fields["success"])
+	assert.Contains(t, fields["message"], "browser-dial daemon returned HTTP 503")
 }
 
 func TestBrowserTaskRunSetsLightpandaPath(t *testing.T) {
@@ -588,6 +679,30 @@ func TestBrowserTaskExecutablePathOption(t *testing.T) {
 
 	t.Setenv("BROWSER_DIAL_PATH", "")
 	assert.Equal(t, defaultBrowserDialPath, task.executablePath())
+}
+
+func TestBrowserTaskDaemonOptions(t *testing.T) {
+	task := &BrowserTask{Task: &Task{}}
+	task.SetOption(map[string]string{
+		optionBrowserDialMode: "daemon",
+		optionBrowserDialURL:  "http://127.0.0.1:18080",
+	})
+	assert.Equal(t, "daemon", task.browserDialMode())
+	assert.Equal(t, "http://127.0.0.1:18080", task.browserDialURL())
+	assert.True(t, task.useBrowserDialDaemon())
+
+	task.SetOption(map[string]string{
+		optionBrowserDialModeCamel: "daemon",
+		optionBrowserDialURLCamel:  "http://127.0.0.1:18081",
+	})
+	assert.Equal(t, "daemon", task.browserDialMode())
+	assert.Equal(t, "http://127.0.0.1:18081", task.browserDialURL())
+	assert.True(t, task.useBrowserDialDaemon())
+
+	task.SetOption(map[string]string{})
+	assert.Equal(t, "exec", task.browserDialMode())
+	assert.Empty(t, task.browserDialURL())
+	assert.False(t, task.useBrowserDialDaemon())
 }
 
 func TestBrowserTaskResultFallbacks(t *testing.T) {
