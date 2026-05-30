@@ -492,11 +492,108 @@ func TestBrowserTaskRunSingleViewport(t *testing.T) {
 	lines := readHelperArgs(t, argsPath)
 	require.Len(t, lines, 1)
 	assert.Contains(t, lines[0], "--viewport-width 1366 --viewport-height 768")
+	assert.Contains(t, lines[0], "--timeout 1000")
 
 	tags, fields := task.GetResults()
 	assert.Equal(t, "1366x768", tags["viewport"])
 	assert.Equal(t, int64(1366), fields["viewport_width"])
 	assert.Equal(t, int64(768), fields["viewport_height"])
+}
+
+func TestBrowserTaskRunRejectsInvalidRetryOptionsAtRuntime(t *testing.T) {
+	cases := []struct {
+		name    string
+		options *BrowserRetryOption
+		want    string
+	}{
+		{
+			name:    "count",
+			options: &BrowserRetryOption{Enabled: true, Count: 4, IntervalSec: 5},
+			want:    "retry_options count should be between 0 and 3",
+		},
+		{
+			name:    "interval",
+			options: &BrowserRetryOption{Enabled: true, Count: 1, IntervalSec: 4},
+			want:    "retry_options interval_sec should be between 5 and 300",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			browserTask := newBrowserTaskForTest()
+			browserTask.RetryOptions = tc.options
+			task, err := NewTask("", browserTask)
+			require.NoError(t, err)
+			task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
+
+			argsPath := t.TempDir() + "/args.log"
+			t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "success")
+			t.Setenv("BROWSER_DIAL_HELPER_ARGS", argsPath)
+			require.NoError(t, task.Run())
+
+			_, err = os.Stat(argsPath)
+			assert.True(t, os.IsNotExist(err))
+
+			tags, fields := task.GetResults()
+			assert.Equal(t, "FAIL", tags["status"])
+			assert.Equal(t, tc.want, fields["message"])
+			assert.Equal(t, "config_error", fields["failure_type"])
+			assert.Equal(t, int64(0), fields["retry_count"])
+			assert.Equal(t, "1920x1080", tags["viewport"])
+			assert.Equal(t, int64(1920), fields["viewport_width"])
+			assert.Equal(t, int64(1080), fields["viewport_height"])
+		})
+	}
+}
+
+func TestBrowserTaskConfigErrorsReportConsistentFields(t *testing.T) {
+	cases := []struct {
+		name   string
+		config string
+		want   string
+	}{
+		{
+			name:   "total-timeout",
+			config: "name: homepage\ntarget: https://example.com\ntimeout_ms: 300001\nsteps:\n  - action: goto\n",
+			want:   "browser_config timeout_ms should not exceed 300000",
+		},
+		{
+			name:   "step-timeout",
+			config: "name: homepage\ntarget: https://example.com\nsteps:\n  - action: goto\n    timeout_ms: 60001\n",
+			want:   "browser_config steps 1 timeout_ms should not exceed 60000",
+		},
+		{
+			name:   "parse",
+			config: "name: [",
+			want:   "parse browser_config failed",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			browserTask := newBrowserTaskForTest()
+			browserTask.BrowserConfig = tc.config
+			task, err := NewTask("", browserTask)
+			require.NoError(t, err)
+			task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
+
+			argsPath := t.TempDir() + "/args.log"
+			t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "success")
+			t.Setenv("BROWSER_DIAL_HELPER_ARGS", argsPath)
+			require.NoError(t, task.Run())
+
+			_, err = os.Stat(argsPath)
+			assert.True(t, os.IsNotExist(err))
+
+			tags, fields := task.GetResults()
+			assert.Equal(t, "FAIL", tags["status"])
+			assert.Contains(t, fields["message"], tc.want)
+			assert.Equal(t, "config_error", fields["failure_type"])
+			assert.Equal(t, int64(-1), fields["success"])
+			assert.Equal(t, int64(0), fields["retry_count"])
+			assert.Equal(t, "1920x1080", tags["viewport"])
+			assert.Equal(t, int64(1920), fields["viewport_width"])
+			assert.Equal(t, int64(1080), fields["viewport_height"])
+		})
+	}
 }
 
 func TestBrowserTaskRunAdvanceOptions(t *testing.T) {

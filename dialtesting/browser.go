@@ -240,8 +240,8 @@ func (t *BrowserTask) metricName() string {
 }
 
 func (t *BrowserTask) run() error {
-	if _, err := t.parseBrowserConfig(); err != nil {
-		t.reqError = fmt.Sprintf("parse browser_config failed: %s", err)
+	if err := t.check(); err != nil {
+		t.setConfigError(err)
 		return nil
 	}
 
@@ -300,6 +300,7 @@ func (t *BrowserTask) runBrowserDial(path string, viewport BrowserViewport) brow
 		"--dry-run",
 		"--skip-token-check",
 		"--json",
+		"--timeout", fmt.Sprintf("%d", timeoutMS),
 	}
 	args = append(args, t.browserDialOptions(viewport)...)
 
@@ -616,6 +617,9 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 	}
 	if result.viewport.Width > 0 && result.viewport.Height > 0 {
 		tags["viewport"] = fmt.Sprintf("%dx%d", result.viewport.Width, result.viewport.Height)
+	} else if viewports := t.effectiveViewports(); len(viewports) > 0 {
+		result.viewport = viewports[0]
+		tags["viewport"] = fmt.Sprintf("%dx%d", result.viewport.Width, result.viewport.Height)
 	}
 
 	responseTime := t.result.DurationUS
@@ -635,6 +639,8 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 	}
 	if result.attempts > 0 {
 		fields["retry_count"] = int64(result.attempts - 1)
+	} else {
+		fields["retry_count"] = int64(0)
 	}
 
 	if t.reqError == "" && t.result.Success {
@@ -650,6 +656,9 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 		fields["fail_reason"] = strings.Join(reasons, ";")
 		fields["message"] = strings.Join(reasons, ";")
 		fields["failure_type"] = t.result.FailureType
+		if fields["failure_type"] == "" && t.reqError != "" {
+			fields["failure_type"] = "config_error"
+		}
 	}
 	if len(t.result.Steps) > 0 {
 		last := t.result.Steps[len(t.result.Steps)-1]
@@ -851,6 +860,14 @@ func (t *BrowserTask) initTask() {
 
 func (t *BrowserTask) setReqError(err string) {
 	t.reqError = err
+}
+
+func (t *BrowserTask) setConfigError(err error) {
+	if err == nil {
+		return
+	}
+	t.reqError = err.Error()
+	t.result.FailureType = "config_error"
 }
 
 func firstNonEmpty(values ...string) string {
