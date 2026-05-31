@@ -820,6 +820,77 @@ func TestBrowserTaskResultFallbacks(t *testing.T) {
 	assert.Equal(t, []string{"before run failed"}, reasons)
 }
 
+func TestBrowserTaskResultUsesLastExecutedStep(t *testing.T) {
+	task := newBrowserTaskForTest()
+	task.exitCode = 1
+	task.result = browserDialRun{
+		RunID:       "run-failed",
+		Name:        "homepage",
+		Target:      "https://example.com",
+		Status:      "FAIL",
+		Success:     false,
+		DurationUS:  60000000,
+		FailReason:  "timeout",
+		FailureType: "timeout",
+		Steps: []browserDialStep{
+			{
+				Seq:        1,
+				Name:       "open",
+				Action:     "goto",
+				Status:     "OK",
+				DurationUS: 1000,
+				URL:        "https://example.com",
+				Title:      "Example Domain",
+				Performance: &browserPerformanceMetrics{
+					TTFBMS:        12,
+					LoadingTimeMS: 123,
+				},
+			},
+			{
+				Seq:        2,
+				Name:       "wait button",
+				Action:     "wait_for_selector",
+				Status:     "FAIL",
+				DurationUS: 60000000,
+				Title:      "Example Domain",
+				Error: &browserDialError{
+					Name:    "errorsx.TimeoutError",
+					Message: "dial script timed out after 60000ms",
+					Stack:   "goroutine 1 [running]",
+				},
+			},
+			{
+				Seq:        3,
+				Name:       "click button",
+				Action:     "click",
+				Status:     "SKIP",
+				DurationUS: 0,
+				SkipReason: "previous_step_failed",
+			},
+		},
+	}
+
+	_, fields := task.getResults()
+	assert.Equal(t, int64(2), fields["last_step"])
+	assert.Equal(t, "https://example.com", fields["page_url"])
+	assert.Equal(t, "Example Domain", fields["page_title"])
+
+	rawSteps, ok := fields["steps"].(string)
+	require.True(t, ok)
+	assert.Contains(t, rawSteps, "dial script timed out after 60000ms")
+	assert.NotContains(t, rawSteps, "goroutine 1")
+	assert.NotContains(t, rawSteps, `"stack"`)
+
+	var steps []browserDialStep
+	require.NoError(t, json.Unmarshal([]byte(rawSteps), &steps))
+	require.Len(t, steps, 3)
+	require.NotNil(t, steps[0].Performance)
+	assert.Equal(t, int64(12), steps[0].Performance.TTFBMS)
+	require.NotNil(t, steps[1].Error)
+	assert.Empty(t, steps[1].Error.Stack)
+	assert.Equal(t, "SKIP", steps[2].Status)
+}
+
 func TestBrowserTaskHostNameErrors(t *testing.T) {
 	task := &BrowserTask{BrowserConfig: "name: homepage\nsteps:\n  - action: click\n"}
 	_, err := task.getHostName()
@@ -919,6 +990,14 @@ func TestBrowserDialHelperProcess(t *testing.T) {
 				{
 					"seq": 1, "name": "open", "action": "goto", "status": "OK", "duration_us": 1000,
 					"url": "https://example.com", "title": "Example", "screenshot": "/tmp/browser-dial/run-1-step-1.png",
+					"performance": map[string]interface{}{
+						"ttfb_ms":               12,
+						"loading_time_ms":       123,
+						"lcp_ms":                98,
+						"cls":                   0.03,
+						"dom_content_loaded_ms": 88,
+						"load_event_end_ms":     123,
+					},
 				},
 				{
 					"seq": 2, "name": "assert body", "action": "assert_text", "selector": "main", "expected": "Example Domain",

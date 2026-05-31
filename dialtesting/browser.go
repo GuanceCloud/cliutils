@@ -171,24 +171,25 @@ type browserDialRun struct {
 }
 
 type browserDialStep struct {
-	Seq          int               `json:"seq"`
-	Name         string            `json:"name"`
-	Action       string            `json:"action,omitempty"`
-	Selector     string            `json:"selector,omitempty"`
-	InputDisplay string            `json:"input_display,omitempty"`
-	ValueFrom    string            `json:"value_from,omitempty"`
-	Expected     string            `json:"expected,omitempty"`
-	TimeoutMS    int               `json:"timeout_ms,omitempty"`
-	Auth         bool              `json:"auth,omitempty"`
-	Status       string            `json:"status"`
-	StartedAt    string            `json:"started_at,omitempty"`
-	EndedAt      string            `json:"ended_at,omitempty"`
-	DurationUS   int64             `json:"duration_us"`
-	URL          string            `json:"url,omitempty"`
-	Title        string            `json:"title,omitempty"`
-	Screenshot   string            `json:"screenshot,omitempty"`
-	SkipReason   string            `json:"skip_reason,omitempty"`
-	Error        *browserDialError `json:"error,omitempty"`
+	Seq          int                        `json:"seq"`
+	Name         string                     `json:"name"`
+	Action       string                     `json:"action,omitempty"`
+	Selector     string                     `json:"selector,omitempty"`
+	InputDisplay string                     `json:"input_display,omitempty"`
+	ValueFrom    string                     `json:"value_from,omitempty"`
+	Expected     string                     `json:"expected,omitempty"`
+	TimeoutMS    int                        `json:"timeout_ms,omitempty"`
+	Auth         bool                       `json:"auth,omitempty"`
+	Status       string                     `json:"status"`
+	StartedAt    string                     `json:"started_at,omitempty"`
+	EndedAt      string                     `json:"ended_at,omitempty"`
+	DurationUS   int64                      `json:"duration_us"`
+	URL          string                     `json:"url,omitempty"`
+	Title        string                     `json:"title,omitempty"`
+	Performance  *browserPerformanceMetrics `json:"performance,omitempty"`
+	Screenshot   string                     `json:"screenshot,omitempty"`
+	SkipReason   string                     `json:"skip_reason,omitempty"`
+	Error        *browserDialError          `json:"error,omitempty"`
 }
 
 type browserPerformanceMetrics struct {
@@ -660,9 +661,8 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 			fields["failure_type"] = "config_error"
 		}
 	}
-	if len(t.result.Steps) > 0 {
-		last := t.result.Steps[len(t.result.Steps)-1]
-		fields["page_url"] = last.URL
+	if last, ok := lastExecutedBrowserStep(t.result.Steps); ok {
+		fields["page_url"] = firstNonEmpty(last.URL, t.result.Target, cfg.Target, t.URL)
 		fields["page_title"] = last.Title
 	}
 	if len(t.result.TraceIDs) > 0 {
@@ -672,7 +672,7 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 		}
 	}
 	addBrowserPerformanceFields(fields, t.result.Performance)
-	if steps, err := json.Marshal(t.result.Steps); err == nil {
+	if steps, err := json.Marshal(compactBrowserSteps(t.result.Steps)); err == nil {
 		fields["steps"] = string(steps)
 	}
 	if vars := browserConfigResultVars(cfg.ConfigVars); len(vars) > 0 {
@@ -735,10 +735,35 @@ func addBrowserPerformanceFields(fields map[string]interface{}, metrics *browser
 }
 
 func lastBrowserStep(steps []browserDialStep) int {
-	if len(steps) == 0 {
-		return 0
+	if last, ok := lastExecutedBrowserStep(steps); ok {
+		return last.Seq
 	}
-	return steps[len(steps)-1].Seq
+	return 0
+}
+
+func lastExecutedBrowserStep(steps []browserDialStep) (browserDialStep, bool) {
+	for i := len(steps) - 1; i >= 0; i-- {
+		if !strings.EqualFold(steps[i].Status, "SKIP") {
+			return steps[i], true
+		}
+	}
+	return browserDialStep{}, false
+}
+
+func compactBrowserSteps(steps []browserDialStep) []browserDialStep {
+	if len(steps) == 0 {
+		return nil
+	}
+	compact := make([]browserDialStep, len(steps))
+	copy(compact, steps)
+	for i := range compact {
+		if compact[i].Error != nil {
+			errInfo := *compact[i].Error
+			errInfo.Stack = ""
+			compact[i].Error = &errInfo
+		}
+	}
+	return compact
 }
 
 func (t *BrowserTask) check() error {
