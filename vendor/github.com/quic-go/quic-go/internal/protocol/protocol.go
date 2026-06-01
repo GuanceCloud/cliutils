@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+	"sync/atomic"
 	"time"
 )
 
@@ -37,14 +38,65 @@ func (t PacketType) String() string {
 type ECN uint8
 
 const (
-	ECNNon ECN = iota // 00
-	ECT1              // 01
-	ECT0              // 10
-	ECNCE             // 11
+	ECNUnsupported ECN = iota
+	ECNNon             // 00
+	ECT1               // 01
+	ECT0               // 10
+	ECNCE              // 11
 )
+
+func ParseECNHeaderBits(bits byte) ECN {
+	switch bits {
+	case 0:
+		return ECNNon
+	case 0b00000010:
+		return ECT0
+	case 0b00000001:
+		return ECT1
+	case 0b00000011:
+		return ECNCE
+	default:
+		panic("invalid ECN bits")
+	}
+}
+
+func (e ECN) ToHeaderBits() byte {
+	//nolint:exhaustive // There are only 4 values.
+	switch e {
+	case ECNNon:
+		return 0
+	case ECT0:
+		return 0b00000010
+	case ECT1:
+		return 0b00000001
+	case ECNCE:
+		return 0b00000011
+	default:
+		panic("ECN unsupported")
+	}
+}
+
+func (e ECN) String() string {
+	switch e {
+	case ECNUnsupported:
+		return "ECN unsupported"
+	case ECNNon:
+		return "Not-ECT"
+	case ECT1:
+		return "ECT(1)"
+	case ECT0:
+		return "ECT(0)"
+	case ECNCE:
+		return "CE"
+	default:
+		return fmt.Sprintf("invalid ECN value: %d", e)
+	}
+}
 
 // A ByteCount in QUIC
 type ByteCount int64
+
+type AtomicByteCount atomic.Int64
 
 // MaxByteCount is the maximum value of a ByteCount
 const MaxByteCount = ByteCount(1<<62 - 1)
@@ -73,6 +125,10 @@ const MinUnknownVersionPacketSize = MinInitialPacketSize
 
 // MinStatelessResetSize is the minimum size of a stateless reset packet that we send
 const MinStatelessResetSize = 1 /* first byte */ + 20 /* max. conn ID length */ + 4 /* max. packet number length */ + 1 /* min. payload length */ + 16 /* token */
+
+// MinReceivedStatelessResetSize is the minimum size of a received stateless reset,
+// as specified in section 10.3 of RFC 9000.
+const MinReceivedStatelessResetSize = 5 + 16
 
 // MinConnectionIDLenInitial is the minimum length of the destination connection ID on an Initial packet.
 const MinConnectionIDLenInitial = 8

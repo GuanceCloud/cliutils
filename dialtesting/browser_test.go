@@ -6,15 +6,16 @@
 package dialtesting
 
 import (
+	"context"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
+	"errors"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	browserevidence "github.com/GuanceCloud/cliutils/internal/browserdial/evidence"
+	browserrunner "github.com/GuanceCloud/cliutils/internal/browserdial/runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,13 +26,12 @@ func TestCreateBrowserTaskChild(t *testing.T) {
 	require.IsType(t, &BrowserTask{}, ct)
 }
 
-func TestBrowserTaskRunExternalProcess(t *testing.T) {
+func TestBrowserTaskRunEmbeddedByDefault(t *testing.T) {
 	browserTask := newBrowserTaskForTest()
 	task, err := NewTask("", browserTask)
 	require.NoError(t, err)
-	task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
+	stubBrowserEngine(t, nil, nil)
 
-	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "success")
 	err = task.Run()
 	require.NoError(t, err)
 
@@ -40,113 +40,17 @@ func TestBrowserTaskRunExternalProcess(t *testing.T) {
 	assert.Equal(t, ClassHeadless, task.Class())
 	assert.Equal(t, "browser_dial_testing", task.MetricName())
 	assert.Equal(t, int64(1), fields["success"])
-	assert.Equal(t, int64(12345), fields["response_time"])
+	assert.Greater(t, fields["response_time"], int64(0))
 	assert.Equal(t, int64(2), fields["last_step"])
-	assert.Equal(t, "trace-1", fields["trace_id"])
-	assert.Contains(t, fields["steps"], "open")
-	assert.Contains(t, fields["steps"], "assert_text")
-	assert.Contains(t, fields["steps"], "main")
+	assert.Contains(t, fields["steps"], "goto")
+	assert.Contains(t, fields["steps"], "assert_title")
 	assert.Contains(t, fields["steps"], "Example Domain")
-	assert.Contains(t, fields["steps"], "/tmp/browser-dial/run-1-step-1.png")
 	assert.Equal(t, "https://example.com", tags["url"])
 	assert.Equal(t, "platform", tags["owner"])
 	assert.Equal(t, "1920x1080", tags["viewport"])
 	assert.Equal(t, int64(1920), fields["viewport_width"])
 	assert.Equal(t, int64(1080), fields["viewport_height"])
 	assert.Equal(t, int64(0), fields["retry_count"])
-	assert.Equal(t, int64(12), fields["ttfb"])
-	assert.Equal(t, int64(123), fields["loading_time"])
-	assert.Equal(t, int64(98), fields["lcp"])
-	assert.Equal(t, 0.03, fields["cls"])
-}
-
-func TestBrowserTaskRunDaemon(t *testing.T) {
-	browserTask := newBrowserTaskForTest()
-	browserTask.BrowserWindow = &BrowserWindowOption{Viewports: []BrowserViewport{{Width: 1366, Height: 768}}}
-	browserTask.AdvanceOptions = &BrowserAdvanceOption{
-		Engine:              "chrome",
-		ScreenshotOnFailure: true,
-		Headers:             map[string]string{"X-Test": "ok"},
-		Cookies:             []BrowserCookie{{Name: "sid", Value: "abc"}},
-		IgnoreHTTPSErrors:   true,
-		ProxyURL:            "http://127.0.0.1:7897",
-	}
-
-	var got browserDialDaemonRequest
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodPost, r.Method)
-		assert.Equal(t, "/v1/run", r.URL.Path)
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
-		assert.Contains(t, got.Script, "name: homepage")
-		assert.Equal(t, "homepage", got.Name)
-		assert.Equal(t, "chrome", got.Engine)
-		assert.Equal(t, 1000, got.TimeoutMS)
-		assert.Equal(t, "/opt/datakit-browser/chrome/chrome", got.ChromePath)
-		assert.Equal(t, 1366, got.ViewportWidth)
-		assert.Equal(t, 768, got.ViewportHeight)
-		assert.True(t, got.ScreenshotOnFailure)
-		assert.Equal(t, "ok", got.Headers["X-Test"])
-		assert.Equal(t, []BrowserCookie{{Name: "sid", Value: "abc"}}, got.Cookies)
-		assert.True(t, got.IgnoreHTTPSErrors)
-		assert.Equal(t, "http://127.0.0.1:7897", got.ProxyURL)
-
-		_ = json.NewEncoder(w).Encode(browserDialOutput{
-			ExitCode: 0,
-			Run: browserDialRun{
-				RunID:      "run-daemon",
-				Name:       "homepage",
-				Target:     "https://example.com",
-				Status:     "OK",
-				Success:    true,
-				DurationUS: 23456,
-				Steps: []browserDialStep{{
-					Seq:        1,
-					Name:       "open",
-					Action:     "goto",
-					Status:     "OK",
-					DurationUS: 1000,
-				}},
-			},
-		})
-	}))
-	defer server.Close()
-
-	task, err := NewTask("", browserTask)
-	require.NoError(t, err)
-	task.SetOption(map[string]string{
-		optionBrowserDialMode: "daemon",
-		optionBrowserDialURL:  server.URL,
-		optionChromePath:      "/opt/datakit-browser/chrome/chrome",
-	})
-
-	require.NoError(t, task.Run())
-
-	tags, fields := task.GetResults()
-	assert.Equal(t, "OK", tags["status"])
-	assert.Equal(t, "1366x768", tags["viewport"])
-	assert.Equal(t, int64(1), fields["success"])
-	assert.Equal(t, int64(23456), fields["response_time"])
-	assert.Equal(t, "run-daemon", fields["browser_run_id"])
-}
-
-func TestBrowserTaskRunDaemonFailure(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "busy", http.StatusServiceUnavailable)
-	}))
-	defer server.Close()
-
-	browserTask := newBrowserTaskForTest()
-	task, err := NewTask("", browserTask)
-	require.NoError(t, err)
-	task.SetOption(map[string]string{
-		optionBrowserDialMode: "daemon",
-		optionBrowserDialURL:  server.URL,
-	})
-
-	require.NoError(t, task.Run())
-	_, fields := task.GetResults()
-	assert.Equal(t, int64(-1), fields["success"])
-	assert.Contains(t, fields["message"], "browser-dial daemon returned HTTP 503")
 }
 
 func TestBrowserTaskRunSetsLightpandaPath(t *testing.T) {
@@ -154,17 +58,18 @@ func TestBrowserTaskRunSetsLightpandaPath(t *testing.T) {
 	task, err := NewTask("", browserTask)
 	require.NoError(t, err)
 	task.SetOption(map[string]string{
-		optionBrowserDialPath: os.Args[0],
-		optionLightpandaPath:  "/opt/datakit/lightpanda",
+		optionLightpandaPath: "/opt/datakit/lightpanda",
 	})
 
-	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "check-lightpanda")
-	err = task.Run()
-	require.NoError(t, err)
+	var gotOptions browserrunner.EngineOptions
+	browserTask.AdvanceOptions = &BrowserAdvanceOption{Engine: "lightpanda"}
+	stubBrowserEngine(t, &gotOptions, nil)
+	require.NoError(t, task.Run())
 
 	tags, fields := task.GetResults()
 	assert.Equal(t, "OK", tags["status"])
 	assert.Equal(t, int64(1), fields["success"])
+	assert.Equal(t, "/opt/datakit/lightpanda", gotOptions.LightpandaPath)
 }
 
 func TestBrowserTaskRunSetsChromePath(t *testing.T) {
@@ -172,26 +77,25 @@ func TestBrowserTaskRunSetsChromePath(t *testing.T) {
 	task, err := NewTask("", browserTask)
 	require.NoError(t, err)
 	task.SetOption(map[string]string{
-		optionBrowserDialPath: os.Args[0],
-		optionChromePath:      "/opt/datakit-browser/chrome/chrome",
+		optionChromePath: "/opt/datakit-browser/chrome/chrome",
 	})
 
-	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "check-chrome")
-	err = task.Run()
-	require.NoError(t, err)
+	var gotOptions browserrunner.EngineOptions
+	stubBrowserEngine(t, &gotOptions, nil)
+	require.NoError(t, task.Run())
 
 	tags, fields := task.GetResults()
 	assert.Equal(t, "OK", tags["status"])
 	assert.Equal(t, int64(1), fields["success"])
+	assert.Equal(t, "/opt/datakit-browser/chrome/chrome", gotOptions.ChromePath)
 }
 
-func TestBrowserTaskRunExternalProcessFailure(t *testing.T) {
+func TestBrowserTaskRunEmbeddedFailure(t *testing.T) {
 	browserTask := newBrowserTaskForTest()
 	task, err := NewTask("", browserTask)
 	require.NoError(t, err)
-	task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
 
-	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "failure")
+	stubBrowserEngine(t, nil, nil, "Wrong Title")
 	err = task.Run()
 	require.NoError(t, err)
 
@@ -200,44 +104,28 @@ func TestBrowserTaskRunExternalProcessFailure(t *testing.T) {
 	assert.Equal(t, int64(-1), fields["success"])
 	assert.Contains(t, fields["fail_reason"], "step_error")
 	assert.Equal(t, "assertion_failed", fields["failure_type"])
-	assert.Contains(t, fields["message"], "title mismatch")
+	assert.Contains(t, fields["message"], "title assertion failed")
 	assert.Equal(t, int64(2), fields["last_step"])
 	assert.Contains(t, fields["steps"], "title")
 }
 
-func TestBrowserTaskStopCancelsExternalProcess(t *testing.T) {
+func TestBrowserTaskRunEmbeddedEngineError(t *testing.T) {
 	browserTask := newBrowserTaskForTest()
 	task, err := NewTask("", browserTask)
 	require.NoError(t, err)
-	task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
 
-	startedPath := t.TempDir() + "/started"
-	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "sleep")
-	t.Setenv("BROWSER_DIAL_HELPER_STARTED", startedPath)
-
-	done := make(chan error, 1)
-	go func() {
-		done <- task.Run()
-	}()
-
-	require.Eventually(t, func() bool {
-		_, err := os.Stat(startedPath)
-		return err == nil
-	}, 2*time.Second, 10*time.Millisecond)
-
-	task.Stop()
-	task.Stop()
-
-	select {
-	case err := <-done:
-		require.NoError(t, err)
-	case <-time.After(3 * time.Second):
-		t.Fatal("browser task did not stop external process")
+	oldChromeFactory := browserEmbeddedChromeEngineFactory
+	browserEmbeddedChromeEngineFactory = func(context.Context, browserrunner.EngineOptions) (browserrunner.Engine, error) {
+		return nil, errors.New("start chrome failed")
 	}
+	t.Cleanup(func() {
+		browserEmbeddedChromeEngineFactory = oldChromeFactory
+	})
 
+	require.NoError(t, task.Run())
 	_, fields := task.GetResults()
 	assert.Equal(t, int64(-1), fields["success"])
-	assert.NotEmpty(t, fields["message"])
+	assert.Contains(t, fields["message"], "start chrome failed")
 }
 
 func TestBrowserTaskRenderTemplate(t *testing.T) {
@@ -482,17 +370,13 @@ func TestBrowserTaskRunSingleViewport(t *testing.T) {
 	browserTask.BrowserWindow = &BrowserWindowOption{Viewports: []BrowserViewport{{Width: 1366, Height: 768}}}
 	task, err := NewTask("", browserTask)
 	require.NoError(t, err)
-	task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
 
-	argsPath := t.TempDir() + "/args.log"
-	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "success")
-	t.Setenv("BROWSER_DIAL_HELPER_ARGS", argsPath)
+	var gotOptions browserrunner.EngineOptions
+	stubBrowserEngine(t, &gotOptions, nil)
 	require.NoError(t, task.Run())
 
-	lines := readHelperArgs(t, argsPath)
-	require.Len(t, lines, 1)
-	assert.Contains(t, lines[0], "--viewport-width 1366 --viewport-height 768")
-	assert.Contains(t, lines[0], "--timeout 1000")
+	assert.Equal(t, 1366, gotOptions.ViewportWidth)
+	assert.Equal(t, 768, gotOptions.ViewportHeight)
 
 	tags, fields := task.GetResults()
 	assert.Equal(t, "1366x768", tags["viewport"])
@@ -523,15 +407,15 @@ func TestBrowserTaskRunRejectsInvalidRetryOptionsAtRuntime(t *testing.T) {
 			browserTask.RetryOptions = tc.options
 			task, err := NewTask("", browserTask)
 			require.NoError(t, err)
-			task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
 
-			argsPath := t.TempDir() + "/args.log"
-			t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "success")
-			t.Setenv("BROWSER_DIAL_HELPER_ARGS", argsPath)
+			var calls int
+			stubBrowserEngineWithFactory(t, func(_ context.Context, options browserrunner.EngineOptions) (browserrunner.Engine, error) {
+				calls++
+				return &fakeBrowserEngine{}, nil
+			})
 			require.NoError(t, task.Run())
 
-			_, err = os.Stat(argsPath)
-			assert.True(t, os.IsNotExist(err))
+			assert.Equal(t, 0, calls)
 
 			tags, fields := task.GetResults()
 			assert.Equal(t, "FAIL", tags["status"])
@@ -573,15 +457,15 @@ func TestBrowserTaskConfigErrorsReportConsistentFields(t *testing.T) {
 			browserTask.BrowserConfig = tc.config
 			task, err := NewTask("", browserTask)
 			require.NoError(t, err)
-			task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
 
-			argsPath := t.TempDir() + "/args.log"
-			t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "success")
-			t.Setenv("BROWSER_DIAL_HELPER_ARGS", argsPath)
+			var calls int
+			stubBrowserEngineWithFactory(t, func(_ context.Context, options browserrunner.EngineOptions) (browserrunner.Engine, error) {
+				calls++
+				return &fakeBrowserEngine{}, nil
+			})
 			require.NoError(t, task.Run())
 
-			_, err = os.Stat(argsPath)
-			assert.True(t, os.IsNotExist(err))
+			assert.Equal(t, 0, calls)
 
 			tags, fields := task.GetResults()
 			assert.Equal(t, "FAIL", tags["status"])
@@ -608,20 +492,18 @@ func TestBrowserTaskRunAdvanceOptions(t *testing.T) {
 	}
 	task, err := NewTask("", browserTask)
 	require.NoError(t, err)
-	task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
 
-	argsPath := t.TempDir() + "/args.log"
-	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "success")
-	t.Setenv("BROWSER_DIAL_HELPER_ARGS", argsPath)
+	var gotOptions browserrunner.EngineOptions
+	var gotConfig browserrunner.BrowserConfig
+	stubBrowserEngine(t, &gotOptions, &gotConfig)
 	require.NoError(t, task.Run())
 
-	line := readHelperArgs(t, argsPath)[0]
-	assert.Contains(t, line, "--engine chrome")
-	assert.Contains(t, line, "--screenshot-on-failure")
-	assert.Contains(t, line, "--header X-Test=ok")
-	assert.Contains(t, line, "--cookie sid=abc")
-	assert.Contains(t, line, "--ignore-https-errors")
-	assert.Contains(t, line, "--proxy-url http://127.0.0.1:7897")
+	assert.Equal(t, "http://127.0.0.1:7897", gotOptions.ProxyURL)
+	assert.True(t, gotOptions.IgnoreHTTPSErrors)
+	assert.Equal(t, "ok", gotConfig.Headers["X-Test"])
+	require.Len(t, gotConfig.Cookies, 1)
+	assert.Equal(t, "sid", gotConfig.Cookies[0].Name)
+	assert.Equal(t, "abc", gotConfig.Cookies[0].Value)
 }
 
 func TestBrowserTaskRetryStopsAfterSuccess(t *testing.T) {
@@ -633,12 +515,15 @@ func TestBrowserTaskRetryStopsAfterSuccess(t *testing.T) {
 	browserTask.RetryOptions = &BrowserRetryOption{Enabled: true, Count: 2, IntervalSec: 5}
 	task, err := NewTask("", browserTask)
 	require.NoError(t, err)
-	task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
 
-	dir := t.TempDir()
-	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "fail-once")
-	t.Setenv("BROWSER_DIAL_HELPER_COUNT", dir+"/count")
-	t.Setenv("BROWSER_DIAL_HELPER_ARGS", dir+"/args.log")
+	var calls int
+	stubBrowserEngineWithFactory(t, func(_ context.Context, options browserrunner.EngineOptions) (browserrunner.Engine, error) {
+		calls++
+		if calls == 1 {
+			return &fakeBrowserEngine{title: "Wrong Title"}, nil
+		}
+		return &fakeBrowserEngine{}, nil
+	})
 	require.NoError(t, task.Run())
 
 	tags, fields := task.GetResults()
@@ -658,7 +543,7 @@ func TestBrowserTaskRetryStopsAfterSuccess(t *testing.T) {
 	assert.Equal(t, 2, records[1].Attempt)
 	assert.Equal(t, "OK", records[1].Status)
 	assert.True(t, records[1].Success)
-	assert.Len(t, readHelperArgs(t, dir+"/args.log"), 2)
+	assert.Equal(t, 2, calls)
 }
 
 func TestBrowserTaskParseFailureDoesNotRetry(t *testing.T) {
@@ -667,15 +552,15 @@ func TestBrowserTaskParseFailureDoesNotRetry(t *testing.T) {
 	browserTask.RetryOptions = &BrowserRetryOption{Enabled: true, Count: 2, IntervalSec: 5}
 	task, err := NewTask("", browserTask)
 	require.NoError(t, err)
-	task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
 
-	argsPath := t.TempDir() + "/args.log"
-	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "success")
-	t.Setenv("BROWSER_DIAL_HELPER_ARGS", argsPath)
+	var calls int
+	stubBrowserEngineWithFactory(t, func(_ context.Context, options browserrunner.EngineOptions) (browserrunner.Engine, error) {
+		calls++
+		return &fakeBrowserEngine{}, nil
+	})
 	require.NoError(t, task.Run())
 
-	_, err = os.Stat(argsPath)
-	assert.True(t, os.IsNotExist(err))
+	assert.Equal(t, 0, calls)
 	_, fields := task.GetResults()
 	assert.Contains(t, fields["message"], "parse browser_config failed")
 }
@@ -710,9 +595,8 @@ func TestBrowserTaskIgnoresOuterSuccessWhen(t *testing.T) {
 	require.NoError(t, err)
 	task, err := NewTask(taskJSON, child)
 	require.NoError(t, err)
-	task.SetOption(map[string]string{optionBrowserDialPath: os.Args[0]})
 
-	t.Setenv("GO_WANT_BROWSER_DIAL_HELPER", "success")
+	stubBrowserEngine(t, nil, nil)
 	require.NoError(t, task.Check())
 	require.NoError(t, task.Run())
 	tags, fields := task.GetResults()
@@ -765,54 +649,6 @@ func TestBrowserTaskChromePathOption(t *testing.T) {
 
 	task.SetOption(map[string]string{})
 	assert.Empty(t, task.chromePath())
-}
-
-func TestSetEnvOverridesExistingValue(t *testing.T) {
-	env := setEnv([]string{"A=1", "CHROME_EXECUTABLE_PATH=/old/chrome"}, "CHROME_EXECUTABLE_PATH", "/new/chrome")
-	assert.Equal(t, []string{"A=1", "CHROME_EXECUTABLE_PATH=/new/chrome"}, env)
-
-	env = setEnv([]string{"A=1"}, "CHROME_EXECUTABLE_PATH", "/new/chrome")
-	assert.Equal(t, []string{"A=1", "CHROME_EXECUTABLE_PATH=/new/chrome"}, env)
-}
-
-func TestBrowserTaskExecutablePathOption(t *testing.T) {
-	task := &BrowserTask{Task: &Task{}}
-	task.SetOption(map[string]string{optionBrowserDialPath: "/opt/browser-dial"})
-	assert.Equal(t, "/opt/browser-dial", task.executablePath())
-
-	task.SetOption(map[string]string{optionBrowserDialPathCamel: "/opt/browser-dial-camel"})
-	assert.Equal(t, "/opt/browser-dial-camel", task.executablePath())
-
-	task.SetOption(map[string]string{})
-	t.Setenv("BROWSER_DIAL_PATH", "/env/browser-dial")
-	assert.Equal(t, "/env/browser-dial", task.executablePath())
-
-	t.Setenv("BROWSER_DIAL_PATH", "")
-	assert.Equal(t, defaultBrowserDialPath, task.executablePath())
-}
-
-func TestBrowserTaskDaemonOptions(t *testing.T) {
-	task := &BrowserTask{Task: &Task{}}
-	task.SetOption(map[string]string{
-		optionBrowserDialMode: "daemon",
-		optionBrowserDialURL:  "http://127.0.0.1:18080",
-	})
-	assert.Equal(t, "daemon", task.browserDialMode())
-	assert.Equal(t, "http://127.0.0.1:18080", task.browserDialURL())
-	assert.True(t, task.useBrowserDialDaemon())
-
-	task.SetOption(map[string]string{
-		optionBrowserDialModeCamel: "daemon",
-		optionBrowserDialURLCamel:  "http://127.0.0.1:18081",
-	})
-	assert.Equal(t, "daemon", task.browserDialMode())
-	assert.Equal(t, "http://127.0.0.1:18081", task.browserDialURL())
-	assert.True(t, task.useBrowserDialDaemon())
-
-	task.SetOption(map[string]string{})
-	assert.Equal(t, "exec", task.browserDialMode())
-	assert.Empty(t, task.browserDialURL())
-	assert.False(t, task.useBrowserDialDaemon())
 }
 
 func TestBrowserTaskResultFallbacks(t *testing.T) {
@@ -960,103 +796,132 @@ func TestBrowserTaskSmallHelpers(t *testing.T) {
 	assert.Equal(t, []string{}, dedupBrowserHostNames([]string{"", ""}))
 }
 
-func TestBrowserDialHelperProcess(t *testing.T) {
-	mode := os.Getenv("GO_WANT_BROWSER_DIAL_HELPER")
-	if mode == "" {
-		return
-	}
-	if len(os.Args) == 0 || !strings.Contains(strings.Join(os.Args, " "), "run") {
-		os.Exit(2)
-	}
-	if argsPath := os.Getenv("BROWSER_DIAL_HELPER_ARGS"); argsPath != "" {
-		file, err := os.OpenFile(argsPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-		if err != nil {
-			os.Exit(4)
-		}
-		_, _ = file.WriteString(strings.Join(os.Args, " ") + "\n")
-		_ = file.Close()
-	}
-	if mode == "check-lightpanda" && os.Getenv("LIGHTPANDA_EXECUTABLE_PATH") != "/opt/datakit/lightpanda" {
-		os.Exit(3)
-	}
-	if mode == "check-chrome" && os.Getenv("CHROME_EXECUTABLE_PATH") != "/opt/datakit-browser/chrome/chrome" {
-		os.Exit(3)
-	}
-	if mode == "sleep" {
-		if startedPath := os.Getenv("BROWSER_DIAL_HELPER_STARTED"); startedPath != "" {
-			_ = os.WriteFile(startedPath, []byte("started"), 0o600)
-		}
-		time.Sleep(10 * time.Second)
-		os.Exit(0)
+func TestBrowserTaskRunEmbedded(t *testing.T) {
+	browserTask := newBrowserTaskForTest()
+	browserTask.BrowserWindow = &BrowserWindowOption{Viewports: []BrowserViewport{{Width: 1366, Height: 768}}}
+	browserTask.AdvanceOptions = &BrowserAdvanceOption{
+		Engine:              "chrome",
+		ScreenshotOnFailure: true,
+		Headers:             map[string]string{"X-Test": "ok"},
+		Cookies:             []BrowserCookie{{Name: "sid", Value: "abc"}},
+		IgnoreHTTPSErrors:   true,
+		ProxyURL:            "http://127.0.0.1:7897",
 	}
 
-	output := map[string]interface{}{
-		"exit_code": 0,
-		"run": map[string]interface{}{
-			"run_id":      "run-1",
-			"name":        "homepage",
-			"target":      "https://example.com",
-			"status":      "OK",
-			"success":     true,
-			"duration_us": 12345,
-			"steps": []map[string]interface{}{
-				{
-					"seq": 1, "name": "open", "action": "goto", "status": "OK", "duration_us": 1000,
-					"url": "https://example.com", "title": "Example", "screenshot": "/tmp/browser-dial/run-1-step-1.png",
-					"performance": map[string]interface{}{
-						"ttfb_ms":               12,
-						"loading_time_ms":       123,
-						"lcp_ms":                98,
-						"cls":                   0.03,
-						"dom_content_loaded_ms": 88,
-						"load_event_end_ms":     123,
-					},
-				},
-				{
-					"seq": 2, "name": "assert body", "action": "assert_text", "selector": "main", "expected": "Example Domain",
-					"status": "OK", "duration_us": 2000, "url": "https://example.com", "title": "Example",
-				},
-			},
-			"performance": map[string]interface{}{
-				"ttfb_ms":               12,
-				"loading_time_ms":       123,
-				"lcp_ms":                98,
-				"cls":                   0.03,
-				"dom_content_loaded_ms": 88,
-				"load_event_end_ms":     123,
-			},
-			"trace_ids": []string{"trace-1"},
-		},
+	var gotOptions browserrunner.EngineOptions
+	var gotConfig browserrunner.BrowserConfig
+	oldChromeFactory := browserEmbeddedChromeEngineFactory
+	browserEmbeddedChromeEngineFactory = func(_ context.Context, options browserrunner.EngineOptions) (browserrunner.Engine, error) {
+		gotOptions = options
+		return &fakeBrowserEngine{config: &gotConfig}, nil
 	}
-	exitCode := 0
-	if mode == "fail-once" && incrementHelperCount(os.Getenv("BROWSER_DIAL_HELPER_COUNT")) == 1 {
-		mode = "failure"
-	}
-	if mode == "failure" {
-		output["exit_code"] = 1
-		output["run"] = map[string]interface{}{
-			"run_id":       "run-2",
-			"name":         "homepage",
-			"target":       "https://example.com",
-			"status":       "FAIL",
-			"success":      false,
-			"duration_us":  54321,
-			"fail_reason":  "step_error",
-			"failure_type": "assertion_failed",
-			"error": map[string]interface{}{
-				"name":    "assertion",
-				"message": "title mismatch",
-			},
-			"steps": []map[string]interface{}{
-				{"seq": 1, "name": "open", "status": "OK", "duration_us": 1000},
-				{"seq": 2, "name": "title", "status": "FAIL", "duration_us": 1000},
-			},
-		}
-		exitCode = 1
-	}
+	t.Cleanup(func() {
+		browserEmbeddedChromeEngineFactory = oldChromeFactory
+	})
 
-	_ = json.NewEncoder(os.Stdout).Encode(output)
-	os.Exit(exitCode)
+	task, err := NewTask("", browserTask)
+	require.NoError(t, err)
+	task.SetOption(map[string]string{
+		optionChromePath: "/opt/datakit-browser/chrome/chrome",
+	})
+	require.NoError(t, task.Run())
+
+	tags, fields := task.GetResults()
+	assert.Equal(t, "OK", tags["status"])
+	assert.Equal(t, "browser-dial", tags["runner"])
+	assert.Equal(t, "chrome", tags["browser_engine"])
+	assert.Equal(t, "1366x768", tags["viewport"])
+	assert.Equal(t, int64(1), fields["success"])
+	assert.Equal(t, "success", fields["message"])
+	assert.Equal(t, int64(1366), fields["viewport_width"])
+	assert.Equal(t, int64(768), fields["viewport_height"])
+	assert.Equal(t, "/opt/datakit-browser/chrome/chrome", gotOptions.ChromePath)
+	assert.Equal(t, 1366, gotOptions.ViewportWidth)
+	assert.Equal(t, 768, gotOptions.ViewportHeight)
+	assert.Equal(t, "http://127.0.0.1:7897", gotOptions.ProxyURL)
+	assert.True(t, gotOptions.IgnoreHTTPSErrors)
+	assert.Equal(t, "ok", gotConfig.Headers["X-Test"])
+	require.Len(t, gotConfig.Cookies, 1)
+	assert.Equal(t, "sid", gotConfig.Cookies[0].Name)
+	assert.Equal(t, "abc", gotConfig.Cookies[0].Value)
+}
+
+type fakeBrowserEngine struct {
+	config *browserrunner.BrowserConfig
+	title  string
+}
+
+func (e *fakeBrowserEngine) Close(context.Context) error { return nil }
+
+func (e *fakeBrowserEngine) Navigate(context.Context, string) error { return nil }
+
+func (e *fakeBrowserEngine) WaitForSelector(context.Context, string) error { return nil }
+
+func (e *fakeBrowserEngine) Click(context.Context, string) error { return nil }
+
+func (e *fakeBrowserEngine) Fill(context.Context, string, string) error { return nil }
+
+func (e *fakeBrowserEngine) Title(context.Context) (string, error) {
+	if e.title != "" {
+		return e.title, nil
+	}
+	return "Example Domain", nil
+}
+
+func (e *fakeBrowserEngine) URL(context.Context) (string, error) { return "https://example.com", nil }
+
+func (e *fakeBrowserEngine) Text(context.Context, string) (string, error) {
+	return "Example Domain", nil
+}
+
+func (e *fakeBrowserEngine) Eval(context.Context, string) (string, error) { return "", nil }
+
+func (e *fakeBrowserEngine) CaptureDOM(context.Context) (browserevidence.DomSnapshot, error) {
+	return browserevidence.DomSnapshot{}, nil
+}
+
+func (e *fakeBrowserEngine) ConsoleEvents() []browserevidence.ConsoleEvent { return nil }
+
+func (e *fakeBrowserEngine) NetworkEvents() []browserevidence.NetworkEvent { return nil }
+
+func (e *fakeBrowserEngine) ConfigureBrowser(_ context.Context, config browserrunner.BrowserConfig) error {
+	if e.config != nil {
+		*e.config = config
+	}
+	return nil
+}
+
+func stubBrowserEngine(
+	t *testing.T,
+	gotOptions *browserrunner.EngineOptions,
+	gotConfig *browserrunner.BrowserConfig,
+	titles ...string,
+) {
+	t.Helper()
+	var calls int
+	stubBrowserEngineWithFactory(t, func(_ context.Context, options browserrunner.EngineOptions) (browserrunner.Engine, error) {
+		if gotOptions != nil {
+			*gotOptions = options
+		}
+		title := ""
+		if calls < len(titles) {
+			title = titles[calls]
+		}
+		calls++
+		return &fakeBrowserEngine{config: gotConfig, title: title}, nil
+	})
+}
+
+func stubBrowserEngineWithFactory(t *testing.T, factory browserrunner.EngineFactory) {
+	t.Helper()
+	oldChromeFactory := browserEmbeddedChromeEngineFactory
+	oldLightpandaFactory := browserEmbeddedLightpandaEngineFactory
+	browserEmbeddedChromeEngineFactory = factory
+	browserEmbeddedLightpandaEngineFactory = factory
+	t.Cleanup(func() {
+		browserEmbeddedChromeEngineFactory = oldChromeFactory
+		browserEmbeddedLightpandaEngineFactory = oldLightpandaFactory
+	})
 }
 
 func newBrowserTaskForTest() *BrowserTask {
@@ -1077,24 +942,4 @@ func mustJSON(t *testing.T, value interface{}) string {
 	data, err := json.Marshal(value)
 	require.NoError(t, err)
 	return string(data)
-}
-
-func readHelperArgs(t *testing.T, path string) []string {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	require.NoError(t, err)
-	return strings.Split(strings.TrimSpace(string(data)), "\n")
-}
-
-func incrementHelperCount(path string) int {
-	if path == "" {
-		return 1
-	}
-	count := 0
-	if data, err := os.ReadFile(path); err == nil {
-		count, _ = strconv.Atoi(strings.TrimSpace(string(data)))
-	}
-	count++
-	_ = os.WriteFile(path, []byte(strconv.Itoa(count)), 0o600)
-	return count
 }

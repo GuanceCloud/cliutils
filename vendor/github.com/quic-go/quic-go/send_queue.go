@@ -1,9 +1,14 @@
 package quic
 
-import "github.com/quic-go/quic-go/internal/protocol"
+import (
+	"net"
+
+	"github.com/quic-go/quic-go/internal/protocol"
+)
 
 type sender interface {
-	Send(p *packetBuffer, packetSize protocol.ByteCount)
+	Send(p *packetBuffer, gsoSize uint16, ecn protocol.ECN)
+	SendProbe(*packetBuffer, net.Addr)
 	Run() error
 	WouldBlock() bool
 	Available() <-chan struct{}
@@ -11,8 +16,9 @@ type sender interface {
 }
 
 type queueEntry struct {
-	buf  *packetBuffer
-	size protocol.ByteCount
+	buf     *packetBuffer
+	gsoSize uint16
+	ecn     protocol.ECN
 }
 
 type sendQueue struct {
@@ -40,9 +46,9 @@ func newSendQueue(conn sendConn) sender {
 // Send sends out a packet. It's guaranteed to not block.
 // Callers need to make sure that there's actually space in the send queue by calling WouldBlock.
 // Otherwise Send will panic.
-func (h *sendQueue) Send(p *packetBuffer, size protocol.ByteCount) {
+func (h *sendQueue) Send(p *packetBuffer, gsoSize uint16, ecn protocol.ECN) {
 	select {
-	case h.queue <- queueEntry{buf: p, size: size}:
+	case h.queue <- queueEntry{buf: p, gsoSize: gsoSize, ecn: ecn}:
 		// clear available channel if we've reached capacity
 		if len(h.queue) == sendQueueCapacity {
 			select {
@@ -54,6 +60,10 @@ func (h *sendQueue) Send(p *packetBuffer, size protocol.ByteCount) {
 	default:
 		panic("sendQueue.Send would have blocked")
 	}
+}
+
+func (h *sendQueue) SendProbe(p *packetBuffer, addr net.Addr) {
+	h.conn.WriteTo(p.Data, addr)
 }
 
 func (h *sendQueue) WouldBlock() bool {
@@ -77,12 +87,12 @@ func (h *sendQueue) Run() error {
 			// make sure that all queued packets are actually sent out
 			shouldClose = true
 		case e := <-h.queue:
-			if err := h.conn.Write(e.buf.Data, e.size); err != nil {
+			if err := h.conn.Write(e.buf.Data, e.gsoSize, e.ecn); err != nil {
 				// This additional check enables:
 				// 1. Checking for "datagram too large" message from the kernel, as such,
 				// 2. Path MTU discovery,and
 				// 3. Eventual detection of loss PingFrame.
-				if !isMsgSizeErr(err) {
+				if !isSendMsgSizeErr(err) {
 					return err
 				}
 			}

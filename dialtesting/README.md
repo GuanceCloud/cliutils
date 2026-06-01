@@ -7,37 +7,26 @@ Copyright 2021-present Guance, Inc.
 
 # Dialtesting Browser Tasks
 
-`BROWSER` tasks run browser synthetic checks through an external `browser-dial`
-process. The `dialtesting` package keeps the same task lifecycle as other dial
+`BROWSER` tasks run browser synthetic checks through the embedded browser runner.
+The `dialtesting` package keeps the same task lifecycle as other dial
 types:
 
 ```text
 task JSON -> NewTask -> Run -> GetResults -> report
 ```
 
-`browser-dial` executes the browser script and returns JSON. `dialtesting`
-parses that JSON and reports the final `browser_dial_testing` point through the
-existing reporting path.
+The embedded runner executes the browser script and returns the final
+`browser_dial_testing` point through the existing reporting path.
 
 ## Runtime Dependencies
 
 Browser tasks require these binaries on the dial node:
 
-- `browser-dial`
-- Chrome/Chromium, resolved by `browser-dial` when `engine=chrome`
-- Lightpanda, resolved by `browser-dial` when `engine=lightpanda`
+- Chrome/Chromium when `engine=chrome`
+- Lightpanda when `engine=lightpanda`
 
-`dialtesting` resolves `browser-dial` in this order:
-
-1. `Task.SetOption()["browser_dial_path"]`
-2. `Task.SetOption()["browserDialPath"]`
-3. `BROWSER_DIAL_PATH`
-4. `browser-dial` from `PATH`
-
-Lightpanda is not configured in task JSON. Configure it in the node environment,
-for example with `LIGHTPANDA_EXECUTABLE_PATH`, or make it available from `PATH`.
-Chrome can be configured by `Task.SetOption()["chrome_path"]`; `dialtesting`
-passes it to `browser-dial` as `CHROME_EXECUTABLE_PATH`.
+Chrome can be configured by `Task.SetOption()["chrome_path"]`. Lightpanda can be
+configured by `Task.SetOption()["lightpanda_path"]`.
 
 ## Task Fields
 
@@ -73,7 +62,6 @@ Do not put these browser script fields at the outer task level:
 - `auth`
 - `success_when`
 - `success_when_logic`
-- `browser_dial_path`
 - `chrome_path`
 - `lightpanda_path`
 
@@ -94,12 +82,6 @@ Success rules belong in `browser_config.steps` as browser assertions such as
   },
   "browser_config": "name: homepage\ntarget: https://example.com\ntimeout_ms: 30000\nsteps:\n  - name: open homepage\n    action: goto\n  - name: check title\n    action: assert_title\n    contains: Example\n  - name: check body\n    action: assert_text\n    selector: body\n    contains: Example Domain\n"
 }
-```
-
-The generated command is equivalent to:
-
-```bash
-browser-dial run <tmp-browser-config.yaml> --dry-run --skip-token-check --json
 ```
 
 ## Host Validation

@@ -608,7 +608,7 @@ func Test_shuffle(t *T.T) {
 
 	p := NewPoint(t.Name(), kvs)
 
-	t.Logf(p.Pretty())
+	t.Logf("%s", p.Pretty())
 }
 
 func TestShuffleGzip(t *T.T) {

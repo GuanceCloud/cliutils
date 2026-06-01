@@ -6,46 +6,42 @@
 package dialtesting
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
 
+	browserchrome "github.com/GuanceCloud/cliutils/internal/browserdial/chrome"
+	browserlightpanda "github.com/GuanceCloud/cliutils/internal/browserdial/lightpanda"
+	browserrunner "github.com/GuanceCloud/cliutils/internal/browserdial/runner"
+	browserscript "github.com/GuanceCloud/cliutils/internal/browserdial/script"
 	"gopkg.in/yaml.v3"
 )
 
 var (
 	_ TaskChild = (*BrowserTask)(nil)
 	_ ITask     = (*BrowserTask)(nil)
+
+	browserEmbeddedChromeEngineFactory     = browserchrome.NewEngine
+	browserEmbeddedLightpandaEngineFactory = browserlightpanda.NewEngine
 )
 
 const (
-	defaultBrowserDialPath    = "browser-dial"
 	defaultBrowserDialTimeout = 300_000
 	defaultBrowserWidth       = 1920
 	defaultBrowserHeight      = 1080
 	maxBrowserTotalTimeoutMS  = 300_000
 	maxBrowserStepTimeoutMS   = 60_000
 
-	optionBrowserDialPath      = "browser_dial_path"
-	optionBrowserDialPathCamel = "browserDialPath"
-	optionBrowserDialMode      = "browser_dial_mode"
-	optionBrowserDialModeCamel = "browserDialMode"
-	optionBrowserDialURL       = "browser_dial_url"
-	optionBrowserDialURLCamel  = "browserDialURL"
-	optionLightpandaPath       = "lightpanda_path"
-	optionLightpandaPathCamel  = "lightpandaPath"
-	optionChromePath           = "chrome_path"
-	optionChromePathCamel      = "chromePath"
+	optionLightpandaPath      = "lightpanda_path"
+	optionLightpandaPathCamel = "lightpandaPath"
+	optionChromePath          = "chrome_path"
+	optionChromePathCamel     = "chromePath"
 )
 
 type BrowserTask struct {
@@ -137,27 +133,6 @@ type browserConfigStep struct {
 	TimeoutMS int    `yaml:"timeout_ms"`
 }
 
-type browserDialOutput struct {
-	ExitCode int            `json:"exit_code"`
-	Run      browserDialRun `json:"run"`
-}
-
-type browserDialDaemonRequest struct {
-	Script              string            `json:"script"`
-	Name                string            `json:"name,omitempty"`
-	Engine              string            `json:"engine,omitempty"`
-	TimeoutMS           int               `json:"timeout_ms,omitempty"`
-	ChromePath          string            `json:"chrome_path,omitempty"`
-	LightpandaPath      string            `json:"lightpanda_path,omitempty"`
-	ScreenshotOnFailure bool              `json:"screenshot_on_failure,omitempty"`
-	ViewportWidth       int               `json:"viewport_width,omitempty"`
-	ViewportHeight      int               `json:"viewport_height,omitempty"`
-	Headers             map[string]string `json:"headers,omitempty"`
-	Cookies             []BrowserCookie   `json:"cookies,omitempty"`
-	IgnoreHTTPSErrors   bool              `json:"ignore_https_errors,omitempty"`
-	ProxyURL            string            `json:"proxy_url,omitempty"`
-}
-
 type browserDialRun struct {
 	RunID        string                     `json:"run_id"`
 	Name         string                     `json:"name"`
@@ -231,6 +206,27 @@ type browserRetryRecord struct {
 	FailReason  string `json:"fail_reason,omitempty"`
 	FailureType string `json:"failure_type,omitempty"`
 	Message     string `json:"message,omitempty"`
+}
+
+func browserDialRunFromEmbedded(result browserrunner.Result) browserDialRun {
+	var run browserDialRun
+	data, err := json.Marshal(result)
+	if err != nil {
+		return run
+	}
+	if err := json.Unmarshal(data, &run); err != nil {
+		return browserDialRun{
+			RunID:       result.RunID,
+			Name:        result.Name,
+			Target:      result.Target,
+			Status:      string(result.Status),
+			Success:     result.Success,
+			DurationUS:  result.DurationUS,
+			FailReason:  result.FailReason,
+			FailureType: result.FailureType,
+		}
+	}
+	return run
 }
 
 func (t *BrowserTask) clear() {
@@ -312,67 +308,10 @@ func (t *BrowserTask) runViewport(path string, viewport BrowserViewport) browser
 }
 
 func (t *BrowserTask) runBrowserDial(path string, viewport BrowserViewport) browserViewportResult {
-	if t.useBrowserDialDaemon() {
-		return t.runBrowserDialDaemon(path, viewport)
-	}
-
-	start := time.Now()
-	timeoutMS := t.effectiveTimeoutMS()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMS)*time.Millisecond+15*time.Second)
-	defer cancel()
-	cancelState := t.setCancel(cancel)
-	defer t.clearCancel(cancelState)
-
-	result := browserViewportResult{viewport: viewport, startedAt: start.UTC().Format(time.RFC3339Nano)}
-	args := []string{
-		"run", path,
-		"--dry-run",
-		"--skip-token-check",
-		"--json",
-		"--timeout", fmt.Sprintf("%d", timeoutMS),
-	}
-	args = append(args, t.browserDialOptions(viewport)...)
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmdArgs := executableArgs(args)
-	cmd := exec.CommandContext(ctx, t.executablePath(), cmdArgs...)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	env := os.Environ()
-	if lightpandaPath := t.lightpandaPath(); lightpandaPath != "" {
-		env = setEnv(env, "LIGHTPANDA_EXECUTABLE_PATH", lightpandaPath)
-	}
-	if chromePath := t.chromePath(); chromePath != "" {
-		env = setEnv(env, "CHROME_EXECUTABLE_PATH", chromePath)
-	}
-	cmd.Env = env
-
-	err := cmd.Run()
-	result.duration = time.Since(start)
-	result.endedAt = time.Now().UTC().Format(time.RFC3339Nano)
-	result.stderr = strings.TrimSpace(stderr.String())
-	if exitErr := new(exec.ExitError); errors.As(err, &exitErr) {
-		result.exitCode = exitErr.ExitCode()
-	} else if err != nil {
-		result.reqError = err.Error()
-		return result
-	}
-
-	var output browserDialOutput
-	if decodeErr := json.Unmarshal(stdout.Bytes(), &output); decodeErr != nil {
-		result.reqError = fmt.Sprintf("parse browser-dial output failed: %s", decodeErr)
-		if result.stderr != "" {
-			result.reqError += ": " + result.stderr
-		}
-		return result
-	}
-	result.exitCode = output.ExitCode
-	result.result = output.Run
-	return result
+	return t.runBrowserDialEmbedded(path, viewport)
 }
 
-func (t *BrowserTask) runBrowserDialDaemon(path string, viewport BrowserViewport) browserViewportResult {
+func (t *BrowserTask) runBrowserDialEmbedded(path string, viewport BrowserViewport) browserViewportResult {
 	start := time.Now()
 	timeoutMS := t.effectiveTimeoutMS()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMS)*time.Millisecond+15*time.Second)
@@ -381,73 +320,39 @@ func (t *BrowserTask) runBrowserDialDaemon(path string, viewport BrowserViewport
 	defer t.clearCancel(cancelState)
 
 	result := browserViewportResult{viewport: viewport, startedAt: start.UTC().Format(time.RFC3339Nano)}
-	if t.browserDialURL() == "" {
-		result.reqError = "browser_dial_url should not be empty when browser_dial_mode is daemon"
-		return result
-	}
-	script, err := os.ReadFile(path)
+	engineName, engineFactory, err := t.embeddedEngineFactory()
 	if err != nil {
 		result.reqError = err.Error()
+		result.duration = time.Since(start)
+		result.endedAt = time.Now().UTC().Format(time.RFC3339Nano)
 		return result
 	}
 
-	payload := browserDialDaemonRequest{
-		Script:         string(script),
-		Name:           t.Name,
-		Engine:         t.effectiveEngine(),
-		TimeoutMS:      timeoutMS,
-		ChromePath:     t.chromePath(),
-		LightpandaPath: t.lightpandaPath(),
-		ViewportWidth:  viewport.Width,
-		ViewportHeight: viewport.Height,
-	}
-	if t.AdvanceOptions != nil {
-		payload.ScreenshotOnFailure = t.AdvanceOptions.ScreenshotOnFailure
-		payload.Headers = t.AdvanceOptions.Headers
-		payload.Cookies = t.AdvanceOptions.Cookies
-		payload.IgnoreHTTPSErrors = t.AdvanceOptions.IgnoreHTTPSErrors
-		payload.ProxyURL = t.AdvanceOptions.ProxyURL
-	}
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		result.reqError = err.Error()
-		return result
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(t.browserDialURL(), "/")+"/v1/run", bytes.NewReader(body))
-	if err != nil {
-		result.reqError = err.Error()
-		return result
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
+	runResult := browserrunner.Run(ctx, browserrunner.Options{
+		ScriptPath:          path,
+		Name:                t.Name,
+		TimeoutMS:           timeoutMS,
+		Tags:                t.Tags,
+		EngineName:          engineName,
+		LightpandaPath:      t.lightpandaPath(),
+		ChromePath:          t.chromePath(),
+		StartupTimeout:      5 * time.Second,
+		ScreenshotOnFailure: t.AdvanceOptions != nil && t.AdvanceOptions.ScreenshotOnFailure,
+		ViewportWidth:       viewport.Width,
+		ViewportHeight:      viewport.Height,
+		Headers:             t.embeddedHeaders(),
+		Cookies:             t.embeddedCookies(),
+		IgnoreHTTPSErrors:   t.AdvanceOptions != nil && t.AdvanceOptions.IgnoreHTTPSErrors,
+		ProxyURL:            t.embeddedProxyURL(),
+		EngineFactory:       engineFactory,
+	})
 	result.duration = time.Since(start)
 	result.endedAt = time.Now().UTC().Format(time.RFC3339Nano)
-	if err != nil {
-		result.reqError = err.Error()
-		return result
-	}
-	defer resp.Body.Close() //nolint:errcheck
-
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
-	if err != nil {
-		result.reqError = err.Error()
-		return result
-	}
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+	result.exitCode = 0
+	if !runResult.Success {
 		result.exitCode = 1
-		result.reqError = fmt.Sprintf("browser-dial daemon returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
-		return result
 	}
-
-	var output browserDialOutput
-	if decodeErr := json.Unmarshal(respBody, &output); decodeErr != nil {
-		result.reqError = fmt.Sprintf("parse browser-dial daemon output failed: %s", decodeErr)
-		return result
-	}
-	result.exitCode = output.ExitCode
-	result.result = output.Run
+	result.result = browserDialRunFromEmbedded(runResult)
 	return result
 }
 
@@ -505,35 +410,6 @@ func browserRetryRecordFromResult(result browserViewportResult, attempt int) bro
 	return record
 }
 
-func (t *BrowserTask) browserDialOptions(viewport BrowserViewport) []string {
-	args := []string{
-		"--viewport-width", fmt.Sprintf("%d", viewport.Width),
-		"--viewport-height", fmt.Sprintf("%d", viewport.Height),
-	}
-	if t.AdvanceOptions == nil {
-		return args
-	}
-	if t.AdvanceOptions.Engine != "" {
-		args = append(args, "--engine", t.AdvanceOptions.Engine)
-	}
-	if t.AdvanceOptions.ScreenshotOnFailure {
-		args = append(args, "--screenshot-on-failure")
-	}
-	for key, value := range t.AdvanceOptions.Headers {
-		args = append(args, "--header", key+"="+value)
-	}
-	for _, cookie := range t.AdvanceOptions.Cookies {
-		args = append(args, "--cookie", cookie.Name+"="+cookie.Value)
-	}
-	if t.AdvanceOptions.IgnoreHTTPSErrors {
-		args = append(args, "--ignore-https-errors")
-	}
-	if t.AdvanceOptions.ProxyURL != "" {
-		args = append(args, "--proxy-url", t.AdvanceOptions.ProxyURL)
-	}
-	return args
-}
-
 func (t *BrowserTask) setCancel(cancel context.CancelFunc) *browserTaskCancel {
 	cancelState := &browserTaskCancel{cancel: cancel}
 	t.cancelMu.Lock()
@@ -548,24 +424,6 @@ func (t *BrowserTask) clearCancel(cancelState *browserTaskCancel) {
 		t.cancel = nil
 	}
 	t.cancelMu.Unlock()
-}
-
-func executableArgs(args []string) []string {
-	if os.Getenv("GO_WANT_BROWSER_DIAL_HELPER") == "" {
-		return args
-	}
-	return append([]string{"-test.run=TestBrowserDialHelperProcess", "--"}, args...)
-}
-
-func setEnv(env []string, key string, value string) []string {
-	prefix := key + "="
-	for index, item := range env {
-		if strings.HasPrefix(item, prefix) {
-			env[index] = prefix + value
-			return env
-		}
-	}
-	return append(env, prefix+value)
 }
 
 func (t *BrowserTask) writeScriptFile() (string, error) {
@@ -587,41 +445,43 @@ func (t *BrowserTask) writeScriptFile() (string, error) {
 	return file.Name(), nil
 }
 
-func (t *BrowserTask) executablePath() string {
-	if value := t.GetOption()[optionBrowserDialPath]; value != "" {
-		return value
+func (t *BrowserTask) embeddedEngineFactory() (string, browserrunner.EngineFactory, error) {
+	switch strings.TrimSpace(strings.ToLower(t.effectiveEngine())) {
+	case "", "chrome", "chromium":
+		return "chrome", browserEmbeddedChromeEngineFactory, nil
+	case "lightpanda":
+		return "lightpanda", browserEmbeddedLightpandaEngineFactory, nil
+	default:
+		return "", nil, fmt.Errorf("browser engine must be lightpanda or chrome")
 	}
-	if value := t.GetOption()[optionBrowserDialPathCamel]; value != "" {
-		return value
-	}
-	if value := os.Getenv("BROWSER_DIAL_PATH"); value != "" {
-		return value
-	}
-	return defaultBrowserDialPath
 }
 
-func (t *BrowserTask) browserDialMode() string {
-	if value := t.GetOption()[optionBrowserDialMode]; value != "" {
-		return strings.ToLower(strings.TrimSpace(value))
+func (t *BrowserTask) embeddedHeaders() map[string]string {
+	if t.AdvanceOptions == nil {
+		return nil
 	}
-	if value := t.GetOption()[optionBrowserDialModeCamel]; value != "" {
-		return strings.ToLower(strings.TrimSpace(value))
-	}
-	return "exec"
+	return t.AdvanceOptions.Headers
 }
 
-func (t *BrowserTask) browserDialURL() string {
-	if value := t.GetOption()[optionBrowserDialURL]; value != "" {
-		return strings.TrimSpace(value)
+func (t *BrowserTask) embeddedCookies() []browserscript.Cookie {
+	if t.AdvanceOptions == nil || len(t.AdvanceOptions.Cookies) == 0 {
+		return nil
 	}
-	if value := t.GetOption()[optionBrowserDialURLCamel]; value != "" {
-		return strings.TrimSpace(value)
+	cookies := make([]browserscript.Cookie, 0, len(t.AdvanceOptions.Cookies))
+	for _, cookie := range t.AdvanceOptions.Cookies {
+		cookies = append(cookies, browserscript.Cookie{
+			Name:  cookie.Name,
+			Value: cookie.Value,
+		})
 	}
-	return ""
+	return cookies
 }
 
-func (t *BrowserTask) useBrowserDialDaemon() bool {
-	return t.browserDialMode() == "daemon" || t.browserDialURL() != ""
+func (t *BrowserTask) embeddedProxyURL() string {
+	if t.AdvanceOptions == nil {
+		return ""
+	}
+	return t.AdvanceOptions.ProxyURL
 }
 
 func (t *BrowserTask) lightpandaPath() string {
@@ -874,15 +734,6 @@ func (t *BrowserTask) check() error {
 	}
 	if err := t.checkBrowserRetryOptions(); err != nil {
 		return err
-	}
-	switch t.browserDialMode() {
-	case "exec":
-	case "daemon":
-		if t.browserDialURL() == "" {
-			return errors.New("browser_dial_url should not be empty when browser_dial_mode is daemon")
-		}
-	default:
-		return errors.New("browser_dial_mode should be exec or daemon")
 	}
 	return nil
 }
