@@ -582,6 +582,24 @@ steps:
 	assert.Equal(t, []string{"example.com", "docs.example.com"}, hosts)
 }
 
+func TestBrowserTaskGetHostNameFromAuthGotoURL(t *testing.T) {
+	task := &BrowserTask{
+		BrowserConfig: `name: homepage
+auth:
+  mode: form
+  steps:
+    - action: goto
+      url: https://login.example.com
+steps:
+  - action: goto
+    url: https://app.example.com
+`,
+	}
+	hosts, err := task.getHostName()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"login.example.com", "app.example.com"}, hosts)
+}
+
 func TestBrowserTaskIgnoresOuterSuccessWhen(t *testing.T) {
 	taskJSON := `{
 		"external_id": "bd-homepage",

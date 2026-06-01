@@ -124,6 +124,7 @@ type browserConfig struct {
 }
 
 type browserConfigAuth struct {
+	Mode  string              `yaml:"mode"`
 	Steps []browserConfigStep `yaml:"steps"`
 }
 
@@ -754,6 +755,18 @@ func (t *BrowserTask) getHostName() ([]string, error) {
 			return nil, err
 		}
 		hosts = append(hosts, host)
+	}
+	if strings.EqualFold(cfg.Auth.Mode, "form") {
+		for _, step := range cfg.Auth.Steps {
+			if step.Action != "goto" || strings.TrimSpace(step.URL) == "" {
+				continue
+			}
+			host, err := getHostName(step.URL)
+			if err != nil {
+				return nil, err
+			}
+			hosts = append(hosts, host)
+		}
 	}
 	for _, step := range cfg.Steps {
 		if step.Action != "goto" || strings.TrimSpace(step.URL) == "" {
