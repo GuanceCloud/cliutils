@@ -105,13 +105,16 @@ type browserTaskCancel struct {
 }
 
 type browserViewportResult struct {
-	viewport BrowserViewport
-	duration time.Duration
-	result   browserDialRun
-	exitCode int
-	reqError string
-	stderr   string
-	attempts int
+	viewport     BrowserViewport
+	duration     time.Duration
+	startedAt    string
+	endedAt      string
+	result       browserDialRun
+	exitCode     int
+	reqError     string
+	stderr       string
+	attempts     int
+	retryRecords []browserRetryRecord
 }
 
 type browserConfig struct {
@@ -156,18 +159,21 @@ type browserDialDaemonRequest struct {
 }
 
 type browserDialRun struct {
-	RunID       string                     `json:"run_id"`
-	Name        string                     `json:"name"`
-	Target      string                     `json:"target,omitempty"`
-	Status      string                     `json:"status"`
-	Success     bool                       `json:"success"`
-	DurationUS  int64                      `json:"duration_us"`
-	Steps       []browserDialStep          `json:"steps"`
-	TraceIDs    []string                   `json:"trace_ids,omitempty"`
-	Performance *browserPerformanceMetrics `json:"performance,omitempty"`
-	Error       *browserDialError          `json:"error,omitempty"`
-	FailReason  string                     `json:"fail_reason,omitempty"`
-	FailureType string                     `json:"failure_type,omitempty"`
+	RunID        string                     `json:"run_id"`
+	Name         string                     `json:"name"`
+	Target       string                     `json:"target,omitempty"`
+	Status       string                     `json:"status"`
+	Success      bool                       `json:"success"`
+	StartedAt    string                     `json:"started_at,omitempty"`
+	EndedAt      string                     `json:"ended_at,omitempty"`
+	DurationUS   int64                      `json:"duration_us"`
+	Steps        []browserDialStep          `json:"steps"`
+	TraceIDs     []string                   `json:"trace_ids,omitempty"`
+	Performance  *browserPerformanceMetrics `json:"performance,omitempty"`
+	Error        *browserDialError          `json:"error,omitempty"`
+	FailReason   string                     `json:"fail_reason,omitempty"`
+	FailureType  string                     `json:"failure_type,omitempty"`
+	RetryRecords []browserRetryRecord       `json:"retry_records,omitempty"`
 }
 
 type browserDialStep struct {
@@ -212,6 +218,19 @@ type browserDialError struct {
 	Name    string `json:"name"`
 	Message string `json:"message"`
 	Stack   string `json:"stack,omitempty"`
+}
+
+type browserRetryRecord struct {
+	Attempt     int    `json:"attempt"`
+	StartedAt   string `json:"started_at,omitempty"`
+	EndedAt     string `json:"ended_at,omitempty"`
+	DurationUS  int64  `json:"duration_us,omitempty"`
+	Status      string `json:"status"`
+	Success     bool   `json:"success"`
+	FailedStep  int    `json:"failed_step,omitempty"`
+	FailReason  string `json:"fail_reason,omitempty"`
+	FailureType string `json:"failure_type,omitempty"`
+	Message     string `json:"message,omitempty"`
 }
 
 func (t *BrowserTask) clear() {
@@ -267,9 +286,18 @@ func (t *BrowserTask) runViewport(path string, viewport BrowserViewport) browser
 	}
 
 	var result browserViewportResult
+	retryRecords := make([]browserRetryRecord, 0, maxAttempts)
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		result = t.runBrowserDial(path, viewport)
 		result.attempts = attempt
+		if len(result.result.RetryRecords) > 0 {
+			retryRecords = append(retryRecords, result.result.RetryRecords...)
+		} else {
+			retryRecords = append(retryRecords, browserRetryRecordFromResult(result, attempt))
+		}
+		if maxAttempts > 1 {
+			result.retryRecords = append([]browserRetryRecord(nil), retryRecords...)
+		}
 		if result.reqError == "" && result.result.Success {
 			return result
 		}
@@ -295,7 +323,7 @@ func (t *BrowserTask) runBrowserDial(path string, viewport BrowserViewport) brow
 	cancelState := t.setCancel(cancel)
 	defer t.clearCancel(cancelState)
 
-	result := browserViewportResult{viewport: viewport}
+	result := browserViewportResult{viewport: viewport, startedAt: start.UTC().Format(time.RFC3339Nano)}
 	args := []string{
 		"run", path,
 		"--dry-run",
@@ -322,6 +350,7 @@ func (t *BrowserTask) runBrowserDial(path string, viewport BrowserViewport) brow
 
 	err := cmd.Run()
 	result.duration = time.Since(start)
+	result.endedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	result.stderr = strings.TrimSpace(stderr.String())
 	if exitErr := new(exec.ExitError); errors.As(err, &exitErr) {
 		result.exitCode = exitErr.ExitCode()
@@ -351,7 +380,7 @@ func (t *BrowserTask) runBrowserDialDaemon(path string, viewport BrowserViewport
 	cancelState := t.setCancel(cancel)
 	defer t.clearCancel(cancelState)
 
-	result := browserViewportResult{viewport: viewport}
+	result := browserViewportResult{viewport: viewport, startedAt: start.UTC().Format(time.RFC3339Nano)}
 	if t.browserDialURL() == "" {
 		result.reqError = "browser_dial_url should not be empty when browser_dial_mode is daemon"
 		return result
@@ -394,6 +423,7 @@ func (t *BrowserTask) runBrowserDialDaemon(path string, viewport BrowserViewport
 
 	resp, err := http.DefaultClient.Do(req)
 	result.duration = time.Since(start)
+	result.endedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	if err != nil {
 		result.reqError = err.Error()
 		return result
@@ -427,6 +457,52 @@ func (t *BrowserTask) setLastResult(result browserViewportResult) {
 	t.exitCode = result.exitCode
 	t.reqError = result.reqError
 	t.stderr = result.stderr
+}
+
+func browserRetryRecordFromResult(result browserViewportResult, attempt int) browserRetryRecord {
+	status := result.result.Status
+	success := result.reqError == "" && result.result.Success
+	if status == "" {
+		if success {
+			status = "OK"
+		} else {
+			status = "FAIL"
+		}
+	}
+	record := browserRetryRecord{
+		Attempt:     attempt,
+		StartedAt:   firstNonEmpty(result.result.StartedAt, result.startedAt),
+		EndedAt:     firstNonEmpty(result.result.EndedAt, result.endedAt),
+		DurationUS:  result.result.DurationUS,
+		Status:      status,
+		Success:     success,
+		FailReason:  result.result.FailReason,
+		FailureType: result.result.FailureType,
+	}
+	if record.DurationUS == 0 && result.duration > 0 {
+		record.DurationUS = int64(result.duration) / 1000
+	}
+	if result.reqError != "" {
+		record.Message = result.reqError
+		if record.FailureType == "" {
+			record.FailureType = "runner_error"
+		}
+		return record
+	}
+	if result.result.Error != nil {
+		record.Message = result.result.Error.Message
+	}
+	for _, step := range result.result.Steps {
+		if !strings.EqualFold(step.Status, "FAIL") {
+			continue
+		}
+		record.FailedStep = step.Seq
+		if record.Message == "" && step.Error != nil {
+			record.Message = step.Error.Message
+		}
+		break
+	}
+	return record
 }
 
 func (t *BrowserTask) browserDialOptions(viewport BrowserViewport) []string {
@@ -674,6 +750,15 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 	addBrowserPerformanceFields(fields, t.result.Performance)
 	if steps, err := json.Marshal(compactBrowserSteps(t.result.Steps)); err == nil {
 		fields["steps"] = string(steps)
+	}
+	if len(result.retryRecords) > 0 {
+		if data, err := json.Marshal(result.retryRecords); err == nil {
+			fields["retry_records"] = string(data)
+		}
+	} else if len(t.result.RetryRecords) > 0 {
+		if data, err := json.Marshal(t.result.RetryRecords); err == nil {
+			fields["retry_records"] = string(data)
+		}
 	}
 	if vars := browserConfigResultVars(cfg.ConfigVars); len(vars) > 0 {
 		if data, err := json.Marshal(vars); err == nil {

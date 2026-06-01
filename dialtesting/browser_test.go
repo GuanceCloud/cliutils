@@ -645,6 +645,19 @@ func TestBrowserTaskRetryStopsAfterSuccess(t *testing.T) {
 	assert.Equal(t, "RETRY_OK", tags["status"])
 	assert.Equal(t, int64(1), fields["retry_count"])
 	assert.Equal(t, int64(1), fields["success"])
+	rawRecords, ok := fields["retry_records"].(string)
+	require.True(t, ok)
+	var records []browserRetryRecord
+	require.NoError(t, json.Unmarshal([]byte(rawRecords), &records))
+	require.Len(t, records, 2)
+	assert.Equal(t, 1, records[0].Attempt)
+	assert.Equal(t, "FAIL", records[0].Status)
+	assert.False(t, records[0].Success)
+	assert.Equal(t, 2, records[0].FailedStep)
+	assert.Equal(t, "assertion_failed", records[0].FailureType)
+	assert.Equal(t, 2, records[1].Attempt)
+	assert.Equal(t, "OK", records[1].Status)
+	assert.True(t, records[1].Success)
 	assert.Len(t, readHelperArgs(t, dir+"/args.log"), 2)
 }
 
