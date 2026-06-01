@@ -295,7 +295,7 @@ func (t *BrowserTask) runViewport(path string, viewport BrowserViewport) browser
 		} else {
 			retryRecords = append(retryRecords, browserRetryRecordFromResult(result, attempt))
 		}
-		if maxAttempts > 1 {
+		if maxAttempts > 1 && (len(retryRecords) > 1 || result.reqError != "" || !result.result.Success) {
 			result.retryRecords = append([]browserRetryRecord(nil), retryRecords...)
 		}
 		if result.reqError == "" && result.result.Success {
