@@ -739,8 +739,8 @@ func TestBrowserTaskResultUsesLastExecutedStep(t *testing.T) {
 
 	_, fields := task.getResults()
 	assert.Equal(t, int64(2), fields["last_step"])
-	assert.Equal(t, "https://example.com", fields["page_url"])
-	assert.Equal(t, "Example Domain", fields["page_title"])
+	assert.NotContains(t, fields, "page_url")
+	assert.NotContains(t, fields, "page_title")
 
 	rawSteps, ok := fields["steps"].(string)
 	require.True(t, ok)
@@ -846,7 +846,7 @@ func TestBrowserTaskRunEmbedded(t *testing.T) {
 
 	tags, fields := task.GetResults()
 	assert.Equal(t, "OK", tags["status"])
-	assert.Equal(t, "browser-dial", tags["runner"])
+	assert.NotContains(t, tags, "runner")
 	assert.Equal(t, "chrome", tags["browser_engine"])
 	assert.Equal(t, "1366x768", tags["viewport"])
 	assert.Equal(t, int64(1), fields["success"])

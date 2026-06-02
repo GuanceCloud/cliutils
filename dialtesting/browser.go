@@ -552,7 +552,6 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 		"name":           name,
 		"url":            target,
 		"status":         "FAIL",
-		"runner":         "browser-dial",
 		"browser_engine": t.effectiveEngine(),
 	}
 	for k, v := range cfg.Tags {
@@ -577,7 +576,6 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 		"success":        int64(-1),
 		"last_step":      int64(lastBrowserStep(t.result.Steps)),
 		"browser_run_id": t.result.RunID,
-		"exit_code":      int64(t.exitCode),
 	}
 	if result.viewport.Width > 0 && result.viewport.Height > 0 {
 		fields["viewport_width"] = int64(result.viewport.Width)
@@ -606,15 +604,8 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 			fields["failure_type"] = "config_error"
 		}
 	}
-	if last, ok := lastExecutedBrowserStep(t.result.Steps); ok {
-		fields["page_url"] = firstNonEmpty(last.URL, t.result.Target, cfg.Target, t.URL)
-		fields["page_title"] = last.Title
-	}
 	if len(t.result.TraceIDs) > 0 {
 		fields["trace_id"] = t.result.TraceIDs[0]
-		if traceIDs, err := json.Marshal(t.result.TraceIDs); err == nil {
-			fields["trace_ids"] = string(traceIDs)
-		}
 	}
 	addBrowserPerformanceFields(fields, t.result.Performance)
 	if steps, err := json.Marshal(compactBrowserSteps(t.result.Steps)); err == nil {
