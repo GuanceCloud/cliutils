@@ -607,7 +607,6 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 	if len(t.result.TraceIDs) > 0 {
 		fields["trace_id"] = t.result.TraceIDs[0]
 	}
-	addBrowserPerformanceFields(fields, t.result.Performance)
 	if steps, err := json.Marshal(compactBrowserSteps(t.result.Steps)); err == nil {
 		fields["steps"] = string(steps)
 	}
@@ -650,33 +649,6 @@ func browserConfigResultVars(configVars []ConfigVar) []browserConfigResultVar {
 		vars = append(vars, result)
 	}
 	return vars
-}
-
-func addBrowserPerformanceFields(fields map[string]interface{}, metrics *browserPerformanceMetrics) {
-	if metrics == nil {
-		return
-	}
-	if metrics.TTFBMS > 0 {
-		fields["ttfb"] = metrics.TTFBMS
-		fields["ttfb_ms"] = metrics.TTFBMS
-	}
-	if metrics.LoadingTimeMS > 0 {
-		fields["loading_time"] = metrics.LoadingTimeMS
-		fields["loading_time_ms"] = metrics.LoadingTimeMS
-	}
-	if metrics.LCPMS > 0 {
-		fields["lcp"] = metrics.LCPMS
-		fields["lcp_ms"] = metrics.LCPMS
-	}
-	if metrics.CLS > 0 {
-		fields["cls"] = metrics.CLS
-	}
-	if metrics.DOMContentLoadedMS > 0 {
-		fields["dom_content_loaded_ms"] = metrics.DOMContentLoadedMS
-	}
-	if metrics.LoadEventEndMS > 0 {
-		fields["load_event_end_ms"] = metrics.LoadEventEndMS
-	}
 }
 
 func lastBrowserStep(steps []browserDialStep) int {
