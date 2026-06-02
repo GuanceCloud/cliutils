@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"runtime/debug"
 
-	"github.com/GuanceCloud/cliutils/internal/browserdial/evidence"
+	"github.com/GuanceCloud/cliutils/dialtesting/browserdial/evidence"
 )
 
 type TimeoutError struct {

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GuanceCloud/cliutils/internal/browserdial/runner"
+	"github.com/GuanceCloud/cliutils/dialtesting/browserdial/runner"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"

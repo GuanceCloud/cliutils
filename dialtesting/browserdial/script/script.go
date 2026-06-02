@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	errorsx "github.com/GuanceCloud/cliutils/internal/browserdial/errors"
+	errorsx "github.com/GuanceCloud/cliutils/dialtesting/browserdial/errors"
 	"gopkg.in/yaml.v3"
 )
 

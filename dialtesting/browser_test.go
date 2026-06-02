@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	browserevidence "github.com/GuanceCloud/cliutils/internal/browserdial/evidence"
-	browserrunner "github.com/GuanceCloud/cliutils/internal/browserdial/runner"
+	browserevidence "github.com/GuanceCloud/cliutils/dialtesting/browserdial/evidence"
+	browserrunner "github.com/GuanceCloud/cliutils/dialtesting/browserdial/runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

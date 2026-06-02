@@ -1,38 +1,30 @@
-package lightpanda
+package chrome
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
-	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
-	"strconv"
 	"strings"
 	"sync"
-	"time"
 
-	"github.com/GuanceCloud/cliutils/internal/browserdial/evidence"
-	"github.com/GuanceCloud/cliutils/internal/browserdial/runner"
-	"github.com/GuanceCloud/cliutils/internal/browserdial/util"
+	"github.com/GuanceCloud/cliutils/dialtesting/browserdial/evidence"
+	"github.com/GuanceCloud/cliutils/dialtesting/browserdial/runner"
+	"github.com/GuanceCloud/cliutils/dialtesting/browserdial/util"
 	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/page"
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/security"
 	"github.com/chromedp/chromedp"
 )
 
-const defaultHost = "127.0.0.1"
-
 type Engine struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	run       func(context.Context, ...chromedp.Action) error
-	session   *session
 	mu        sync.Mutex
 	console   []evidence.ConsoleEvent
 	network   []evidence.NetworkEvent
@@ -48,41 +40,55 @@ type requestInfo struct {
 }
 
 func NewEngine(ctx context.Context, options runner.EngineOptions) (runner.Engine, error) {
-	executable, err := resolveExecutable(options.LightpandaPath)
+	executable, err := resolveExecutable(options.ChromePath)
 	if err != nil {
 		return nil, err
 	}
-	activeSession, err := start(ctx, executable, options.StartupTimeout)
-	if err != nil {
-		return nil, err
-	}
-	cdpURL := activeSession.endpoint
-
-	websocketURL, err := resolveWebsocketURL(ctx, cdpURL)
-	if err != nil {
-		activeSession.Close()
-		return nil, err
-	}
-
-	allocCtx, allocCancel := chromedp.NewRemoteAllocator(ctx, websocketURL)
+	width, height := viewportSize(options.ViewportWidth, options.ViewportHeight)
+	allocatorOptions := chromeAllocatorOptions(executable, width, height, options)
+	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, allocatorOptions...)
 	tabCtx, tabCancel := chromedp.NewContext(allocCtx)
+	engine, err := newEngineFromContext(tabCtx, chromedp.Run, func() {
+		tabCancel()
+		allocCancel()
+	})
+	if err != nil {
+		tabCancel()
+		allocCancel()
+		return nil, err
+	}
+	return engine, nil
+}
+
+func chromeAllocatorOptions(executable string, width int, height int, options runner.EngineOptions) []chromedp.ExecAllocatorOption {
+	allocatorOptions := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.ExecPath(executable),
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("no-first-run", true),
+		chromedp.Flag("no-default-browser-check", true),
+		chromedp.Flag("ignore-certificate-errors", options.IgnoreHTTPSErrors),
+		chromedp.WindowSize(width, height),
+	)
+	if strings.TrimSpace(options.ProxyURL) != "" {
+		allocatorOptions = append(allocatorOptions, chromedp.ProxyServer(options.ProxyURL))
+	}
+	return allocatorOptions
+}
+
+func newEngineFromContext(tabCtx context.Context, run func(context.Context, ...chromedp.Action) error, cancel context.CancelFunc) (*Engine, error) {
 	engine := &Engine{
 		ctx:       tabCtx,
-		run:       chromedp.Run,
-		session:   activeSession,
+		run:       run,
 		requests:  map[network.RequestID]requestInfo{},
 		responses: map[network.RequestID]struct{}{},
 	}
-	engine.cancel = func() {
-		tabCancel()
-		allocCancel()
-		if engine.session != nil {
-			engine.session.Close()
-		}
-	}
-
+	engine.cancel = cancel
 	chromedp.ListenTarget(tabCtx, engine.listen)
-	if err := engine.run(tabCtx, network.Enable(), cdpruntime.Enable()); err != nil {
+	if err := engine.run(tabCtx, network.Enable(), cdpruntime.Enable(), chromedp.ActionFunc(func(ctx context.Context) error {
+		_, err := page.AddScriptToEvaluateOnNewDocument(performanceObserverScript).Do(ctx)
+		return err
+	})); err != nil {
 		engine.cancel()
 		return nil, err
 	}
@@ -126,6 +132,16 @@ func (e *Engine) ConfigureBrowser(ctx context.Context, config runner.BrowserConf
 	return e.run(actionCtx, actions...)
 }
 
+func viewportSize(width int, height int) (int, int) {
+	if width <= 0 {
+		width = 1920
+	}
+	if height <= 0 {
+		height = 1080
+	}
+	return width, height
+}
+
 func (e *Engine) Close(context.Context) error {
 	if e.cancel != nil {
 		e.cancel()
@@ -140,21 +156,9 @@ func (e *Engine) Navigate(ctx context.Context, target string) error {
 }
 
 func (e *Engine) WaitForSelector(ctx context.Context, selector string) error {
-	for {
-		var exists bool
-		expression := fmt.Sprintf(`document.querySelector(%s) !== null`, jsString(selector))
-		if err := e.evaluate(ctx, expression, &exists); err != nil {
-			return err
-		}
-		if exists {
-			return nil
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(100 * time.Millisecond):
-		}
-	}
+	actionCtx, cancel := e.actionContext(ctx)
+	defer cancel()
+	return e.run(actionCtx, chromedp.WaitReady(selector, chromedp.ByQuery))
 }
 
 func (e *Engine) Click(ctx context.Context, selector string) error {
@@ -199,13 +203,10 @@ func (e *Engine) URL(ctx context.Context) (string, error) {
 }
 
 func (e *Engine) Text(ctx context.Context, selector string) (string, error) {
+	actionCtx, cancel := e.actionContext(ctx)
+	defer cancel()
 	var text string
-	expression := fmt.Sprintf(`(() => {
-const el = document.querySelector(%s);
-if (!el) throw new Error("selector not found: %s");
-return el.innerText || el.textContent || "";
-})()`, jsString(selector), escapeJSMessage(selector))
-	err := e.evaluate(ctx, expression, &text)
+	err := e.run(actionCtx, chromedp.Text(selector, &text, chromedp.ByQuery))
 	return text, err
 }
 
@@ -242,6 +243,72 @@ return {
 	snapshot.Text = util.Truncate(dom.Text, 16_000)
 	snapshot.HTML = util.Truncate(dom.HTML, 32_000)
 	return snapshot, nil
+}
+
+func (e *Engine) CapturePerformance(ctx context.Context) (evidence.PerformanceMetrics, error) {
+	var metrics evidence.PerformanceMetrics
+	expression := `(() => {
+const nav = performance.getEntriesByType("navigation")[0] || {};
+const lcpEntries = performance.getEntriesByType("largest-contentful-paint") || [];
+const cached = window.__browserDialPerf || {};
+const lcp = cached.lcp || (lcpEntries.length ? lcpEntries[lcpEntries.length - 1].startTime : 0);
+const cls = cached.cls || (performance.getEntriesByType("layout-shift") || [])
+  .filter(entry => !entry.hadRecentInput)
+  .reduce((sum, entry) => sum + (entry.value || 0), 0);
+const round = value => Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
+return {
+  ttfb_ms: round((nav.responseStart || 0) - (nav.requestStart || nav.startTime || 0)),
+  loading_time_ms: round((nav.loadEventEnd || 0) - (nav.startTime || 0)),
+  lcp_ms: round(lcp),
+  cls: Number.isFinite(cls) ? cls : 0,
+  dom_content_loaded_ms: round((nav.domContentLoadedEventEnd || 0) - (nav.startTime || 0)),
+  load_event_end_ms: round((nav.loadEventEnd || 0) - (nav.startTime || 0))
+};
+})()`
+	if err := e.evaluate(ctx, expression, &metrics); err != nil {
+		return evidence.PerformanceMetrics{}, err
+	}
+	return metrics, nil
+}
+
+const performanceObserverScript = `(() => {
+window.__browserDialPerf = window.__browserDialPerf || { lcp: 0, cls: 0 };
+try {
+  new PerformanceObserver(list => {
+    const entries = list.getEntries();
+    const last = entries[entries.length - 1];
+    if (last) window.__browserDialPerf.lcp = last.startTime || 0;
+  }).observe({ type: "largest-contentful-paint", buffered: true });
+} catch (_) {}
+try {
+  new PerformanceObserver(list => {
+    for (const entry of list.getEntries()) {
+      if (!entry.hadRecentInput) window.__browserDialPerf.cls += entry.value || 0;
+    }
+  }).observe({ type: "layout-shift", buffered: true });
+} catch (_) {}
+})()`
+
+func (e *Engine) CaptureScreenshot(ctx context.Context, path string, fullPage bool) (string, error) {
+	actionCtx, cancel := e.actionContext(ctx)
+	defer cancel()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", err
+	}
+	var image []byte
+	if fullPage {
+		if err := e.run(actionCtx, chromedp.FullScreenshot(&image, 80)); err != nil {
+			return "", err
+		}
+	} else {
+		if err := e.run(actionCtx, chromedp.CaptureScreenshot(&image)); err != nil {
+			return "", err
+		}
+	}
+	if err := os.WriteFile(path, image, 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 func (e *Engine) ConsoleEvents() []evidence.ConsoleEvent {
@@ -328,7 +395,6 @@ func (e *Engine) listen(event any) {
 		}
 		e.responses[ev.RequestID] = struct{}{}
 		info := e.requests[ev.RequestID]
-		status := int64(ev.Response.Status)
 		e.network = append(e.network, evidence.NetworkEvent{
 			Seq:          len(e.network) + 1,
 			Timestamp:    util.NowISO(),
@@ -337,7 +403,7 @@ func (e *Engine) listen(event any) {
 			Method:       info.Method,
 			ResourceType: string(ev.Type),
 			TraceID:      firstNonEmpty(info.TraceID, extractTraceID(ev.Response.URL, ev.Response.RequestHeaders, ev.Response.Headers)),
-			Status:       status,
+			Status:       int64(ev.Response.Status),
 		})
 	case *network.EventLoadingFailed:
 		info := e.requests[ev.RequestID]
@@ -354,98 +420,24 @@ func (e *Engine) listen(event any) {
 	}
 }
 
-type session struct {
-	endpoint string
-	cmd      *exec.Cmd
-	cancel   context.CancelFunc
-	done     chan error
-	logs     *limitedBuffer
-}
-
-func start(parent context.Context, executable string, startupTimeout time.Duration) (*session, error) {
-	if startupTimeout <= 0 {
-		startupTimeout = 5 * time.Second
-	}
-	port, err := freePort(defaultHost)
-	if err != nil {
-		return nil, err
-	}
-	endpoint := fmt.Sprintf("http://%s:%d", defaultHost, port)
-	procCtx, cancel := context.WithCancel(parent)
-	logs := &limitedBuffer{limit: 8_000}
-	cmd := exec.CommandContext(procCtx, executable, "serve", "--host", defaultHost, "--port", strconv.Itoa(port))
-	cmd.Stdout = logs
-	cmd.Stderr = logs
-	if err := cmd.Start(); err != nil {
-		cancel()
-		return nil, err
-	}
-	s := &session{
-		endpoint: endpoint,
-		cmd:      cmd,
-		cancel:   cancel,
-		done:     make(chan error, 1),
-		logs:     logs,
-	}
-	go func() {
-		s.done <- cmd.Wait()
-	}()
-	if err := waitReady(parent, endpoint, startupTimeout, s); err != nil {
-		s.Close()
-		return nil, err
-	}
-	return s, nil
-}
-
-func (s *session) Close() {
-	if s == nil {
-		return
-	}
-	s.cancel()
-	select {
-	case <-s.done:
-	case <-time.After(2 * time.Second):
-		if s.cmd != nil && s.cmd.Process != nil {
-			_ = s.cmd.Process.Kill()
-		}
-	}
-}
-
-func waitReady(parent context.Context, endpoint string, timeout time.Duration, s *session) error {
-	deadline := time.NewTimer(timeout)
-	defer deadline.Stop()
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		if _, err := resolveWebsocketURL(parent, endpoint); err == nil {
-			return nil
-		}
-		select {
-		case err := <-s.done:
-			return fmt.Errorf("lightpanda exited before CDP was ready: %v\n%s", err, s.logs.String())
-		case <-deadline.C:
-			return fmt.Errorf("lightpanda CDP server did not become ready at %s\n%s", endpoint, s.logs.String())
-		case <-ticker.C:
-		case <-parent.Done():
-			return parent.Err()
-		}
-	}
-}
-
 func resolveExecutable(override string) (string, error) {
 	candidates := []string{}
 	if override != "" {
 		candidates = append(candidates, override)
 	}
-	if env := os.Getenv("LIGHTPANDA_EXECUTABLE_PATH"); env != "" {
+	if env := os.Getenv("CHROME_EXECUTABLE_PATH"); env != "" {
 		candidates = append(candidates, env)
 	}
-	if path, err := exec.LookPath("lightpanda"); err == nil {
-		candidates = append(candidates, path)
+	if goruntime.GOOS == "darwin" {
+		candidates = append(candidates,
+			"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+			filepath.Join(os.Getenv("HOME"), "Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+		)
 	}
-	if home, err := os.UserHomeDir(); err == nil {
-		candidates = append(candidates, filepath.Join(home, ".cache", "lightpanda-node", "lightpanda"))
+	for _, name := range []string{"google-chrome", "chromium", "chromium-browser", "chrome"} {
+		if path, err := exec.LookPath(name); err == nil {
+			candidates = append(candidates, path)
+		}
 	}
 
 	seen := map[string]struct{}{}
@@ -464,11 +456,10 @@ func resolveExecutable(override string) (string, error) {
 		}
 		return candidate, nil
 	}
-
 	if len(problems) > 0 {
-		return "", fmt.Errorf("no usable lightpanda executable found (%s)", strings.Join(problems, "; "))
+		return "", fmt.Errorf("no usable chrome executable found (%s)", strings.Join(problems, "; "))
 	}
-	return "", fmt.Errorf("no lightpanda executable found; set LIGHTPANDA_EXECUTABLE_PATH or install lightpanda in PATH")
+	return "", fmt.Errorf("no chrome executable found; set --chrome-path or CHROME_EXECUTABLE_PATH")
 }
 
 func checkExecutable(path string) error {
@@ -488,55 +479,31 @@ func checkExecutable(path string) error {
 	return nil
 }
 
-func resolveWebsocketURL(ctx context.Context, raw string) (string, error) {
-	if strings.HasPrefix(raw, "ws://") || strings.HasPrefix(raw, "wss://") {
-		return raw, nil
+func extractTraceID(rawURL string, headers ...network.Headers) string {
+	if traceID := traceFromURL(rawURL); traceID != "" {
+		return traceID
 	}
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return "", err
+	for _, headerSet := range headers {
+		for key, value := range headerSet {
+			if strings.EqualFold(key, "traceparent") || strings.EqualFold(key, "x-datadog-trace-id") || strings.EqualFold(key, "x-trace-id") {
+				return fmt.Sprint(value)
+			}
+		}
 	}
-	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/json/version"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
-	if err != nil {
-		return "", err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("%s returned %s", parsed.String(), resp.Status)
-	}
-	var payload struct {
-		WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return "", err
-	}
-	if payload.WebSocketDebuggerURL == "" {
-		return "", fmt.Errorf("%s did not return webSocketDebuggerUrl", parsed.String())
-	}
-	return payload.WebSocketDebuggerURL, nil
+	return ""
 }
 
-func freePort(host string) (int, error) {
-	listener, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
-	if err != nil {
-		return 0, err
+func traceFromURL(rawURL string) string {
+	for _, marker := range []string{"trace_id=", "traceid=", "traceId="} {
+		if index := strings.Index(rawURL, marker); index >= 0 {
+			value := rawURL[index+len(marker):]
+			if cut := strings.IndexAny(value, "&#"); cut >= 0 {
+				value = value[:cut]
+			}
+			return value
+		}
 	}
-	defer listener.Close()
-	return listener.Addr().(*net.TCPAddr).Port, nil
-}
-
-func jsString(value string) string {
-	encoded, _ := json.Marshal(value)
-	return string(encoded)
-}
-
-func escapeJSMessage(value string) string {
-	return strings.ReplaceAll(value, `"`, `\"`)
+	return ""
 }
 
 func firstNonEmpty(values ...string) string {
@@ -561,27 +528,11 @@ func sameSite(value string) (network.CookieSameSite, bool) {
 	}
 }
 
-type limitedBuffer struct {
-	mu    sync.Mutex
-	limit int
-	buf   bytes.Buffer
+func jsString(value string) string {
+	encoded, _ := json.Marshal(value)
+	return string(encoded)
 }
 
-func (b *limitedBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	n, err := b.buf.Write(p)
-	if b.buf.Len() > b.limit {
-		content := b.buf.Bytes()
-		keep := append([]byte(nil), content[len(content)-b.limit:]...)
-		b.buf.Reset()
-		_, _ = b.buf.Write(keep)
-	}
-	return n, err
-}
-
-func (b *limitedBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buf.String()
+func escapeJSMessage(value string) string {
+	return strings.ReplaceAll(value, `"`, `\"`)
 }

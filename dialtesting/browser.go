@@ -16,10 +16,10 @@ import (
 	"text/template"
 	"time"
 
-	browserchrome "github.com/GuanceCloud/cliutils/internal/browserdial/chrome"
-	browserlightpanda "github.com/GuanceCloud/cliutils/internal/browserdial/lightpanda"
-	browserrunner "github.com/GuanceCloud/cliutils/internal/browserdial/runner"
-	browserscript "github.com/GuanceCloud/cliutils/internal/browserdial/script"
+	browserchrome "github.com/GuanceCloud/cliutils/dialtesting/browserdial/chrome"
+	browserlightpanda "github.com/GuanceCloud/cliutils/dialtesting/browserdial/lightpanda"
+	browserrunner "github.com/GuanceCloud/cliutils/dialtesting/browserdial/runner"
+	browserscript "github.com/GuanceCloud/cliutils/dialtesting/browserdial/script"
 	"gopkg.in/yaml.v3"
 )
 
@@ -63,6 +63,14 @@ type BrowserTask struct {
 
 	cancelMu sync.Mutex
 	cancel   *browserTaskCancel
+}
+
+type browserRawTask struct {
+	URL            string                `json:"url,omitempty"`
+	BrowserConfig  string                `json:"browser_config"`
+	BrowserWindow  *BrowserWindowOption  `json:"browser_window,omitempty"`
+	AdvanceOptions *BrowserAdvanceOption `json:"advance_options,omitempty"`
+	RetryOptions   *BrowserRetryOption   `json:"retry_options,omitempty"`
 }
 
 type BrowserWindowOption struct {
@@ -793,9 +801,14 @@ func (t *BrowserTask) getRawTask(taskString string) (string, error) {
 	if err := json.Unmarshal([]byte(taskString), &task); err != nil {
 		return "", fmt.Errorf("unmarshal browser task failed: %w", err)
 	}
-	task.Task = nil
-	task.BrowserConfig = sanitizeBrowserConfig(task.BrowserConfig)
-	bytes, _ := json.Marshal(task)
+	rawTask := browserRawTask{
+		URL:            task.URL,
+		BrowserConfig:  sanitizeBrowserConfig(task.BrowserConfig),
+		BrowserWindow:  task.BrowserWindow,
+		AdvanceOptions: task.AdvanceOptions,
+		RetryOptions:   task.RetryOptions,
+	}
+	bytes, _ := json.Marshal(rawTask)
 	return string(bytes), nil
 }
 

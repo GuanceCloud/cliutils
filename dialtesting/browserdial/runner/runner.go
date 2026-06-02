@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	errorsx "github.com/GuanceCloud/cliutils/internal/browserdial/errors"
-	"github.com/GuanceCloud/cliutils/internal/browserdial/evidence"
-	"github.com/GuanceCloud/cliutils/internal/browserdial/script"
-	"github.com/GuanceCloud/cliutils/internal/browserdial/util"
+	errorsx "github.com/GuanceCloud/cliutils/dialtesting/browserdial/errors"
+	"github.com/GuanceCloud/cliutils/dialtesting/browserdial/evidence"
+	"github.com/GuanceCloud/cliutils/dialtesting/browserdial/script"
+	"github.com/GuanceCloud/cliutils/dialtesting/browserdial/util"
 )
 
 type Engine interface {
