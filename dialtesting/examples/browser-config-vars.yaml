@@ -1,0 +1,30 @@
+name: browser-config-vars
+target: https://example.com
+timeout_ms: 60000
+config_vars:
+  - name: SEARCH_TEXT
+    value: Example Domain
+  - name: SESSION_ID
+    value: replace-with-secret
+    secure: true
+cookies:
+  - name: sid
+    value_from: SESSION_ID
+    domain: example.com
+    path: /
+    secure: true
+    http_only: true
+    same_site: Lax
+steps:
+  - name: open target
+    action: goto
+  - name: fill local input
+    action: eval
+    value: document.body.insertAdjacentHTML("beforeend", "<input id='search-box' />");
+  - name: input search text
+    action: fill
+    selector: "#search-box"
+    value_from: SEARCH_TEXT
+  - name: check title
+    action: assert_title
+    contains: Example Domain

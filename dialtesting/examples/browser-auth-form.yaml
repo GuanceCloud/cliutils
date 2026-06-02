@@ -1,0 +1,37 @@
+name: browser-auth-form
+target: https://example.com/dashboard
+timeout_ms: 60000
+config_vars:
+  - name: LOGIN_USER
+    value: monitor@example.com
+  - name: LOGIN_PASSWORD
+    value: replace-with-secret
+    secure: true
+auth:
+  mode: form
+  steps:
+    - name: open login
+      action: goto
+      url: https://example.com/login
+    - name: fill user
+      action: fill
+      selector: input[name="email"]
+      value_from: LOGIN_USER
+    - name: fill password
+      action: fill
+      selector: input[name="password"]
+      value_from: LOGIN_PASSWORD
+      sensitive: true
+    - name: submit login
+      action: click
+      selector: button[type="submit"]
+    - name: wait dashboard url
+      action: assert_url
+      contains: /dashboard
+steps:
+  - name: open dashboard
+    action: goto
+  - name: check dashboard
+    action: assert_text
+    selector: body
+    contains: Dashboard
