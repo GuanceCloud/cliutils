@@ -1,17 +1,46 @@
 package quic
 
 import (
-	"fmt"
+	"io"
+	"log"
 	"net"
+	"os"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/quic-go/quic-go/internal/monotime"
 	"github.com/quic-go/quic-go/internal/protocol"
 	"github.com/quic-go/quic-go/internal/utils"
 )
 
+type connCapabilities struct {
+	// This connection has the Don't Fragment (DF) bit set.
+	// This means it makes to run DPLPMTUD.
+	DF bool
+	// GSO (Generic Segmentation Offload) supported
+	GSO bool
+	// ECN (Explicit Congestion Notifications) supported
+	ECN bool
+}
+
+// rawConn is a connection that allow reading of a receivedPackeh.
+type rawConn interface {
+	ReadPacket() (receivedPacket, error)
+	// WritePacket writes a packet on the wire.
+	// gsoSize is the size of a single packet, or 0 to disable GSO.
+	// It is invalid to set gsoSize if capabilities.GSO is not set.
+	WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gsoSize uint16, ecn protocol.ECN) (int, error)
+	LocalAddr() net.Addr
+	SetReadDeadline(time.Time) error
+	io.Closer
+
+	capabilities() connCapabilities
+}
+
 // OOBCapablePacketConn is a connection that allows the reading of ECN bits from the IP header.
-// If the PacketConn passed to Dial or Listen satisfies this interface, quic-go will use it.
+// If the PacketConn passed to the [Transport] satisfies this interface, quic-go will use it.
 // In this case, ReadMsgUDP() will be used instead of ReadFrom() to read packets.
 type OOBCapablePacketConn interface {
 	net.PacketConn
@@ -23,27 +52,28 @@ type OOBCapablePacketConn interface {
 
 var _ OOBCapablePacketConn = &net.UDPConn{}
 
-// OptimizeConn takes a net.PacketConn and attempts to enable various optimizations that will improve QUIC performance:
-//  1. It enables the Don't Fragment (DF) bit on the IP header.
-//     This is required to run DPLPMTUD (Path MTU Discovery, RFC 8899).
-//  2. It enables reading of the ECN bits from the IP header.
-//     This allows the remote node to speed up its loss detection and recovery.
-//  3. It uses batched syscalls (recvmmsg) to more efficiently receive packets from the socket.
-//  4. It uses Generic Segmentation Offload (GSO) to efficiently send batches of packets (on Linux).
-//
-// In order for this to work, the connection needs to implement the OOBCapablePacketConn interface (as a *net.UDPConn does).
-//
-// It's only necessary to call this function explicitly if the application calls WriteTo
-// after passing the connection to the Transport.
-func OptimizeConn(c net.PacketConn) (net.PacketConn, error) {
-	return wrapConn(c)
-}
+func wrapConn(pc net.PacketConn) (rawConn, error) {
+	if err := setReceiveBuffer(pc); err != nil {
+		if !strings.Contains(err.Error(), "use of closed network connection") {
+			setBufferWarningOnce.Do(func() {
+				if disable, _ := strconv.ParseBool(os.Getenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING")); disable {
+					return
+				}
+				log.Printf("%s. See https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes for details.", err)
+			})
+		}
+	}
+	if err := setSendBuffer(pc); err != nil {
+		if !strings.Contains(err.Error(), "use of closed network connection") {
+			setBufferWarningOnce.Do(func() {
+				if disable, _ := strconv.ParseBool(os.Getenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING")); disable {
+					return
+				}
+				log.Printf("%s. See https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes for details.", err)
+			})
+		}
+	}
 
-func wrapConn(pc net.PacketConn) (interface {
-	net.PacketConn
-	rawConn
-}, error,
-) {
 	conn, ok := pc.(interface {
 		SyscallConn() (syscall.RawConn, error)
 	})
@@ -54,8 +84,8 @@ func wrapConn(pc net.PacketConn) (interface {
 			return nil, err
 		}
 
+		// only set DF on UDP sockets
 		if _, ok := pc.LocalAddr().(*net.UDPAddr); ok {
-			// Only set DF on sockets that we expect to be able to handle that configuration.
 			var err error
 			supportsDF, err = setDF(rawConn)
 			if err != nil {
@@ -88,23 +118,26 @@ func (c *basicConn) ReadPacket() (receivedPacket, error) {
 	// The packet size should not exceed protocol.MaxPacketBufferSize bytes
 	// If it does, we only read a truncated packet, which will then end up undecryptable
 	buffer.Data = buffer.Data[:protocol.MaxPacketBufferSize]
-	n, addr, err := c.PacketConn.ReadFrom(buffer.Data)
+	n, addr, err := c.ReadFrom(buffer.Data)
 	if err != nil {
 		return receivedPacket{}, err
 	}
 	return receivedPacket{
 		remoteAddr: addr,
-		rcvTime:    time.Now(),
+		rcvTime:    monotime.Now(),
 		data:       buffer.Data[:n],
 		buffer:     buffer,
 	}, nil
 }
 
-func (c *basicConn) WritePacket(b []byte, packetSize uint16, addr net.Addr, _ []byte) (n int, err error) {
-	if uint16(len(b)) != packetSize {
-		panic(fmt.Sprintf("inconsistent length. got: %d. expected %d", packetSize, len(b)))
+func (c *basicConn) WritePacket(b []byte, addr net.Addr, _ []byte, gsoSize uint16, ecn protocol.ECN) (n int, err error) {
+	if gsoSize != 0 {
+		panic("cannot use GSO with a basicConn")
 	}
-	return c.PacketConn.WriteTo(b, addr)
+	if ecn != protocol.ECNUnsupported {
+		panic("cannot use ECN with a basicConn")
+	}
+	return c.WriteTo(b, addr)
 }
 
 func (c *basicConn) capabilities() connCapabilities { return connCapabilities{DF: c.supportsDF} }

@@ -927,7 +927,7 @@ func FuzzPBPointString(f *T.F) {
 
 		assert.NoError(t, err)
 		if pt != nil {
-			t.Logf(pt.Pretty())
+			t.Logf("%s", pt.Pretty())
 		}
 	})
 }
