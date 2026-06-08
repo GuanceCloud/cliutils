@@ -207,9 +207,14 @@ func (t *SSLTask) getResults() (tags map[string]string, fields map[string]interf
 	}
 
 	message := map[string]interface{}{}
-	reasons, succFlag := t.checkResult()
+	var (
+		reasons  []string
+		succFlag bool
+	)
 	if t.reqError != "" {
 		reasons = append(reasons, t.reqError)
+	} else {
+		reasons, succFlag = t.checkResult()
 	}
 
 	switch t.SuccessWhenLogic {

@@ -156,7 +156,12 @@ func TestSSLTaskRunFailure(t *testing.T) {
 		Port:    port,
 		timeout: time.Second,
 		SuccessWhen: []*SSLSuccess{
-			{ResponseTime: "1s"},
+			{
+				ResponseTime: "1s",
+				CertificateExpiresInDays: []*ValueSuccess{
+					{Op: "gt", Target: 7},
+				},
+			},
 		},
 	}
 
@@ -167,6 +172,7 @@ func TestSSLTaskRunFailure(t *testing.T) {
 	assert.Equal(t, "FAIL", tags["status"])
 	assert.Equal(t, int64(-1), fields["success"])
 	assert.Contains(t, fields["fail_reason"], "connect")
+	assert.NotContains(t, fields["fail_reason"], "SSL certificate expires in days")
 }
 
 func TestSSLTaskCheckErrors(t *testing.T) {
