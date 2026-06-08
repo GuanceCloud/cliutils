@@ -86,6 +86,21 @@ func TestBrowserTaskDisplayRunnerErrorKeepsNonRunnerError(t *testing.T) {
 	assert.Equal(t, []string{"selector not found: #login"}, task.displayReasons([]string{"selector not found: #login"}))
 }
 
+func TestBrowserTaskDisplayRunnerErrorKeepsConfigErrorMentioningLightpanda(t *testing.T) {
+	task := &BrowserTask{
+		reqError: "advance_options engine should be chrome or lightpanda",
+		result: browserDialRun{
+			FailureType: "config_error",
+		},
+	}
+
+	assert.Empty(t, task.displayRunnerError())
+	assert.Equal(t,
+		[]string{"advance_options engine should be chrome or lightpanda"},
+		task.displayReasons([]string{"advance_options engine should be chrome or lightpanda"}),
+	)
+}
+
 func assertNoLeak(t *testing.T, value string, leaks ...string) {
 	t.Helper()
 	for _, leak := range leaks {

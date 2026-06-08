@@ -148,6 +148,20 @@ func TestBrowserTaskRunEmbeddedEngineError(t *testing.T) {
 	assert.NotContains(t, fields["message"], "start chrome failed")
 }
 
+func TestBrowserTaskRunInvalidEngineKeepsConfigError(t *testing.T) {
+	browserTask := newBrowserTaskForTest()
+	browserTask.AdvanceOptions = &BrowserAdvanceOption{Engine: "firefox"}
+	task, err := NewTask("", browserTask)
+	require.NoError(t, err)
+
+	require.NoError(t, task.Run())
+	_, fields := task.GetResults()
+	assert.Equal(t, int64(-1), fields["success"])
+	assert.Equal(t, "config_error", fields["failure_type"])
+	assert.Contains(t, fields["message"], "advance_options engine should be chrome or lightpanda")
+	assert.NotEqual(t, browserSystemErrorMessage, fields["message"])
+}
+
 func TestBrowserTaskRenderTemplate(t *testing.T) {
 	task := &BrowserTask{
 		Task: &Task{

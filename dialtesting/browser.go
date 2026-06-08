@@ -707,8 +707,7 @@ func (t *BrowserTask) displayRunnerError() string {
 }
 
 func (t *BrowserTask) isRunnerError() bool {
-	return strings.EqualFold(t.result.FailReason, "runner_error") ||
-		(t.reqError != "" && strings.Contains(strings.ToLower(t.reqError), "lightpanda"))
+	return strings.EqualFold(t.result.FailReason, "runner_error")
 }
 
 func (t *BrowserTask) runnerErrorText() string {
