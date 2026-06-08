@@ -51,6 +51,38 @@ func TestBrowserTaskDisplayRunnerError(t *testing.T) {
 	assertNoLeak(t, records[0].Message, "/root/.local/bin/lightpanda", "GLIBC_")
 }
 
+func TestSanitizeBrowserRetryRecordsKeepsNonRunnerMessages(t *testing.T) {
+	records := []browserRetryRecord{
+		{
+			Attempt:     1,
+			Status:      "FAIL",
+			FailReason:  "step_error",
+			FailureType: "assertion_failed",
+			Message:     "title assertion failed: expected Home",
+		},
+		{
+			Attempt:     2,
+			Status:      "FAIL",
+			FailReason:  "runner_error",
+			FailureType: "browser_error",
+			Message:     "lightpanda exited before CDP was ready: exit status 1",
+		},
+		{
+			Attempt:     3,
+			Status:      "FAIL",
+			FailureType: "runner_error",
+			Message:     "runner engine factory is not configured",
+		},
+	}
+
+	got := sanitizeBrowserRetryRecords(records, browserSystemErrorMessage)
+
+	assert.Len(t, got, 3)
+	assert.Equal(t, "title assertion failed: expected Home", got[0].Message)
+	assert.Equal(t, browserSystemErrorMessage, got[1].Message)
+	assert.Equal(t, browserSystemErrorMessage, got[2].Message)
+}
+
 func TestBrowserTaskDisplayRunnerErrorUsesUnifiedMessage(t *testing.T) {
 	rawMessages := []string{
 		"no lightpanda executable found; set LIGHTPANDA_EXECUTABLE_PATH or install lightpanda in PATH",

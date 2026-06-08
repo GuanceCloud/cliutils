@@ -753,12 +753,17 @@ func sanitizeBrowserRetryRecords(records []browserRetryRecord, displayError stri
 	out := make([]browserRetryRecord, len(records))
 	copy(out, records)
 	for i := range out {
-		if out[i].Message == "" && !strings.EqualFold(out[i].FailureType, "runner_error") {
+		if !isBrowserRunnerRetryRecord(out[i]) {
 			continue
 		}
 		out[i].Message = displayError
 	}
 	return out
+}
+
+func isBrowserRunnerRetryRecord(record browserRetryRecord) bool {
+	return strings.EqualFold(record.FailReason, "runner_error") ||
+		strings.EqualFold(record.FailureType, "runner_error")
 }
 
 func (t *BrowserTask) check() error {
