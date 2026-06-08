@@ -109,6 +109,25 @@ func TestBrowserTaskRunEmbeddedFailure(t *testing.T) {
 	assert.Contains(t, fields["steps"], "title")
 }
 
+func TestBrowserTaskRunEmbeddedScriptError(t *testing.T) {
+	browserTask := newBrowserTaskForTest()
+	browserTask.BrowserConfig = "name: browser\nsteps:\n  - action: eval\n    text: window.fail()\n"
+	task, err := NewTask("", browserTask)
+	require.NoError(t, err)
+
+	stubBrowserEngineWithFactory(t, func(context.Context, browserrunner.EngineOptions) (browserrunner.Engine, error) {
+		return &fakeBrowserEngine{evalErr: errors.New("eval boom")}, nil
+	})
+
+	require.NoError(t, task.Run())
+	_, fields := task.GetResults()
+	assert.Equal(t, int64(-1), fields["success"])
+	assert.Contains(t, fields["fail_reason"], "step_error")
+	assert.Equal(t, "script_error", fields["failure_type"])
+	assert.Contains(t, fields["message"], "eval boom")
+	assert.NotEqual(t, browserSystemErrorMessage, fields["message"])
+}
+
 func TestBrowserTaskRunEmbeddedEngineError(t *testing.T) {
 	browserTask := newBrowserTaskForTest()
 	task, err := NewTask("", browserTask)
@@ -866,8 +885,9 @@ func TestBrowserTaskRunEmbedded(t *testing.T) {
 }
 
 type fakeBrowserEngine struct {
-	config *browserrunner.BrowserConfig
-	title  string
+	config  *browserrunner.BrowserConfig
+	title   string
+	evalErr error
 }
 
 func (e *fakeBrowserEngine) Close(context.Context) error { return nil }
@@ -893,7 +913,12 @@ func (e *fakeBrowserEngine) Text(context.Context, string) (string, error) {
 	return "Example Domain", nil
 }
 
-func (e *fakeBrowserEngine) Eval(context.Context, string) (string, error) { return "", nil }
+func (e *fakeBrowserEngine) Eval(context.Context, string) (string, error) {
+	if e.evalErr != nil {
+		return "", e.evalErr
+	}
+	return "", nil
+}
 
 func (e *fakeBrowserEngine) CaptureDOM(context.Context) (browserevidence.DomSnapshot, error) {
 	return browserevidence.DomSnapshot{}, nil
