@@ -307,7 +307,21 @@ func TestSSLTaskRenderTemplate(t *testing.T) {
 		Port:       "{{ port }}",
 		ServerName: "{{ server }}",
 		SuccessWhen: []*SSLSuccess{
-			{ResponseTime: "1s"},
+			{
+				ResponseTime: "{{ timeout }}",
+				Subject: []*SuccessOption{
+					{Contains: "{{ subject }}"},
+					{IsNot: "{{ subject_is_not }}"},
+				},
+				Issuer: []*SuccessOption{
+					{MatchRegex: "{{ issuer_regex }}"},
+					{NotContains: "{{ issuer_not_contains }}"},
+				},
+				TLSVersion: []*SuccessOption{
+					{Is: "{{ tls_version }}"},
+					{NotMatchRegex: "{{ tls_not_regex }}"},
+				},
+			},
 		},
 	})
 	require.NoError(t, err)
@@ -317,11 +331,41 @@ func TestSSLTaskRenderTemplate(t *testing.T) {
 		"host":   func() string { return "example.org" },
 		"port":   func() string { return "443" },
 		"server": func() string { return "sni.example.org" },
+		"timeout": func() string {
+			return "2s"
+		},
+		"subject": func() string {
+			return "example.org"
+		},
+		"subject_is_not": func() string {
+			return "bad.example.org"
+		},
+		"issuer_regex": func() string {
+			return "Example.*CA"
+		},
+		"issuer_not_contains": func() string {
+			return "Bad CA"
+		},
+		"tls_version": func() string {
+			return "TLS1.3"
+		},
+		"tls_not_regex": func() string {
+			return "TLS1\\.0"
+		},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "example.org", sslTask.Host)
 	assert.Equal(t, "443", sslTask.Port)
 	assert.Equal(t, "sni.example.org", sslTask.ServerName)
+	require.NoError(t, sslTask.init())
+	assert.Equal(t, 2*time.Second, sslTask.SuccessWhen[0].respTime)
+	assert.Equal(t, "example.org", sslTask.SuccessWhen[0].Subject[0].Contains)
+	assert.Equal(t, "bad.example.org", sslTask.SuccessWhen[0].Subject[1].IsNot)
+	assert.Equal(t, "Example.*CA", sslTask.SuccessWhen[0].Issuer[0].MatchRegex)
+	assert.Equal(t, "Bad CA", sslTask.SuccessWhen[0].Issuer[1].NotContains)
+	assert.Equal(t, "TLS1.3", sslTask.SuccessWhen[0].TLSVersion[0].Is)
+	assert.Equal(t, "TLS1\\.0", sslTask.SuccessWhen[0].TLSVersion[1].NotMatchRegex)
+	require.NoError(t, sslTask.renderSuccessWhen(nil, map[string]interface{}{}))
 
 	sslTask.rawTask = nil
 	sslTask.SetTaskJSONString("")
@@ -332,6 +376,19 @@ func TestSSLTaskRenderTemplate(t *testing.T) {
 	err = (&SSLTask{Task: &Task{}, rawTask: nil}).renderTemplate(map[string]interface{}{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "new raw task failed")
+
+	badTask, err := NewTask("", &SSLTask{
+		Task: &Task{},
+		Host: "example.com",
+		Port: "443",
+		SuccessWhen: []*SSLSuccess{
+			{ResponseTime: "{{"},
+		},
+	})
+	require.NoError(t, err)
+	err = badTask.(*SSLTask).renderTemplate(map[string]interface{}{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render response time failed")
 }
 
 func TestSSLTaskExtractCertificateInfoEmpty(t *testing.T) {

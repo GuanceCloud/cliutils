@@ -378,6 +378,44 @@ func (t *SSLTask) renderTemplate(fm template.FuncMap) error {
 		t.ServerName = text
 	}
 
+	if err := t.renderSuccessWhen(task, fm); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (t *SSLTask) renderSuccessWhen(task *SSLTask, fm template.FuncMap) error {
+	if task == nil {
+		return nil
+	}
+
+	for index, checker := range task.SuccessWhen {
+		if text, err := t.GetParsedString(checker.ResponseTime, fm); err != nil {
+			return fmt.Errorf("render response time failed: %w", err)
+		} else {
+			t.SuccessWhen[index].ResponseTime = text
+		}
+
+		for optionIndex, option := range checker.Subject {
+			if err := t.renderSuccessOption(option, t.SuccessWhen[index].Subject[optionIndex], fm); err != nil {
+				return fmt.Errorf("render subject failed: %w", err)
+			}
+		}
+
+		for optionIndex, option := range checker.Issuer {
+			if err := t.renderSuccessOption(option, t.SuccessWhen[index].Issuer[optionIndex], fm); err != nil {
+				return fmt.Errorf("render issuer failed: %w", err)
+			}
+		}
+
+		for optionIndex, option := range checker.TLSVersion {
+			if err := t.renderSuccessOption(option, t.SuccessWhen[index].TLSVersion[optionIndex], fm); err != nil {
+				return fmt.Errorf("render tls version failed: %w", err)
+			}
+		}
+	}
+
 	return nil
 }
 
