@@ -125,7 +125,8 @@ func TestBrowserTaskRunEmbeddedEngineError(t *testing.T) {
 	require.NoError(t, task.Run())
 	_, fields := task.GetResults()
 	assert.Equal(t, int64(-1), fields["success"])
-	assert.Contains(t, fields["message"], "start chrome failed")
+	assert.Equal(t, browserSystemErrorMessage, fields["message"])
+	assert.NotContains(t, fields["message"], "start chrome failed")
 }
 
 func TestBrowserTaskRenderTemplate(t *testing.T) {
