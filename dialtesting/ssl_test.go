@@ -1,6 +1,12 @@
 package dialtesting
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -81,4 +87,286 @@ func TestSSLTaskCheckResultCertificateExpiresSoon(t *testing.T) {
 	assert.False(t, ok)
 	require.Len(t, reasons, 1)
 	assert.Contains(t, reasons[0], "SSL certificate expires in days check failed")
+}
+
+func TestSSLTaskRunSuccess(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	host, port, err := net.SplitHostPort(server.Listener.Addr().String())
+	require.NoError(t, err)
+
+	task, err := NewTask("", &SSLTask{
+		Task: &Task{
+			ExternalID: "ssl-run-success",
+			Name:       "ssl-run-success",
+			Frequency:  "1m",
+		},
+		Host:                         host,
+		Port:                         port,
+		ServerName:                   "example.test",
+		Timeout:                      "3s",
+		IgnoreServerCertificateError: true,
+		SuccessWhen: []*SSLSuccess{
+			{
+				ResponseTime: "3s",
+				CertificateExpiresInDays: []*ValueSuccess{
+					{Op: "gt", Target: 0},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, task.Check())
+	require.NoError(t, task.Run())
+
+	sslTask := task.(*SSLTask)
+	assert.Empty(t, sslTask.reqError)
+	assert.NotZero(t, sslTask.reqCost)
+	assert.Equal(t, host, sslTask.destIP)
+	assert.NotEmpty(t, sslTask.tlsVersion)
+
+	tags, fields := task.GetResults()
+	assert.Equal(t, "OK", tags["status"])
+	assert.Equal(t, "example.test", tags["server_name"])
+	assert.Equal(t, int64(1), fields["success"])
+	assert.NotEmpty(t, fields["task"])
+	assert.NotEmpty(t, fields["config_vars"])
+}
+
+func TestSSLTaskRunFailure(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	addr := listener.Addr().String()
+	require.NoError(t, listener.Close())
+
+	host, port, err := net.SplitHostPort(addr)
+	require.NoError(t, err)
+
+	task := &SSLTask{
+		Task:    &Task{Name: "ssl-run-failure"},
+		Host:    host,
+		Port:    port,
+		timeout: time.Second,
+		SuccessWhen: []*SSLSuccess{
+			{ResponseTime: "1s"},
+		},
+	}
+
+	require.NoError(t, task.run())
+	assert.NotEmpty(t, task.reqError)
+
+	tags, fields := task.getResults()
+	assert.Equal(t, "FAIL", tags["status"])
+	assert.Equal(t, int64(-1), fields["success"])
+	assert.Contains(t, fields["fail_reason"], "connect")
+}
+
+func TestSSLTaskCheckErrors(t *testing.T) {
+	assert.EqualError(t, (&SSLTask{}).check(), "host should not be empty")
+	assert.EqualError(t, (&SSLTask{Host: "example.com"}).check(), "port should not be empty")
+}
+
+func TestSSLTaskInitErrors(t *testing.T) {
+	err := (&SSLTask{Timeout: "bad", SuccessWhen: []*SSLSuccess{{}}}).init()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid duration")
+
+	err = (&SSLTask{}).init()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no any check rule")
+
+	err = (&SSLTask{SuccessWhen: []*SSLSuccess{{ResponseTime: "bad"}}}).init()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid duration")
+
+	err = (&SSLTask{SuccessWhen: []*SSLSuccess{{Subject: []*SuccessOption{{MatchRegex: "["}}}}}).init()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing closing")
+
+	err = (&SSLTask{SuccessWhen: []*SSLSuccess{{Issuer: []*SuccessOption{{MatchRegex: "["}}}}}).init()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing closing")
+
+	err = (&SSLTask{SuccessWhen: []*SSLSuccess{{TLSVersion: []*SuccessOption{{MatchRegex: "["}}}}}).init()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing closing")
+}
+
+func TestSSLTaskCheckResultFailures(t *testing.T) {
+	task := &SSLTask{
+		reqCost:              2 * time.Second,
+		sslCertExpiresInDays: 3,
+		sslCertNotAfter:      100,
+		certSubject:          "CN=unexpected",
+		certIssuer:           "CN=Unexpected CA",
+		tlsVersion:           "TLS1.2",
+		SuccessWhen: []*SSLSuccess{
+			{
+				respTime:                 time.Second,
+				CertificateExpiresInDays: []*ValueSuccess{{Op: "gt", Target: 7}},
+				CertificateNotAfter:      []*ValueSuccess{{Op: "gt", Target: 200}},
+				Subject:                  []*SuccessOption{{Contains: "example.com"}},
+				Issuer:                   []*SuccessOption{{Contains: "Expected CA"}},
+				TLSVersion:               []*SuccessOption{{Is: "TLS1.3"}},
+			},
+		},
+	}
+
+	reasons, ok := task.checkResult()
+	assert.False(t, ok)
+	require.Len(t, reasons, 6)
+	assert.Contains(t, reasons[0], "SSL response time")
+	assert.Contains(t, reasons[1], "SSL certificate expires in days")
+	assert.Contains(t, reasons[2], "SSL certificate not after")
+	assert.Contains(t, reasons[3], "SSL certificate subject")
+	assert.Contains(t, reasons[4], "SSL certificate issuer")
+	assert.Contains(t, reasons[5], "TLS version")
+}
+
+func TestSSLTaskGetResultsOrLogicFailure(t *testing.T) {
+	task := &SSLTask{
+		Task:             &Task{Name: "ssl-task", Tags: map[string]string{"env": "test"}},
+		Host:             "example.com",
+		Port:             "443",
+		ServerName:       "sni.example.com",
+		SuccessWhenLogic: "or",
+		SuccessWhen:      []*SSLSuccess{{respTime: time.Second}},
+		reqCost:          2 * time.Second,
+		reqError:         "handshake failed",
+	}
+
+	tags, fields := task.getResults()
+	assert.Equal(t, "FAIL", tags["status"])
+	assert.Equal(t, "test", tags["env"])
+	assert.Equal(t, "sni.example.com", tags["server_name"])
+	assert.Equal(t, int64(-1), fields["success"])
+	assert.Contains(t, fields["fail_reason"], "handshake failed")
+	assert.Contains(t, fields["message"], "FAIL")
+}
+
+func TestSSLTaskHelpers(t *testing.T) {
+	task := &SSLTask{
+		Task:                 &Task{Name: "ssl-task"},
+		Host:                 "example.com",
+		Port:                 "443",
+		reqCost:              time.Second,
+		reqError:             "err",
+		destIP:               "127.0.0.1",
+		tlsVersion:           "TLS1.3",
+		sslCertNotBefore:     1,
+		sslCertNotAfter:      2,
+		sslCertExpiresInDays: 3,
+		certSubject:          "subject",
+		certIssuer:           "issuer",
+	}
+
+	assert.Equal(t, "ssl_dial_testing", task.metricName())
+	assert.Equal(t, ClassSSL, task.class())
+	hosts, err := task.getHostName()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"example.com"}, hosts)
+	assert.EqualError(t, func() error {
+		_, err := task.getVariableValue(Variable{})
+		return err
+	}(), "not support")
+	task.setReqError("new error")
+	assert.Equal(t, "new error", task.reqError)
+	task.stop()
+
+	task.clear()
+	assert.Zero(t, task.reqCost)
+	assert.Empty(t, task.reqError)
+	assert.Empty(t, task.destIP)
+	assert.Empty(t, task.tlsVersion)
+	assert.Zero(t, task.sslCertNotBefore)
+	assert.Zero(t, task.sslCertNotAfter)
+	assert.Zero(t, task.sslCertExpiresInDays)
+	assert.Empty(t, task.certSubject)
+	assert.Empty(t, task.certIssuer)
+
+	task.Task = nil
+	task.initTask()
+	assert.NotNil(t, task.Task)
+
+	raw, err := task.getRawTask(`{"host":"example.com","port":"443"}`)
+	require.NoError(t, err)
+	assert.Contains(t, raw, `"host":"example.com"`)
+
+	_, err = task.getRawTask(`{`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unmarshal ssl task failed")
+}
+
+func TestSSLTaskRenderTemplate(t *testing.T) {
+	task, err := NewTask("", &SSLTask{
+		Task:       &Task{ConfigVars: []*ConfigVar{{Name: "host", Value: "example.com"}}},
+		Host:       "{{ host }}",
+		Port:       "{{ port }}",
+		ServerName: "{{ server }}",
+		SuccessWhen: []*SSLSuccess{
+			{ResponseTime: "1s"},
+		},
+	})
+	require.NoError(t, err)
+
+	sslTask := task.(*SSLTask)
+	err = sslTask.renderTemplate(map[string]interface{}{
+		"host":   func() string { return "example.org" },
+		"port":   func() string { return "443" },
+		"server": func() string { return "sni.example.org" },
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "example.org", sslTask.Host)
+	assert.Equal(t, "443", sslTask.Port)
+	assert.Equal(t, "sni.example.org", sslTask.ServerName)
+
+	sslTask.rawTask = nil
+	sslTask.SetTaskJSONString("")
+	err = sslTask.renderTemplate(map[string]interface{}{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "new raw task failed")
+
+	err = (&SSLTask{Task: &Task{}, rawTask: nil}).renderTemplate(map[string]interface{}{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "new raw task failed")
+}
+
+func TestSSLTaskExtractCertificateInfoEmpty(t *testing.T) {
+	task := &SSLTask{}
+	task.extractCertificateInfo(tls.ConnectionState{})
+	assert.Zero(t, task.sslCertNotAfter)
+}
+
+func TestSSLTaskExtractCertificateInfo(t *testing.T) {
+	notBefore := time.Now().Add(-time.Hour).Truncate(time.Microsecond)
+	notAfter := time.Now().Add(48 * time.Hour).Truncate(time.Microsecond)
+	task := &SSLTask{}
+
+	task.extractCertificateInfo(tls.ConnectionState{
+		PeerCertificates: []*x509.Certificate{
+			{
+				Subject:   pkix.Name{CommonName: "example.com"},
+				Issuer:    pkix.Name{CommonName: "Example CA"},
+				NotBefore: notBefore,
+				NotAfter:  notAfter,
+			},
+		},
+	})
+
+	assert.Equal(t, notBefore.UnixMicro(), task.sslCertNotBefore)
+	assert.Equal(t, notAfter.UnixMicro(), task.sslCertNotAfter)
+	assert.GreaterOrEqual(t, task.sslCertExpiresInDays, int64(1))
+	assert.Contains(t, task.certSubject, "example.com")
+	assert.Contains(t, task.certIssuer, "Example CA")
+}
+
+func TestTLSVersionString(t *testing.T) {
+	assert.Equal(t, "TLS1.0", tlsVersionString(tls.VersionTLS10))
+	assert.Equal(t, "TLS1.1", tlsVersionString(tls.VersionTLS11))
+	assert.Equal(t, "TLS1.2", tlsVersionString(tls.VersionTLS12))
+	assert.Equal(t, "TLS1.3", tlsVersionString(tls.VersionTLS13))
+	assert.Equal(t, "0x1234", tlsVersionString(0x1234))
 }

@@ -35,12 +35,13 @@ type SSLSuccess struct {
 
 type SSLTask struct {
 	*Task
-	Host             string        `json:"host"`
-	Port             string        `json:"port"`
-	ServerName       string        `json:"server_name,omitempty"`
-	Timeout          string        `json:"timeout,omitempty"`
-	SuccessWhen      []*SSLSuccess `json:"success_when"`
-	SuccessWhenLogic string        `json:"success_when_logic"`
+	Host                         string        `json:"host"`
+	Port                         string        `json:"port"`
+	ServerName                   string        `json:"server_name,omitempty"`
+	Timeout                      string        `json:"timeout,omitempty"`
+	IgnoreServerCertificateError bool          `json:"ignore_server_certificate_error,omitempty"`
+	SuccessWhen                  []*SSLSuccess `json:"success_when"`
+	SuccessWhenLogic             string        `json:"success_when_logic"`
 
 	reqCost              time.Duration
 	reqError             string
@@ -276,8 +277,9 @@ func (t *SSLTask) run() error {
 	}
 
 	cfg := &tls.Config{
-		MinVersion: tls.VersionTLS12,
-		ServerName: serverName,
+		MinVersion:         tls.VersionTLS12,
+		ServerName:         serverName,
+		InsecureSkipVerify: t.IgnoreServerCertificateError, //nolint:gosec
 	}
 
 	start := time.Now()
