@@ -40,7 +40,7 @@ const (
 	ScheduleTypeFrequency = "frequency"
 )
 
-var logger = log.DefaultSLogger("icmp")
+var logger = log.DefaultSLogger("dialtesting")
 
 var (
 	setupLock        sync.Mutex // setup global variable
