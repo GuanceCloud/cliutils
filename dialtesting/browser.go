@@ -43,7 +43,7 @@ const (
 	optionChromePath          = "chrome_path"
 	optionChromePathCamel     = "chromePath"
 
-	browserSystemErrorMessage = "Browser dial testing system error, please check DataKit logs"
+	browserSystemErrorMessage = "Browser dial testing system error, please check agent logs"
 )
 
 type BrowserTask struct {
