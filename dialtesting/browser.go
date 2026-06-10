@@ -746,7 +746,7 @@ func sanitizeBrowserSteps(steps []browserDialStep, displayError string) []browse
 }
 
 func sanitizeBrowserRetryRecords(records []browserRetryRecord, displayError string) []browserRetryRecord {
-	if displayError == "" || len(records) == 0 {
+	if len(records) == 0 {
 		return records
 	}
 
@@ -756,7 +756,11 @@ func sanitizeBrowserRetryRecords(records []browserRetryRecord, displayError stri
 		if !isBrowserRunnerRetryRecord(out[i]) {
 			continue
 		}
-		out[i].Message = displayError
+		if displayError != "" {
+			out[i].Message = displayError
+		} else {
+			out[i].Message = browserSystemErrorMessage
+		}
 	}
 	return out
 }

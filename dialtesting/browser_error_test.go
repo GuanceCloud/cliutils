@@ -83,6 +83,30 @@ func TestSanitizeBrowserRetryRecordsKeepsNonRunnerMessages(t *testing.T) {
 	assert.Equal(t, browserSystemErrorMessage, got[2].Message)
 }
 
+func TestSanitizeBrowserRetryRecordsHidesRunnerErrorWithoutFinalRunnerError(t *testing.T) {
+	records := []browserRetryRecord{
+		{
+			Attempt:     1,
+			Status:      "FAIL",
+			FailureType: "runner_error",
+			Message:     "/opt/lightpanda: /lib64/libc.so.6: version GLIBC_2.34 not found",
+		},
+		{
+			Attempt: 2,
+			Status:  "OK",
+			Success: true,
+			Message: "success",
+		},
+	}
+
+	got := sanitizeBrowserRetryRecords(records, "")
+
+	assert.Len(t, got, 2)
+	assert.Equal(t, browserSystemErrorMessage, got[0].Message)
+	assert.Equal(t, "success", got[1].Message)
+	assertNoLeak(t, got[0].Message, "/opt/lightpanda", "GLIBC_")
+}
+
 func TestBrowserTaskDisplayRunnerErrorUsesUnifiedMessage(t *testing.T) {
 	rawMessages := []string{
 		"no lightpanda executable found; set LIGHTPANDA_EXECUTABLE_PATH or install lightpanda in PATH",
