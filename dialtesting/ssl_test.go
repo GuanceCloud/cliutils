@@ -58,6 +58,7 @@ func TestSSLTaskCheckAndResult(t *testing.T) {
 
 	sslTask := task.(*SSLTask)
 	sslTask.reqCost = 100 * time.Millisecond
+	sslTask.tlsHandshakeCost = 80 * time.Millisecond
 	sslTask.sslCertExpiresInDays = 30
 	sslTask.sslCertNotAfter = time.Now().Add(30 * 24 * time.Hour).UnixMicro()
 	sslTask.tlsVersion = "TLS1.3"
@@ -72,6 +73,7 @@ func TestSSLTaskCheckAndResult(t *testing.T) {
 	assert.Equal(t, "OK", tags["status"])
 	assert.Equal(t, int64(1), fields["success"])
 	assert.Equal(t, "TLS1.3", fields["tls_version"])
+	assert.Equal(t, int64(80000), fields["tls_handshake_time"])
 	assert.Equal(t, int64(30), fields["ssl_cert_expires_in_days"])
 }
 
@@ -130,6 +132,8 @@ func TestSSLTaskRunSuccess(t *testing.T) {
 	sslTask := task.(*SSLTask)
 	assert.Empty(t, sslTask.reqError)
 	assert.NotZero(t, sslTask.reqCost)
+	assert.NotZero(t, sslTask.tlsHandshakeCost)
+	assert.LessOrEqual(t, sslTask.tlsHandshakeCost, sslTask.reqCost)
 	assert.Equal(t, host, sslTask.destIP)
 	assert.NotEmpty(t, sslTask.tlsVersion)
 
@@ -139,6 +143,24 @@ func TestSSLTaskRunSuccess(t *testing.T) {
 	assert.Equal(t, int64(1), fields["success"])
 	assert.NotEmpty(t, fields["task"])
 	assert.NotEmpty(t, fields["config_vars"])
+}
+
+func TestSSLTaskClearResetsTimingFields(t *testing.T) {
+	task := &SSLTask{
+		reqCost:          time.Second,
+		tlsHandshakeCost: 500 * time.Millisecond,
+		reqError:         "failed",
+		destIP:           "127.0.0.1",
+		tlsVersion:       "TLS1.3",
+	}
+
+	task.clear()
+
+	assert.Zero(t, task.reqCost)
+	assert.Zero(t, task.tlsHandshakeCost)
+	assert.Empty(t, task.reqError)
+	assert.Empty(t, task.destIP)
+	assert.Empty(t, task.tlsVersion)
 }
 
 func TestSSLTaskRunFailure(t *testing.T) {

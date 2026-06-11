@@ -44,6 +44,7 @@ type SSLTask struct {
 	SuccessWhenLogic             string        `json:"success_when_logic"`
 
 	reqCost              time.Duration
+	tlsHandshakeCost     time.Duration
 	reqError             string
 	destIP               string
 	timeout              time.Duration
@@ -184,9 +185,11 @@ func (t *SSLTask) getResults() (tags map[string]string, fields map[string]interf
 	}
 
 	responseTime := int64(t.reqCost) / 1000
+	tlsHandshakeTime := int64(t.tlsHandshakeCost) / 1000
 	fields = map[string]interface{}{
-		"response_time": responseTime,
-		"success":       int64(-1),
+		"response_time":      responseTime,
+		"tls_handshake_time": tlsHandshakeTime,
+		"success":            int64(-1),
 	}
 
 	if t.tlsVersion != "" {
@@ -260,6 +263,7 @@ func (t *SSLTask) metricName() string {
 
 func (t *SSLTask) clear() {
 	t.reqCost = 0
+	t.tlsHandshakeCost = 0
 	t.reqError = ""
 	t.destIP = ""
 	t.tlsVersion = ""
@@ -294,11 +298,13 @@ func (t *SSLTask) run() error {
 		return nil
 	}
 	conn := tls.Client(rawConn, cfg)
+	handshakeStart := time.Now()
 	if err := conn.HandshakeContext(ctx); err != nil {
 		_ = conn.Close()
 		t.reqError = err.Error()
 		return nil
 	}
+	t.tlsHandshakeCost = time.Since(handshakeStart)
 	defer conn.Close() //nolint:errcheck
 
 	t.reqCost = time.Since(start)
