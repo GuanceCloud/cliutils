@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -127,4 +128,10 @@ func TestICMPRenderTemplate(t *testing.T) {
 
 	assert.NoError(t, ct.renderTemplate(fm))
 	assert.Equal(t, "localhost", ct.Host)
+}
+
+func TestNormalizeICMPRTT(t *testing.T) {
+	assert.Equal(t, time.Microsecond, normalizeICMPRTT(0))
+	assert.Equal(t, time.Microsecond, normalizeICMPRTT(-time.Nanosecond))
+	assert.Equal(t, 2*time.Microsecond, normalizeICMPRTT(2*time.Microsecond))
 }
