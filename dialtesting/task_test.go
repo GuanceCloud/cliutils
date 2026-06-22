@@ -68,6 +68,31 @@ func TestCreateTaskChild(t *testing.T) {
 	assert.NotNil(t, task)
 }
 
+func TestNormalizeWorkspaceLanguage(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "default empty", in: "", want: "zh"},
+		{name: "unknown fallback", in: "go", want: "zh"},
+		{name: "zh", in: "zh", want: "zh"},
+		{name: "zh cn", in: "zh-CN", want: "zh"},
+		{name: "zh hans", in: "zh_Hans", want: "zh"},
+		{name: "en", in: "en", want: "en"},
+		{name: "id", in: "id", want: "id"},
+		{name: "zh hant", in: "zh-Hant", want: "zh-hant"},
+		{name: "zh tw", in: "zh_TW", want: "zh-hant"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, NormalizeWorkspaceLanguage(tc.in))
+			assert.Equal(t, tc.want, (&Task{WorkspaceLanguage: tc.in}).GetWorkspaceLanguage())
+		})
+	}
+}
+
 func TestCustomFunc(t *testing.T) {
 	ct := &HTTPTask{
 		URL: `{{date "iso8601"}}`,
