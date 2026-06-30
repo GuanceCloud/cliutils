@@ -12,11 +12,7 @@ func (c *DiskCache) writeFileName() string {
 		return c.wfd.Name()
 	}
 
-	if c.curWriteFile != "" {
-		return c.curWriteFile
-	}
-
-	return c.path
+	return c.curWriteFile
 }
 
 func (c *DiskCache) readFileName() string {
@@ -24,11 +20,7 @@ func (c *DiskCache) readFileName() string {
 		return c.rfd.Name()
 	}
 
-	if c.curReadfile != "" {
-		return c.curReadfile
-	}
-
-	return c.path
+	return c.curReadfile
 }
 
 func (c *DiskCache) ensureWriteFile() error {
