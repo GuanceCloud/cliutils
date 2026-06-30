@@ -4,8 +4,8 @@ import (
 	"math"
 	"time"
 
+	"github.com/quic-go/quic-go/internal/monotime"
 	"github.com/quic-go/quic-go/internal/protocol"
-	"github.com/quic-go/quic-go/internal/utils"
 )
 
 // This cubic implementation is based on the one found in Chromiums's QUIC
@@ -18,11 +18,11 @@ import (
 // 1024*1024^3 (first 1024 is from 0.100^3)
 // where 0.100 is 100 ms which is the scaling round trip time.
 const (
-	cubeScale                                    = 40
-	cubeCongestionWindowScale                    = 410
-	cubeFactor                protocol.ByteCount = 1 << cubeScale / cubeCongestionWindowScale / maxDatagramSize
+	cubeScale                 = 40
+	cubeCongestionWindowScale = 410
+	cubeFactor                = 1 << cubeScale / cubeCongestionWindowScale / maxDatagramSize
 	// TODO: when re-enabling cubic, make sure to use the actual packet size here
-	maxDatagramSize = protocol.ByteCount(protocol.InitialPacketSizeIPv4)
+	maxDatagramSize = protocol.ByteCount(protocol.InitialPacketSize)
 )
 
 const defaultNumConnections = 1
@@ -43,7 +43,7 @@ type Cubic struct {
 	numConnections int
 
 	// Time when this cycle started, after last loss event.
-	epoch time.Time
+	epoch monotime.Time
 
 	// Max congestion window used just before last loss event.
 	// Note: to improve fairness to other streams an additional back off is
@@ -78,7 +78,7 @@ func NewCubic(clock Clock) *Cubic {
 
 // Reset is called after a timeout to reset the cubic state
 func (c *Cubic) Reset() {
-	c.epoch = time.Time{}
+	c.epoch = 0
 	c.lastMaxCongestionWindow = 0
 	c.ackedBytesCount = 0
 	c.estimatedTCPcongestionWindow = 0
@@ -122,7 +122,7 @@ func (c *Cubic) OnApplicationLimited() {
 	// in such a period. This reset effectively freezes congestion window growth
 	// through application-limited periods and allows Cubic growth to continue
 	// when the entire window is being used.
-	c.epoch = time.Time{}
+	c.epoch = 0
 }
 
 // CongestionWindowAfterPacketLoss computes a new congestion window to use after
@@ -136,7 +136,7 @@ func (c *Cubic) CongestionWindowAfterPacketLoss(currentCongestionWindow protocol
 	} else {
 		c.lastMaxCongestionWindow = currentCongestionWindow
 	}
-	c.epoch = time.Time{} // Reset time.
+	c.epoch = 0 // Reset time.
 	return protocol.ByteCount(float32(currentCongestionWindow) * c.beta())
 }
 
@@ -148,7 +148,7 @@ func (c *Cubic) CongestionWindowAfterAck(
 	ackedBytes protocol.ByteCount,
 	currentCongestionWindow protocol.ByteCount,
 	delayMin time.Duration,
-	eventTime time.Time,
+	eventTime monotime.Time,
 ) protocol.ByteCount {
 	c.ackedBytesCount += ackedBytes
 
@@ -187,7 +187,7 @@ func (c *Cubic) CongestionWindowAfterAck(
 		targetCongestionWindow = c.originPointCongestionWindow - deltaCongestionWindow
 	}
 	// Limit the CWND increase to half the acked bytes.
-	targetCongestionWindow = utils.Min(targetCongestionWindow, currentCongestionWindow+c.ackedBytesCount/2)
+	targetCongestionWindow = min(targetCongestionWindow, currentCongestionWindow+c.ackedBytesCount/2)
 
 	// Increase the window by approximately Alpha * 1 MSS of bytes every
 	// time we ack an estimated tcp window of bytes.  For small

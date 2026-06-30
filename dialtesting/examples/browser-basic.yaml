@@ -1,0 +1,17 @@
+name: browser-basic
+target: https://example.com
+timeout_ms: 60000
+tags:
+  scenario: basic
+metadata:
+  generated_by: recorder
+steps:
+  - name: open homepage
+    action: goto
+  - name: check title
+    action: assert_title
+    contains: Example
+  - name: check body text
+    action: assert_text
+    selector: body
+    contains: Example Domain
