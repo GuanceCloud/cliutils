@@ -3,6 +3,7 @@ package aggregate
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"time"
@@ -23,7 +24,7 @@ type AggregatorConfigure struct {
 	calcs map[uint64]Calculator
 }
 
-func (ac *AggregatorConfigure) UnmarshalTOML(data interface{}) error {
+func (ac *AggregatorConfigure) UnmarshalTOML(data any) error {
 	type rawAggregatorConfigure struct {
 		DefaultWindow    any              `json:"default_window"`
 		AggregateRules   []*AggregateRule `json:"aggregate_rules"`
@@ -143,9 +144,7 @@ func (cfg *AggregationAlgoConfig) ToAggregationAlgo() *AggregationAlgo {
 
 	if len(cfg.AddTags) > 0 {
 		algo.AddTags = make(map[string]string, len(cfg.AddTags))
-		for k, v := range cfg.AddTags {
-			algo.AddTags[k] = v
-		}
+		maps.Copy(algo.AddTags, cfg.AddTags)
 	}
 
 	switch {

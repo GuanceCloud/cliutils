@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -190,19 +191,15 @@ func NewDefaultOption() *Option {
 }
 
 func (opt *Option) checkDisabledField(f string) error {
-	for _, x := range opt.DisabledFieldKeys {
-		if f == x {
-			return fmt.Errorf("field key `%s' disabled", f)
-		}
+	if slices.Contains(opt.DisabledFieldKeys, f) {
+		return fmt.Errorf("field key `%s' disabled", f)
 	}
 	return nil
 }
 
 func (opt *Option) checkDisabledTag(t string) error {
-	for _, x := range opt.DisabledTagKeys {
-		if t == x {
-			return fmt.Errorf("tag key `%s' disabled", t)
-		}
+	if slices.Contains(opt.DisabledTagKeys, t) {
+		return fmt.Errorf("tag key `%s' disabled", t)
 	}
 	return nil
 }
@@ -268,7 +265,7 @@ func ParsePoints(data []byte, opt *Option) ([]*influxdb.Point, error) {
 
 func MakeLineProtoPoint(name string,
 	tags map[string]string,
-	fields map[string]interface{},
+	fields map[string]any,
 	opt *Option,
 ) (*influxdb.Point, error) {
 	pt, _, err := MakeLineProtoPointWithWarnings(name, tags, fields, opt)
@@ -277,7 +274,7 @@ func MakeLineProtoPoint(name string,
 
 func MakeLineProtoPointWithWarnings(name string,
 	tags map[string]string,
-	fields map[string]interface{},
+	fields map[string]any,
 	opt *Option,
 ) (pt *influxdb.Point, warnings []*PointWarning, err error) {
 	warnings = []*PointWarning{}
@@ -334,7 +331,7 @@ func MakeLineProtoPointWithWarnings(name string,
 
 func MakeLineProtoPointV2(name string,
 	tags map[string]string,
-	fields map[string]interface{},
+	fields map[string]any,
 	opt *Option,
 ) (*Point, error) {
 	pt, _, err := MakeLineProtoPointWithWarningsV2(name, tags, fields, opt)
@@ -343,7 +340,7 @@ func MakeLineProtoPointV2(name string,
 
 func MakeLineProtoPointWithWarningsV2(name string,
 	tags map[string]string,
-	fields map[string]interface{},
+	fields map[string]any,
 	opt *Option,
 ) (pt *Point, warnings []*PointWarning, err error) {
 	warnings = []*PointWarning{}
@@ -496,7 +493,7 @@ func checkPointV2(p *Point, opt *Option) error {
 	return nil
 }
 
-func checkTagFieldSameKey(tags map[string]string, fields map[string]interface{}, warnings *[]*PointWarning) error {
+func checkTagFieldSameKey(tags map[string]string, fields map[string]any, warnings *[]*PointWarning) error {
 	if tags == nil || fields == nil {
 		return nil
 	}
@@ -528,7 +525,7 @@ func trimSuffixAll(s, sfx string) string {
 	return x
 }
 
-func checkField(k string, v interface{}, opt *Option, pointWarnings *[]*PointWarning) (interface{}, error) {
+func checkField(k string, v any, opt *Option, pointWarnings *[]*PointWarning) (any, error) {
 	if strings.Contains(k, ".") && !opt.EnablePointInKey {
 		return nil, fmt.Errorf("invalid field key `%s': found `.'", k)
 	}
@@ -606,7 +603,7 @@ func checkField(k string, v interface{}, opt *Option, pointWarnings *[]*PointWar
 	}
 }
 
-func checkFields(fields map[string]interface{}, opt *Option, pointWarnings *[]*PointWarning) error {
+func checkFields(fields map[string]any, opt *Option, pointWarnings *[]*PointWarning) error {
 	// warnings: WarnMaxFields
 	warnings := []*PointWarning{}
 

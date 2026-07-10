@@ -45,11 +45,11 @@ func TestCache_Concurrency(t *testing.T) {
 	start := time.Now()
 
 	// 2. 启动并发写入
-	for i := 0; i < workerCount; i++ {
+	for i := range workerCount {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
-			for j := 0; j < batchesPerWorker; j++ {
+			for j := range batchesPerWorker {
 				// 模拟不同时间点的请求
 				token := tokens[j%len(tokens)]
 				var kvs point.KVs

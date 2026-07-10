@@ -18,7 +18,7 @@ import (
 func TestHTTPServer(t *testing.T) {
 	opt := &HTTPServerOptions{
 		Bind: ":12345",
-		Exit: make(chan interface{}),
+		Exit: make(chan any),
 		Routes: map[string]func(*gin.Context){
 			"/route1": func(*gin.Context) { fmt.Printf("on route1") },
 			"/route2": func(*gin.Context) { fmt.Printf("on route2") },
@@ -27,12 +27,9 @@ func TestHTTPServer(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		NewHTTPServer(t, opt)
-	}()
+	})
 
 	time.Sleep(time.Second)
 

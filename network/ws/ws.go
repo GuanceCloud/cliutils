@@ -103,11 +103,9 @@ func (s *Server) Start() {
 		fmt.Printf("warn: Setrlimit %+#v failed: %s\n", rLimit, err.Error())
 	}
 
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
+	s.wg.Go(func() {
 		s.startEpoll()
-	}()
+	})
 
 	srv := &http.Server{
 		Addr: s.Bind,
@@ -119,13 +117,11 @@ func (s *Server) Start() {
 
 	http.HandleFunc(s.Path, s.AddCli)
 
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
+	s.wg.Go(func() {
 		if err := srv.ListenAndServe(); err != nil {
 			l.Info(err)
 		}
-	}()
+	})
 
 	<-s.exit.Wait()
 	if err := srv.Shutdown(context.TODO()); err != nil {

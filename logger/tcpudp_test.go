@@ -26,7 +26,7 @@ func serve(t *testing.T,
 	expectLogCnt int,
 	proto string,
 	listen string,
-	ch chan interface{},
+	ch chan any,
 ) (listener, error) {
 	t.Helper()
 	switch proto {
@@ -122,7 +122,7 @@ func TestRemoteLogger(t *testing.T) {
 		options      int
 		logs         [][2]string
 		expectLogCnt int
-		ch           chan interface{}
+		ch           chan any
 		fail         bool
 	}{
 		{
@@ -135,7 +135,7 @@ func TestRemoteLogger(t *testing.T) {
 				{INFO, "this is info msg"},
 			},
 			expectLogCnt: 2,
-			ch:           make(chan interface{}),
+			ch:           make(chan any),
 		},
 
 		{
@@ -148,7 +148,7 @@ func TestRemoteLogger(t *testing.T) {
 				{INFO, "this is info msg"},
 			},
 			expectLogCnt: 2,
-			ch:           make(chan interface{}),
+			ch:           make(chan any),
 		},
 
 		{
@@ -161,7 +161,7 @@ func TestRemoteLogger(t *testing.T) {
 				{INFO, "this is info msg"},
 			},
 			expectLogCnt: 2,
-			ch:           make(chan interface{}),
+			ch:           make(chan any),
 		},
 
 		{

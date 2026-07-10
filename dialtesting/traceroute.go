@@ -88,7 +88,7 @@ func mean(v []float64) float64 {
 		return 0
 	}
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		res += v[i]
 	}
 	return res / float64(n)
@@ -98,7 +98,7 @@ func variance(v []float64) float64 {
 	var res float64 = 0
 	m := mean(v)
 	var n int = len(v)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		res += (v[i] - m) * (v[i] - m)
 	}
 	if n <= 1 {

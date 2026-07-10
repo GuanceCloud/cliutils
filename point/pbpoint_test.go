@@ -50,7 +50,7 @@ func BenchmarkMarshal(b *T.B) {
 			pts := RandPoints(tc.repeat)
 			for i := 0; i < b.N; i++ {
 				arr := []string{}
-				for i := 0; i < len(pts); i++ {
+				for i := range pts {
 					arr = append(arr, pts[i].LineProto())
 				}
 				x := strings.Join(arr, "\n")
@@ -77,7 +77,7 @@ func BenchmarkMarshal(b *T.B) {
 		b.Run(tc.name+"_lp-unmarshal", func(b *T.B) {
 			pts := RandPoints(tc.repeat)
 			arr := []string{}
-			for i := 0; i < len(pts); i++ {
+			for i := range pts {
 				arr = append(arr, pts[i].LineProto())
 			}
 			ptbytes := []byte(strings.Join(arr, "\n"))
@@ -95,7 +95,7 @@ func TestPBPointJSON(t *T.T) {
 	cases := []struct {
 		name   string
 		tags   map[string]string
-		fields map[string]interface{}
+		fields map[string]any
 		time   time.Time
 		warns  []*Warn
 		debugs []*Debug
@@ -103,7 +103,7 @@ func TestPBPointJSON(t *T.T) {
 		{
 			name: "simple",
 			tags: nil,
-			fields: map[string]interface{}{
+			fields: map[string]any{
 				"f1": int64(123),
 				"f2": 123.4,
 				"f3": false,
@@ -120,7 +120,7 @@ func TestPBPointJSON(t *T.T) {
 				"t1": "123",
 				"t2": "xyz",
 			},
-			fields: map[string]interface{}{
+			fields: map[string]any{
 				"f1": int64(123),
 				"f2": 123.4,
 				"f3": false,
@@ -136,7 +136,7 @@ func TestPBPointJSON(t *T.T) {
 			tags: map[string]string{
 				"t1": "123",
 			},
-			fields: map[string]interface{}{
+			fields: map[string]any{
 				"t1": "dulicated key in tags", // triger warnning
 				"f1": int64(123),
 			},
@@ -148,7 +148,7 @@ func TestPBPointJSON(t *T.T) {
 			tags: map[string]string{
 				"t1": "123",
 			},
-			fields: map[string]interface{}{
+			fields: map[string]any{
 				"t1": "dulicated key in tags",
 				"f1": int64(123),
 			},

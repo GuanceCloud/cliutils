@@ -12,7 +12,7 @@ import (
 var (
 	metricCh = make(chan *APIMetric, 32)
 	qch      = make(chan *qAPIStats)
-	exitch   = make(chan interface{})
+	exitch   = make(chan any)
 )
 
 type APIMetric struct {

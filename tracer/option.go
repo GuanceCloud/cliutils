@@ -49,7 +49,7 @@ func WithDebug(debug bool) StartOption {
 	}
 }
 
-func WithGlobalTag(key string, value interface{}) StartOption {
+func WithGlobalTag(key string, value any) StartOption {
 	return func(t *Tracer) {
 		t.Tags[key] = value
 	}

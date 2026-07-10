@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -121,7 +122,7 @@ func (t *HTTPTask) metricName() string {
 	return `http_dial_testing`
 }
 
-func (t *HTTPTask) getResults() (tags map[string]string, fields map[string]interface{}) {
+func (t *HTTPTask) getResults() (tags map[string]string, fields map[string]any) {
 	tags = map[string]string{
 		"name":    t.Name,
 		"url":     t.URL,
@@ -140,7 +141,7 @@ func (t *HTTPTask) getResults() (tags map[string]string, fields map[string]inter
 		tags["proto"] = t.req.Proto
 	}
 
-	fields = map[string]interface{}{
+	fields = map[string]any{
 		"response_time":      int64(t.reqCost) / 1000, // unit: us
 		"response_body_size": int64(len(t.respBody)),
 		"success":            int64(-1),
@@ -152,11 +153,9 @@ func (t *HTTPTask) getResults() (tags map[string]string, fields map[string]inter
 		tags["status_code_class"] = fmt.Sprintf(`%dxx`, t.resp.StatusCode/100)
 	}
 
-	for k, v := range t.Tags {
-		tags[k] = v
-	}
+	maps.Copy(tags, t.Tags)
 
-	message := map[string]interface{}{
+	message := map[string]any{
 		"request_body":   t.reqBody,
 		"request_header": t.reqHeader,
 	}

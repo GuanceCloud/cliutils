@@ -208,7 +208,7 @@ func WindowsToData(ws []*Window) []*PointsData {
 }
 
 var windowPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return &Window{
 			// 预分配一定的初始容量，减少后续扩容次数
 			cache: make(map[uint64]Calculator, 64),

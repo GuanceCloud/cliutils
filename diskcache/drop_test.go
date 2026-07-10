@@ -77,9 +77,7 @@ func TestDropDuringGet(t *T.T) {
 
 	sample := bytes.Repeat([]byte("hello"), 7351)
 	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() { // fast put
-		defer wg.Done()
+	wg.Go(func() { // fast put
 		n := 0
 		for {
 			if err := c.Put(sample); err != nil {
@@ -92,7 +90,7 @@ func TestDropDuringGet(t *T.T) {
 				return
 			}
 		}
-	}()
+	})
 
 	time.Sleep(time.Second) // wait new data write
 

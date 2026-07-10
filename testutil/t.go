@@ -12,10 +12,10 @@ import (
 
 type TB interface {
 	Helper()
-	Fatalf(string, ...interface{})
+	Fatalf(string, ...any)
 }
 
-func Assert(tb TB, condition bool, fmt string, a ...interface{}) {
+func Assert(tb TB, condition bool, fmt string, a ...any) {
 	tb.Helper()
 	if !condition {
 		tb.Fatalf("\033[31m"+fmt+"\033[39m\n", a...)
@@ -29,7 +29,7 @@ func Ok(tb TB, err error) {
 	}
 }
 
-func NotOk(tb TB, err error, fmt string, a ...interface{}) {
+func NotOk(tb TB, err error, fmt string, a ...any) {
 	tb.Helper()
 	if err == nil {
 		if len(a) != 0 {
@@ -39,7 +39,7 @@ func NotOk(tb TB, err error, fmt string, a ...interface{}) {
 	}
 }
 
-func Equals(tb TB, exp, act interface{}) {
+func Equals(tb TB, exp, act any) {
 	tb.Helper()
 	if !reflect.DeepEqual(exp, act) {
 		tb.Fatalf("\033[31m\nexp: %#v\n\ngot: %#v\033[39m\n", exp, act)

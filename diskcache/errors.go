@@ -223,8 +223,8 @@ func isTemporaryError(err error) bool {
 }
 
 // GetErrorContext extracts useful context information from errors.
-func GetErrorContext(err error) map[string]interface{} {
-	context := make(map[string]interface{})
+func GetErrorContext(err error) map[string]any {
+	context := make(map[string]any)
 
 	if err == nil {
 		return context

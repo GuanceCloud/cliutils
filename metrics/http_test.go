@@ -37,7 +37,7 @@ func TestRouteForGin(t *T.T) {
 
 		div := 10000.0
 
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			switch i % 3 {
 			case 0:
 				vec.WithLabelValues("/v1/write/metric", "ok").Add(float64(i) / div)

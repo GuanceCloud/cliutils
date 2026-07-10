@@ -30,7 +30,7 @@ func TestHistogram(t *T.T) {
 
 		div := 10000.0
 
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			switch i % 3 {
 			case 0:
 				vec.WithLabelValues("/v1/write/metric", "ok").Observe(float64(i) / div)
@@ -76,7 +76,7 @@ func TestConcurrentAdd(t *T.T) {
 		)
 
 		wg.Add(nwrk)
-		for i := 0; i < nwrk; i++ {
+		for range nwrk {
 			go func() {
 				defer wg.Done()
 
@@ -113,7 +113,7 @@ func TestAdd(t *T.T) {
 
 		reg := prometheus.NewRegistry()
 		reg.MustRegister(vec)
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			vec.WithLabelValues("/v1/write/abc", "ok").Observe(float64(i))
 			vec.WithLabelValues("/v1/write/def", "fail").Observe(float64(100 - i))
 		}

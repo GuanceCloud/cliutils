@@ -34,15 +34,15 @@ type Tracer struct {
 
 	agentAddr string
 
-	LogsStartup  bool                   `toml:"logs_startup"  yaml:"logs_startup"`  // env: DD_TRACE_STARTUP_LOGS
-	Debug        bool                   `toml:"debug"         yaml:"debug"`         // env: DD_TRACE_DEBUG
-	TraceEnabled bool                   `toml:"trace_enabled" yaml:"trace_enabled"` // env: DD_TRACE_ENABLED
-	Tags         map[string]interface{} `toml:"tags"          yaml:"tags"`          // env: DD_TAGS
+	LogsStartup  bool           `toml:"logs_startup"  yaml:"logs_startup"`  // env: DD_TRACE_STARTUP_LOGS
+	Debug        bool           `toml:"debug"         yaml:"debug"`         // env: DD_TRACE_DEBUG
+	TraceEnabled bool           `toml:"trace_enabled" yaml:"trace_enabled"` // env: DD_TRACE_ENABLED
+	Tags         map[string]any `toml:"tags"          yaml:"tags"`          // env: DD_TAGS
 }
 
 func (t *Tracer) GetStartOptions(opts ...StartOption) []tracer.StartOption {
 	if t.Tags == nil {
-		t.Tags = make(map[string]interface{})
+		t.Tags = make(map[string]any)
 	}
 
 	for i := range opts {

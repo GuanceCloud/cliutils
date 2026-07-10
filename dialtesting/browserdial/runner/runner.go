@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -192,10 +193,7 @@ func runLoaded(ctx context.Context, loaded script.Script, options Options, runID
 	if engineName == "lightpanda" && strings.TrimSpace(loaded.ProxyURL) != "" {
 		logIgnoredOption(options, "proxy_url", "lightpanda does not support proxy_url")
 	}
-	maxAttempts := options.RetryCount + 1
-	if maxAttempts < 1 {
-		maxAttempts = 1
-	}
+	maxAttempts := max(options.RetryCount+1, 1)
 
 	var last Result
 	retryRecords := make([]evidence.RetryRecord, 0, maxAttempts)
@@ -386,9 +384,7 @@ func isZeroPerformance(metrics evidence.PerformanceMetrics) bool {
 
 func browserConfig(loaded script.Script, options Options, vars map[string]string) (BrowserConfig, error) {
 	headers := cloneStringMap(loaded.Headers)
-	for key, value := range options.Headers {
-		headers[key] = value
-	}
+	maps.Copy(headers, options.Headers)
 	cookies := make([]BrowserCookie, 0, len(loaded.Cookies)+len(options.Cookies))
 	for _, cookie := range append(append([]script.Cookie{}, loaded.Cookies...), options.Cookies...) {
 		value := cookie.Value
@@ -817,17 +813,13 @@ func classifyFailureType(err error, steps []evidence.StepResult, failReason stri
 
 func mergeTags(first map[string]string, second map[string]string) map[string]string {
 	out := cloneStringMap(first)
-	for key, value := range second {
-		out[key] = value
-	}
+	maps.Copy(out, second)
 	return out
 }
 
 func cloneStringMap(input map[string]string) map[string]string {
 	out := map[string]string{}
-	for key, value := range input {
-		out[key] = value
-	}
+	maps.Copy(out, input)
 	return out
 }
 

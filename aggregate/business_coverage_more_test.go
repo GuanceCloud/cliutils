@@ -15,7 +15,7 @@ import (
 type brokenAggregationOptions struct{}
 
 func (*brokenAggregationOptions) isAggregationAlgo_Options() {}
-func (*brokenAggregationOptions) Equal(interface{}) bool     { return false }
+func (*brokenAggregationOptions) Equal(any) bool             { return false }
 func (*brokenAggregationOptions) MarshalTo([]byte) (int, error) {
 	return 0, errors.New("broken options")
 }

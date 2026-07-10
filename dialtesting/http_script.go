@@ -38,7 +38,7 @@ type ScriptHTTPResult struct {
 	ErrorMessage string `json:"error_message"`
 }
 
-type Vars map[string]interface{}
+type Vars map[string]any
 
 type ScriptResult struct {
 	Result ScriptHTTPResult `json:"result"`
@@ -128,7 +128,7 @@ func runPipeline(script string, response *ScriptHTTPRequestResponse, vars *Vars)
 		return nil, fmt.Errorf("message marshal failed: %w", err)
 	}
 
-	fileds := map[string]interface{}{
+	fileds := map[string]any{
 		"message": messageString,
 	}
 

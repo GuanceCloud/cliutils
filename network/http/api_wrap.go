@@ -24,9 +24,9 @@ type WrapPlugins struct {
 	Reporter APIMetricReporter
 }
 
-type apiHandler func(http.ResponseWriter, *http.Request, ...interface{}) (interface{}, error)
+type apiHandler func(http.ResponseWriter, *http.Request, ...any) (any, error)
 
-func HTTPAPIWrapper(p *WrapPlugins, next apiHandler, args ...interface{}) func(*gin.Context) {
+func HTTPAPIWrapper(p *WrapPlugins, next apiHandler, args ...any) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var start time.Time
 		var m *APIMetric

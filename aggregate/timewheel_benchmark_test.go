@@ -40,7 +40,7 @@ func BenchmarkGlobalSamplerTimeWheelIngestMergeGroup(b *testing.B) {
 	sampler := newBenchmarkGlobalSampler(b, ttl, nil)
 	sampler.Ingest(newBenchmarkTracePacket(1, nil))
 	packets := make([]*DataPacket, 0, packetCount)
-	for i := 0; i < packetCount; i++ {
+	for range packetCount {
 		packets = append(packets, newBenchmarkTracePacket(1, nil))
 	}
 
@@ -132,7 +132,7 @@ func newBenchmarkGlobalSampler(tb testing.TB, ttl time.Duration, pipelines []*Sa
 
 func newBenchmarkTracePackets(count int, payload []byte) []*DataPacket {
 	packets := make([]*DataPacket, 0, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		packets = append(packets, newBenchmarkTracePacket(uint64(i+1), payload))
 	}
 	return packets
@@ -158,7 +158,7 @@ func benchmarkTracePayload() []byte {
 }
 
 func drainBenchmarkSampler(sampler *GlobalSampler, seconds int) {
-	for i := 0; i < seconds; i++ {
+	for range seconds {
 		releaseBenchmarkDataGroups(sampler.AdvanceTime())
 	}
 }

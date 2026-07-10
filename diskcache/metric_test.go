@@ -23,10 +23,7 @@ func getSamples(data []byte) []byte {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	// at least 1/10 of data
-	n := (len(data)/10 + (r.Int() % len(data)))
-	if n >= len(data) {
-		n = len(data)
-	}
+	n := min((len(data)/10 + (r.Int() % len(data))), len(data))
 
 	start := r.Int() % len(data)
 
@@ -87,7 +84,7 @@ func TestPutGetMetrics(t *T.T) {
 
 		data := make([]byte, bsize/2)
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			c.Put(data)
 		}
 
@@ -243,7 +240,7 @@ func TestPerfConcurrentPutGet(t *T.T) {
 		// 10 worker
 		wg := sync.WaitGroup{}
 		wg.Add(10)
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			go func() {
 				defer wg.Done()
 				for {
@@ -285,7 +282,7 @@ func TestPerfConcurrentPutGet(t *T.T) {
 		// put/get each 10 worker
 		wg := sync.WaitGroup{}
 		wg.Add(20)
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			go func() {
 				defer wg.Done()
 				for {
@@ -301,7 +298,7 @@ func TestPerfConcurrentPutGet(t *T.T) {
 			}()
 		}
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			go func() {
 				defer wg.Done()
 				for {

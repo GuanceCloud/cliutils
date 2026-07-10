@@ -44,7 +44,7 @@ func TestWSServer(t *testing.T) {
 
 	// msg-handle callback
 	df_srv.MsgHandler = func(s *Server, c net.Conn, data []byte, op ws.OpCode) error {
-		SendMsgToClient([]byte(fmt.Sprintf("your are %s", c.RemoteAddr().String())), c)
+		SendMsgToClient(fmt.Appendf(nil, "your are %s", c.RemoteAddr().String()), c)
 		return nil
 	}
 
@@ -78,7 +78,7 @@ func TestWSServer(t *testing.T) {
 
 	// datakit as ws proxy client
 	dkclis := []*wscli{}
-	for i := 0; i < ncli; i++ {
+	for range ncli {
 		cliid := cliutils.XID("id_")
 
 		dw_wsurl := url.URL{
@@ -96,10 +96,10 @@ func TestWSServer(t *testing.T) {
 	}
 
 	__wg.Add(ncli)
-	ch := make(chan interface{})
+	ch := make(chan any)
 
 	// ws-cli send msg to ws-server
-	for i := 0; i < ncli; i++ {
+	for i := range ncli {
 		go func(t *testing.T, i int) {
 			t.Helper()
 

@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"net/url"
@@ -196,7 +197,7 @@ func (t *WebsocketTask) checkResult() (reasons []string, succFlag bool) {
 	return reasons, succFlag
 }
 
-func (t *WebsocketTask) getResults() (tags map[string]string, fields map[string]interface{}) {
+func (t *WebsocketTask) getResults() (tags map[string]string, fields map[string]any) {
 	tags = map[string]string{
 		"name":   t.Name,
 		"url":    t.URL,
@@ -207,7 +208,7 @@ func (t *WebsocketTask) getResults() (tags map[string]string, fields map[string]
 	responseTime := int64(t.reqCost+t.reqDNSCost) / 1000        // us
 	responseTimeWithDNS := int64(t.reqCost+t.reqDNSCost) / 1000 // us
 
-	fields = map[string]interface{}{
+	fields = map[string]any{
 		"response_time":          responseTime,
 		"response_time_with_dns": responseTimeWithDNS,
 		"response_message":       t.responseMessage,
@@ -221,11 +222,9 @@ func (t *WebsocketTask) getResults() (tags map[string]string, fields map[string]
 		fields[`ssl_cert_expires_in_days`] = (t.sslCertNotAfter - time.Now().UnixMicro()) / (24 * time.Hour).Microseconds()
 	}
 
-	for k, v := range t.Tags {
-		tags[k] = v
-	}
+	maps.Copy(tags, t.Tags)
 
-	message := map[string]interface{}{}
+	message := map[string]any{}
 
 	reasons, succFlag := t.checkResult()
 	if t.reqError != "" {

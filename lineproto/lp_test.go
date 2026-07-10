@@ -28,7 +28,7 @@ func TestUnsafeBytesToString(t *testing.T) {
 }
 
 func TestInterfaceToValue(t *testing.T) {
-	ints := []interface{}{
+	ints := []any{
 		-5,
 		int8(-5),
 		int16(-5),
@@ -71,7 +71,7 @@ func TestPointString(t *testing.T) {
 		"t1": cliutils.CreateRandomString(100),
 		"t2": cliutils.CreateRandomString(100),
 	}
-	fields := map[string]interface{}{
+	fields := map[string]any{
 		"f1": int64(1024),
 		"f2": 1024.2048,
 		"f3": cliutils.CreateRandomString(128),
@@ -174,7 +174,7 @@ func TestNewLineEncoder(t *testing.T) {
 		pts  []struct {
 			measurement string
 			tags        map[string]string
-			fields      map[string]interface{}
+			fields      map[string]any
 			time        time.Time
 		}
 		opt *Option
@@ -185,7 +185,7 @@ func TestNewLineEncoder(t *testing.T) {
 			pts: []struct {
 				measurement string
 				tags        map[string]string
-				fields      map[string]interface{}
+				fields      map[string]any
 				time        time.Time
 			}{
 				{
@@ -194,7 +194,7 @@ func TestNewLineEncoder(t *testing.T) {
 						"t2": cliutils.CreateRandomString(100),
 						"t1": cliutils.CreateRandomString(100),
 					},
-					fields: map[string]interface{}{
+					fields: map[string]any{
 						"f3": int64(1024),
 						"f1": 1024.2048,
 						"f2": cliutils.CreateRandomString(128),
@@ -207,7 +207,7 @@ func TestNewLineEncoder(t *testing.T) {
 						"aaa": cliutils.CreateRandomString(110),
 						"AAA": cliutils.CreateRandomString(110),
 					},
-					fields: map[string]interface{}{
+					fields: map[string]any{
 						"f1": int64(1024),
 						"f5": 1024.2048,
 						"f3": cliutils.CreateRandomString(138),
@@ -221,7 +221,7 @@ func TestNewLineEncoder(t *testing.T) {
 						"t31": cliutils.CreateRandomString(100),
 						"t22": cliutils.CreateRandomString(120),
 					},
-					fields: map[string]interface{}{
+					fields: map[string]any{
 						"f1":   int64(1024),
 						"f222": 1024.2048,
 						"f3":   cliutils.CreateRandomString(148),
@@ -295,7 +295,7 @@ func TestEncode(t *testing.T) {
 		pts  []struct {
 			measurement string
 			tags        map[string]string
-			fields      map[string]interface{}
+			fields      map[string]any
 			time        time.Time
 		}
 		opt *Option
@@ -306,7 +306,7 @@ func TestEncode(t *testing.T) {
 			pts: []struct {
 				measurement string
 				tags        map[string]string
-				fields      map[string]interface{}
+				fields      map[string]any
 				time        time.Time
 			}{
 				{
@@ -316,7 +316,7 @@ func TestEncode(t *testing.T) {
 						"t1":     cliutils.CreateRandomString(100),
 						"t2":     cliutils.CreateRandomString(100),
 					},
-					fields: map[string]interface{}{
+					fields: map[string]any{
 						"f1": int64(1024),
 						"f2": 1024.2048,
 						"f3": cliutils.CreateRandomString(128),
@@ -331,7 +331,7 @@ func TestEncode(t *testing.T) {
 						"t1":   cliutils.CreateRandomString(100),
 						"t2":   cliutils.CreateRandomString(100),
 					},
-					fields: map[string]interface{}{
+					fields: map[string]any{
 						"ffff": "",
 						"f1":   int64(1024),
 						"f2":   1024.2048,
@@ -375,7 +375,7 @@ func BenchmarkEncode(b *testing.B) {
 		pts  []struct {
 			measurement string
 			tags        map[string]string
-			fields      map[string]interface{}
+			fields      map[string]any
 			time        time.Time
 		}
 		opt *Option
@@ -386,7 +386,7 @@ func BenchmarkEncode(b *testing.B) {
 			pts: []struct {
 				measurement string
 				tags        map[string]string
-				fields      map[string]interface{}
+				fields      map[string]any
 				time        time.Time
 			}{
 				{
@@ -395,7 +395,7 @@ func BenchmarkEncode(b *testing.B) {
 						"t1": cliutils.CreateRandomString(100),
 						"t2": cliutils.CreateRandomString(100),
 					},
-					fields: map[string]interface{}{
+					fields: map[string]any{
 						"f1": int64(1024),
 						"f2": 1024.2048,
 						"f3": cliutils.CreateRandomString(128),
@@ -411,7 +411,7 @@ func BenchmarkEncode(b *testing.B) {
 			pts: []struct {
 				measurement string
 				tags        map[string]string
-				fields      map[string]interface{}
+				fields      map[string]any
 				time        time.Time
 			}{
 				{
@@ -420,7 +420,7 @@ func BenchmarkEncode(b *testing.B) {
 						"t1": cliutils.CreateRandomString(100),
 						"t2": cliutils.CreateRandomString(100),
 					},
-					fields: map[string]interface{}{
+					fields: map[string]any{
 						"f1": int64(1024),
 						"f2": 1024.2048,
 						"f3": cliutils.CreateRandomString(1024),
@@ -435,7 +435,7 @@ func BenchmarkEncode(b *testing.B) {
 						"t1": cliutils.CreateRandomString(100),
 						"t2": cliutils.CreateRandomString(100),
 					},
-					fields: map[string]interface{}{
+					fields: map[string]any{
 						"f1": int64(1024),
 						"f2": 1024.2048,
 						"f3": cliutils.CreateRandomString(1024),
@@ -450,7 +450,7 @@ func BenchmarkEncode(b *testing.B) {
 						"t1": cliutils.CreateRandomString(100),
 						"t2": cliutils.CreateRandomString(100),
 					},
-					fields: map[string]interface{}{
+					fields: map[string]any{
 						"f1": int64(1024),
 						"f2": 1024.2048,
 						"f3": cliutils.CreateRandomString(1024),
@@ -512,7 +512,7 @@ func TestLineEncoderBytesWithoutLn(t *testing.T) {
 		pts  []struct {
 			measurement string
 			tags        map[string]string
-			fields      map[string]interface{}
+			fields      map[string]any
 			time        time.Time
 		}
 		opt *Option
@@ -523,7 +523,7 @@ func TestLineEncoderBytesWithoutLn(t *testing.T) {
 			pts: []struct {
 				measurement string
 				tags        map[string]string
-				fields      map[string]interface{}
+				fields      map[string]any
 				time        time.Time
 			}{
 				{
@@ -532,7 +532,7 @@ func TestLineEncoderBytesWithoutLn(t *testing.T) {
 						"t2": cliutils.CreateRandomString(100),
 						"t1": cliutils.CreateRandomString(100),
 					},
-					fields: map[string]interface{}{
+					fields: map[string]any{
 						"f3": int64(1024),
 						"f1": 1024.2048,
 						"f2": cliutils.CreateRandomString(128),
@@ -545,7 +545,7 @@ func TestLineEncoderBytesWithoutLn(t *testing.T) {
 						"aaa": cliutils.CreateRandomString(110),
 						"AAA": cliutils.CreateRandomString(110),
 					},
-					fields: map[string]interface{}{
+					fields: map[string]any{
 						"f1": int64(1024),
 						"f5": 1024.2048,
 						"f3": cliutils.CreateRandomString(138),
@@ -559,7 +559,7 @@ func TestLineEncoderBytesWithoutLn(t *testing.T) {
 						"t31": cliutils.CreateRandomString(100),
 						"t22": cliutils.CreateRandomString(120),
 					},
-					fields: map[string]interface{}{
+					fields: map[string]any{
 						"f1":   int64(1024),
 						"f222": 1024.2048,
 						"f3":   cliutils.CreateRandomString(148),

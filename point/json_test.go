@@ -28,7 +28,7 @@ func TestJSONPointMarshal(t *T.T) {
 			p: func() *Point {
 				pt, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "tv1", "t2": "tv2"},
-					map[string]interface{}{"f1": 123, "f2": false},
+					map[string]any{"f1": 123, "f2": false},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 
@@ -136,7 +136,7 @@ func TestJSONPoint2Point(t *T.T) {
 			p: &JSONPoint{
 				Measurement: "abc",
 				Tags:        nil,
-				Fields:      map[string]interface{}{"f1": 123, "f2": false},
+				Fields:      map[string]any{"f1": 123, "f2": false},
 			},
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			expect: "abc f1=123i,f2=false 123",
@@ -157,7 +157,7 @@ func TestJSONPoint2Point(t *T.T) {
 			p: &JSONPoint{
 				Measurement: "", // not set
 				Tags:        nil,
-				Fields:      map[string]interface{}{"f1": 123, "f2": false},
+				Fields:      map[string]any{"f1": 123, "f2": false},
 			},
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			expect: fmt.Sprintf("%s f1=123i,f2=false 123", DefaultMeasurementName),

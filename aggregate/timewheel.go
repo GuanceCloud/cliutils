@@ -11,7 +11,7 @@ import (
 )
 
 var dataGroupPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return &DataGroup{}
 	},
 }
@@ -70,7 +70,7 @@ func NewGlobalSampler(shardCount int, waitTime time.Duration) *GlobalSampler {
 		configMap:  make(map[string]*TailSamplingConfigs),
 	}
 
-	for i := 0; i < shardCount; i++ {
+	for i := range shardCount {
 		// 1. 初始化 Shard 结构体
 		sampler.shards[i] = &Shard{
 			activeMap: make(map[uint64]*DataGroup),
@@ -79,7 +79,7 @@ func NewGlobalSampler(shardCount int, waitTime time.Duration) *GlobalSampler {
 
 		// 2. 初始化时间轮的 3600 个槽位
 		// 必须为每个槽位创建一个新的 list.List
-		for j := 0; j < 3600; j++ {
+		for j := range 3600 {
 			sampler.shards[i].slots[j] = list.New()
 		}
 	}
@@ -116,7 +116,7 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 	// 懒加载初始化
 	if shard.activeMap == nil {
 		shard.activeMap = make(map[uint64]*DataGroup)
-		for i := 0; i < 3600; i++ {
+		for i := range 3600 {
 			shard.slots[i] = list.New()
 		}
 	}

@@ -14,7 +14,7 @@ import (
 
 func TestPickTrace(t *testing.T) {
 	now := time.Now()
-	pt1 := point.NewPoint("ddtrace", point.NewKVs(map[string]interface{}{
+	pt1 := point.NewPoint("ddtrace", point.NewKVs(map[string]any{
 		"http.server.requests_bucket": float64(10),
 		"resource":                    "/resource",
 		"trace_id":                    "1000000000",
@@ -24,7 +24,7 @@ func TestPickTrace(t *testing.T) {
 	}), point.CommonLoggingOptions()...)
 	pt1.SetTime(now)
 
-	pt2 := point.NewPoint("ddtrace", point.NewKVs(map[string]interface{}{
+	pt2 := point.NewPoint("ddtrace", point.NewKVs(map[string]any{
 		"http.server.requests_bucket": float64(10),
 		"resource":                    "/client",
 		"trace_id":                    "2000000000",
@@ -53,7 +53,7 @@ func TestSamplingPipeline_DoAction1(t *testing.T) {
 	err := pip.Apply()
 	assert.NoError(t, err)
 	now := time.Now()
-	pt1 := point.NewPoint("ddtrace", point.NewKVs(map[string]interface{}{
+	pt1 := point.NewPoint("ddtrace", point.NewKVs(map[string]any{
 		"http.server.requests_bucket": float64(10),
 		"resource":                    "/resource",
 		"trace_id":                    "1000000000",
@@ -272,7 +272,7 @@ func TestSamplingPipeline_DoAction(t *testing.T) {
 func MockTrace() []byte {
 	var payload []byte
 	now := time.Now()
-	pt1 := point.NewPoint("ddtrace", point.NewKVs(map[string]interface{}{
+	pt1 := point.NewPoint("ddtrace", point.NewKVs(map[string]any{
 		"http.server.requests_bucket": float64(10),
 		"resource":                    "/resource",
 		"trace_id":                    "1000000000",
@@ -282,7 +282,7 @@ func MockTrace() []byte {
 	}), point.CommonLoggingOptions()...)
 	pt1.SetTime(now)
 
-	pt2 := point.NewPoint("ddtrace", point.NewKVs(map[string]interface{}{
+	pt2 := point.NewPoint("ddtrace", point.NewKVs(map[string]any{
 		"http.server.requests_bucket": float64(10),
 		"resource":                    "/client",
 		"trace_id":                    "1000000000",
@@ -292,7 +292,7 @@ func MockTrace() []byte {
 	}), point.CommonLoggingOptions()...)
 	pt2.SetTime(now)
 
-	pt3 := point.NewPoint("ddtrace", point.NewKVs(map[string]interface{}{
+	pt3 := point.NewPoint("ddtrace", point.NewKVs(map[string]any{
 		"http.server.requests_bucket": float64(10),
 		"resource":                    "select",
 		"trace_id":                    "1000000000",
@@ -304,7 +304,7 @@ func MockTrace() []byte {
 	}), point.CommonLoggingOptions()...)
 	pt3.SetTime(now)
 
-	pt4 := point.NewPoint("ddtrace", point.NewKVs(map[string]interface{}{
+	pt4 := point.NewPoint("ddtrace", point.NewKVs(map[string]any{
 		"http.server.requests_bucket": float64(10),
 		"resource":                    "mysql",
 		"trace_id":                    "1000000000",
@@ -316,7 +316,7 @@ func MockTrace() []byte {
 	}), point.CommonLoggingOptions()...)
 	pt4.SetTime(now)
 
-	pt5 := point.NewPoint("ddtrace", point.NewKVs(map[string]interface{}{
+	pt5 := point.NewPoint("ddtrace", point.NewKVs(map[string]any{
 		"http.server.requests_bucket": float64(10),
 		"resource":                    "GET /tmall/123",
 		"trace_id":                    "1000000000",
@@ -337,8 +337,8 @@ func MockTrace() []byte {
 func TestEvaluatePipelinesTraceWideOrder(t *testing.T) {
 	t.Run("earlier pipeline wins even when a later span matches it", func(t *testing.T) {
 		packet := makeTracePacket(t,
-			map[string]interface{}{"resource": "/keep-first", "trace_id": "trace-wide", "span_id": "span-1", "start_time": time.Now().Unix(), "duration": int64(1)},
-			map[string]interface{}{"resource": "/drop-later", "trace_id": "trace-wide", "span_id": "span-2", "start_time": time.Now().Unix(), "duration": int64(1)},
+			map[string]any{"resource": "/keep-first", "trace_id": "trace-wide", "span_id": "span-1", "start_time": time.Now().Unix(), "duration": int64(1)},
+			map[string]any{"resource": "/drop-later", "trace_id": "trace-wide", "span_id": "span-2", "start_time": time.Now().Unix(), "duration": int64(1)},
 		)
 
 		pipelines := []*SamplingPipeline{
@@ -356,8 +356,8 @@ func TestEvaluatePipelinesTraceWideOrder(t *testing.T) {
 
 	t.Run("keep and drop conflicts follow pipeline order", func(t *testing.T) {
 		packet := makeTracePacket(t,
-			map[string]interface{}{"resource": "/normal", "trace_id": "trace-conflict", "span_id": "span-1", "status": "error", "start_time": time.Now().Unix(), "duration": int64(1)},
-			map[string]interface{}{"resource": "/drop-me", "trace_id": "trace-conflict", "span_id": "span-2", "start_time": time.Now().Unix(), "duration": int64(1)},
+			map[string]any{"resource": "/normal", "trace_id": "trace-conflict", "span_id": "span-1", "status": "error", "start_time": time.Now().Unix(), "duration": int64(1)},
+			map[string]any{"resource": "/drop-me", "trace_id": "trace-conflict", "span_id": "span-2", "start_time": time.Now().Unix(), "duration": int64(1)},
 		)
 
 		pipelines := []*SamplingPipeline{
@@ -374,7 +374,7 @@ func TestEvaluatePipelinesTraceWideOrder(t *testing.T) {
 	})
 }
 
-func makeTracePacket(t *testing.T, spanFields ...map[string]interface{}) *DataPacket {
+func makeTracePacket(t *testing.T, spanFields ...map[string]any) *DataPacket {
 	t.Helper()
 
 	var payload []byte
@@ -674,7 +674,7 @@ func TestPickLogging(t *testing.T) {
 	now := time.Now()
 
 	// 创建测试数据点
-	createLogPoint := func(name string, fields map[string]interface{}) *point.Point {
+	createLogPoint := func(name string, fields map[string]any) *point.Point {
 		pt := point.NewPoint("logging", point.NewKVs(fields), point.CommonLoggingOptions()...)
 		pt.SetTime(now)
 		return pt
@@ -694,19 +694,19 @@ func TestPickLogging(t *testing.T) {
 				GroupKey: "user_id",
 			},
 			points: []*point.Point{
-				createLogPoint("user_action", map[string]interface{}{
+				createLogPoint("user_action", map[string]any{
 					"message": "User logged in",
 					"user_id": "user_123",
 					"level":   "info",
 					"status":  "ok",
 				}),
-				createLogPoint("user_action", map[string]interface{}{
+				createLogPoint("user_action", map[string]any{
 					"message": "User viewed profile",
 					"user_id": "user_123", // 同一个用户
 					"level":   "info",
 					"status":  "ok",
 				}),
-				createLogPoint("user_action", map[string]interface{}{
+				createLogPoint("user_action", map[string]any{
 					"message": "Another user action",
 					"user_id": "user_456", // 不同用户
 					"level":   "info",
@@ -723,19 +723,19 @@ func TestPickLogging(t *testing.T) {
 				GroupKey: "user_id",
 			},
 			points: []*point.Point{
-				createLogPoint("system", map[string]interface{}{
+				createLogPoint("system", map[string]any{
 					"message": "System started",
 					"level":   "info",
 					"status":  "ok",
 					// 没有 user_id
 				}),
-				createLogPoint("user_action", map[string]interface{}{
+				createLogPoint("user_action", map[string]any{
 					"message": "User logged in",
 					"user_id": "user_123",
 					"level":   "info",
 					"status":  "ok",
 				}),
-				createLogPoint("system", map[string]interface{}{
+				createLogPoint("system", map[string]any{
 					"message": "System error",
 					"level":   "error",
 					"status":  "error",
@@ -752,22 +752,22 @@ func TestPickLogging(t *testing.T) {
 				GroupKey: "order_id",
 			},
 			points: []*point.Point{
-				createLogPoint("order", map[string]interface{}{
+				createLogPoint("order", map[string]any{
 					"message":  "Order created",
 					"order_id": "ORD-12345", // 字符串
 					"level":    "info",
 				}),
-				createLogPoint("order", map[string]interface{}{
+				createLogPoint("order", map[string]any{
 					"message":  "Order updated",
 					"order_id": int64(12345), // int64
 					"level":    "info",
 				}),
-				createLogPoint("order", map[string]interface{}{
+				createLogPoint("order", map[string]any{
 					"message":  "Order completed",
 					"order_id": float64(12345.0), // float64
 					"level":    "info",
 				}),
-				createLogPoint("order", map[string]interface{}{
+				createLogPoint("order", map[string]any{
 					"message":  "Invalid order",
 					"order_id": true, // 不支持的类型
 					"level":    "error",
@@ -783,17 +783,17 @@ func TestPickLogging(t *testing.T) {
 				GroupKey: "session_id",
 			},
 			points: []*point.Point{
-				createLogPoint("session", map[string]interface{}{
+				createLogPoint("session", map[string]any{
 					"message":    "Session started",
 					"session_id": "sess_abc",
 					"level":      "info",
 				}),
-				createLogPoint("session", map[string]interface{}{
+				createLogPoint("session", map[string]any{
 					"message":    "Session activity",
 					"session_id": "", // 空字符串
 					"level":      "info",
 				}),
-				createLogPoint("session", map[string]interface{}{
+				createLogPoint("session", map[string]any{
 					"message": "No session id",
 					"level":   "info",
 					// 没有 session_id
@@ -809,19 +809,19 @@ func TestPickLogging(t *testing.T) {
 				GroupKey: "user_id",
 			},
 			points: []*point.Point{
-				createLogPoint("error", map[string]interface{}{
+				createLogPoint("error", map[string]any{
 					"message": "Login failed",
 					"user_id": "user_123",
 					"level":   "error",
 					"status":  "error", // 有错误状态
 				}),
-				createLogPoint("info", map[string]interface{}{
+				createLogPoint("info", map[string]any{
 					"message": "Login successful",
 					"user_id": "user_123",
 					"level":   "info",
 					"status":  "ok",
 				}),
-				createLogPoint("error", map[string]interface{}{
+				createLogPoint("error", map[string]any{
 					"message": "Payment failed",
 					"user_id": "user_456",
 					"level":   "error",
@@ -838,7 +838,7 @@ func TestPickLogging(t *testing.T) {
 				GroupKey: "user_id",
 			},
 			points: []*point.Point{
-				createLogPoint("test", map[string]interface{}{
+				createLogPoint("test", map[string]any{
 					"message": "Test message",
 					"user_id": "user_123",
 					"level":   "info",
@@ -855,8 +855,8 @@ func TestPickLogging(t *testing.T) {
 			},
 			points: func() []*point.Point {
 				var points []*point.Point
-				for i := 0; i < 100; i++ {
-					points = append(points, createLogPoint("request", map[string]interface{}{
+				for i := range 100 {
+					points = append(points, createLogPoint("request", map[string]any{
 						"message":    "Request processed",
 						"request_id": fmt.Sprintf("req_%d", i%10), // 10个不同的请求ID
 						"level":      "info",

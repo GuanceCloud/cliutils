@@ -495,8 +495,8 @@ func extractTraceID(rawURL string, headers ...network.Headers) string {
 
 func traceFromURL(rawURL string) string {
 	for _, marker := range []string{"trace_id=", "traceid=", "traceId="} {
-		if index := strings.Index(rawURL, marker); index >= 0 {
-			value := rawURL[index+len(marker):]
+		if _, after, ok := strings.Cut(rawURL, marker); ok {
+			value := after
 			if cut := strings.IndexAny(value, "&#"); cut >= 0 {
 				value = value[:cut]
 			}

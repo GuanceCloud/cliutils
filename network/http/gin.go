@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -132,7 +133,7 @@ func (c CORSHeaders) Add(requestHeaders string) string {
 		return allowHeaders
 	}
 	headers := make([]string, 0)
-	for _, key := range strings.Split(requestHeaders, ",") {
+	for key := range strings.SplitSeq(requestHeaders, ",") {
 		key = strings.TrimSpace(key)
 		if key == "" {
 			continue
@@ -236,12 +237,7 @@ func originIsAllowed(origin string, allowedOrigins []string) bool {
 	if len(allowedOrigins) == 0 {
 		return true
 	}
-	for _, allowedOrigin := range allowedOrigins {
-		if origin == allowedOrigin {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allowedOrigins, origin)
 }
 
 func TraceIDMiddleware(c *gin.Context) {

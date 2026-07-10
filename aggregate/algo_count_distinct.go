@@ -141,7 +141,7 @@ func (c *algoCountDistinct) count() int64 {
 		if word == ^uint64(0) {
 			continue
 		}
-		for bit := 0; bit < 64; bit++ {
+		for bit := range 64 {
 			if word&(uint64(1)<<bit) == 0 {
 				zeroBits++
 			}

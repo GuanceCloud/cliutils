@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"strings"
 	"text/template"
@@ -451,9 +452,7 @@ func (t *GRPCTask) findMethodAmongProtofiles() (*pdesc.MethodDescriptor, error) 
 
 func buildExtendedProtoMap(protoFiles map[string]string) (map[string]string, error) {
 	extendedMap := make(map[string]string, len(protoFiles))
-	for k, v := range protoFiles {
-		extendedMap[k] = v
-	}
+	maps.Copy(extendedMap, protoFiles)
 	var missingImports []string
 	for _, content := range protoFiles {
 		for _, imp := range extractImports(content) {
@@ -733,7 +732,7 @@ func (t *GRPCTask) checkResult() ([]string, bool) {
 	return reasons, succFlag
 }
 
-func (t *GRPCTask) getResults() (tags map[string]string, fields map[string]interface{}) {
+func (t *GRPCTask) getResults() (tags map[string]string, fields map[string]any) {
 	tags = map[string]string{
 		"name":   t.Name,
 		"server": t.Server,
@@ -742,7 +741,7 @@ func (t *GRPCTask) getResults() (tags map[string]string, fields map[string]inter
 		"proto":  "grpc",
 	}
 
-	fields = map[string]interface{}{
+	fields = map[string]any{
 		"response_time": int64(t.reqCost) / 1000,
 		"success":       int64(-1),
 	}
@@ -756,11 +755,9 @@ func (t *GRPCTask) getResults() (tags map[string]string, fields map[string]inter
 		tags["dest_host"] = hostnames[0]
 	}
 
-	for k, v := range t.Tags {
-		tags[k] = v
-	}
+	maps.Copy(tags, t.Tags)
 
-	message := map[string]interface{}{}
+	message := map[string]any{}
 
 	reasons, succFlag := t.checkResult()
 

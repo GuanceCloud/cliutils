@@ -29,7 +29,7 @@ func TestHTTPWrapperWithMetricReporter(t *testing.T) {
 	limitRate := 10
 	lmt := NewAPIRateLimiter(float64(limitRate), DefaultRequestKey)
 
-	testHandler := func(http.ResponseWriter, *http.Request, ...interface{}) (interface{}, error) {
+	testHandler := func(http.ResponseWriter, *http.Request, ...any) (any, error) {
 		return nil, nil
 	}
 
@@ -39,11 +39,9 @@ func TestHTTPWrapperWithMetricReporter(t *testing.T) {
 	}
 
 	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		StartReporter()
-	}()
+	})
 
 	r.GET("/test", HTTPAPIWrapper(plg, testHandler))
 
@@ -89,7 +87,7 @@ func TestHTTPWrapperWithRateLimit(t *testing.T) {
 	limitRate := 10
 	lmt := NewAPIRateLimiter(float64(limitRate), DefaultRequestKey)
 
-	testHandler := func(http.ResponseWriter, *http.Request, ...interface{}) (interface{}, error) {
+	testHandler := func(http.ResponseWriter, *http.Request, ...any) (any, error) {
 		return nil, nil
 	}
 

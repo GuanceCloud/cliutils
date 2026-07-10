@@ -4,7 +4,6 @@
 // Copyright 2021-present Guance, Inc.
 
 //go:build !windows
-// +build !windows
 
 package dialtesting
 
@@ -38,7 +37,7 @@ type Traceroute struct {
 
 	routes           []*Route
 	response         chan *Response
-	stopCh           chan interface{}
+	stopCh           chan any
 	packetCh         chan *Packet
 	receivePacketsCh chan *receivePacket
 	id               uint32
@@ -67,7 +66,7 @@ func (t *Traceroute) init() {
 	t.routes = make([]*Route, 0)
 
 	t.response = make(chan *Response)
-	t.stopCh = make(chan interface{})
+	t.stopCh = make(chan any)
 	t.packetCh = make(chan *Packet)
 	t.receivePacketsCh = make(chan *receivePacket, 5000)
 

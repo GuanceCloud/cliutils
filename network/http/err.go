@@ -29,8 +29,8 @@ type HttpError struct {
 
 type BodyResp struct {
 	*HttpError
-	Message string      `json:"message,omitempty"`
-	Content interface{} `json:"content,omitempty"`
+	Message string `json:"message,omitempty"`
+	Content any    `json:"content,omitempty"`
 }
 
 func NewNamespaceErr(err error, httpCode int, namespace string) *HttpError {
@@ -63,7 +63,7 @@ func (he *HttpError) Error() string {
 	}
 }
 
-func (he *HttpError) HttpBodyPretty(c *gin.Context, body interface{}) {
+func (he *HttpError) HttpBodyPretty(c *gin.Context, body any) {
 	if body == nil {
 		c.Status(he.HttpCode)
 		return
@@ -84,7 +84,7 @@ func (he *HttpError) HttpBodyPretty(c *gin.Context, body interface{}) {
 	c.Data(he.HttpCode, `application/json`, j)
 }
 
-func (he *HttpError) WriteBody(c *gin.Context, obj interface{}) {
+func (he *HttpError) WriteBody(c *gin.Context, obj any) {
 	if obj == nil {
 		c.Status(he.HttpCode)
 		return
@@ -114,7 +114,7 @@ func (he *HttpError) WriteBody(c *gin.Context, obj interface{}) {
 type RawJSONBody []byte
 
 // HttpBody Deprecated, use WriteBody.
-func (he *HttpError) HttpBody(c *gin.Context, body interface{}) {
+func (he *HttpError) HttpBody(c *gin.Context, body any) {
 	if body == nil {
 		c.Status(he.HttpCode)
 		return
@@ -164,7 +164,7 @@ func HttpErr(c *gin.Context, err error) {
 	}
 }
 
-func HttpErrf(c *gin.Context, err error, format string, args ...interface{}) {
+func HttpErrf(c *gin.Context, err error, format string, args ...any) {
 	var (
 		e1 *HttpError
 		e2 *MsgError
@@ -180,7 +180,7 @@ func HttpErrf(c *gin.Context, err error, format string, args ...interface{}) {
 	}
 }
 
-func (he *HttpError) httpRespf(c *gin.Context, format string, args ...interface{}) {
+func (he *HttpError) httpRespf(c *gin.Context, format string, args ...any) {
 	resp := &BodyResp{
 		HttpError: he,
 	}
@@ -225,10 +225,10 @@ func titleErr(namespace string, err error) string {
 type MsgError struct {
 	*HttpError
 	Fmt  string
-	Args []interface{}
+	Args []any
 }
 
-func Errorf(he *HttpError, format string, args ...interface{}) *MsgError {
+func Errorf(he *HttpError, format string, args ...any) *MsgError {
 	return &MsgError{
 		HttpError: he,
 		Fmt:       format,
@@ -240,7 +240,7 @@ func Error(he *HttpError, msg string) *MsgError {
 	return &MsgError{
 		HttpError: he,
 		Fmt:       "%s",
-		Args:      []interface{}{msg},
+		Args:      []any{msg},
 	}
 }
 

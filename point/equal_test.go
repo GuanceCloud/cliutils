@@ -25,14 +25,14 @@ func TestEqual(t *T.T) {
 			expectEqual: true,
 			l: func() *Point {
 				x, err := NewPointDeprecated("abc", nil,
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
 			}(),
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc", nil,
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -44,14 +44,14 @@ func TestEqual(t *T.T) {
 			expectEqual: false,
 			l: func() *Point {
 				x, err := NewPointDeprecated("abc", nil,
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
 			}(),
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc", nil,
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(1, 0)))
 				assert.NoError(t, err)
 				return x
@@ -64,7 +64,7 @@ func TestEqual(t *T.T) {
 			l: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -72,7 +72,7 @@ func TestEqual(t *T.T) {
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{
+					map[string]any{
 						"f1": 123.1,
 						"t1": "duplicated-tag-key", // duplicated key
 					},
@@ -88,7 +88,7 @@ func TestEqual(t *T.T) {
 			l: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -96,7 +96,7 @@ func TestEqual(t *T.T) {
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1", "t2": "v2"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -109,7 +109,7 @@ func TestEqual(t *T.T) {
 			l: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -117,7 +117,7 @@ func TestEqual(t *T.T) {
 			r: func() *Point {
 				x, err := NewPointDeprecated("def",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -130,7 +130,7 @@ func TestEqual(t *T.T) {
 			l: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -138,7 +138,7 @@ func TestEqual(t *T.T) {
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": "foo"},
+					map[string]any{"f1": "foo"},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -151,7 +151,7 @@ func TestEqual(t *T.T) {
 			l: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -159,7 +159,7 @@ func TestEqual(t *T.T) {
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f2": "foo"},
+					map[string]any{"f2": "foo"},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -172,7 +172,7 @@ func TestEqual(t *T.T) {
 			l: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": 123.1, "f2": "haha"},
+					map[string]any{"f1": 123.1, "f2": "haha"},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -180,7 +180,7 @@ func TestEqual(t *T.T) {
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f2": "foo"},
+					map[string]any{"f2": "foo"},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -193,7 +193,7 @@ func TestEqual(t *T.T) {
 			l: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1", "t2": "v2"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -201,7 +201,7 @@ func TestEqual(t *T.T) {
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -214,7 +214,7 @@ func TestEqual(t *T.T) {
 			l: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -222,7 +222,7 @@ func TestEqual(t *T.T) {
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t2": "v2"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -235,7 +235,7 @@ func TestEqual(t *T.T) {
 			l: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -243,7 +243,7 @@ func TestEqual(t *T.T) {
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "vx"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -255,7 +255,7 @@ func TestEqual(t *T.T) {
 			expectEqual: true,
 			l: func() *Point {
 				x, err := NewPointDeprecated("abc", nil,
-					map[string]interface{}{
+					map[string]any{
 						"f1":           int64(123),
 						"f2_f64":       123.01234567890123456789,
 						"f2_large_f64": 1234567890123456789.01234567890123456789, // -> 1234567890123456800
@@ -272,7 +272,7 @@ func TestEqual(t *T.T) {
 			}(),
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc", nil,
-					map[string]interface{}{
+					map[string]any{
 						"f1":           int64(123),
 						"f2_f64":       123.01234567890123456789,
 						"f2_large_f64": 1234567890123456789.01234567890123456789,
@@ -321,7 +321,7 @@ func TestHash(t *T.T) {
 			l: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -329,7 +329,7 @@ func TestHash(t *T.T) {
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f2": 123},
+					map[string]any{"f2": 123},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -342,7 +342,7 @@ func TestHash(t *T.T) {
 			l: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -350,7 +350,7 @@ func TestHash(t *T.T) {
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f2": 123},
+					map[string]any{"f2": 123},
 					WithTime(time.Unix(0, 456)))
 				assert.NoError(t, err)
 				return x
@@ -363,7 +363,7 @@ func TestHash(t *T.T) {
 			l: func() *Point {
 				x, err := NewPointDeprecated("def",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -371,7 +371,7 @@ func TestHash(t *T.T) {
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f2": 123},
+					map[string]any{"f2": 123},
 					WithTime(time.Unix(0, 456)))
 				assert.NoError(t, err)
 				return x
@@ -384,7 +384,7 @@ func TestHash(t *T.T) {
 			l: func() *Point {
 				x, err := NewPointDeprecated("def",
 					map[string]string{"t2": "v1"},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -392,7 +392,7 @@ func TestHash(t *T.T) {
 			r: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f2": 123},
+					map[string]any{"f2": 123},
 					WithTime(time.Unix(0, 456)))
 				assert.NoError(t, err)
 				return x
@@ -428,7 +428,7 @@ func TestTimeSeriesHash(t *T.T) {
 			p: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{},
-					map[string]interface{}{"f1": 123.1},
+					map[string]any{"f1": 123.1},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x
@@ -440,7 +440,7 @@ func TestTimeSeriesHash(t *T.T) {
 			p: func() *Point {
 				x, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": 123.1, "f2": 123.2},
+					map[string]any{"f1": 123.1, "f2": 123.2},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 				return x

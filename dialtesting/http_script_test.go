@@ -41,6 +41,6 @@ func TestPostScriptDo(t *testing.T) {
 	assert.True(t, result.Result.IsFailed)
 
 	// nolint: unconvert
-	assert.True(t, reflect.DeepEqual([]interface{}([]interface{}{"value1", "value2"}), result.Vars["header"]))
+	assert.True(t, reflect.DeepEqual([]any([]any{"value1", "value2"}), result.Vars["header"]))
 	assert.Equal(t, "token", result.Vars["token"])
 }

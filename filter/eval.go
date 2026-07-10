@@ -105,7 +105,7 @@ func almostEqual(a, b float64) bool {
 	return math.Abs(a-b) <= float64EqualityThreshold
 }
 
-func toFloat64(f interface{}) float64 {
+func toFloat64(f any) float64 {
 	switch v := f.(type) {
 	case float32:
 		return float64(v)
@@ -117,7 +117,7 @@ func toFloat64(f interface{}) float64 {
 	}
 }
 
-func toInt64(i interface{}) int64 {
+func toInt64(i any) int64 {
 	switch v := i.(type) {
 	case int:
 		return int64(v)
@@ -143,7 +143,7 @@ func toInt64(i interface{}) int64 {
 	}
 }
 
-func binEval(op ItemType, lhs, rhs interface{}) bool {
+func binEval(op ItemType, lhs, rhs any) bool {
 	if _, ok := rhs.(*Regex); ok {
 		if _, isStr := lhs.(string); !isStr {
 			log.Warnf("non-string(type %s) can not match with regexp", reflect.TypeOf(lhs))
@@ -302,8 +302,8 @@ func (e *BinaryExpr) singleEval(data KVs) bool {
 	}
 
 	// first: fetch right-handle-symbol
-	var lit interface{}
-	var arr []interface{}
+	var lit any
+	var arr []any
 	switch rhs := e.RHS.(type) {
 	case *StringLiteral:
 		lit = rhs.Val

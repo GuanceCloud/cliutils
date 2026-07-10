@@ -7,6 +7,7 @@ package hash
 
 import (
 	"hash/fnv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,11 +30,11 @@ func TestHash(t *testing.T) {
 
 	h3 := hash4ts(d)
 
-	var s string
+	var s strings.Builder
 	for _, v := range d {
-		s += v
+		s.WriteString(v)
 	}
-	h4 := Fnv1aStrHash(s)
+	h4 := Fnv1aStrHash(s.String())
 
 	assert.NotEqual(t, Fnv1aNew(), h1)
 	assert.Equal(t, h1, h2)

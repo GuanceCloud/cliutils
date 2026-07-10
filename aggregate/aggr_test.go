@@ -14,7 +14,7 @@ import (
 
 func otelHistograms(n int) []*point.Point {
 	pts := make([]*point.Point, 0)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		var kvs point.KVs
 		kvs = kvs.AddTag("service", "tmall").
 			AddTag("agent_version", "1.30").

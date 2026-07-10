@@ -48,7 +48,7 @@ func TestGetPut(t *T.T) {
 
 		ok := false
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			if err := dq.BufGet(buf, func(msg []byte) error {
 				t.Logf("msg: %p/%d", msg, len(msg))
 				t.Logf("msg: %p/%d", buf, len(buf))
@@ -98,7 +98,7 @@ func TestGetPut(t *T.T) {
 
 		ok := false
 
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			if err := dq.Get(func(msg []byte) error {
 				t.Logf("get message: %q\n", string(msg))
 				ok = true
@@ -125,7 +125,7 @@ func TestDropInvalidDataFile(t *T.T) {
 
 		// put some data and rotate 10 datafiles
 		data := make([]byte, 100)
-		for i := 0; i < 10; i++ {
+		for i := range 10 {
 			assert.NoError(t, c.Put(data))
 			assert.NoError(t, c.rotate())
 
@@ -410,7 +410,7 @@ func TestPutGet(t *T.T) {
 		c, err := Open(WithPath(p), WithNoPos(true))
 		assert.NoError(t, err)
 
-		for i := 0; i < 10; i++ { // write 10kb
+		for range 10 { // write 10kb
 			require.NoError(t, c.Put(kbdata), "cache: %s", c)
 		}
 
@@ -470,7 +470,7 @@ func TestPutGet(t *T.T) {
 
 		assert.NoError(t, err)
 
-		for i := 0; i < ndata; i++ { // write 10 data
+		for range ndata { // write 10 data
 			require.NoError(t, c.Put(testData), "cache: %s", c)
 		}
 
@@ -535,7 +535,7 @@ func TestDelayPosDump(t *T.T) {
 		testData := []byte("0123456789")
 		ndata := 10
 
-		for i := 0; i < ndata; i++ { // write 10 data
+		for range ndata { // write 10 data
 			require.NoError(t, c.Put(testData), "cache: %s", c)
 		}
 
@@ -543,7 +543,7 @@ func TestDelayPosDump(t *T.T) {
 		require.NoError(t, c.rotate())
 
 		// create n read pos
-		for i := 0; i < 6; i++ {
+		for range 6 {
 			assert.NoError(t, c.Get(func(data []byte) error {
 				assert.Len(t, data, len(testData))
 				return nil
@@ -586,7 +586,7 @@ func TestDelayPosDump(t *T.T) {
 		testData := []byte("0123456789")
 		ndata := 10
 
-		for i := 0; i < ndata; i++ { // write 10 data
+		for range ndata { // write 10 data
 			require.NoError(t, c.Put(testData), "cache: %s", c)
 		}
 
@@ -594,7 +594,7 @@ func TestDelayPosDump(t *T.T) {
 		require.NoError(t, c.rotate())
 
 		// create n read pos
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			assert.NoError(t, c.Get(func(data []byte) error {
 				assert.Len(t, data, len(testData))
 				return nil
@@ -639,7 +639,7 @@ func TestDelayPosDump(t *T.T) {
 		testData := []byte("0123456789")
 		ndata := 10
 
-		for i := 0; i < ndata; i++ { // write 10 data
+		for range ndata { // write 10 data
 			require.NoError(t, c.Put(testData), "cache: %s", c)
 		}
 
@@ -647,7 +647,7 @@ func TestDelayPosDump(t *T.T) {
 		require.NoError(t, c.rotate())
 
 		// create n read pos
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			assert.NoError(t, c.Get(func(data []byte) error {
 				assert.Len(t, data, len(testData))
 				return nil

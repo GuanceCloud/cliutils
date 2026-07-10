@@ -82,7 +82,7 @@ type TaskChild interface {
 	run() error
 	init() error
 	checkResult() ([]string, bool)
-	getResults() (map[string]string, map[string]interface{})
+	getResults() (map[string]string, map[string]any)
 	stop()
 	check() error
 	clear()
@@ -118,7 +118,7 @@ type ITask interface {
 	Clear()
 	CheckResult() ([]string, bool)
 	Class() string
-	GetResults() (map[string]string, map[string]interface{})
+	GetResults() (map[string]string, map[string]any)
 	PostURLStr() string
 	MetricName() string
 	Stop()
@@ -399,7 +399,7 @@ func (t *Task) SetIsTemplate(isTemplate bool) {
 	t.isTemplate = isTemplate
 }
 
-func (t *Task) GetResults() (tags map[string]string, fields map[string]interface{}) {
+func (t *Task) GetResults() (tags map[string]string, fields map[string]any) {
 	tags, fields = t.child.getResults()
 
 	// add config_vars

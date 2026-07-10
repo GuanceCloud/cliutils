@@ -147,7 +147,7 @@ func TestNewLPPoint(t *testing.T) {
 		tname  string // test name
 		name   string
 		tags   map[string]string
-		fields map[string]interface{}
+		fields map[string]any
 		opts   []Option
 		expect string
 		warns  int
@@ -156,7 +156,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `field-key-with-dot`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1.a": 1},
+			fields: map[string]any{"f1.a": 1},
 			tags:   map[string]string{"t1": "def"},
 			opts:   []Option{WithTime(time.Unix(0, 123)), WithDotInKey(false)},
 			warns:  1,
@@ -166,7 +166,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `tag-key-with-dot`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1, "f2": nil},
+			fields: map[string]any{"f1": 1, "f2": nil},
 			tags:   map[string]string{"t1.a": "def"},
 			opts:   []Option{WithTime(time.Unix(0, 123)), WithDotInKey(false)},
 			warns:  2,
@@ -176,7 +176,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `influx1.x-small-uint`,
 			name:   "abc",
-			fields: map[string]interface{}{"f.1": 1, "f2": uint64(32)},
+			fields: map[string]any{"f.1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
 			opts:   append(DefaultMetricOptionsForInflux1X(), WithTime(time.Unix(0, 123))),
 			expect: "abc,t1=abc,t2=32 f.1=1i,f2=32i 123",
@@ -185,7 +185,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname: `large-field-value-length`,
 			name:  "some",
-			fields: map[string]interface{}{
+			fields: map[string]any{
 				"key1": __largeVal,
 			},
 			opts: []Option{WithMaxFieldValLen(len(__largeVal) - 2), WithTime(time.Unix(0, 123))},
@@ -197,7 +197,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `max-field-value-length`,
 			name:   "some",
-			fields: map[string]interface{}{"key": "too-long-field-value-123"},
+			fields: map[string]any{"key": "too-long-field-value-123"},
 			opts: []Option{
 				WithMaxFieldValLen(2),
 				WithTime(time.Unix(0, 123)),
@@ -209,7 +209,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname: `max-field-key-length`,
 			name:  "some",
-			fields: map[string]interface{}{
+			fields: map[string]any{
 				__largeVal: "123",
 			},
 			opts: []Option{
@@ -223,7 +223,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `max-tag-value-length`,
 			name:   "some",
-			fields: map[string]interface{}{"f1": 1},
+			fields: map[string]any{"f1": 1},
 			tags:   map[string]string{"key": "too-long-tag-value-123"},
 			opts: []Option{
 				WithMaxTagValLen(2),
@@ -235,7 +235,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `disable-string-field`,
 			name:   "some",
-			fields: map[string]interface{}{"f1": 1, "f2": "this is a string"},
+			fields: map[string]any{"f1": 1, "f2": "this is a string"},
 			tags:   map[string]string{"key": "string"},
 			opts: []Option{
 				WithStrField(false),
@@ -248,7 +248,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `max-tag-key-length`,
 			name:   "some",
-			fields: map[string]interface{}{"f1": 1},
+			fields: map[string]any{"f1": 1},
 			tags:   map[string]string{"too-long-tag-key": "123"},
 			opts: []Option{
 				WithMaxTagKeyLen(2),
@@ -261,7 +261,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `empty-measurement-name`,
 			name:   "", // empty
-			fields: map[string]interface{}{"f1": 1, "f2": uint64(32)},
+			fields: map[string]any{"f1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
 			opts: []Option{
 				WithTime(time.Unix(0, 123)),
@@ -274,7 +274,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `enable-dot-in-metric-point`,
 			name:   "abc",
-			fields: map[string]interface{}{"f.1": 1, "f2": uint64(32)},
+			fields: map[string]any{"f.1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t.1": "abc", "t2": "32"},
 			opts: []Option{
 				WithDotInKey(true),
@@ -287,7 +287,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `with-disabled-field-keys`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1, "f2": uint64(32), "f3": 32},
+			fields: map[string]any{"f1": 1, "f2": uint64(32), "f3": 32},
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
 			warns:  1,
 			opts: []Option{
@@ -300,7 +300,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `with-disabled-tag-keys`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1, "f2": uint64(32)},
+			fields: map[string]any{"f1": 1, "f2": uint64(32)},
 			tags:   map[string]string{"t1": "abc", "t2": "32"},
 			opts: []Option{
 				WithDisabledKeys(NewTagKey(`t2`, "")),
@@ -314,7 +314,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `int-exceed-influx1.x-int64-max`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1, "f2": uint64(math.MaxInt64) + 1},
+			fields: map[string]any{"f1": 1, "f2": uint64(math.MaxInt64) + 1},
 			opts:   append(DefaultMetricOptionsForInflux1X(), WithTime(time.Unix(0, 123))),
 
 			warns:  1,
@@ -324,7 +324,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `extra-tags-and-field-exceed-max-tags`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1, "f2": "3"},
+			fields: map[string]any{"f1": 1, "f2": "3"},
 			tags:   map[string]string{"t1": "def", "t2": "abc"},
 			opts: []Option{
 				WithTime(time.Unix(0, 123)),
@@ -344,7 +344,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `extra-tags-exceed-max-tags`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1},
+			fields: map[string]any{"f1": 1},
 			tags:   map[string]string{"t1": "def", "t2": "abc"},
 			warns:  1,
 			opts: []Option{
@@ -363,7 +363,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `extra-tags-not-exceed-max-tags`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1},
+			fields: map[string]any{"f1": 1},
 			tags:   map[string]string{"t1": "def", "t2": "abc"},
 			expect: "abc,etag1=1,etag2=2,t1=def,t2=abc f1=1i 123",
 			opts: []Option{
@@ -379,7 +379,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `only-extra-tags`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1},
+			fields: map[string]any{"f1": 1},
 			expect: "abc,etag1=1,etag2=2 f1=1i 123",
 
 			opts: []Option{
@@ -395,7 +395,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `exceed-max-tags`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1, "f2": nil},
+			fields: map[string]any{"f1": 1, "f2": nil},
 			tags:   map[string]string{"t1": "def", "t2": "abc"},
 			opts:   []Option{WithTime(time.Unix(0, 123)), WithMaxTags(1), WithKeySorted(true)},
 			expect: `abc,t1=def f1=1i 123`,
@@ -405,7 +405,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `exceed-max-field`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1, "f2": 2},
+			fields: map[string]any{"f1": 1, "f2": 2},
 			tags:   map[string]string{"t1": "def"},
 			opts:   []Option{WithTime(time.Unix(0, 123)), WithMaxFields(1)},
 			warns:  1,
@@ -415,7 +415,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `nil-field-not-allowed`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1, "f2": nil},
+			fields: map[string]any{"f1": 1, "f2": nil},
 			tags:   map[string]string{"t1": "def"},
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			warns:  1,
@@ -425,7 +425,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `same-key-in-field-and-tag`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1, "f2": 2, "x": 123},
+			fields: map[string]any{"f1": 1, "f2": 2, "x": 123},
 			tags:   map[string]string{"t1": "def", "x": "42"},
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			warns:  0, // tag `x` override field `x` before checking point(kvs.Add()), so no warning here.
@@ -435,7 +435,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname:  `no-tag`,
 			name:   "abc",
-			fields: map[string]interface{}{"f1": 1},
+			fields: map[string]any{"f1": 1},
 			tags:   nil,
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			expect: "abc f1=1i 123",
@@ -452,7 +452,7 @@ func TestNewLPPoint(t *testing.T) {
 		{
 			tname: `field-val-with-new-line`,
 			name:  "abc",
-			fields: map[string]interface{}{"f1": `abc
+			fields: map[string]any{"f1": `abc
 123`},
 			opts: []Option{WithTime(time.Unix(0, 123))},
 			expect: `abc f1="abc
@@ -470,7 +470,7 @@ func TestNewLPPoint(t *testing.T) {
 2`: `def
 456\`,
 			},
-			fields: map[string]interface{}{"f1": 123},
+			fields: map[string]any{"f1": 123},
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			warns:  3,
 			expect: "abc,tag\\ 2=def\\ 456,tag1=abc\\ 123 f1=123i 123",
@@ -481,7 +481,7 @@ func TestNewLPPoint(t *testing.T) {
 			tname:  `ok-case`,
 			name:   "abc",
 			tags:   nil,
-			fields: map[string]interface{}{"f1": 123},
+			fields: map[string]any{"f1": 123},
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			expect: "abc f1=123i 123",
 			fail:   false,
@@ -491,7 +491,7 @@ func TestNewLPPoint(t *testing.T) {
 			tname:  `tag-key-with-backslash`,
 			name:   "abc",
 			tags:   map[string]string{"tag1": "val1", `tag2\`: `val2\`},
-			fields: map[string]interface{}{"f1": 123},
+			fields: map[string]any{"f1": 123},
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			warns:  2,
 			expect: `abc,tag1=val1,tag2=val2 f1=123i 123`,
@@ -501,7 +501,7 @@ func TestNewLPPoint(t *testing.T) {
 			tname:  `field-is-nil`,
 			name:   "abc",
 			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`},
-			fields: map[string]interface{}{"f1": 123, "f2": nil},
+			fields: map[string]any{"f1": 123, "f2": nil},
 
 			opts:  []Option{WithTime(time.Unix(0, 123))},
 			warns: 1,
@@ -513,7 +513,7 @@ func TestNewLPPoint(t *testing.T) {
 			tname:  `field-is-map`,
 			name:   "abc",
 			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`},
-			fields: map[string]interface{}{"f1": 123, "f2": map[string]interface{}{"a": "b"}},
+			fields: map[string]any{"f1": 123, "f2": map[string]any{"a": "b"}},
 
 			opts:  []Option{WithTime(time.Unix(0, 123))},
 			warns: 1,
@@ -525,7 +525,7 @@ func TestNewLPPoint(t *testing.T) {
 			tname:  `field-is-object`,
 			name:   "abc",
 			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`},
-			fields: map[string]interface{}{"f1": 123, "f2": struct{ a string }{a: "abc"}},
+			fields: map[string]any{"f1": 123, "f2": struct{ a string }{a: "abc"}},
 
 			opts: []Option{WithTime(time.Unix(0, 123))},
 
@@ -537,7 +537,7 @@ func TestNewLPPoint(t *testing.T) {
 			tname:  `ignore-nil-field`,
 			name:   "abc",
 			tags:   map[string]string{"tag1": "val1", `tag2\`: `val2\`},
-			fields: map[string]interface{}{"f1": 123, "f2": nil},
+			fields: map[string]any{"f1": 123, "f2": nil},
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 
 			warns:  3,
@@ -548,7 +548,7 @@ func TestNewLPPoint(t *testing.T) {
 			tname:  `utf8-characters-in-metric-name`,
 			name:   "abc≈≈≈≈øøππ†®",
 			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`},
-			fields: map[string]interface{}{"f1": 123},
+			fields: map[string]any{"f1": 123},
 
 			opts:  []Option{WithTime(time.Unix(0, 123))},
 			warns: 0,
@@ -560,7 +560,7 @@ func TestNewLPPoint(t *testing.T) {
 			tname:  `utf8-characters-in-metric-name-fields-tags`,
 			name:   "abc≈≈≈≈øøππ†®",
 			tags:   map[string]string{"tag1": "val1", `tag2`: `val2`, "tag3": `ºª•¶§∞¢£`, `tag-中文`: "foobar"},
-			fields: map[string]interface{}{"f1": 123, "f2": "¡™£¢∞§¶•ªº", `field-中文`: "barfoo"},
+			fields: map[string]any{"f1": 123, "f2": "¡™£¢∞§¶•ªº", `field-中文`: "barfoo"},
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			warns:  0,
 
@@ -583,7 +583,7 @@ func TestNewLPPoint(t *testing.T) {
 			tname: `new-line-in-field`,
 			name:  "abc",
 			tags:  map[string]string{"tag1": "val1"},
-			fields: map[string]interface{}{
+			fields: map[string]any{
 				"f1": `aaa
 	bbb
 			ccc`,
@@ -631,7 +631,7 @@ func TestNewLPPoint(t *testing.T) {
 func TestParsePoint(t *testing.T) {
 	newPoint := func(m string,
 		tags map[string]string,
-		fields map[string]interface{},
+		fields map[string]any,
 		ts ...time.Time,
 	) *influxdb.Point {
 		pt, err := influxdb.NewPoint(m, tags, fields, ts...)
@@ -655,7 +655,7 @@ func TestParsePoint(t *testing.T) {
 	}{
 		{
 			name: `32mb-field`,
-			data: []byte(fmt.Sprintf(`abc f1="%s" 123`, __32mbString)),
+			data: fmt.Appendf(nil, `abc f1="%s" 123`, __32mbString),
 			opts: []Option{
 				WithTime(time.Unix(0, 123)),
 				WithMaxFieldValLen(32 * 1024 * 1024),
@@ -664,13 +664,13 @@ func TestParsePoint(t *testing.T) {
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					nil,
-					map[string]interface{}{"f1": __32mbString},
+					map[string]any{"f1": __32mbString},
 					time.Unix(0, 123)),
 			},
 		},
 		{
 			name: `65k-field`,
-			data: []byte(fmt.Sprintf(`abc f1="%s" 123`, __65kbString)),
+			data: fmt.Appendf(nil, `abc f1="%s" 123`, __65kbString),
 			opts: []Option{
 				WithTime(time.Unix(0, 123)),
 				WithMaxFieldValLen(0),
@@ -679,7 +679,7 @@ func TestParsePoint(t *testing.T) {
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					nil,
-					map[string]interface{}{"f1": __65kbString},
+					map[string]any{"f1": __65kbString},
 					time.Unix(0, 123)),
 			},
 		},
@@ -695,7 +695,7 @@ func TestParsePoint(t *testing.T) {
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					map[string]string{"t1": "1", "t2": "2"},
-					map[string]interface{}{"f2": 2.0, "f3": "abc"},
+					map[string]any{"f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 			},
 		},
@@ -711,7 +711,7 @@ func TestParsePoint(t *testing.T) {
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					map[string]string{"t2": "2"},
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 			},
 		},
@@ -724,7 +724,7 @@ func TestParsePoint(t *testing.T) {
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					map[string]string{"t1": "1"},
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 			},
 		},
@@ -737,7 +737,7 @@ func TestParsePoint(t *testing.T) {
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					nil,
-					map[string]interface{}{"f1": 1, "f2": 2.0},
+					map[string]any{"f1": 1, "f2": 2.0},
 					time.Unix(0, 123)),
 			},
 		},
@@ -749,7 +749,7 @@ func TestParsePoint(t *testing.T) {
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					map[string]string{"tag_1": "xxx"},
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 			},
 		},
@@ -761,7 +761,7 @@ func TestParsePoint(t *testing.T) {
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					nil,
-					map[string]interface{}{"f_1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f_1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 			},
 		},
@@ -779,17 +779,17 @@ abc f1=1i,f2=2,f3="abc" 789
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					nil,
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 
 				newPoint("abc",
 					nil,
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 456)),
 
 				newPoint("abc",
 					nil,
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 789)),
 			},
 		},
@@ -802,7 +802,7 @@ abc f1=1i,f2=2,f3="abc" 789
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					map[string]string{"x": "456"},
-					map[string]interface{}{"f1": "abc", "f3": 2.0}, // field x dropped
+					map[string]any{"f1": "abc", "f3": 2.0}, // field x dropped
 					time.Unix(0, 123)),
 			},
 		},
@@ -815,7 +815,7 @@ abc f1=1i,f2=2,f3="abc" 789
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					map[string]string{"b": "abc"},
-					map[string]interface{}{"a": 1}, // field b dropped
+					map[string]any{"a": 1}, // field b dropped
 					time.Unix(0, 123)),
 			},
 		},
@@ -827,7 +827,7 @@ abc f1=1i,f2=2,f3="abc" 789
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					map[string]string{"b": "abc"},
-					map[string]interface{}{"a": 1, "c": "xyz"},
+					map[string]any{"a": 1, "c": "xyz"},
 					time.Unix(0, 123)),
 			},
 		},
@@ -851,7 +851,7 @@ abc f1=1i,f2=2,f3="abc" 789
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					map[string]string{"tag1": "1", "tag2": "2"},
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 			},
 		},
@@ -863,7 +863,7 @@ abc f1=1i,f2=2,f3="abc" 789
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					nil,
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 			},
 		},
@@ -881,17 +881,17 @@ abc f1=1i,f2=2,f3="abc" 789
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					nil,
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 
 				newPoint("abc",
 					nil,
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 456)),
 
 				newPoint("abc",
 					nil,
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 789)),
 			},
 		},
@@ -912,7 +912,7 @@ abc f1=1i,f2=2,f3="abc" 789
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					map[string]string{"tag1": "1", "tag2": "2"},
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 			},
 		},
@@ -928,7 +928,7 @@ abc f1=1i,f2=2,f3="abc" 789
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					map[string]string{`tag1`: "1", "tag2": `2`},
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 			},
 		},
@@ -944,7 +944,7 @@ abc f1=1i,f2=2,f3="abc" 789
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					map[string]string{`tag1`: "1,", "tag2": `2`, "tag3": `3`},
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 			},
 		},
@@ -960,7 +960,7 @@ abc f1=1i,f2=2,f3="abc" 789
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					map[string]string{`tag\1`: "1", "tag2": `2\34`},
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 			},
 		},
@@ -988,7 +988,7 @@ abc f1=1i,f2=2,f3="abc" 789
 			expect: []*influxdb.Point{
 				newPoint("abc",
 					nil,
-					map[string]interface{}{"f1": 1, "f2": 2.0, "f3": "abc"},
+					map[string]any{"f1": 1, "f2": 2.0, "f3": "abc"},
 					time.Unix(0, 123)),
 			},
 		},
@@ -1114,9 +1114,9 @@ func TestParseLineProto(t *testing.T) {
 
 		{
 			name: `65kb-field-key`,
-			data: []byte(fmt.Sprintf(`abc,tag1=1,tag2=2 "%s"="hello" 123`, func() string {
+			data: fmt.Appendf(nil, `abc,tag1=1,tag2=2 "%s"="hello" 123`, func() string {
 				return __65kbString
-			}())),
+			}()),
 
 			fail: true,
 			prec: "n",
@@ -1124,9 +1124,9 @@ func TestParseLineProto(t *testing.T) {
 
 		{
 			name: `65kb-tag-key`,
-			data: []byte(fmt.Sprintf(`abc,tag1=1,%s=2 f1="hello" 123`, func() string {
+			data: fmt.Appendf(nil, `abc,tag1=1,%s=2 f1="hello" 123`, func() string {
 				return __65kbString
-			}())),
+			}()),
 
 			fail: true,
 			prec: "n",
@@ -1134,9 +1134,9 @@ func TestParseLineProto(t *testing.T) {
 
 		{
 			name: `65kb-measurement-name`,
-			data: []byte(fmt.Sprintf(`%s,tag1=1,t2=2 f1="hello" 123`, func() string {
+			data: fmt.Appendf(nil, `%s,tag1=1,t2=2 f1="hello" 123`, func() string {
 				return __65kbString
-			}())),
+			}()),
 
 			fail: true,
 			prec: "n",
@@ -1144,9 +1144,9 @@ func TestParseLineProto(t *testing.T) {
 
 		{
 			name: `32mb-field`,
-			data: []byte(fmt.Sprintf(`abc,tag1=1,tag2=2 f3="%s" 123`, func() string {
+			data: fmt.Appendf(nil, `abc,tag1=1,tag2=2 f3="%s" 123`, func() string {
 				return __32mbString
-			}())),
+			}()),
 
 			check: func(pts models.Points) error {
 				if len(pts) != 1 {

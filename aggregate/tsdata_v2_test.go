@@ -12,11 +12,11 @@ import (
 
 func TestDataPacketWalkRawPBPoints(t *testing.T) {
 	now := time.Now()
-	payload := point.AppendPointToPBPointsPayload(nil, point.NewPoint("trace", point.NewKVs(map[string]interface{}{
+	payload := point.AppendPointToPBPointsPayload(nil, point.NewPoint("trace", point.NewKVs(map[string]any{
 		"trace_id": "trace-walk",
 		"span_id":  "span-1",
 	}), point.WithTime(now)))
-	payload = point.AppendPointToPBPointsPayload(payload, point.NewPoint("trace", point.NewKVs(map[string]interface{}{
+	payload = point.AppendPointToPBPointsPayload(payload, point.NewPoint("trace", point.NewKVs(map[string]any{
 		"trace_id": "trace-walk",
 		"span_id":  "span-2",
 	}), point.WithTime(now.Add(time.Millisecond))))
@@ -37,7 +37,7 @@ func TestDataPacketWalkRawPBPoints(t *testing.T) {
 
 func TestDataPacketProtoRoundTrip(t *testing.T) {
 	now := time.Now()
-	payload := point.AppendPointToPBPointsPayload(nil, point.NewPoint("trace", point.NewKVs(map[string]interface{}{
+	payload := point.AppendPointToPBPointsPayload(nil, point.NewPoint("trace", point.NewKVs(map[string]any{
 		"trace_id": "trace-compat",
 		"span_id":  "span-compat",
 	}), point.WithTime(now)))

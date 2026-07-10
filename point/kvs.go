@@ -465,7 +465,7 @@ func (x KVs) Keys() *Keys {
 func (x KVs) shuffle() KVs {
 	rand.Seed(time.Now().UnixNano()) // nolint: staticcheck
 	n := len(x)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		j := rand.Intn(n) // nolint:gosec
 		x[i], x[j] = x[j], x[i]
 	}
@@ -538,7 +538,7 @@ func NewKV(k string, v any, opts ...KVOption) *Field {
 }
 
 // NewKVs create kvs slice from map structure.
-func NewKVs(kvs map[string]interface{}) (res KVs) {
+func NewKVs(kvs map[string]any) (res KVs) {
 	for k, v := range kvs {
 		res = append(res, NewKV(k, v))
 	}

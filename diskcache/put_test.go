@@ -198,7 +198,7 @@ func TestConcurrentPutGet(t *T.T) {
 		assert.NoError(t, err)
 
 		wg.Add(concurrency * 2)
-		for i := 0; i < concurrency; i++ {
+		for i := range concurrency {
 			go fnPut(c, i)
 			go fnGet(c, i)
 		}
@@ -230,13 +230,13 @@ func TestConcurrentPutGet(t *T.T) {
 		assert.NoError(t, err)
 
 		wg.Add(concurrency)
-		for i := 0; i < concurrency; i++ {
+		for i := range concurrency {
 			go fnPut(c, i)
 		}
 		wg.Wait() // wait Put done: there should be drop(4*32K*1000) > 32M
 
 		wg.Add(concurrency)
-		for i := 0; i < concurrency; i++ {
+		for i := range concurrency {
 			go fnGet(c, i)
 		}
 		wg.Wait()
@@ -354,7 +354,7 @@ func TestPutOnCapacityReached(t *T.T) {
 		total := int64(0)
 
 		wg.Add(10)
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			go func() {
 				defer wg.Done()
 				n := 0

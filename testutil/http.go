@@ -15,7 +15,7 @@ import (
 
 type HTTPServerOptions struct {
 	Bind string
-	Exit chan interface{}
+	Exit chan any
 
 	SSL     bool
 	CrtFile string

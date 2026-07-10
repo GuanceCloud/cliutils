@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"strings"
 	"sync"
@@ -545,7 +546,7 @@ func (t *BrowserTask) checkResult() (reasons []string, succFlag bool) {
 	return reasons, false
 }
 
-func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]interface{}) {
+func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]any) {
 	cfg, _ := t.parseBrowserConfig()
 	result := t.lastViewportResult()
 	name := firstNonEmpty(t.result.Name, cfg.Name, t.Name)
@@ -556,12 +557,8 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 		"status":         "FAIL",
 		"browser_engine": t.effectiveEngine(),
 	}
-	for k, v := range cfg.Tags {
-		tags[k] = v
-	}
-	for k, v := range t.Tags {
-		tags[k] = v
-	}
+	maps.Copy(tags, cfg.Tags)
+	maps.Copy(tags, t.Tags)
 	if result.viewport.Width > 0 && result.viewport.Height > 0 {
 		tags["viewport"] = fmt.Sprintf("%dx%d", result.viewport.Width, result.viewport.Height)
 	} else if viewports := t.effectiveViewports(); len(viewports) > 0 {
@@ -573,7 +570,7 @@ func (t *BrowserTask) getResults() (tags map[string]string, fields map[string]in
 	if responseTime == 0 {
 		responseTime = int64(t.duration) / 1000
 	}
-	fields = map[string]interface{}{
+	fields = map[string]any{
 		"response_time":  responseTime,
 		"success":        int64(-1),
 		"last_step":      int64(lastBrowserStep(t.result.Steps)),
@@ -1079,10 +1076,7 @@ func (t *BrowserTask) retryInterval() time.Duration {
 	if t.RetryOptions == nil || !t.RetryOptions.Enabled || t.RetryOptions.Count <= 0 {
 		return 0
 	}
-	interval := t.RetryOptions.IntervalSec
-	if interval < 5 {
-		interval = 5
-	}
+	interval := max(t.RetryOptions.IntervalSec, 5)
 	if interval > 300 {
 		interval = 300
 	}

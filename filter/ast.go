@@ -172,9 +172,9 @@ func (n *OrderByElem) MarshalJSON() ([]byte, error) {
 
 	switch n.Opt {
 	case OrderAsc:
-		return []byte(fmt.Sprintf(output, b, "asc")), nil
+		return fmt.Appendf(nil, output, b, "asc"), nil
 	case OrderDesc:
-		return []byte(fmt.Sprintf(output, b, "desc")), nil
+		return fmt.Appendf(nil, output, b, "desc"), nil
 	}
 	return []byte(`""`), nil
 }
@@ -265,7 +265,7 @@ func getFuncArgList(nl NodeList) FuncArgList {
 
 // SearchAfter 深度分页.
 type SearchAfter struct {
-	Vals []interface{} `json:"vals,omitempty"`
+	Vals []any `json:"vals,omitempty"`
 }
 
 // Pos pos.
@@ -299,22 +299,22 @@ func (n *Fill) MarshalJSON() ([]byte, error) {
 
 	switch n.FillType {
 	case FillNil:
-		return []byte(fmt.Sprintf(output1, Nil)), nil
+		return fmt.Appendf(nil, output1, Nil), nil
 
 	case FillInt:
-		return []byte(fmt.Sprintf(output2, "integer", "integer_val", n.Int)), nil
+		return fmt.Appendf(nil, output2, "integer", "integer_val", n.Int), nil
 
 	case FillFloat:
-		return []byte(fmt.Sprintf(output2, "float", "float_val", n.Float)), nil
+		return fmt.Appendf(nil, output2, "float", "float_val", n.Float), nil
 
 	case FillStr:
-		return []byte(fmt.Sprintf(output2, "str", "str_val", fmt.Sprintf(`"%s"`, n.Str))), nil
+		return fmt.Appendf(nil, output2, "str", "str_val", fmt.Sprintf(`"%s"`, n.Str)), nil
 
 	case FillLinear:
-		return []byte(fmt.Sprintf(output1, "linear")), nil
+		return fmt.Appendf(nil, output1, "linear"), nil
 
 	case FillPrevious:
-		return []byte(fmt.Sprintf(output1, "previous")), nil
+		return fmt.Appendf(nil, output1, "previous"), nil
 	}
 
 	return []byte(`""`), nil
@@ -654,7 +654,7 @@ type Regex struct {
 }
 
 func (e *Regex) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`"%s"`, e.String())), nil
+	return fmt.Appendf(nil, `"%s"`, e.String()), nil
 }
 
 func (e *Regex) Type() ValueType     { return "" /* TODO */ }
@@ -766,10 +766,10 @@ type StaticCast struct {
 func (e *StaticCast) MarshalJSON() ([]byte, error) {
 	const res = `{"%s":"%s"}`
 	if e.IsInt {
-		return []byte(fmt.Sprintf(res, "int", e.Val.String())), nil
+		return fmt.Appendf(nil, res, "int", e.Val.String()), nil
 	}
 	if e.IsFloat {
-		return []byte(fmt.Sprintf(res, "float", e.Val.String())), nil
+		return fmt.Appendf(nil, res, "float", e.Val.String()), nil
 	}
 	return nil, fmt.Errorf("unreachable")
 }
@@ -798,10 +798,10 @@ type Statement interface {
 
 // OuterFunc outerFunc.
 type OuterFunc struct {
-	Func         *FuncExpr     `json:"func,omitempty"`
-	FuncArgVals  []interface{} `json:"func_arg_vals,omitempty"`
-	FuncArgTypes []string      `json:"func_arg_types,omitempty"`
-	FuncArgNames []string      `json:"func_arg_names,omitempty"`
+	Func         *FuncExpr `json:"func,omitempty"`
+	FuncArgVals  []any     `json:"func_arg_vals,omitempty"`
+	FuncArgTypes []string  `json:"func_arg_types,omitempty"`
+	FuncArgNames []string  `json:"func_arg_names,omitempty"`
 }
 
 type OuterFuncs struct {

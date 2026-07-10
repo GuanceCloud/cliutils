@@ -31,9 +31,7 @@ func TestLockContention(t *testing.T) {
 	contentionStarted := make(chan bool, 1)
 
 	// First goroutine holds lock
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -42,15 +40,13 @@ func TestLockContention(t *testing.T) {
 
 		// Hold lock for a bit
 		time.Sleep(50 * time.Millisecond)
-	}()
+	})
 
 	// Wait for first lock to be acquired
 	<-contentionStarted
 
 	// Second goroutine tries to lock (will contend)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		start := time.Now()
 		mu.Lock() // This should wait due to contention
 		duration := time.Since(start)
@@ -60,7 +56,7 @@ func TestLockContention(t *testing.T) {
 		if duration < 10*time.Millisecond {
 			t.Errorf("Contented lock didn't wait enough: %v", duration)
 		}
-	}()
+	})
 
 	wg.Wait()
 
@@ -117,21 +113,17 @@ func TestInstrumentedRWMutex(t *testing.T) {
 	readStarted := make(chan bool, 1)
 
 	// Start read lock holder
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		rwmu.RLock()
 		defer rwmu.RUnlock()
 		readStarted <- true
 		time.Sleep(30 * time.Millisecond)
-	}()
+	})
 
 	<-readStarted
 
 	// Try to get write lock while read is held
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		start := time.Now()
 		rwmu.Lock() // Should wait for read to complete
 		duration := time.Since(start)
@@ -140,7 +132,7 @@ func TestInstrumentedRWMutex(t *testing.T) {
 		if duration < 10*time.Millisecond {
 			t.Errorf("Write lock during read didn't wait enough: %v", duration)
 		}
-	}()
+	})
 
 	wg.Wait()
 }

@@ -126,7 +126,7 @@ func (r *ptRander) Rand(count int) []*Point {
 
 	pts := make([]*Point, 0, count)
 
-	for i := 0; i < count; i++ {
+	for range count {
 		pts = append(pts, r.doRand())
 	}
 

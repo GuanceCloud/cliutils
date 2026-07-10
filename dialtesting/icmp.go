@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"math/rand"
 	"net"
@@ -206,7 +207,7 @@ func (t *ICMPTask) checkResult() (reasons []string, succFlag bool) {
 	return reasons, succFlag
 }
 
-func (t *ICMPTask) getResults() (tags map[string]string, fields map[string]interface{}) {
+func (t *ICMPTask) getResults() (tags map[string]string, fields map[string]any) {
 	tags = map[string]string{
 		"name":      t.Name,
 		"dest_host": t.Host,
@@ -214,7 +215,7 @@ func (t *ICMPTask) getResults() (tags map[string]string, fields map[string]inter
 		"proto":     "icmp",
 	}
 
-	fields = map[string]interface{}{
+	fields = map[string]any{
 		"average_round_trip_time_in_millis": t.round(t.avgRoundTripTime/1000, 3),
 		"average_round_trip_time":           t.avgRoundTripTime,
 		"min_round_trip_time_in_millis":     t.round(t.minRoundTripTime/1000, 3),
@@ -229,9 +230,7 @@ func (t *ICMPTask) getResults() (tags map[string]string, fields map[string]inter
 		"success":                           int64(-1),
 	}
 
-	for k, v := range t.Tags {
-		tags[k] = v
-	}
+	maps.Copy(tags, t.Tags)
 
 	if t.EnableTraceroute {
 		fields["hops"] = 0
@@ -248,7 +247,7 @@ func (t *ICMPTask) getResults() (tags map[string]string, fields map[string]inter
 		}
 	}
 
-	message := map[string]interface{}{}
+	message := map[string]any{}
 
 	reasons, succFlag := t.checkResult()
 	if t.reqError != "" {

@@ -4,7 +4,6 @@
 // Copyright 2021-present Guance, Inc.
 
 //go:build linux
-// +build linux
 
 package ws
 
@@ -75,7 +74,7 @@ func (e *epoll) Wait(cnt int) ([]net.Conn, error) {
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 	var connections []net.Conn
-	for i := 0; i < n; i++ {
+	for i := range n {
 		conn := e.connections[int(events[i].Fd)]
 		connections = append(connections, conn)
 	}

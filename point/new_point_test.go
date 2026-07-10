@@ -17,11 +17,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func getNFields(n int) map[string]interface{} {
+func getNFields(n int) map[string]any {
 	i := 0
-	fields := map[string]interface{}{}
+	fields := map[string]any{}
 	for {
-		var v interface{}
+		var v any
 		v = i // int
 
 		if i%2 == 0 { // string
@@ -52,7 +52,7 @@ func getNFields(n int) map[string]interface{} {
 func TestV2NewPoint(t *T.T) {
 	t.Run("valid-fields", func(t *T.T) {
 		pt := NewPoint("abc", NewKVs(
-			map[string]interface{}{
+			map[string]any{
 				"[]byte":  []byte("abc"),
 				"[]uint8": []uint8("abc"),
 
@@ -80,7 +80,7 @@ func TestV2NewPoint(t *T.T) {
 	})
 
 	t.Run("valid-fields-under-pb", func(t *T.T) {
-		kvs := map[string]interface{}{
+		kvs := map[string]any{
 			"[]byte":    []byte("abc"),
 			"[]uint8":   []uint8("abc"),
 			"b-false":   false,
@@ -107,7 +107,7 @@ func TestV2NewPoint(t *T.T) {
 	})
 
 	t.Run("basic", func(t *T.T) {
-		kvs := NewKVs(map[string]interface{}{"f1": 12}).SetTag(`t1`, `tval1`)
+		kvs := NewKVs(map[string]any{"f1": 12}).SetTag(`t1`, `tval1`)
 		pt := NewPoint(`abc`, kvs, WithTime(time.Unix(0, 123)))
 
 		assert.Equal(t, "abc,t1=tval1 f1=12i 123", pt.LineProto())
@@ -121,7 +121,7 @@ func TestNewPoint(t *T.T) {
 		tname, name, expect string
 
 		t map[string]string
-		f map[string]interface{}
+		f map[string]any
 
 		warns    int
 		withPool bool
@@ -131,7 +131,7 @@ func TestNewPoint(t *T.T) {
 			opts:     []Option{WithTime(time.Unix(0, 123))},
 			name:     "valid-fields",
 			withPool: true,
-			f: map[string]interface{}{
+			f: map[string]any{
 				"[]byte":  []byte("abc"),
 				"[]uint8": []uint8("abc"),
 
@@ -160,7 +160,7 @@ func TestNewPoint(t *T.T) {
 			tname: "valid-fields",
 			opts:  []Option{WithTime(time.Unix(0, 123))},
 			name:  "valid-fields",
-			f: map[string]interface{}{
+			f: map[string]any{
 				"[]byte":  []byte("abc"),
 				"[]uint8": []uint8("abc"),
 
@@ -189,7 +189,7 @@ func TestNewPoint(t *T.T) {
 			tname: "valid-fields-under-pb",
 			opts:  []Option{WithTime(time.Unix(0, 123)), WithEncoding(Protobuf)},
 			name:  "valid-fields",
-			f: map[string]interface{}{
+			f: map[string]any{
 				"[]byte":    []byte("abc"),
 				"[]uint8":   []uint8("abc"),
 				"b-false":   false,
@@ -218,7 +218,7 @@ func TestNewPoint(t *T.T) {
 			opts:  []Option{WithTime(time.Unix(0, 123)), WithMaxMeasurementLen(10)},
 
 			name:   "name-exceed-len",
-			f:      map[string]interface{}{"f1": 123},
+			f:      map[string]any{"f1": 123},
 			expect: `name-excee f1=123i 123`,
 			warns:  1,
 		},
@@ -227,7 +227,7 @@ func TestNewPoint(t *T.T) {
 			tname:  "empty-measurement",
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			name:   "",
-			f:      map[string]interface{}{"f1": 123},
+			f:      map[string]any{"f1": 123},
 			expect: fmt.Sprintf(`%s f1=123i 123`, DefaultMeasurementName),
 			warns:  1,
 		},
@@ -247,7 +247,7 @@ func TestNewPoint(t *T.T) {
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			name:   "abc",
 			t:      map[string]string{"t1": "tval1"},
-			f:      map[string]interface{}{"f1": 12},
+			f:      map[string]any{"f1": 12},
 			expect: "abc,t1=tval1 f1=12i 123",
 		},
 		{
@@ -255,7 +255,7 @@ func TestNewPoint(t *T.T) {
 			name:   "abc",
 			opts:   append(DefaultMetricOptions(), WithTime(time.Unix(0, 123))),
 			t:      map[string]string{"t1": "tval1"},
-			f:      map[string]interface{}{"f.1": 12},
+			f:      map[string]any{"f.1": 12},
 			expect: "abc,t1=tval1 f.1=12i 123",
 		},
 		{
@@ -263,7 +263,7 @@ func TestNewPoint(t *T.T) {
 			name:   "abc",
 			opts:   append(DefaultMetricOptions(), WithTime(time.Unix(0, 123))),
 			t:      map[string]string{"t.1": "tval1"},
-			f:      map[string]interface{}{"f1": 12},
+			f:      map[string]any{"f1": 12},
 			expect: "abc,t.1=tval1 f1=12i 123",
 		},
 		{
@@ -272,7 +272,7 @@ func TestNewPoint(t *T.T) {
 			opts:  append(DefaultObjectOptions(), WithTime(time.Unix(0, 123))),
 
 			t:      map[string]string{"t1": "tval1"},
-			f:      map[string]interface{}{"f.1": 12},
+			f:      map[string]any{"f.1": 12},
 			expect: fmt.Sprintf(`abc,t1=tval1 f_1=12i,name="%s" 123`, defaultObjectName),
 			warns:  2,
 		},
@@ -282,7 +282,7 @@ func TestNewPoint(t *T.T) {
 			name:   "abc",
 			opts:   append(DefaultObjectOptions(), WithTime(time.Unix(0, 123))),
 			t:      map[string]string{"t1": "abc", "t.2": "xyz"},
-			f:      map[string]interface{}{"f1": 123, "f.2": "def"},
+			f:      map[string]any{"f1": 123, "f.2": "def"},
 			expect: fmt.Sprintf(`abc,t1=abc,t_2=xyz f1=123i,f_2="def",name="%s" 123`, defaultObjectName),
 			warns:  3,
 		},
@@ -301,7 +301,7 @@ func TestNewPoint(t *T.T) {
 				"t8": "abc",
 				"t9": "abc",
 			},
-			f: map[string]interface{}{
+			f: map[string]any{
 				"f1": 123,
 				"f2": "def",
 				"f3": "def",
@@ -330,7 +330,7 @@ func TestNewPoint(t *T.T) {
 				"t1": "abc",
 				"t2": "xyz",
 			},
-			f: map[string]interface{}{
+			f: map[string]any{
 				"f1": 123,
 				"f2": "def",
 				"f3": "def",
@@ -360,7 +360,7 @@ func TestNewPoint(t *T.T) {
 				"t8": "abc",
 				"t9": "abc",
 			},
-			f: map[string]interface{}{
+			f: map[string]any{
 				"f1": 123,
 			},
 			expect: `abc,t1=abc f1=123i 123`,
@@ -372,7 +372,7 @@ func TestNewPoint(t *T.T) {
 			opts:   []Option{WithTime(time.Unix(0, 123)), WithMaxTagKeyLen(1)},
 			name:   "abc",
 			t:      map[string]string{"t1": "x"},
-			f:      map[string]interface{}{"f1": 123},
+			f:      map[string]any{"f1": 123},
 			expect: `abc,t=x f1=123i 123`,
 			warns:  1,
 		},
@@ -382,7 +382,7 @@ func TestNewPoint(t *T.T) {
 			opts:   []Option{WithTime(time.Unix(0, 123)), WithMaxTagValLen(3)},
 			name:   "abc",
 			t:      map[string]string{"t": "1234"},
-			f:      map[string]interface{}{"f1": 123},
+			f:      map[string]any{"f1": 123},
 			expect: `abc,t=123 f1=123i 123`,
 			warns:  1,
 		},
@@ -391,7 +391,7 @@ func TestNewPoint(t *T.T) {
 			tname:  "exceed-max-field-key-len",
 			name:   "abc",
 			opts:   []Option{WithTime(time.Unix(0, 123)), WithMaxFieldKeyLen(3)},
-			f:      map[string]interface{}{"f123": 123},
+			f:      map[string]any{"f123": 123},
 			expect: `abc f12=123i 123`,
 			warns:  1,
 		},
@@ -400,7 +400,7 @@ func TestNewPoint(t *T.T) {
 			tname:  "exceed-max-field-val-len",
 			name:   "abc",
 			opts:   []Option{WithTime(time.Unix(0, 123)), WithMaxFieldValLen(3)},
-			f:      map[string]interface{}{"f1": "hello"},
+			f:      map[string]any{"f1": "hello"},
 			expect: `abc f1="hel" 123`,
 			warns:  1,
 		},
@@ -411,7 +411,7 @@ func TestNewPoint(t *T.T) {
 			opts:  append(DefaultLoggingOptions(), WithTime(time.Unix(0, 123))),
 
 			t:      map[string]string{"source": "s1"},
-			f:      map[string]interface{}{"f1": 123},
+			f:      map[string]any{"f1": 123},
 			expect: fmt.Sprintf(`abc f1=123i,status="%s" 123`, DefaultLoggingStatus),
 			warns:  2,
 		},
@@ -420,7 +420,7 @@ func TestNewPoint(t *T.T) {
 			name:   "abc",
 			opts:   append(DefaultObjectOptions(), WithTime(time.Unix(0, 123))),
 			t:      map[string]string{"class": "xyz"},
-			f:      map[string]interface{}{"class": 123, "f1": 1},
+			f:      map[string]any{"class": 123, "f1": 1},
 			expect: fmt.Sprintf(`abc f1=1i,name="%s" 123`, defaultObjectName),
 
 			// NOTE: tag key `class` override field `class`, then the tag disabled
@@ -432,7 +432,7 @@ func TestNewPoint(t *T.T) {
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			name:   "abc",
 			t:      map[string]string{},
-			f:      map[string]interface{}{"f1": 123},
+			f:      map[string]any{"f1": 123},
 			expect: "abc f1=123i 123",
 		},
 
@@ -440,7 +440,7 @@ func TestNewPoint(t *T.T) {
 			tname:  "invalid-category",
 			opts:   []Option{WithTime(time.Unix(0, 123))},
 			name:   "abc",
-			f:      map[string]interface{}{"f1": 123},
+			f:      map[string]any{"f1": 123},
 			expect: `abc f1=123i 123`,
 		},
 
@@ -448,7 +448,7 @@ func TestNewPoint(t *T.T) {
 			tname: "nil-opiton",
 			name:  "abc",
 			t:     map[string]string{},
-			f:     map[string]interface{}{"f1": 123},
+			f:     map[string]any{"f1": 123},
 		},
 	}
 
@@ -571,7 +571,7 @@ func BenchmarkV2NewPoint(b *T.B) {
 				"t9": "val9",
 				"t0": "val0",
 			}
-			fields := map[string]interface{}{
+			fields := map[string]any{
 				"f1":  123,
 				"f2":  "abc",
 				"f3":  45.6,
@@ -799,7 +799,7 @@ func FuzzPLPBEquality(f *T.F) {
 
 		lppt, err := NewPointDeprecated(measurement,
 			map[string]string{tagk: tagv},
-			map[string]interface{}{
+			map[string]any{
 				"i64": i64,
 				"u64": u64,
 				"str": str,
@@ -814,7 +814,7 @@ func FuzzPLPBEquality(f *T.F) {
 
 		pbpt, err := NewPointDeprecated(measurement,
 			map[string]string{tagk: tagv},
-			map[string]interface{}{
+			map[string]any{
 				"i64": i64,
 				"u64": u64,
 				"str": str,

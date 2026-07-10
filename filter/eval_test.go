@@ -16,98 +16,98 @@ func TestExprConditions(t *testing.T) {
 		in     string
 		source string
 		tags   map[string]string
-		fields map[string]interface{}
+		fields map[string]any
 		pass   bool
 	}{
 		{
 			in:     "{ abc notmatch []}",
-			fields: map[string]interface{}{"abc": "abc123"},
+			fields: map[string]any{"abc": "abc123"},
 			pass:   false,
 		},
 
 		{
 			in:     "{ abc match ['g(-z]+ng wrong regex']} # invalid regexp",
-			fields: map[string]interface{}{"abc": "abc123"},
+			fields: map[string]any{"abc": "abc123"},
 			pass:   false,
 		},
 
 		{
 			in:     "{ abc match ['a.*']}",
-			fields: map[string]interface{}{"abc": "abc123"},
+			fields: map[string]any{"abc": "abc123"},
 			pass:   true,
 		},
 
 		{
 			in:     "{ abc match ['a.*']}",
-			fields: map[string]interface{}{"abc": "abc123"},
+			fields: map[string]any{"abc": "abc123"},
 			pass:   true,
 		},
 
 		{
 			in:     "{ source = re(`.*`) and (abc match ['a.*'])}",
-			fields: map[string]interface{}{"abc": "abc123"},
+			fields: map[string]any{"abc": "abc123"},
 			tags:   map[string]string{"source": "12345"},
 			pass:   true,
 		},
 
 		{
 			in:     "{ abc notmatch ['a.*'] or xyz match ['.*']}",
-			fields: map[string]interface{}{"abc": "abc123"},
+			fields: map[string]any{"abc": "abc123"},
 			tags:   map[string]string{"xyz": "def"},
 			pass:   true,
 		},
 
 		{
 			in:     "{abc notin [1.1,1.2,1.3] and (a > 1 || c< 0)}",
-			fields: map[string]interface{}{"abc": int64(4), "a": int64(-1), "c": int64(-2)},
+			fields: map[string]any{"abc": int64(4), "a": int64(-1), "c": int64(-2)},
 			pass:   true,
 		},
 
 		{
 			in:     "{a notin [1,2,3,4]}",
-			fields: map[string]interface{}{"a": int64(4)},
+			fields: map[string]any{"a": int64(4)},
 			pass:   false,
 		},
 
 		{
 			in:     "{abc notin [1,2,3]}",
-			fields: map[string]interface{}{"abc": int64(4)},
+			fields: map[string]any{"abc": int64(4)},
 			pass:   true,
 		},
 
 		{
 			in:     ";;;{a > 1, b > 1 or c > 1, xx != 123 };;;; {xyz > 1};;;",
-			fields: map[string]interface{}{"a": int64(2), "c": "xyz"},
+			fields: map[string]any{"a": int64(2), "c": "xyz"},
 			pass:   false,
 		},
 
 		{
 			in:     "{a > 1, b > 1 or c > 1}",
-			fields: map[string]interface{}{"a": int64(2), "c": "xyz"},
+			fields: map[string]any{"a": int64(2), "c": "xyz"},
 			pass:   false,
 		},
 
 		{
 			in:     "{a > 1, b > 1 or c = 'xyz'}",
-			fields: map[string]interface{}{"a": int64(2), "c": "xyz", "b": false},
+			fields: map[string]any{"a": int64(2), "c": "xyz", "b": false},
 			pass:   true,
 		},
 
 		{
 			in:     "{xxx < 111}; {a > 1, b > 1 or c = 'xyz'}",
-			fields: map[string]interface{}{"a": int64(2), "c": "xyz", "b": false},
+			fields: map[string]any{"a": int64(2), "c": "xyz", "b": false},
 			pass:   true,
 		},
 
 		{
 			in:     `{host = re("^nginx_.*$")}`,
-			fields: map[string]interface{}{"host": "nginx_abc"},
+			fields: map[string]any{"host": "nginx_abc"},
 			pass:   true,
 		},
 
 		{
 			in:     "{host = re(`nginx_*`)}",
-			fields: map[string]interface{}{"host": "abcdef"},
+			fields: map[string]any{"host": "abcdef"},
 			pass:   false,
 		},
 
@@ -208,25 +208,25 @@ func TestExprConditions(t *testing.T) {
 
 		{
 			in:     "{ abc = re(`nginx_*`)}", // abc is nil
-			fields: map[string]interface{}{"host": "abcdef"},
+			fields: map[string]any{"host": "abcdef"},
 			pass:   false,
 		},
 
 		{
 			in:     "{ false = re(`nginx_*`)}",
-			fields: map[string]interface{}{"host": "abcdef"},
+			fields: map[string]any{"host": "abcdef"},
 			pass:   false,
 		},
 
 		{
 			in:     "{ 123 = re(`nginx_*`)}",
-			fields: map[string]interface{}{"host": "abcdef"},
+			fields: map[string]any{"host": "abcdef"},
 			pass:   false,
 		},
 
 		{
 			in:     "{ 3.14 = re(`nginx_*`)}",
-			fields: map[string]interface{}{"host": "abcdef"},
+			fields: map[string]any{"host": "abcdef"},
 			pass:   false,
 		},
 
@@ -259,11 +259,11 @@ func TestConditions(t *testing.T) {
 	cases := []struct {
 		in     WhereConditions
 		tags   map[string]string
-		fields map[string]interface{}
+		fields map[string]any
 		pass   bool
 	}{
 		{ // multi conditions
-			fields: map[string]interface{}{"a": int64(2), "c": "xyz"},
+			fields: map[string]any{"a": int64(2), "c": "xyz"},
 			in: WhereConditions{
 				&WhereCondition{
 					conditions: []Node{
@@ -289,7 +289,7 @@ func TestConditions(t *testing.T) {
 		},
 
 		{
-			fields: map[string]interface{}{"a": int64(2)},
+			fields: map[string]any{"a": int64(2)},
 			in: WhereConditions{
 				&WhereCondition{
 					conditions: []Node{
@@ -306,7 +306,7 @@ func TestConditions(t *testing.T) {
 
 		{
 			pass:   true,
-			fields: map[string]interface{}{"a": "abc"},
+			fields: map[string]any{"a": "abc"},
 			in: WhereConditions{
 				&WhereCondition{
 					conditions: []Node{
@@ -388,8 +388,8 @@ func TestConditions(t *testing.T) {
 func TestBinEval(t *testing.T) {
 	cases := []struct {
 		op   ItemType
-		lhs  interface{}
-		rhs  interface{}
+		lhs  any
+		rhs  any
 		pass bool
 	}{
 		{
@@ -480,11 +480,11 @@ func TestEval(t *testing.T) {
 	cases := []struct {
 		cond   *BinaryExpr
 		tags   map[string]string
-		fields map[string]interface{}
+		fields map[string]any
 		pass   bool
 	}{
 		{
-			fields: map[string]interface{}{"a": int64(3)},
+			fields: map[string]any{"a": int64(3)},
 			cond: &BinaryExpr{
 				Op:  GTE,
 				LHS: &Identifier{Name: "a"},
@@ -494,7 +494,7 @@ func TestEval(t *testing.T) {
 		},
 
 		{
-			fields: map[string]interface{}{"a": float64(3.14)},
+			fields: map[string]any{"a": float64(3.14)},
 			cond: &BinaryExpr{
 				Op:  GT,
 				LHS: &Identifier{Name: "a"},

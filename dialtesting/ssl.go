@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"strings"
 	"text/template"
@@ -166,7 +167,7 @@ func (t *SSLTask) checkResult() (reasons []string, succFlag bool) {
 	return reasons, succFlag
 }
 
-func (t *SSLTask) getResults() (tags map[string]string, fields map[string]interface{}) {
+func (t *SSLTask) getResults() (tags map[string]string, fields map[string]any) {
 	tags = map[string]string{
 		"name":      t.Name,
 		"dest_host": t.Host,
@@ -180,13 +181,11 @@ func (t *SSLTask) getResults() (tags map[string]string, fields map[string]interf
 		tags["server_name"] = t.ServerName
 	}
 
-	for k, v := range t.Tags {
-		tags[k] = v
-	}
+	maps.Copy(tags, t.Tags)
 
 	responseTime := int64(t.reqCost) / 1000
 	tlsHandshakeTime := int64(t.tlsHandshakeCost) / 1000
-	fields = map[string]interface{}{
+	fields = map[string]any{
 		"response_time":      responseTime,
 		"tls_handshake_time": tlsHandshakeTime,
 		"success":            int64(-1),
@@ -209,7 +208,7 @@ func (t *SSLTask) getResults() (tags map[string]string, fields map[string]interf
 		fields["ssl_cert_issuer"] = t.certIssuer
 	}
 
-	message := map[string]interface{}{}
+	message := map[string]any{}
 	var (
 		reasons  []string
 		succFlag bool

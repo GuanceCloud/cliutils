@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"text/template"
 	"time"
 )
@@ -44,7 +45,7 @@ type MultiStep struct {
 	Value         int                 `json:"value,omitempty"` // wait seconds for wait task
 	ExtractedVars []MultiExtractedVar `json:"extracted_vars,omitempty"`
 
-	result           map[string]interface{}
+	result           map[string]any
 	postScriptResult *ScriptResult
 }
 
@@ -80,8 +81,8 @@ func (t *MultiTask) metricName() string {
 	return `multi_dial_testing`
 }
 
-func (t *MultiTask) getResults() (tags map[string]string, fields map[string]interface{}) {
-	fields = map[string]interface{}{
+func (t *MultiTask) getResults() (tags map[string]string, fields map[string]any) {
+	fields = map[string]any{
 		"success":       -1,
 		"response_time": int64(t.duration) / 1000,
 		"last_step":     t.lastStep,
@@ -91,9 +92,7 @@ func (t *MultiTask) getResults() (tags map[string]string, fields map[string]inte
 		"status": "FAIL",
 		"name":   t.Name,
 	}
-	for k, v := range t.Tags {
-		tags[k] = v
-	}
+	maps.Copy(tags, t.Tags)
 
 	if t.lastHTTPStep > -1 {
 		step := t.Steps[t.lastHTTPStep]
@@ -108,7 +107,7 @@ func (t *MultiTask) getResults() (tags map[string]string, fields map[string]inte
 		}
 	}
 
-	steps := []map[string]interface{}{}
+	steps := []map[string]any{}
 
 	for _, s := range t.Steps {
 		// extraced vars
@@ -126,11 +125,9 @@ func (t *MultiTask) getResults() (tags map[string]string, fields map[string]inte
 
 			extractedVars = append(extractedVars, ev)
 		}
-		result := map[string]interface{}{}
+		result := map[string]any{}
 		if s.result != nil {
-			for k, v := range s.result {
-				result[k] = v
-			}
+			maps.Copy(result, s.result)
 		}
 		result["extracted_vars"] = extractedVars
 		steps = append(steps, result)
@@ -142,14 +139,14 @@ func (t *MultiTask) getResults() (tags map[string]string, fields map[string]inte
 	return tags, fields
 }
 
-func (t *MultiTask) runHTTPStep(step *MultiStep) (map[string]interface{}, error) {
+func (t *MultiTask) runHTTPStep(step *MultiStep) (map[string]any, error) {
 	var err error
 	var task ITask
 	runCount := 0
 	maxCount := 1
 	interval := time.Millisecond
 
-	result := map[string]interface{}{}
+	result := map[string]any{}
 	if step == nil {
 		return nil, errors.New("step should not be nil")
 	}
@@ -193,9 +190,7 @@ func (t *MultiTask) runHTTPStep(step *MultiStep) (map[string]interface{}, error)
 			for k, v := range tags {
 				result[k] = v
 			}
-			for k, v := range fields {
-				result[k] = v
-			}
+			maps.Copy(result, fields)
 		}
 
 		if httpTask.postScriptResult != nil { // set extracted vars
@@ -251,7 +246,7 @@ func (t *MultiTask) run() error {
 
 	isLastStepFailed := false
 	for i, step := range t.Steps {
-		step.result = map[string]interface{}{
+		step.result = map[string]any{
 			"type":          step.Type,
 			"allow_failure": step.AllowFailure,
 			"task":          step.TaskString,
@@ -280,9 +275,7 @@ func (t *MultiTask) run() error {
 
 				result, err := t.runHTTPStep(step)
 
-				for k, v := range result {
-					step.result[k] = v
-				}
+				maps.Copy(step.result, result)
 				if err != nil {
 					step.result["fail_reason"] = fmt.Sprintf("run task failed: %s", err.Error())
 					if !step.AllowFailure {

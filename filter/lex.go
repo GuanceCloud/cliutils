@@ -50,7 +50,7 @@ func (i ItemType) IsKeyword() bool  { return i > keywordsStart && i < keywordsEn
 type ItemType int
 
 func (i *ItemType) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`"%s"`, reflect.ValueOf(i))), nil
+	return fmt.Appendf(nil, `"%s"`, reflect.ValueOf(i)), nil
 }
 
 const (
@@ -549,7 +549,7 @@ func (l *Lexer) emit(t ItemType) {
 	l.scannedItem = true
 }
 
-func (l *Lexer) errorf(format string, args ...interface{}) stateFn {
+func (l *Lexer) errorf(format string, args ...any) stateFn {
 	*l.itemp = Item{ERROR, l.start, fmt.Sprintf(format, args...)}
 	l.scannedItem = true
 

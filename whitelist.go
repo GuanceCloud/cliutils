@@ -16,8 +16,8 @@ func NewWhiteListItem(pattern string) *WhiteListItem {
 	pattern = strings.TrimSpace(pattern)
 
 	// 处理正则表达式模式
-	if strings.HasPrefix(pattern, "reg:") {
-		regexPattern := strings.TrimPrefix(pattern, "reg:")
+	if after, ok := strings.CutPrefix(pattern, "reg:"); ok {
+		regexPattern := after
 		return &WhiteListItem{
 			s:  regexPattern,
 			re: regexp.MustCompile(regexPattern),

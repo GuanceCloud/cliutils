@@ -360,7 +360,7 @@ func TestSSLTaskRenderTemplate(t *testing.T) {
 	require.NoError(t, err)
 
 	sslTask := task.(*SSLTask)
-	err = sslTask.renderTemplate(map[string]interface{}{
+	err = sslTask.renderTemplate(map[string]any{
 		"host":   func() string { return "example.org" },
 		"port":   func() string { return "443" },
 		"server": func() string { return "sni.example.org" },
@@ -398,15 +398,15 @@ func TestSSLTaskRenderTemplate(t *testing.T) {
 	assert.Equal(t, "Bad CA", sslTask.SuccessWhen[0].Issuer[1].NotContains)
 	assert.Equal(t, "TLS1.3", sslTask.SuccessWhen[0].TLSVersion[0].Is)
 	assert.Equal(t, "TLS1\\.0", sslTask.SuccessWhen[0].TLSVersion[1].NotMatchRegex)
-	require.NoError(t, sslTask.renderSuccessWhen(nil, map[string]interface{}{}))
+	require.NoError(t, sslTask.renderSuccessWhen(nil, map[string]any{}))
 
 	sslTask.rawTask = nil
 	sslTask.SetTaskJSONString("")
-	err = sslTask.renderTemplate(map[string]interface{}{})
+	err = sslTask.renderTemplate(map[string]any{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "new raw task failed")
 
-	err = (&SSLTask{Task: &Task{}, rawTask: nil}).renderTemplate(map[string]interface{}{})
+	err = (&SSLTask{Task: &Task{}, rawTask: nil}).renderTemplate(map[string]any{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "new raw task failed")
 
@@ -419,7 +419,7 @@ func TestSSLTaskRenderTemplate(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	err = badTask.(*SSLTask).renderTemplate(map[string]interface{}{})
+	err = badTask.(*SSLTask).renderTemplate(map[string]any{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "render response time failed")
 }

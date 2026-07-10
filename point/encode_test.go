@@ -100,17 +100,17 @@ func TestEncodeEqualty(t *T.T) {
 		randPts = r.Rand(nrand)
 
 		simplePts = []*Point{
-			NewPoint(`abc`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
+			NewPoint(`abc`, NewKVs(map[string]any{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
 				AddTag(`t1`, `tv1`).
 				AddTag(`t2`, `tv2`).
 				AddTag(`t3`, `tv3`), WithTime(time.Unix(0, 123))),
 
-			NewPoint(`def`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
+			NewPoint(`def`, NewKVs(map[string]any{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
 				AddTag(`t1`, `tv1`).
 				AddTag(`t2`, `tv2`).
 				AddTag(`t3`, `tv3`), WithTime(time.Unix(0, 123))),
 
-			NewPoint(`xyz`, NewKVs(map[string]interface{}{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
+			NewPoint(`xyz`, NewKVs(map[string]any{"f1": "fv1", "f2": "fv2", "f3": "fv3"}).
 				AddTag(`t1`, `tv1`).
 				AddTag(`t2`, `tv2`).
 				AddTag(`t3`, `tv3`), WithTime(time.Unix(0, 123))),
@@ -142,7 +142,7 @@ func TestEncodeEqualty(t *T.T) {
 					"t1": "tv1",
 					"t2": "tv2",
 					"t3": "tv3",
-				}, map[string]interface{}{
+				}, map[string]any{
 					"f1": "fv1",
 					"f2": "fv2",
 					"f3": "fv3",
@@ -405,7 +405,7 @@ func TestEncodeTags(t *T.T) {
 		arr := func() []*Point {
 			x, err := NewPointDeprecated("abc", map[string]string{
 				"service": "/sf-webproxy/api/online_status",
-			}, map[string]interface{}{
+			}, map[string]any{
 				"f3": "fv3",
 			}, WithTime(time.Unix(0, 123)))
 
@@ -511,7 +511,7 @@ func TestEncBufUsage(t *T.T) {
 			n := 0
 
 			usages := 0.0
-			for i := 0; i < 100; i++ {
+			for range 100 {
 				enc := GetEncoder(WithEncEncoding(Protobuf))
 				enc.EncodeV2(pts)
 
@@ -1479,7 +1479,7 @@ func BenchmarkPointsSize(b *T.B) {
 func TestPointsSize(t *T.T) {
 	r := NewRander(WithFixedTags(true), WithRandText(1))
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		pt := r.Rand(1)[0]
 		pt.MustAdd("s-arr", []string{"s1", "s2"})
 

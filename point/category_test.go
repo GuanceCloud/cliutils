@@ -6,6 +6,7 @@
 package point
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -106,11 +107,5 @@ func TestAllCategoriesIncludesNewCategories(t *testing.T) {
 }
 
 func containsCategory(all []Category, target Category) bool {
-	for _, c := range all {
-		if c == target {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(all, target)
 }

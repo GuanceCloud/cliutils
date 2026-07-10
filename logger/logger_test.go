@@ -335,12 +335,12 @@ func TestTotalSLoggers(t *testing.T) {
 
 	n := int64(1000)
 
-	for i := int64(0); i < n; i++ {
+	for i := range n {
 		_ = SLogger(fmt.Sprintf("slogger-%d", i))
 	}
 
 	// should not create new SLogger any more
-	for i := int64(0); i < n; i++ {
+	for i := range n {
 		_ = SLogger(fmt.Sprintf("slogger-%d", i))
 	}
 
@@ -740,17 +740,17 @@ func TestSeparateErrorFile(t *testing.T) {
 	assert.Len(t, validErrorLines, 1)
 
 	// Parse each line as JSON and verify levels
-	var mainLogs []map[string]interface{}
+	var mainLogs []map[string]any
 	for _, line := range validMainLines {
-		var logEntry map[string]interface{}
+		var logEntry map[string]any
 		err = json.Unmarshal([]byte(line), &logEntry)
 		assert.NoError(t, err)
 		mainLogs = append(mainLogs, logEntry)
 	}
 
-	var errorLogs []map[string]interface{}
+	var errorLogs []map[string]any
 	for _, line := range validErrorLines {
-		var logEntry map[string]interface{}
+		var logEntry map[string]any
 		err = json.Unmarshal([]byte(line), &logEntry)
 		assert.NoError(t, err)
 		errorLogs = append(errorLogs, logEntry)

@@ -253,7 +253,7 @@ func TestPointPool(t *T.T) {
 		defer ClearPointPool()
 
 		// total add 100 * 4 Field
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			var kvs KVs
 			kvs = kvs.Add(fmt.Sprintf("f%d", i), 123)
 			kvs = kvs.Add(fmt.Sprintf("f%d", i+1), 123)
@@ -283,7 +283,7 @@ func TestPointPool(t *T.T) {
 		f := func() {
 			defer wg.Done()
 
-			for i := 0; i < 100; i++ {
+			for i := range 100 {
 				var kvs KVs
 				kvs = kvs.Add(fmt.Sprintf("f-%d", i*100), 123)
 				kvs = kvs.Add(fmt.Sprintf("f-%d", i*100+1), 123)
@@ -298,7 +298,7 @@ func TestPointPool(t *T.T) {
 
 		n := 100
 		wg.Add(n)
-		for i := 0; i < n; i++ {
+		for range n {
 			go f()
 		}
 
@@ -393,7 +393,7 @@ func TestPointPoolMetrics(t *T.T) {
 		metrics.MustRegister(pp)
 
 		// total add 100 * 4 Field
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			func() {
 				var kvs KVs
 				kvs = kvs.Add(fmt.Sprintf("f%d", i), 123)
@@ -603,7 +603,7 @@ func TestPoolKVResuable(t *T.T) {
 
 			var f Foo
 			maxPT := (1 << 20)
-			for i := 0; i < maxPT; i++ {
+			for i := range maxPT {
 				assert.NoError(t, gofakeit.Struct(&f))
 				var kvs KVs
 				kvs = kvs.AddTag("T_"+f.T1Key, f.T1)

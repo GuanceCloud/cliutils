@@ -25,7 +25,7 @@ func Fnv1aHashAdd(h uint64, s string) uint64 {
 }
 
 func Fnv1aHashAddByte(h uint64, s []byte) uint64 {
-	for i := 0; i < len(s); i++ {
+	for i := range s {
 		h ^= uint64(s[i])
 		h *= prime64
 	}
@@ -43,7 +43,7 @@ func Fnv1aStrHash(s string) uint64 {
 
 func Fnv1aU8Hash(s []byte) uint64 {
 	var h uint64 = offset64
-	for i := 0; i < len(s); i++ {
+	for i := range s {
 		h ^= uint64(s[i])
 		h *= prime64
 	}

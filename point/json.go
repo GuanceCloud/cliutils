@@ -21,7 +21,7 @@ type JSONPoint struct {
 	Tags map[string]string `json:"tags,omitempty"`
 
 	// Requride
-	Fields map[string]interface{} `json:"fields"`
+	Fields map[string]any `json:"fields"`
 
 	// Unix nanosecond
 	Time int64 `json:"time,omitempty"`

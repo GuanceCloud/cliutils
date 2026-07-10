@@ -73,10 +73,9 @@ func main() {
 func getSamples() []byte {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	n := (sampleMin + (r.Int() % sampleMax)) * 1024 // in KB
-	if n >= len(dataBuf) {
-		n = len(dataBuf)
-	}
+	n := min(
+		// in KB
+		(sampleMin+(r.Int()%sampleMax))*1024, len(dataBuf))
 
 	start := r.Int() % len(dataBuf)
 

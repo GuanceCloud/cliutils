@@ -15,10 +15,7 @@ func ChunkStringByRuneLength(s string, size int) []string {
 	chunks := make([]string, 0, (len(runes)+size-1)/size)
 
 	for i := 0; i < len(runes); i += size {
-		end := i + size
-		if end > len(runes) {
-			end = len(runes)
-		}
+		end := min(i+size, len(runes))
 		chunks = append(chunks, string(runes[i:end]))
 	}
 

@@ -131,13 +131,11 @@ func TestOpen(t *T.T) {
 
 		var wg sync.WaitGroup
 
-		wg.Add(1)
 		// hold the cache for 5 seconds
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			time.Sleep(time.Second * 5)
 			assert.NoError(t, c.Close())
-		}()
+		})
 
 		c2, err := Open(WithPath(p), WithNoLock(true))
 		assert.NoError(t, err) // no error on re-Open() without lock

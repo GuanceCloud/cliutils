@@ -1,6 +1,7 @@
 package aggregate
 
 import (
+	"maps"
 	"sort"
 	"strconv"
 	"sync"
@@ -286,9 +287,7 @@ func cloneTags(tags map[string]string) map[string]string {
 	}
 
 	res := make(map[string]string, len(tags))
-	for key, value := range tags {
-		res[key] = value
-	}
+	maps.Copy(res, tags)
 	return res
 }
 

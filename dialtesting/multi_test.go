@@ -72,7 +72,7 @@ type cs struct {
 	Name       string
 	Task       *MultiTask
 	IsFailed   bool
-	Check      func(t assert.TestingT, tags map[string]string, fields map[string]interface{}) error
+	Check      func(t assert.TestingT, tags map[string]string, fields map[string]any) error
 	GlobalVars map[string]Variable
 }
 
@@ -143,9 +143,9 @@ func makeCases(serverURL string) []cs {
 					Value: "global_var_value",
 				},
 			},
-			Check: func(t assert.TestingT, tags map[string]string, fields map[string]interface{}) error {
+			Check: func(t assert.TestingT, tags map[string]string, fields map[string]any) error {
 				assert.Equal(t, "FAIL", tags["status"])
-				msg := map[string]interface{}{}
+				msg := map[string]any{}
 				message, ok := fields["message"].(string)
 				assert.True(t, ok)
 				assert.NoError(t, json.Unmarshal([]byte(message), &msg))
@@ -195,7 +195,7 @@ func makeCases(serverURL string) []cs {
 					},
 				}
 			}(),
-			Check: func(t assert.TestingT, tags map[string]string, fields map[string]interface{}) error {
+			Check: func(t assert.TestingT, tags map[string]string, fields map[string]any) error {
 				assert.Equal(t, "OK", tags["status"])
 				steps := []MultiStep{}
 				str, ok := fields["steps"].(string)
@@ -250,7 +250,7 @@ func makeCases(serverURL string) []cs {
 					Value: "global_var_value",
 				},
 			},
-			Check: func(t assert.TestingT, tags map[string]string, fields map[string]interface{}) error {
+			Check: func(t assert.TestingT, tags map[string]string, fields map[string]any) error {
 				assert.Equal(t, "OK", tags["status"])
 				vars := []ConfigVar{}
 				configVarstring, ok := fields["config_vars"].(string)

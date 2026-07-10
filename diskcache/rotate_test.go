@@ -29,7 +29,7 @@ func TestRotate(t *T.T) {
 		_1kb := make([]byte, 1024)
 
 		// put 3kb
-		for i := 0; i < 4; i++ {
+		for range 4 {
 			assert.NoError(t, c.Put(_1kb))
 		}
 

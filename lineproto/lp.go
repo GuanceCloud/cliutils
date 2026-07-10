@@ -59,13 +59,13 @@ func ConvertPrecisionToV2(precision string) (Precision, error) {
 type Point struct {
 	Name   string
 	Tags   map[string]string
-	Fields map[string]interface{}
+	Fields map[string]any
 	Time   time.Time
 }
 
 func NewPoint(name string,
 	tags map[string]string,
-	fields map[string]interface{},
+	fields map[string]any,
 	t ...time.Time,
 ) (*Point, error) {
 	var tm time.Time
@@ -92,7 +92,7 @@ func (p *Point) AddTag(key, val string) {
 	p.Tags[key] = val
 }
 
-func (p *Point) AddField(key string, val interface{}) error {
+func (p *Point) AddField(key string, val any) error {
 	// check the val value
 	if _, ok := InterfaceToValue(val); !ok {
 		return fmt.Errorf("unsupported line protocol field interface{}: %T, [%v]", val, val)
@@ -154,7 +154,7 @@ func Parse(data []byte, opt *Option) ([]*Point, error) {
 	for dec.Next() {
 		pt := &Point{
 			Tags:   make(map[string]string),
-			Fields: make(map[string]interface{}),
+			Fields: make(map[string]any),
 		}
 
 		m, err := dec.Measurement()
@@ -227,7 +227,7 @@ func Parse(data []byte, opt *Option) ([]*Point, error) {
 	return pts, nil
 }
 
-func InterfaceToValue(x interface{}) (lp.Value, bool) {
+func InterfaceToValue(x any) (lp.Value, bool) {
 	switch y := x.(type) {
 	case int64, uint64, float64, bool, string, []byte:
 		// do nothing
@@ -288,10 +288,7 @@ func (le *LineEncoder) EnableLax() {
 func (le *LineEncoder) AppendPoint(pt *Point) error {
 	le.Encoder.StartLine(pt.Name)
 
-	maxLen := len(pt.Tags)
-	if len(pt.Fields) > maxLen {
-		maxLen = len(pt.Fields)
-	}
+	maxLen := max(len(pt.Fields), len(pt.Tags))
 
 	keys := make([]string, 0, maxLen)
 

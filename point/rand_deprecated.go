@@ -35,7 +35,7 @@ func doRandomPoints(count int) ([]*Point, error) {
 	}
 
 	var pts []*Point
-	for i := 0; i < count; i++ {
+	for range count {
 		if pt, err := NewPointDeprecated(cliutils.CreateRandomString(30),
 			map[string]string{ // 4 tags
 				cliutils.CreateRandomString(10): sampleLogs[mrand.Int63()%int64(len(sampleLogs))],
@@ -44,7 +44,7 @@ func doRandomPoints(count int) ([]*Point, error) {
 				cliutils.CreateRandomString(13): sampleLogs[mrand.Int63()%int64(len(sampleLogs))],
 			},
 
-			map[string]interface{}{
+			map[string]any{
 				"message":                       sampleLogs[mrand.Int63()%int64(len(sampleLogs))],
 				cliutils.CreateRandomString(10): mrand.Int63(),
 				cliutils.CreateRandomString(10): mrand.Int63(),
@@ -97,7 +97,7 @@ func doRandomPBPoints(count int) (*PBPoints, error) {
 
 	pts := &PBPoints{}
 
-	for i := 0; i < count; i++ {
+	for range count {
 		pts.Arr = append(pts.Arr, &PBPoint{
 			Name: cliutils.CreateRandomString(30),
 			Fields: []*Field{

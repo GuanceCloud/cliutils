@@ -128,7 +128,7 @@ func (p *prom) getValue(m *dto.Metric, v value) {
 	}
 
 	tags := labelToTags(m.GetLabel())
-	fields := map[string]interface{}{p.metricName: v.GetValue()}
+	fields := map[string]any{p.metricName: v.GetValue()}
 
 	pt, err := p.newPoint(tags, fields, m.GetTimestampMs())
 	if err != nil {
@@ -148,7 +148,7 @@ func (p *prom) getCountAndSum(m *dto.Metric, c countAndSum) {
 	}
 
 	tags := labelToTags(m.GetLabel())
-	fields := map[string]interface{}{
+	fields := map[string]any{
 		p.metricName + "_count": float64(c.GetSampleCount()),
 		p.metricName + "_sum":   c.GetSampleSum(),
 	}
@@ -160,7 +160,7 @@ func (p *prom) getCountAndSum(m *dto.Metric, c countAndSum) {
 	p.pts = append(p.pts, pt)
 }
 
-func (p *prom) newPoint(tags map[string]string, fields map[string]interface{}, ts int64) (*ifxcli.Point, error) {
+func (p *prom) newPoint(tags map[string]string, fields map[string]any, ts int64) (*ifxcli.Point, error) {
 	if ts > 0 {
 		p.t = time.Unix(0, ts*int64(time.Millisecond))
 	}

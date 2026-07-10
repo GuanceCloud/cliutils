@@ -30,11 +30,11 @@ func TestGlobalSampler_AdvanceTime(t *testing.T) { //nolint
 			},
 		},
 	}
-	for i := 0; i < shardCount; i++ {
+	for i := range shardCount {
 		sampler.shards[i] = &Shard{
 			activeMap: make(map[uint64]*DataGroup),
 		}
-		for j := 0; j < 3600; j++ {
+		for j := range 3600 {
 			sampler.shards[i].slots[j] = list.New()
 		}
 	}
@@ -81,9 +81,9 @@ func TestGlobalSampler_IngestKeepsDifferentDataTypeSeparate(t *testing.T) {
 			},
 		},
 	}
-	for i := 0; i < shardCount; i++ {
+	for i := range shardCount {
 		sampler.shards[i] = &Shard{activeMap: make(map[uint64]*DataGroup)}
-		for j := 0; j < 3600; j++ {
+		for j := range 3600 {
 			sampler.shards[i].slots[j] = list.New()
 		}
 	}

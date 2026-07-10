@@ -22,7 +22,7 @@ import (
 
 var (
 	parserPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return &parser{}
 		},
 	}
@@ -34,7 +34,7 @@ type parser struct {
 	lex      Lexer
 	yyParser yyParserImpl
 
-	parseResult interface{}
+	parseResult any
 	lastClosing Pos
 	errs        ParseErrors
 	warns       ParseErrors
@@ -130,11 +130,11 @@ func (p *parser) addParseWarn(pr *PositionRange, err error) {
 	})
 }
 
-func (p *parser) addParseErrf(pr *PositionRange, format string, args ...interface{}) {
+func (p *parser) addParseErrf(pr *PositionRange, format string, args ...any) {
 	p.addParseErr(pr, fmt.Errorf(format, args...))
 }
 
-func (p *parser) addParseWarnf(pr *PositionRange, format string, args ...interface{}) {
+func (p *parser) addParseWarnf(pr *PositionRange, format string, args ...any) {
 	p.addParseWarn(pr, fmt.Errorf(format, args...))
 }
 

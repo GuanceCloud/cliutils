@@ -286,7 +286,7 @@ func TestDecode(t *T.T) {
 			data: func() []byte {
 				pt, err := NewPointDeprecated("abc",
 					map[string]string{"tag1": "v1", "tag2": "v2"},
-					map[string]interface{}{"f1": 1, "f2": 2.0},
+					map[string]any{"f1": 1, "f2": 2.0},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 
@@ -309,7 +309,7 @@ func TestDecode(t *T.T) {
 			data: func() []byte {
 				pt, err := NewPointDeprecated("abc",
 					map[string]string{"tag1": "v1", "tag2": "v2"},
-					map[string]interface{}{"f1": 1, "f2": 2.0},
+					map[string]any{"f1": 1, "f2": 2.0},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 
@@ -329,7 +329,7 @@ func TestDecode(t *T.T) {
 			data: func() []byte {
 				pt, err := NewPointDeprecated("abc",
 					map[string]string{"tag1": "v1", "tag2": "v2"},
-					map[string]interface{}{"f1": 1, "f2": 2.0},
+					map[string]any{"f1": 1, "f2": 2.0},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 
@@ -358,7 +358,7 @@ func TestDecode(t *T.T) {
 			data: func() []byte {
 				pt, err := NewPointDeprecated("abc",
 					map[string]string{"tag1": "v1", "tag2": "v2"},
-					map[string]interface{}{"f1": 1, "f2": 2.0},
+					map[string]any{"f1": 1, "f2": 2.0},
 					WithTime(time.Unix(0, 123)))
 				assert.NoError(t, err)
 

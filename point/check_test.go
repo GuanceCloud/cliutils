@@ -264,26 +264,26 @@ func TestCheckTags(t *T.T) {
 func TestCheckFields(t *T.T) {
 	cases := []struct {
 		name   string
-		f      map[string]interface{}
-		expect map[string]interface{}
+		f      map[string]any
+		expect map[string]any
 		warns  int
 		opts   []Option
 	}{
 		{
 			name: "exceed-max-field-len",
-			f: map[string]interface{}{
+			f: map[string]any{
 				"f1": "123456",
 			},
 			opts:  []Option{WithMaxFieldValLen(1)},
 			warns: 1,
-			expect: map[string]interface{}{
+			expect: map[string]any{
 				"f1": "1",
 			},
 		},
 
 		{
 			name: "exceed-max-field-count",
-			f: map[string]interface{}{
+			f: map[string]any{
 				"f1": "aaaaaa1",
 				"f2": "aaaaaa2",
 				"f3": "aaaaaa3",
@@ -297,20 +297,20 @@ func TestCheckFields(t *T.T) {
 			},
 			opts:  []Option{WithMaxFields(1), WithKeySorted(true)},
 			warns: 1,
-			expect: map[string]interface{}{
+			expect: map[string]any{
 				"f0": "aaaaaa0",
 			},
 		},
 
 		{
 			name: "exceed-max-field-key-len",
-			f: map[string]interface{}{
+			f: map[string]any{
 				"a1": "123456",
 				"b":  "abc123",
 			},
 			opts:  []Option{WithMaxFieldKeyLen(1)},
 			warns: 1,
-			expect: map[string]interface{}{
+			expect: map[string]any{
 				"a": "123456", // key truncated
 				"b": "abc123",
 			},
@@ -318,20 +318,20 @@ func TestCheckFields(t *T.T) {
 
 		{
 			name: "drop-metric-string-field",
-			f: map[string]interface{}{
+			f: map[string]any{
 				"a": 123456,
 				"b": "abc123", // dropped
 			},
 			opts:  []Option{WithStrField(false)},
 			warns: 1,
-			expect: map[string]interface{}{
+			expect: map[string]any{
 				"a": int64(123456),
 			},
 		},
 
 		{
 			name: "invalid-field-type",
-			f: map[string]interface{}{
+			f: map[string]any{
 				"b": struct{}{},
 			},
 			warns: 1,
@@ -339,13 +339,13 @@ func TestCheckFields(t *T.T) {
 
 		{
 			name: "nil-field",
-			f: map[string]interface{}{
+			f: map[string]any{
 				"a": nil, // set value to nil
 				"b": 123,
 				"c": struct{}{}, // ignored
 			},
 			warns: 2,
-			expect: map[string]interface{}{
+			expect: map[string]any{
 				"b": int64(123),
 				"a": nil,
 				"c": nil,
@@ -354,7 +354,7 @@ func TestCheckFields(t *T.T) {
 
 		{
 			name: "exceed-max-int64-under-influxdb1.x",
-			f: map[string]interface{}{
+			f: map[string]any{
 				"b": uint64(math.MaxInt64) + 1, // exceed max-int64
 			},
 			opts:  DefaultMetricOptionsForInflux1X(),
@@ -363,12 +363,12 @@ func TestCheckFields(t *T.T) {
 
 		{
 			name: "exceed-max-int64",
-			f: map[string]interface{}{
+			f: map[string]any{
 				"a": uint64(math.MaxInt64) + 1, // exceed max-int64, drop the key under non-strict mode
 				"b": "abc",
 			},
 
-			expect: map[string]interface{}{
+			expect: map[string]any{
 				"a": uint64(math.MaxInt64) + 1,
 				"b": "abc",
 			},
@@ -376,10 +376,10 @@ func TestCheckFields(t *T.T) {
 
 		{
 			name: "small-uint64",
-			f: map[string]interface{}{
+			f: map[string]any{
 				"a": uint64(12345),
 			},
-			expect: map[string]interface{}{
+			expect: map[string]any{
 				"a": uint64(12345),
 			},
 		},
@@ -392,13 +392,13 @@ func TestCheckFields(t *T.T) {
 
 		{
 			name: "dot-in-key",
-			f: map[string]interface{}{
+			f: map[string]any{
 				"a.b": 12345,
 				"c":   "12345",
 			},
 			opts:  []Option{WithDotInKey(false)},
 			warns: 1,
-			expect: map[string]interface{}{
+			expect: map[string]any{
 				"a_b": int64(12345),
 				"c":   "12345",
 			},
@@ -406,20 +406,20 @@ func TestCheckFields(t *T.T) {
 
 		{
 			name: "disabled-field",
-			f: map[string]interface{}{
+			f: map[string]any{
 				"a": 12345,
 				"b": "12345",
 			},
 			warns: 1,
 			opts:  []Option{WithDisabledKeys(NewKey("a", I))},
-			expect: map[string]interface{}{
+			expect: map[string]any{
 				"b": "12345",
 			},
 		},
 
 		{
 			name: "valid-fields",
-			f: map[string]interface{}{
+			f: map[string]any{
 				"small-uint64": uint64(12345),
 				"int8":         int8(1),
 				"int":          int(1),
@@ -436,7 +436,7 @@ func TestCheckFields(t *T.T) {
 				"str":          "abc",
 			},
 
-			expect: map[string]interface{}{
+			expect: map[string]any{
 				"small-uint64": uint64(12345),
 				"int8":         int64(1),
 				"int":          int64(1),
@@ -530,7 +530,7 @@ func BenchmarkCheck(b *T.B) {
 		name string
 		m    string
 		t    map[string]string
-		f    map[string]interface{}
+		f    map[string]any
 		opts []Option
 	}{
 		{
@@ -539,7 +539,7 @@ func BenchmarkCheck(b *T.B) {
 			t: map[string]string{
 				__shortKey: __shortVal,
 			},
-			f: map[string]interface{}{
+			f: map[string]any{
 				"f1": 123,
 				"f2": 123.0,
 				"f3": __shortVal,
@@ -553,7 +553,7 @@ func BenchmarkCheck(b *T.B) {
 			t: map[string]string{
 				__shortKey: __shortVal,
 			},
-			f: map[string]interface{}{
+			f: map[string]any{
 				"f1": 123,
 				"f2": 123.0,
 				"f3": __shortVal,
@@ -569,7 +569,7 @@ func BenchmarkCheck(b *T.B) {
 				__shortKey: __shortVal,
 				"source":   "should-be-dropped",
 			},
-			f: map[string]interface{}{
+			f: map[string]any{
 				"f1":     123,
 				"f2":     123.0,
 				"f3":     __shortVal,
@@ -584,7 +584,7 @@ func BenchmarkCheck(b *T.B) {
 			m:    "not-set",
 			t: func() map[string]string {
 				x := map[string]string{}
-				for i := 0; i < 100; i++ {
+				for i := range 100 {
 					switch i % 3 {
 					case 0: // normal
 						x[fmt.Sprintf("%s-%d", __shortKey, i)] = cliutils.CreateRandomString(32)
@@ -596,9 +596,9 @@ func BenchmarkCheck(b *T.B) {
 				}
 				return x
 			}(),
-			f: func() map[string]interface{} {
-				x := map[string]interface{}{}
-				for i := 0; i < 100; i++ {
+			f: func() map[string]any {
+				x := map[string]any{}
+				for i := range 100 {
 					switch i % 3 {
 					case 0: // exceed max int64
 						x[fmt.Sprintf("%s-%d", __shortKey, i)] = uint64(math.MaxInt64) + 1

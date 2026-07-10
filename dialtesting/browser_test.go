@@ -995,7 +995,7 @@ func newBrowserTaskForTest() *BrowserTask {
 	return task
 }
 
-func mustJSON(t *testing.T, value interface{}) string {
+func mustJSON(t *testing.T, value any) string {
 	t.Helper()
 	data, err := json.Marshal(value)
 	require.NoError(t, err)

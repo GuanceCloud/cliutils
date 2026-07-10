@@ -15,7 +15,7 @@ import (
 func TestParse(t *testing.T) {
 	cases := []struct {
 		in       string
-		expected interface{}
+		expected any
 		fail     bool
 	}{
 		{

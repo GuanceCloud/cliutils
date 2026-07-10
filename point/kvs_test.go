@@ -119,7 +119,7 @@ func TestTrim(t *T.T) {
 		SetPointPool(pp)
 		defer ClearPointPool()
 
-		for loop := 0; loop < 2; loop++ {
+		for range 2 {
 			var kvs KVs
 			kvs = kvs.AddTag("t1", "v1")
 			kvs = kvs.Add("f0", 1.23)
@@ -167,7 +167,7 @@ func TestTrim(t *T.T) {
 		SetPointPool(pp)
 		defer ClearPointPool()
 
-		for loop := 0; loop < 2; loop++ {
+		for range 2 {
 			var kvs KVs
 
 			kvs = kvs.Add("f0", 1.23)
@@ -613,7 +613,7 @@ func Test_shuffle(t *T.T) {
 
 func TestShuffleGzip(t *T.T) {
 	var pts []*Point
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		var kvs KVs
 		kvs = kvs.Add(`f1`, false)
 		kvs = kvs.Add(`f2`, 123)

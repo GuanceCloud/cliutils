@@ -39,14 +39,14 @@ func TestSizeofPoint(t *T.T) {
 		kvs = kvs.SetTag("t2", "v2")
 
 		pbpt := NewPoint("some", kvs)
-		t.Logf("type  size(pbpt): %d", reflect.TypeOf(*pbpt).Size())
+		t.Logf("type  size(pbpt): %d", reflect.TypeFor[Point]().Size())
 		t.Logf("value size(pbpt): %d", pbpt.Size())
 	})
 
 	t.Run("rand-large-pt", func(t *T.T) {
 		r := NewRander(WithFixedTags(true), WithRandText(3))
 		pts := r.Rand(1)
-		t.Logf("type  size(pbpt): %d", reflect.TypeOf(*pts[0]).Size())
+		t.Logf("type  size(pbpt): %d", reflect.TypeFor[Point]().Size())
 		t.Logf("value size(pbpt): %d", pts[0].Size())
 	})
 }
@@ -337,7 +337,7 @@ func TestPointString(t *T.T) {
 			pt: func() *Point {
 				pt, err := NewPointDeprecated("abc",
 					map[string]string{"tag1": "v1"},
-					map[string]interface{}{
+					map[string]any{
 						"f1": 123, "f2": true,
 					},
 					WithTime(time.Unix(0, 123)))
@@ -355,7 +355,7 @@ func TestPointString(t *T.T) {
 						"tag1": "v1",
 						"tag2": "v2",
 						"xtag": "vx",
-					}, map[string]interface{}{
+					}, map[string]any{
 						"f1": 123,
 						"f2": true,
 						"f3": uint64(123),
@@ -434,7 +434,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-ns-prec",
 			prec: PrecNS,
 			pt: func() *Point {
-				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]any{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(0, 123)))...)
 
 				assert.NoError(t, err)
@@ -449,7 +449,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-ms-prec",
 			prec: PrecMS,
 			pt: func() *Point {
-				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]any{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(0, 12345678)))...)
 
 				assert.NoError(t, err)
@@ -462,7 +462,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-us-prec",
 			prec: PrecUS, // only accept u
 			pt: func() *Point {
-				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]any{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(0, 12345678)))...)
 
 				assert.NoError(t, err)
@@ -475,7 +475,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-ns-prec",
 			prec: PrecNS, // only accept u
 			pt: func() *Point {
-				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]any{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(0, 12345678)))...)
 				assert.NoError(t, err)
 				return pt
@@ -487,7 +487,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-invalid-prec",
 			prec: -1,
 			pt: func() *Point {
-				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]any{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(0, 12345678)))...)
 				assert.NoError(t, err)
 				return pt
@@ -499,7 +499,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-second-prec",
 			prec: PrecS,
 			pt: func() *Point {
-				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]any{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(1, 123456789)))...)
 				assert.NoError(t, err)
 				return pt
@@ -511,7 +511,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-minute-prec",
 			prec: PrecM,
 			pt: func() *Point {
-				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]any{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(120, 123456789)))...)
 				assert.NoError(t, err)
 				return pt
@@ -523,7 +523,7 @@ func TestPointLineProtocol(t *T.T) {
 			name: "lp-point-hour-prec",
 			prec: PrecH,
 			pt: func() *Point {
-				pt, err := NewPointDeprecated("abc", nil, map[string]interface{}{"f1": 1},
+				pt, err := NewPointDeprecated("abc", nil, map[string]any{"f1": 1},
 					append(DefaultLoggingOptions(), WithTime(time.Unix(7199, 123456789)))...)
 				assert.NoError(t, err)
 				return pt
@@ -538,7 +538,7 @@ func TestPointLineProtocol(t *T.T) {
 			pt: func() *Point {
 				pt, err := NewPointDeprecated("abc",
 					nil,
-					map[string]interface{}{"f1": int64(1)},
+					map[string]any{"f1": int64(1)},
 					WithTime(time.Unix(0, 123)), WithEncoding(Protobuf))
 
 				assert.NoError(t, err)
@@ -555,7 +555,7 @@ func TestPointLineProtocol(t *T.T) {
 			pt: func() *Point {
 				pt, err := NewPointDeprecated("abc",
 					map[string]string{"t1": "v1"},
-					map[string]interface{}{"f1": []byte("abc123")},
+					map[string]any{"f1": []byte("abc123")},
 					WithTime(time.Unix(0, 1)), WithEncoding(Protobuf))
 
 				assert.NoError(t, err)
@@ -749,14 +749,14 @@ func TestFields(t *T.T) {
 	cases := []struct {
 		name   string
 		pt     *Point
-		expect map[string]interface{}
+		expect map[string]any
 	}{
 		{
 			name: "basic-lp-point",
 
 			pt: func() *Point {
 				x, err := NewPointDeprecated("abc", nil,
-					map[string]interface{}{
+					map[string]any{
 						"i8":     int8(1),
 						"u8":     uint8(1),
 						"i16":    int16(1),
@@ -778,7 +778,7 @@ func TestFields(t *T.T) {
 				return x
 			}(),
 
-			expect: map[string]interface{}{
+			expect: map[string]any{
 				"i8":     int64(1),
 				"u8":     uint64(1),
 				"i16":    int64(1),
@@ -803,7 +803,7 @@ func TestFields(t *T.T) {
 
 			pt: func() *Point {
 				x, err := NewPointDeprecated("abc", nil,
-					map[string]interface{}{
+					map[string]any{
 						"bool_1": false,
 						"bool_2": true,
 						"data":   []byte("abc123"),
@@ -825,7 +825,7 @@ func TestFields(t *T.T) {
 				return x
 			}(),
 
-			expect: map[string]interface{}{
+			expect: map[string]any{
 				// "any":    someAny,
 				"bool_1": false,
 				"bool_2": true,
@@ -918,7 +918,7 @@ func FuzzPBPointString(f *T.F) {
 	) {
 		pt, err := NewPointDeprecated(measurement,
 			map[string]string{tagk: tagv},
-			map[string]interface{}{
+			map[string]any{
 				"i64": i64,
 				"u64": u64,
 				"str": str,

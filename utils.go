@@ -28,11 +28,11 @@ import (
 )
 
 type Sem struct {
-	sem chan interface{}
+	sem chan any
 }
 
 func NewSem() *Sem {
-	return &Sem{sem: make(chan interface{})}
+	return &Sem{sem: make(chan any)}
 }
 
 func (s *Sem) Close() {
@@ -44,12 +44,12 @@ func (s *Sem) Close() {
 	}
 }
 
-func (s *Sem) Wait() <-chan interface{} {
+func (s *Sem) Wait() <-chan any {
 	return s.sem
 }
 
 func WgWait(wg *sync.WaitGroup, timeout int) {
-	c := make(chan interface{})
+	c := make(chan any)
 
 	go func() {
 		defer close(c)

@@ -8,23 +8,23 @@ import (
 )
 
 type LoggerCtx interface {
-	Debugf(template string, args ...interface{})
-	Infof(template string, args ...interface{})
-	Warnf(template string, args ...interface{})
-	Errorf(template string, args ...interface{})
-	Debug(args ...interface{})
-	Info(args ...interface{})
-	Warn(args ...interface{})
-	Error(args ...interface{})
+	Debugf(template string, args ...any)
+	Infof(template string, args ...any)
+	Warnf(template string, args ...any)
+	Errorf(template string, args ...any)
+	Debug(args ...any)
+	Info(args ...any)
+	Warn(args ...any)
+	Error(args ...any)
 
-	DebugfCtx(ctx context.Context, template string, args ...interface{})
-	InfofCtx(ctx context.Context, template string, args ...interface{})
-	WarnfCtx(ctx context.Context, template string, args ...interface{})
-	ErrorfCtx(ctx context.Context, template string, args ...interface{})
-	DebugCtx(ctx context.Context, template string, args ...interface{})
-	InfoCtx(ctx context.Context, template string, args ...interface{})
-	WarnCtx(ctx context.Context, template string, args ...interface{})
-	ErrorCtx(ctx context.Context, template string, args ...interface{})
+	DebugfCtx(ctx context.Context, template string, args ...any)
+	InfofCtx(ctx context.Context, template string, args ...any)
+	WarnfCtx(ctx context.Context, template string, args ...any)
+	ErrorfCtx(ctx context.Context, template string, args ...any)
+	DebugCtx(ctx context.Context, template string, args ...any)
+	InfoCtx(ctx context.Context, template string, args ...any)
+	WarnCtx(ctx context.Context, template string, args ...any)
+	ErrorCtx(ctx context.Context, template string, args ...any)
 
 	Named(name string) LoggerCtx
 	With(fields ...zap.Field) LoggerCtx
@@ -69,7 +69,7 @@ func (l *loggerCtx) getExtraFields(ctx context.Context) (fields []zap.Field) {
 	return fields
 }
 
-func (l *loggerCtx) getMessage(template string, args []interface{}) string {
+func (l *loggerCtx) getMessage(template string, args []any) string {
 	if len(args) == 0 {
 		return template
 	}
@@ -93,67 +93,67 @@ func (l *loggerCtx) Named(name string) LoggerCtx {
 	}
 }
 
-func (l *loggerCtx) Debugf(template string, args ...interface{}) {
+func (l *loggerCtx) Debugf(template string, args ...any) {
 	l.logger.Debug(l.getMessage(template, args))
 }
 
-func (l *loggerCtx) DebugfCtx(ctx context.Context, template string, args ...interface{}) {
+func (l *loggerCtx) DebugfCtx(ctx context.Context, template string, args ...any) {
 	l.logger.Debug(l.getMessage(template, args), l.getExtraFields(ctx)...)
 }
 
-func (l *loggerCtx) Infof(template string, args ...interface{}) {
+func (l *loggerCtx) Infof(template string, args ...any) {
 	l.logger.Info(l.getMessage(template, args))
 }
 
-func (l *loggerCtx) Warnf(template string, args ...interface{}) {
+func (l *loggerCtx) Warnf(template string, args ...any) {
 	l.logger.Warn(l.getMessage(template, args))
 }
 
-func (l *loggerCtx) Errorf(template string, args ...interface{}) {
+func (l *loggerCtx) Errorf(template string, args ...any) {
 	l.logger.Error(l.getMessage(template, args))
 }
 
-func (l *loggerCtx) InfofCtx(ctx context.Context, template string, args ...interface{}) {
+func (l *loggerCtx) InfofCtx(ctx context.Context, template string, args ...any) {
 	l.logger.Info(l.getMessage(template, args), l.getExtraFields(ctx)...)
 }
 
-func (l *loggerCtx) WarnfCtx(ctx context.Context, template string, args ...interface{}) {
+func (l *loggerCtx) WarnfCtx(ctx context.Context, template string, args ...any) {
 	l.logger.Warn(l.getMessage(template, args), l.getExtraFields(ctx)...)
 }
 
-func (l *loggerCtx) ErrorfCtx(ctx context.Context, template string, args ...interface{}) {
+func (l *loggerCtx) ErrorfCtx(ctx context.Context, template string, args ...any) {
 	l.logger.Error(l.getMessage(template, args), l.getExtraFields(ctx)...)
 }
 
-func (l *loggerCtx) Debug(args ...interface{}) {
+func (l *loggerCtx) Debug(args ...any) {
 	l.logger.Debug(l.getMessage("", args))
 }
 
-func (l *loggerCtx) DebugCtx(ctx context.Context, template string, args ...interface{}) {
+func (l *loggerCtx) DebugCtx(ctx context.Context, template string, args ...any) {
 	l.logger.Debug(l.getMessage(template, args), l.getExtraFields(ctx)...)
 }
 
-func (l *loggerCtx) Error(args ...interface{}) {
+func (l *loggerCtx) Error(args ...any) {
 	l.logger.Error(l.getMessage("", args))
 }
 
-func (l *loggerCtx) ErrorCtx(ctx context.Context, template string, args ...interface{}) {
+func (l *loggerCtx) ErrorCtx(ctx context.Context, template string, args ...any) {
 	l.logger.Error(l.getMessage(template, args), l.getExtraFields(ctx)...)
 }
 
-func (l *loggerCtx) Info(args ...interface{}) {
+func (l *loggerCtx) Info(args ...any) {
 	l.logger.Info(l.getMessage("", args))
 }
 
-func (l *loggerCtx) InfoCtx(ctx context.Context, template string, args ...interface{}) {
+func (l *loggerCtx) InfoCtx(ctx context.Context, template string, args ...any) {
 	l.logger.Info(l.getMessage(template, args), l.getExtraFields(ctx)...)
 }
 
-func (l *loggerCtx) Warn(args ...interface{}) {
+func (l *loggerCtx) Warn(args ...any) {
 	l.logger.Warn(l.getMessage("", args))
 }
 
-func (l *loggerCtx) WarnCtx(ctx context.Context, template string, args ...interface{}) {
+func (l *loggerCtx) WarnCtx(ctx context.Context, template string, args ...any) {
 	l.logger.Warn(l.getMessage("", args), l.getExtraFields(ctx)...)
 }
 

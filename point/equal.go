@@ -9,6 +9,7 @@ import (
 	"crypto/md5" //nolint:gosec
 	"crypto/sha256"
 	"fmt"
+	"slices"
 	"sort"
 )
 
@@ -20,13 +21,7 @@ type eqopt struct {
 }
 
 func (o *eqopt) keyExlcuded(key string) bool {
-	for _, k := range o.excludeKeys {
-		if k == key {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(o.excludeKeys, key)
 }
 
 func (o *eqopt) kvsEq(l, r KVs) (bool, string) {

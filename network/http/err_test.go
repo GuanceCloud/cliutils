@@ -112,7 +112,7 @@ func TestHTTPErr(t *testing.T) {
 	router := gin.New()
 	g := router.Group("")
 
-	okbody := map[string]interface{}{
+	okbody := map[string]any{
 		"data1": 1,
 		"data2": "abc",
 	}
@@ -205,7 +205,7 @@ func TestHTTPErr(t *testing.T) {
 			u: "http://localhost:8090/ok2",
 			expect: func() string {
 				x := struct {
-					Content interface{} `json:"content"`
+					Content any `json:"content"`
 				}{
 					Content: okbody,
 				}
@@ -226,7 +226,7 @@ func TestHTTPErr(t *testing.T) {
 			u: "http://localhost:8090/errfmsg-with-nil-args",
 			expect: func() string {
 				msg := `{"error_code":"reachMaxAPIRateLimit","message":"Errorf without args"}`
-				var x interface{}
+				var x any
 				if err := json.Unmarshal([]byte(msg), &x); err != nil {
 					t.Fatal(err)
 				}
@@ -268,7 +268,7 @@ func TestHTTPErr(t *testing.T) {
 }
 
 func TestErrorf(t *testing.T) {
-	var nilArgs []interface{} = nil
+	var nilArgs []any = nil
 	format := "sprintf with nil args"
 	str := fmt.Sprintf(format, nilArgs...)
 	fmt.Println(str)

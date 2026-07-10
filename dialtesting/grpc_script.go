@@ -102,7 +102,7 @@ func runPipelineGRPC(script string, response *ScriptGRPCRequestResponse, vars *V
 	}
 	messageString := string(messageBytes)
 
-	fileds := map[string]interface{}{
+	fileds := map[string]any{
 		"message": messageString,
 	}
 
