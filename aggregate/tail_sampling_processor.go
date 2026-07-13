@@ -163,7 +163,6 @@ func (r *TailSamplingProcessor) TailSamplingOutcomes(dataGroups map[uint64]*Data
 		if packetForMetrics != nil {
 			r.collector.Add(r.filterBuiltinRecords(packetForMetrics, r.metrics.OnDecision(packetForMetrics, outcome.Decision)))
 		}
-
 	}
 
 	return outcomes
