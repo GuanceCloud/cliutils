@@ -8,6 +8,9 @@ package diskcache
 import (
 	"bytes"
 	"errors"
+	"os"
+	"path/filepath"
+	"runtime"
 	T "testing"
 
 	"github.com/stretchr/testify/assert"
@@ -121,4 +124,63 @@ func TestRotate(t *T.T) {
 			ResetMetrics()
 		})
 	})
+}
+
+func TestRotateRecoverWriteFileOnRenameFailure(t *T.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("removing an open file is not supported on windows")
+	}
+
+	p := t.TempDir()
+	c, err := Open(WithPath(p), WithBatchSize(1024*1024))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, c.Close())
+		ResetMetrics()
+	})
+
+	require.NoError(t, c.Put([]byte("before")))
+	require.NoError(t, os.Remove(c.curWriteFile))
+
+	require.Error(t, c.Rotate())
+	require.NotNil(t, c.wfd)
+	require.NoError(t, c.Put([]byte("after")))
+}
+
+func TestRotateTruncateEOFOnRenameFailure(t *T.T) {
+	p := t.TempDir()
+	c, err := Open(WithPath(p), WithBatchSize(1024*1024))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, c.Close())
+		ResetMetrics()
+	})
+
+	newfile := filepath.Join(p, "data.00000000000000000000000000000000")
+	require.NoError(t, os.Mkdir(newfile, 0o755))
+
+	before := []byte("before")
+	after := []byte("after")
+
+	require.NoError(t, c.Put(before))
+	require.Error(t, c.Rotate())
+	require.NotNil(t, c.wfd)
+
+	require.NoError(t, os.Remove(newfile))
+	require.NoError(t, c.Put(after))
+	require.NoError(t, c.Rotate())
+
+	var got [][]byte
+	for {
+		err := c.Get(func(data []byte) error {
+			got = append(got, append([]byte(nil), data...))
+			return nil
+		})
+		if errors.Is(err, ErrNoData) {
+			break
+		}
+		require.NoError(t, err)
+	}
+
+	require.Equal(t, [][]byte{before, after}, got)
 }
