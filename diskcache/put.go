@@ -51,22 +51,26 @@ func (c *DiskCache) Put(data []byte) error {
 			fmt.Sprintf("max_size=%d, actual_size=%d", c.maxDataSize, len(data)))
 	}
 
+	if err := c.ensureWriteFile(); err != nil {
+		return WrapPutError(err, c.path, len(data)).WithDetails("failed_to_open_write_file")
+	}
+
 	hdr := make([]byte, dataHeaderLen)
 
 	binary.LittleEndian.PutUint32(hdr, uint32(len(data)))
 	if _, err := c.wfd.Write(hdr); err != nil {
-		return WrapFileOperationError(OpWrite, err, c.path, c.wfd.Name()).
+		return WrapFileOperationError(OpWrite, err, c.path, c.writeFileName()).
 			WithDetails("failed_to_write_header")
 	}
 
 	if _, err := c.wfd.Write(data); err != nil {
-		return WrapFileOperationError(OpWrite, err, c.path, c.wfd.Name()).
+		return WrapFileOperationError(OpWrite, err, c.path, c.writeFileName()).
 			WithDetails("failed_to_write_data")
 	}
 
 	if !c.noSync {
 		if err := c.wfd.Sync(); err != nil {
-			return WrapFileOperationError(OpSync, err, c.path, c.wfd.Name()).
+			return WrapFileOperationError(OpSync, err, c.path, c.writeFileName()).
 				WithDetails("failed_to_sync_write")
 		}
 	}
@@ -116,15 +120,20 @@ func (c *DiskCache) StreamPut(r io.Reader, size int) error {
 			fmt.Sprintf("size_exceeded: max=%d, actual=%d", c.maxDataSize, size)).WithPath(c.path)
 	}
 
+	if err := c.ensureWriteFile(); err != nil {
+		return NewCacheError(OpStreamPut, err, "failed_to_open_write_file").
+			WithPath(c.path)
+	}
+
 	if startOffset, err = c.wfd.Seek(0, io.SeekCurrent); err != nil {
-		return WrapFileOperationError(OpSeek, err, c.path, c.wfd.Name()).
+		return WrapFileOperationError(OpSeek, err, c.path, c.writeFileName()).
 			WithDetails("failed_to_get_current_position")
 	}
 
 	defer func() {
 		if total > 0 && err != nil { // fallback to origin position
 			if _, serr := c.wfd.Seek(startOffset, io.SeekStart); serr != nil {
-				c.LastErr = WrapFileOperationError(OpSeek, serr, c.path, c.wfd.Name()).
+				c.LastErr = WrapFileOperationError(OpSeek, serr, c.path, c.writeFileName()).
 					WithDetails(fmt.Sprintf("failed_to_fallback_to_position_%d", startOffset))
 			}
 		}
@@ -135,7 +144,7 @@ func (c *DiskCache) StreamPut(r io.Reader, size int) error {
 	if size > 0 {
 		binary.LittleEndian.PutUint32(c.batchHeader, uint32(size))
 		if _, err := c.wfd.Write(c.batchHeader); err != nil {
-			return WrapFileOperationError(OpWrite, err, c.path, c.wfd.Name()).
+			return WrapFileOperationError(OpWrite, err, c.path, c.writeFileName()).
 				WithDetails("failed_to_write_stream_header")
 		}
 	}
