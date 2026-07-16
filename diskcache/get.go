@@ -13,7 +13,8 @@ import (
 	"time"
 )
 
-// Fn is the handler to eat cache from diskcache.
+// Fn is the handler to consume data from diskcache.
+// A callback must not synchronously call methods on the same DiskCache.
 type Fn func([]byte) error
 
 func (c *DiskCache) switchNextFile() error {
@@ -51,6 +52,8 @@ func (c *DiskCache) Get(fn Fn) error {
 	return c.doGet(nil, fn, nil)
 }
 
+// BufFunc supplies a buffer for BufCallbackGet.
+// A callback must not synchronously call methods on the same DiskCache.
 type BufFunc func() []byte
 
 // BufCallbackGet fetch new data from disk cache, and read into buffer that returned by bfn.
@@ -69,6 +72,13 @@ func (c *DiskCache) doGet(buf []byte, fn Fn, bfn BufFunc) error {
 		n, nbytes int
 		err       error
 	)
+
+	c.lifecycleMu.RLock()
+	defer c.lifecycleMu.RUnlock()
+
+	if c.closed {
+		return WrapGetError(ErrClosed, c.path, "")
+	}
 
 	c.rlock.Lock()
 	defer c.rlock.Unlock()

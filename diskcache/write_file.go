@@ -24,6 +24,10 @@ func (c *DiskCache) readFileName() string {
 }
 
 func (c *DiskCache) ensureWriteFile() error {
+	if c.closed {
+		return ErrClosed
+	}
+
 	if c.wfd != nil {
 		return nil
 	}

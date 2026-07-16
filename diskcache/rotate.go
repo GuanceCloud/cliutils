@@ -21,6 +21,13 @@ import (
 // NOTE: You do not need to call Rotate() during daily usage, we export
 // that function for testing cases.
 func (c *DiskCache) Rotate() error {
+	c.lifecycleMu.RLock()
+	defer c.lifecycleMu.RUnlock()
+
+	if c.closed {
+		return NewCacheError(OpRotate, ErrClosed, "cache_closed").WithPath(c.path)
+	}
+
 	return c.rotate()
 }
 
