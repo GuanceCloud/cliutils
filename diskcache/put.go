@@ -24,6 +24,13 @@ func (c *DiskCache) IsFull(newData []byte) bool {
 func (c *DiskCache) Put(data []byte) error {
 	start := time.Now() // count time before lock
 
+	c.lifecycleMu.RLock()
+	defer c.lifecycleMu.RUnlock()
+
+	if c.closed {
+		return WrapPutError(ErrClosed, c.path, len(data))
+	}
+
 	c.wlock.Lock()
 	defer c.wlock.Unlock()
 
@@ -92,6 +99,7 @@ func (c *DiskCache) Put(data []byte) error {
 //
 // If we read the data from some network stream(such as HTTP response body),
 // we can use StreamPut to avoid a intermediate buffer to accept the huge(may be) body.
+// The reader must not synchronously call methods on the same DiskCache.
 func (c *DiskCache) StreamPut(r io.Reader, size int) error {
 	var (
 		//nolint:ineffassign
@@ -100,6 +108,13 @@ func (c *DiskCache) StreamPut(r io.Reader, size int) error {
 		startOffset int64
 		start       = time.Now()
 	)
+
+	c.lifecycleMu.RLock()
+	defer c.lifecycleMu.RUnlock()
+
+	if c.closed {
+		return NewCacheError(OpStreamPut, ErrClosed, "cache_closed").WithPath(c.path)
+	}
 
 	if size <= 0 {
 		return NewCacheError(OpStreamPut, ErrInvalidStreamSize,

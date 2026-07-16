@@ -16,7 +16,7 @@ import (
 )
 
 func TestLockUnlock(t *T.T) {
-	t.Run("unlock-remove", func(t *T.T) {
+	t.Run("unlock-keeps-lock-file", func(t *T.T) {
 		p := t.TempDir()
 		fl := newFlock(p)
 
@@ -28,10 +28,10 @@ func TestLockUnlock(t *T.T) {
 		assert.NoError(t, err)
 		t.Logf("fi: %+#v", fi)
 
-		fl.unlock()
+		assert.NoError(t, fl.unlock())
 
 		_, err = os.Stat(filepath.Join(p, ".lock"))
-		assert.Error(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("lock", func(t *T.T) {
@@ -48,7 +48,9 @@ func TestLockUnlock(t *T.T) {
 
 			assert.True(t, ok)
 			assert.NoError(t, err)
-			defer fl.unlock()
+			defer func() {
+				assert.NoError(t, fl.unlock())
+			}()
 
 			time.Sleep(time.Second * 5)
 		}()

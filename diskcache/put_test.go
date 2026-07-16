@@ -7,6 +7,7 @@ package diskcache
 
 import (
 	"errors"
+	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -481,4 +482,125 @@ func TestStreamPut(t *T.T) {
 			ResetMetrics()
 		})
 	})
+}
+
+type gatedReader struct {
+	reader  io.Reader
+	started chan struct{}
+	release <-chan struct{}
+	once    sync.Once
+}
+
+func (r *gatedReader) Read(p []byte) (int, error) {
+	r.once.Do(func() {
+		close(r.started)
+		<-r.release
+	})
+
+	return r.reader.Read(p)
+}
+
+func TestCloseWaitsForInFlightStreamPut(t *T.T) {
+	p := t.TempDir()
+	c, err := Open(WithPath(p), WithNoSync(true), WithNoPos(true))
+	require.NoError(t, err)
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseReader := func() {
+		releaseOnce.Do(func() {
+			close(release)
+		})
+	}
+	t.Cleanup(releaseReader)
+	reader := &gatedReader{
+		reader:  strings.NewReader("in-flight"),
+		started: started,
+		release: release,
+	}
+
+	putDone := make(chan error, 1)
+	go func() {
+		putDone <- c.StreamPut(reader, len("in-flight"))
+	}()
+	<-started
+
+	closeDone := make(chan error, 1)
+	go func() {
+		closeDone <- c.Close()
+	}()
+	requireLifecycleWriter(t, c)
+
+	select {
+	case err := <-closeDone:
+		releaseReader()
+		require.NoError(t, <-putDone)
+		require.Failf(t, "Close returned before StreamPut finished", "Close error: %v", err)
+	default:
+	}
+
+	releaseReader()
+	require.NoError(t, <-putDone)
+	require.NoError(t, <-closeDone)
+	require.ErrorIs(t, c.StreamPut(strings.NewReader("late"), len("late")), ErrClosed)
+
+	ResetMetrics()
+}
+
+func TestCloseWaitsForInFlightPut(t *T.T) {
+	p := t.TempDir()
+	c, err := Open(WithPath(p), WithNoSync(true), WithNoPos(true))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = c.Close()
+		ResetMetrics()
+	})
+
+	c.wlock.Lock()
+	wlockHeld := true
+	t.Cleanup(func() {
+		if wlockHeld {
+			c.wlock.Unlock()
+		}
+	})
+
+	putStarted := make(chan struct{})
+	putDone := make(chan error, 1)
+	go func() {
+		close(putStarted)
+		putDone <- c.Put([]byte("in-flight"))
+	}()
+	<-putStarted
+
+	require.Eventually(t, func() bool {
+		if c.lifecycleMu.TryLock() {
+			c.lifecycleMu.Unlock()
+			return false
+		}
+		return true
+	}, time.Second, time.Millisecond)
+
+	closeDone := make(chan error, 1)
+	go func() {
+		closeDone <- c.Close()
+	}()
+	requireLifecycleWriter(t, c)
+
+	c.wlock.Unlock()
+	wlockHeld = false
+	require.NoError(t, <-putDone)
+	require.NoError(t, <-closeDone)
+	require.ErrorIs(t, c.Put([]byte("late")), ErrClosed)
+}
+
+func requireLifecycleWriter(t *T.T, c *DiskCache) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		if c.lifecycleMu.TryRLock() {
+			c.lifecycleMu.RUnlock()
+			return false
+		}
+		return true
+	}, time.Second, time.Millisecond)
 }
