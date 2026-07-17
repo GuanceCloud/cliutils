@@ -17,6 +17,8 @@ import (
 type StateKind string
 
 const (
+	// StateKindPending accounts for packets retained by a caller before tail-sampling configuration is ready.
+	StateKindPending StateKind = "pending"
 	// StateKindTailSamplingConfig accounts for initialized tail-sampling configuration.
 	StateKindTailSamplingConfig StateKind = "tail_sampling_config"
 	// StateKindTailSamplingGroup accounts for one active tail-sampling group.
