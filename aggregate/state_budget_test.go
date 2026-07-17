@@ -80,6 +80,37 @@ func TestStateBudgetObserveRecordsWouldRejectAndKeepsUsage(t *testing.T) {
 	assert.Equal(t, StateCost{Bytes: 11, Objects: 1}, snapshot.Total.Cost)
 	assert.EqualValues(t, 1, snapshot.Total.WouldRejected)
 	assert.EqualValues(t, 1, snapshot.ByKind[StateKindAggregationWindow].WouldRejected)
+	assert.EqualValues(t, 1, snapshot.Total.WouldRejectedByScope[StateBudgetScopeProcess])
+	assert.EqualValues(t, 1, snapshot.ByKind[StateKindAggregationWindow].WouldRejectedByScope[StateBudgetScopeProcess])
+}
+
+func TestStateBudgetSnapshotTracksPeakAndRejectionScope(t *testing.T) {
+	budget := NewStateBudget(StateBudgetConfig{
+		Mode:    StateBudgetEnforce,
+		Process: StateLimit{MaxBytes: 10},
+	})
+
+	lease, err := budget.Reserve(StateReservation{
+		Workspace: "workspace-a",
+		Kind:      StateKindTailSamplingPayload,
+		Cost:      StateCost{Bytes: 10, Objects: 1},
+	})
+	require.Nil(t, err)
+
+	_, err = budget.Reserve(StateReservation{
+		Workspace: "workspace-a",
+		Kind:      StateKindTailSamplingPayload,
+		Cost:      StateCost{Bytes: 1, Objects: 1},
+	})
+	require.NotNil(t, err)
+	assert.Equal(t, StateBudgetScopeProcess, err.Scope)
+
+	budget.Release(lease)
+	snapshot := budget.Snapshot()
+	assert.Equal(t, StateCost{}, snapshot.Total.Cost)
+	assert.Equal(t, StateCost{Bytes: 10, Objects: 1}, snapshot.Total.PeakCost)
+	assert.EqualValues(t, 1, snapshot.Total.RejectedByScope[StateBudgetScopeProcess])
+	assert.EqualValues(t, 1, snapshot.ByKind[StateKindTailSamplingPayload].RejectedByScope[StateBudgetScopeProcess])
 }
 
 func TestStateBudgetResizeReleasedLease(t *testing.T) {

@@ -127,9 +127,12 @@ func (e *StateBudgetError) Error() string {
 
 // StateUsage contains aggregate state usage without high-cardinality identifiers.
 type StateUsage struct {
-	Cost          StateCost
-	Rejected      uint64
-	WouldRejected uint64
+	Cost                 StateCost
+	PeakCost             StateCost
+	Rejected             uint64
+	WouldRejected        uint64
+	RejectedByScope      map[StateBudgetScope]uint64
+	WouldRejectedByScope map[StateBudgetScope]uint64
 }
 
 // StateBudgetSnapshot is safe to expose to metrics collectors. Workspace usage
@@ -197,7 +200,7 @@ func (b *stateBudget) Reserve(reservation StateReservation) (*StateLease, *State
 	defer b.lock.Unlock()
 
 	if rejection := b.rejectionLocked(reservation, reservation.Cost, reservation.Cost); rejection != nil {
-		b.recordRejectionLocked(reservation.Kind)
+		b.recordRejectionLocked(reservation.Kind, rejection.Scope)
 		if b.cfg.Mode == StateBudgetEnforce {
 			return nil, rejection
 		}
@@ -228,7 +231,7 @@ func (b *stateBudget) Resize(lease *StateLease, cost StateCost) *StateBudgetErro
 	delta := StateCost{Bytes: cost.Bytes - lease.reservation.Cost.Bytes, Objects: cost.Objects - lease.reservation.Cost.Objects}
 	if delta.Bytes > 0 || delta.Objects > 0 {
 		if rejection := b.rejectionLocked(lease.reservation, delta, cost); rejection != nil {
-			b.recordRejectionLocked(lease.reservation.Kind)
+			b.recordRejectionLocked(lease.reservation.Kind, rejection.Scope)
 			if b.cfg.Mode == StateBudgetEnforce {
 				return rejection
 			}
@@ -260,8 +263,10 @@ func (b *stateBudget) Snapshot() StateBudgetSnapshot {
 	defer b.lock.Unlock()
 
 	byKind := make(map[StateKind]StateUsage, len(b.byKind))
-	maps.Copy(byKind, b.byKind)
-	return StateBudgetSnapshot{Total: b.total, ByKind: byKind}
+	for kind, usage := range b.byKind {
+		byKind[kind] = cloneStateUsage(usage)
+	}
+	return StateBudgetSnapshot{Total: cloneStateUsage(b.total), ByKind: byKind}
 }
 
 func (b *stateBudget) rejectionLocked(reservation StateReservation, delta, requested StateCost) *StateBudgetError {
@@ -329,23 +334,41 @@ func stateBudgetError(limitErr *stateLimitError, reservation StateReservation, r
 	}
 }
 
-func (b *stateBudget) recordRejectionLocked(kind StateKind) {
+func (b *stateBudget) recordRejectionLocked(kind StateKind, scope StateBudgetScope) {
 	usage := b.byKind[kind]
 	if b.cfg.Mode == StateBudgetEnforce {
 		usage.Rejected++
+		if usage.RejectedByScope == nil {
+			usage.RejectedByScope = make(map[StateBudgetScope]uint64)
+		}
+		usage.RejectedByScope[scope]++
 		b.total.Rejected++
+		if b.total.RejectedByScope == nil {
+			b.total.RejectedByScope = make(map[StateBudgetScope]uint64)
+		}
+		b.total.RejectedByScope[scope]++
 	} else {
 		usage.WouldRejected++
+		if usage.WouldRejectedByScope == nil {
+			usage.WouldRejectedByScope = make(map[StateBudgetScope]uint64)
+		}
+		usage.WouldRejectedByScope[scope]++
 		b.total.WouldRejected++
+		if b.total.WouldRejectedByScope == nil {
+			b.total.WouldRejectedByScope = make(map[StateBudgetScope]uint64)
+		}
+		b.total.WouldRejectedByScope[scope]++
 	}
 	b.byKind[kind] = usage
 }
 
 func (b *stateBudget) addUsageLocked(reservation StateReservation, delta StateCost) {
 	b.total.Cost = addSignedCost(b.total.Cost, delta)
+	b.total.PeakCost = maxStateCost(b.total.PeakCost, b.total.Cost)
 
 	kindUsage := b.byKind[reservation.Kind]
 	kindUsage.Cost = addSignedCost(kindUsage.Cost, delta)
+	kindUsage.PeakCost = maxStateCost(kindUsage.PeakCost, kindUsage.Cost)
 	b.byKind[reservation.Kind] = kindUsage
 
 	workspaceUsage := addSignedCost(b.byWorkspace[reservation.Workspace], delta)
@@ -380,6 +403,16 @@ func addSignedCost(current, delta StateCost) StateCost {
 		Bytes:   maxInt64(0, current.Bytes+delta.Bytes),
 		Objects: maxInt64(0, current.Objects+delta.Objects),
 	}
+}
+
+func maxStateCost(left, right StateCost) StateCost {
+	return StateCost{Bytes: maxInt64(left.Bytes, right.Bytes), Objects: maxInt64(left.Objects, right.Objects)}
+}
+
+func cloneStateUsage(usage StateUsage) StateUsage {
+	usage.RejectedByScope = maps.Clone(usage.RejectedByScope)
+	usage.WouldRejectedByScope = maps.Clone(usage.WouldRejectedByScope)
+	return usage
 }
 
 func maxInt64(left, right int64) int64 {
