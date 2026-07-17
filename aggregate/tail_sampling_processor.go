@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package aggregate
 
 import (
@@ -46,8 +51,18 @@ type TailSamplingProcessor struct {
 }
 
 func NewDefaultTailSamplingProcessor(shardCount int, waitTime time.Duration) *TailSamplingProcessor {
+	return NewDefaultTailSamplingProcessorWithStateBudget(shardCount, waitTime, nil)
+}
+
+// NewDefaultTailSamplingProcessorWithStateBudget creates the default processor
+// with optional state admission. A nil budget preserves the legacy unlimited mode.
+func NewDefaultTailSamplingProcessorWithStateBudget(
+	shardCount int,
+	waitTime time.Duration,
+	budget StateBudget,
+) *TailSamplingProcessor {
 	return &TailSamplingProcessor{
-		sampler:   NewGlobalSampler(shardCount, waitTime),
+		sampler:   NewGlobalSamplerWithStateBudget(shardCount, waitTime, budget),
 		collector: NewDerivedMetricCollector(DefaultDerivedMetricFlushWindow),
 		metrics:   DefaultTailSamplingBuiltinMetrics(),
 	}
@@ -106,6 +121,32 @@ func (r *TailSamplingProcessor) IngestPacket(packet *DataPacket) {
 	if r.sampler != nil {
 		r.sampler.Ingest(packet)
 	}
+}
+
+// IngestPacketWithResult inserts a packet and exposes a state-budget rejection
+// to callers that can make an explicit backpressure decision. Built-in ingest
+// metrics are only recorded after state admission succeeds.
+func (r *TailSamplingProcessor) IngestPacketWithResult(packet *DataPacket) TailSamplingIngestResult {
+	if r == nil || packet == nil || r.sampler == nil {
+		return TailSamplingIngestResult{}
+	}
+
+	result := r.sampler.IngestWithResult(packet)
+	if !result.Accepted {
+		return result
+	}
+	if r.collector != nil && len(r.metrics) > 0 {
+		r.collector.Add(r.filterBuiltinRecords(packet, r.metrics.OnIngest(packet)))
+	}
+	return result
+}
+
+// Close releases state held by the sampler and its derived metric collector.
+func (r *TailSamplingProcessor) Close() {
+	if r == nil || r.sampler == nil {
+		return
+	}
+	r.sampler.Close()
 }
 
 func (r *TailSamplingProcessor) AdvanceTime() map[uint64]*DataGroup {
