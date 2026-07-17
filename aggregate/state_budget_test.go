@@ -92,3 +92,20 @@ func TestStateBudgetResizeReleasedLease(t *testing.T) {
 	require.NotNil(t, err)
 	assert.Equal(t, StateBudgetScopeReleasedLease, err.Scope)
 }
+
+func TestStateBudgetEnforcesIndividualReservation(t *testing.T) {
+	budget := NewStateBudget(StateBudgetConfig{
+		Mode: StateBudgetEnforce,
+		Kinds: map[StateKind]StateLimit{
+			StateKindTailSamplingPayload: {MaxBytesPerReservation: 10},
+		},
+	})
+
+	_, err := budget.Reserve(StateReservation{
+		Workspace: "workspace-a",
+		Kind:      StateKindTailSamplingPayload,
+		Cost:      StateCost{Bytes: 11},
+	})
+	require.NotNil(t, err)
+	assert.Equal(t, StateBudgetScopeObject, err.Scope)
+}

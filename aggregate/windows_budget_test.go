@@ -17,8 +17,8 @@ import (
 func TestCacheStateBudgetDropsWholeAggregationWindow(t *testing.T) {
 	budget := NewStateBudget(StateBudgetConfig{
 		Mode: StateBudgetEnforce,
-		WorkspaceKindLimit: map[StateKind]StateLimit{
-			StateKindAggregationCalculator: {MaxObjects: 1},
+		Kinds: map[StateKind]StateLimit{
+			StateKindAggregationCalculator: {MaxObjectsPerReservation: 1},
 		},
 	})
 	cache := NewCacheWithOptions(time.Second, CacheOptions{StateBudget: budget})
@@ -28,6 +28,7 @@ func TestCacheStateBudgetDropsWholeAggregationWindow(t *testing.T) {
 	assert.Equal(t, 1, cache.AddBatchWithResult("token-a", first).Accepted)
 	result := cache.AddBatchWithResult("token-a", second)
 	require.NotNil(t, result.Rejection)
+	assert.Equal(t, StateBudgetScopeObject, result.Rejection.Scope)
 	assert.Equal(t, 1, result.Dropped)
 	assert.Zero(t, result.Accepted)
 
@@ -49,7 +50,7 @@ func TestCacheStateBudgetDegradesQuantilePrecisionWithoutDroppingWindow(t *testi
 	budget := NewStateBudget(StateBudgetConfig{
 		Mode: StateBudgetEnforce,
 		Kinds: map[StateKind]StateLimit{
-			StateKindAggregationCalculator: {MaxBytes: calculatorLimit},
+			StateKindAggregationWindow: {MaxBytesPerReservation: aggregationWindowBaseBytes + calculatorLimit},
 		},
 	})
 	cache := NewCacheWithOptions(time.Second, CacheOptions{StateBudget: budget})
@@ -73,6 +74,22 @@ func TestCacheStateBudgetDegradesQuantilePrecisionWithoutDroppingWindow(t *testi
 		assert.EqualValues(t, 2, count)
 	}
 	assert.Equal(t, StateCost{}, cache.StateBudgetSnapshot().Total.Cost)
+}
+
+func TestCacheStateBudgetLimitsPointsPerWindow(t *testing.T) {
+	budget := NewStateBudget(StateBudgetConfig{
+		Mode: StateBudgetEnforce,
+		Kinds: map[StateKind]StateLimit{
+			StateKindAggregationPoint: {MaxObjectsPerReservation: 1},
+		},
+	})
+	cache := NewCacheWithOptions(time.Second, CacheOptions{StateBudget: budget})
+	batch := newAggregationBudgetBatch("latency", SUM, 10)
+	assert.Equal(t, 1, cache.AddBatchWithResult("token-a", batch).Accepted)
+	result := cache.AddBatchWithResult("token-a", batch)
+	require.NotNil(t, result.Rejection)
+	assert.Equal(t, StateBudgetScopeObject, result.Rejection.Scope)
+	assert.Equal(t, 1, result.Dropped)
 }
 
 func TestCacheStateBudgetRejectsOversizedWindowSpan(t *testing.T) {

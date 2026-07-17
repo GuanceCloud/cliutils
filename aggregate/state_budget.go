@@ -55,10 +55,15 @@ func (c StateCost) Sub(other StateCost) StateCost {
 	}
 }
 
-// StateLimit bounds bytes and objects independently. A non-positive value is unlimited.
+// StateLimit bounds aggregate usage and an individual lease independently. A
+// non-positive value is unlimited. Per-reservation limits are what let callers
+// protect one trace group or one aggregation window without converting a
+// workspace protection limit into an unfair per-tenant minimum.
 type StateLimit struct {
-	MaxBytes   int64
-	MaxObjects int64
+	MaxBytes                 int64
+	MaxObjects               int64
+	MaxBytesPerReservation   int64
+	MaxObjectsPerReservation int64
 }
 
 // StateBudgetMode decides whether excess state is admitted for observation or rejected.
@@ -97,6 +102,7 @@ const (
 	StateBudgetScopeWorkspace     StateBudgetScope = "workspace"
 	StateBudgetScopeKind          StateBudgetScope = "kind"
 	StateBudgetScopeWorkspaceKind StateBudgetScope = "workspace_kind"
+	StateBudgetScopeObject        StateBudgetScope = "object"
 	StateBudgetScopeReleasedLease StateBudgetScope = "released_lease"
 )
 
@@ -258,6 +264,12 @@ func (b *stateBudget) Snapshot() StateBudgetSnapshot {
 
 func (b *stateBudget) rejectionLocked(reservation StateReservation, delta, requested StateCost) *StateBudgetError {
 	requested = normalizeStateCost(requested)
+	if err := checkReservationLimit(b.cfg.Kinds[reservation.Kind], requested); err != nil {
+		return stateBudgetError(err, reservation, requested)
+	}
+	if err := checkReservationLimit(b.cfg.WorkspaceKindLimit[reservation.Kind], requested); err != nil {
+		return stateBudgetError(err, reservation, requested)
+	}
 	if err := checkStateLimit(StateBudgetScopeProcess, b.cfg.Process, b.total.Cost, delta); err != nil {
 		return stateBudgetError(err, reservation, requested)
 	}
@@ -291,6 +303,16 @@ func checkStateLimit(scope StateBudgetScope, limit StateLimit, current, delta St
 	}
 	if limit.MaxObjects > 0 && current.Objects+delta.Objects > limit.MaxObjects {
 		return &stateLimitError{scope: scope, limit: limit, current: current}
+	}
+	return nil
+}
+
+func checkReservationLimit(limit StateLimit, requested StateCost) *stateLimitError {
+	if limit.MaxBytesPerReservation > 0 && requested.Bytes > limit.MaxBytesPerReservation {
+		return &stateLimitError{scope: StateBudgetScopeObject, limit: limit}
+	}
+	if limit.MaxObjectsPerReservation > 0 && requested.Objects > limit.MaxObjectsPerReservation {
+		return &stateLimitError{scope: StateBudgetScopeObject, limit: limit}
 	}
 	return nil
 }

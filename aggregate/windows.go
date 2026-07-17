@@ -52,13 +52,13 @@ type Window struct {
 	cache map[uint64]Calculator
 	Token string // 用户唯一标记
 
-	budget      StateBudget
-	windowLease *StateLease
-	pointLease  *StateLease
-	calcLeases  map[uint64]*StateLease
-	calcCosts   map[uint64]StateCost
-	dropped     bool
-	rejection   *StateBudgetError
+	budget          StateBudget
+	windowLease     *StateLease
+	calculatorLease *StateLease
+	pointLease      *StateLease
+	calcCosts       map[uint64]StateCost
+	dropped         bool
+	rejection       *StateBudgetError
 }
 
 // Reset prepares a window for reuse. It also releases any state that remains
@@ -74,8 +74,8 @@ func (w *Window) resetLocked() {
 	w.Token = ""
 	w.budget = nil
 	w.windowLease = nil
+	w.calculatorLease = nil
 	w.pointLease = nil
-	w.calcLeases = nil
 	w.calcCosts = nil
 	w.dropped = false
 	w.rejection = nil
@@ -118,19 +118,20 @@ func (w *Window) addCal(cal Calculator) windowAdmissionResult {
 	}
 
 	cost := estimateCalculatorCost(cal)
-	lease, rejection := w.reserveCalculatorLocked(cost)
-	if rejection != nil {
+	if rejection := w.reserveCalculatorLocked(); rejection != nil {
+		w.dropLocked(rejection)
+		return windowAdmissionResult{dropped: true, newlyDropped: true, rejection: rejection}
+	}
+	if rejection := w.resizeWindowLeaseLocked(w.currentWindowBytesLocked() + cost.Bytes); rejection != nil {
 		w.dropLocked(rejection)
 		return windowAdmissionResult{dropped: true, newlyDropped: true, rejection: rejection}
 	}
 	cal.Base().build()
 	w.cache[calcHash] = cal
-	if lease != nil {
-		if w.calcLeases == nil {
-			w.calcLeases = make(map[uint64]*StateLease)
+	if w.budget != nil {
+		if w.calcCosts == nil {
 			w.calcCosts = make(map[uint64]StateCost)
 		}
-		w.calcLeases[calcHash] = lease
 		w.calcCosts[calcHash] = cost
 	}
 	return windowAdmissionResult{accepted: true}
@@ -142,8 +143,9 @@ func (w *Window) mergeCalculatorLocked(existing, incoming Calculator, calcHash u
 		current = estimateCalculatorCost(existing)
 	}
 	next, precisionSensitive := calculatorNextCost(existing, incoming, current)
-	if lease := w.calcLeases[calcHash]; lease != nil && next != current {
-		if rejection := w.budget.Resize(lease, next); rejection != nil {
+	if w.budget != nil && next != current {
+		windowBytes := w.currentWindowBytesLocked() - current.Bytes + next.Bytes
+		if rejection := w.resizeWindowLeaseLocked(windowBytes); rejection != nil {
 			if precisionSensitive {
 				mergeCalculatorWithDegradedPrecision(existing, incoming)
 				return windowAdmissionResult{accepted: true, precisionDegraded: true, rejection: rejection}
@@ -178,28 +180,58 @@ func (w *Window) reservePointLocked() *StateBudgetError {
 	return w.budget.Resize(w.pointLease, cost)
 }
 
-func (w *Window) reserveCalculatorLocked(cost StateCost) (*StateLease, *StateBudgetError) {
+func (w *Window) reserveCalculatorLocked() *StateBudgetError {
 	if w.budget == nil {
-		return nil, nil
+		return nil
 	}
-	return w.budget.Reserve(StateReservation{
-		Workspace: w.Token,
-		Kind:      StateKindAggregationCalculator,
-		Cost:      cost,
-	})
+	if w.calculatorLease == nil {
+		lease, rejection := w.budget.Reserve(StateReservation{
+			Workspace: w.Token,
+			Kind:      StateKindAggregationCalculator,
+			Cost:      StateCost{Objects: 1},
+		})
+		if rejection != nil {
+			return rejection
+		}
+		w.calculatorLease = lease
+		return nil
+	}
+	cost := w.calculatorLease.Reservation().Cost
+	cost.Objects++
+	return w.budget.Resize(w.calculatorLease, cost)
+}
+
+func (w *Window) resizeWindowLeaseLocked(bytes int64) *StateBudgetError {
+	if w.budget == nil || w.windowLease == nil {
+		return nil
+	}
+	cost := w.windowLease.Reservation().Cost
+	cost.Bytes = bytes
+	return w.budget.Resize(w.windowLease, cost)
+}
+
+func (w *Window) currentWindowBytesLocked() int64 {
+	if w.windowLease != nil {
+		return w.windowLease.Reservation().Cost.Bytes
+	}
+	bytes := int64(aggregationWindowBaseBytes)
+	for _, cost := range w.calcCosts {
+		bytes += cost.Bytes
+	}
+	return bytes
 }
 
 func (w *Window) dropLocked(rejection *StateBudgetError) {
 	w.dropped = true
 	w.rejection = rejection
 	if w.budget != nil {
+		w.budget.Release(w.windowLease)
+		w.budget.Release(w.calculatorLease)
 		w.budget.Release(w.pointLease)
-		for _, lease := range w.calcLeases {
-			w.budget.Release(lease)
-		}
 	}
+	w.windowLease = nil
+	w.calculatorLease = nil
 	w.pointLease = nil
-	w.calcLeases = nil
 	w.calcCosts = nil
 	for key := range w.cache {
 		delete(w.cache, key)
@@ -209,10 +241,8 @@ func (w *Window) dropLocked(rejection *StateBudgetError) {
 func (w *Window) releaseStateLocked() {
 	if w.budget != nil {
 		w.budget.Release(w.windowLease)
+		w.budget.Release(w.calculatorLease)
 		w.budget.Release(w.pointLease)
-		for _, lease := range w.calcLeases {
-			w.budget.Release(lease)
-		}
 	}
 }
 

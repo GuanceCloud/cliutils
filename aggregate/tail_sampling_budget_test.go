@@ -17,8 +17,8 @@ import (
 func TestGlobalSamplerStateBudgetDropsWholeGroupAndTombstonesIt(t *testing.T) {
 	budget := NewStateBudget(StateBudgetConfig{
 		Mode: StateBudgetEnforce,
-		WorkspaceKindLimit: map[StateKind]StateLimit{
-			StateKindTailSamplingPayload: {MaxBytes: 5},
+		Kinds: map[StateKind]StateLimit{
+			StateKindTailSamplingPayload: {MaxBytesPerReservation: 5},
 		},
 	})
 	sampler := NewGlobalSamplerWithStateBudget(1, time.Second, budget)
@@ -42,6 +42,7 @@ func TestGlobalSamplerStateBudgetDropsWholeGroupAndTombstonesIt(t *testing.T) {
 	}
 	result := sampler.IngestWithResult(second)
 	require.NotNil(t, result.Rejection)
+	assert.Equal(t, StateBudgetScopeObject, result.Rejection.Scope)
 	assert.True(t, result.Tombstoned)
 	assert.False(t, result.Accepted)
 	assert.Empty(t, sampler.shards[0].activeMap)
@@ -49,7 +50,17 @@ func TestGlobalSamplerStateBudgetDropsWholeGroupAndTombstonesIt(t *testing.T) {
 
 	result = sampler.IngestWithResult(second)
 	assert.True(t, result.Tombstoned)
-	assert.Empty(t, sampler.AdvanceTime(), "a dropped group must not reach a sampling decision")
+	otherGroup := &DataPacket{
+		GroupIdHash:   2,
+		Token:         first.Token,
+		DataType:      first.DataType,
+		GroupKey:      first.GroupKey,
+		PointsPayload: []byte("12345"),
+	}
+	assert.True(t, sampler.IngestWithResult(otherGroup).Accepted, "a group ceiling must not consume another group's quota")
+	expired := sampler.AdvanceTime()
+	require.Len(t, expired, 1, "only the accepted group may reach a sampling decision")
+	assert.Equal(t, otherGroup.GroupIdHash, expired[tailSamplingGroupMapKey(otherGroup)].packet.GroupIdHash)
 
 	snapshot := sampler.StateBudgetSnapshot()
 	assert.Equal(t, StateCost{}, snapshot.ByKind[StateKindTailSamplingGroup].Cost)
