@@ -13,24 +13,16 @@ import (
 	"sync"
 )
 
-const (
-	// A scratch map is faster than repeatedly scanning KVs once a point is this wide.
-	keyConflictMapThreshold = 16
-	// Bound scratch-map retention when callers disable the default field and tag limits.
-	keyConflictMapMaxRetainedKeys = 2048
-)
-
-var keyConflictMapPool sync.Pool
+// One pool per power-of-two size from 16 through 2048 keys.
+var keyConflictMapPools [8]sync.Pool
 
 type checker struct {
 	*cfg
-	warns            []*Warn
-	skipKeyConflicts bool
+	warns []*Warn
 }
 
 func (c *checker) reset() {
 	c.warns = c.warns[:0]
-	c.skipKeyConflicts = false
 }
 
 func (c *checker) check(pt *Point) *Point {
@@ -87,18 +79,19 @@ func (c *checker) checkKVs(kvs KVs) KVs {
 		kvs = kvs.TrimTags(c.cfg.maxTags)
 	}
 
-	c.skipKeyConflicts = canSkipKeyConflicts(kvs)
+	// PointPool operations may mutate fields still referenced by kvs, so retain
+	// the legacy conflict scans when pooling is enabled.
+	skipKeyConflicts := defaultPTPool == nil && canSkipKeyConflicts(kvs)
 
 	// check each kv valid
 	idx := 0
 	for _, kv := range kvs {
-		if x, ok := c.checkKV(kv, kvs); ok {
+		if x, ok := c.checkKV(kv, kvs, skipKeyConflicts); ok {
 			kvs[idx] = x
 			idx++
 		} else if defaultPTPool != nil {
 			// When point-pool enabled, on drop f, we should put-back to pool.
 			defaultPTPool.PutKV(x)
-			c.skipKeyConflicts = false
 		}
 	}
 
@@ -115,17 +108,11 @@ func (c *checker) checkKVs(kvs KVs) KVs {
 }
 
 // canSkipKeyConflicts keeps duplicate inputs on the legacy scan path because
-// in-place compaction and PointPool mutations make conflict order observable.
+// in-place compaction makes conflict order observable.
 func canSkipKeyConflicts(kvs KVs) bool {
-	if len(kvs) < keyConflictMapThreshold {
+	keys, pool := getKeyConflictMap(len(kvs))
+	if keys == nil {
 		return false
-	}
-
-	var keys map[string]struct{}
-	if pooled := keyConflictMapPool.Get(); pooled == nil {
-		keys = make(map[string]struct{}, min(len(kvs), keyConflictMapMaxRetainedKeys))
-	} else {
-		keys = pooled.(map[string]struct{})
 	}
 
 	unique := true
@@ -137,12 +124,43 @@ func canSkipKeyConflicts(kvs KVs) bool {
 		keys[kv.Key] = struct{}{}
 	}
 
-	clear(keys)
-	if len(kvs) <= keyConflictMapMaxRetainedKeys {
-		keyConflictMapPool.Put(keys)
+	if pool != nil {
+		clear(keys)
+		pool.Put(keys)
 	}
 
 	return unique
+}
+
+func getKeyConflictMap(size int) (map[string]struct{}, *sync.Pool) {
+	const (
+		// A scratch map is faster than repeatedly scanning KVs once a point is this wide.
+		KEY_CONFLICT_MAP_THRESHOLD = 16
+		// Bound scratch-map retention when callers disable the default field and tag limits.
+		KEY_CONFLICT_MAP_MAX_RETAINED_KEYS = 2048
+	)
+
+	if size < KEY_CONFLICT_MAP_THRESHOLD {
+		return nil, nil
+	}
+
+	if size > KEY_CONFLICT_MAP_MAX_RETAINED_KEYS {
+		return make(map[string]struct{}, KEY_CONFLICT_MAP_MAX_RETAINED_KEYS), nil
+	}
+
+	poolIndex := 0
+	poolCapacity := KEY_CONFLICT_MAP_THRESHOLD
+	for poolCapacity < size {
+		poolIndex++
+		poolCapacity *= 2
+	}
+
+	pool := &keyConflictMapPools[poolIndex]
+	if pooled := pool.Get(); pooled != nil {
+		return pooled.(map[string]struct{}), pool
+	}
+
+	return make(map[string]struct{}, poolCapacity), pool
 }
 
 // Remove all `\` suffix on key/val
@@ -159,16 +177,16 @@ func adjustKV(x string) string {
 	return x
 }
 
-func (c *checker) checkKV(f *Field, kvs KVs) (*Field, bool) {
+func (c *checker) checkKV(f *Field, kvs KVs, skipKeyConflicts bool) (*Field, bool) {
 	if f.IsTag {
-		return c.checkTag(f, kvs)
+		return c.checkTag(f, kvs, skipKeyConflicts)
 	} else {
-		return c.checkField(f, kvs)
+		return c.checkField(f, kvs, skipKeyConflicts)
 	}
 }
 
-func (c *checker) keyConflict(key string, kvs KVs) bool {
-	if c.skipKeyConflicts {
+func (c *checker) keyConflict(key string, kvs KVs, skip bool) bool {
+	if skip {
 		return false
 	}
 
@@ -189,7 +207,7 @@ func (c *checker) keyConflict(key string, kvs KVs) bool {
 
 // checkTag try to auto modify the f. If we need to drop
 // f, we return false.
-func (c *checker) checkTag(f *Field, kvs KVs) (*Field, bool) {
+func (c *checker) checkTag(f *Field, kvs KVs, skipKeyConflicts bool) (*Field, bool) {
 	if c.cfg.maxTagKeyLen > 0 && len(f.Key) > c.cfg.maxTagKeyLen {
 		c.addWarn(WarnMaxTagKeyLen,
 			fmt.Sprintf("exceed max tag key length(%d), got %d, key truncated",
@@ -234,7 +252,7 @@ func (c *checker) checkTag(f *Field, kvs KVs) (*Field, bool) {
 		return f, false
 	}
 
-	if c.keyConflict(f.Key, kvs) {
+	if c.keyConflict(f.Key, kvs, skipKeyConflicts) {
 		return f, false
 	}
 
@@ -262,7 +280,7 @@ func (c *checker) checkTag(f *Field, kvs KVs) (*Field, bool) {
 
 // checkField try to auto modify the f. If we need to drop
 // f, we return false.
-func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
+func (c *checker) checkField(f *Field, kvs KVs, skipKeyConflicts bool) (*Field, bool) {
 	// trim key
 	if c.cfg.maxFieldKeyLen > 0 && len(f.Key) > c.cfg.maxFieldKeyLen {
 		c.addWarn(WarnMaxFieldKeyLen,
@@ -303,7 +321,7 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 		return f, false
 	}
 
-	if c.keyConflict(f.Key, kvs) {
+	if c.keyConflict(f.Key, kvs, skipKeyConflicts) {
 		return f, false
 	}
 
@@ -321,7 +339,6 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 				//    `abc,tag=1 f1=32i`
 				if defaultPTPool != nil {
 					defaultPTPool.PutKV(f)
-					c.skipKeyConflicts = false
 					f = defaultPTPool.GetKV(f.Key, int64(x.U))
 				} else {
 					f.Val = &Field_I{I: int64(x.U)}

@@ -129,13 +129,15 @@ func TestCheckPoints(t *T.T) {
 }
 
 func TestCheckPointsDuplicateKeys(t *T.T) {
+	const KEY_CONFLICT_MAP_THRESHOLD = 16
+
 	previousPool := GetPointPool()
 	ClearPointPool()
 	t.Cleanup(func() { SetPointPool(previousPool) })
 
 	wideSeparatedKeys := []string{"duplicate"}
-	wideSeparatedWant := make([]string, 0, keyConflictMapThreshold-1)
-	for i := 0; i < keyConflictMapThreshold-2; i++ {
+	wideSeparatedWant := make([]string, 0, KEY_CONFLICT_MAP_THRESHOLD-1)
+	for i := 0; i < KEY_CONFLICT_MAP_THRESHOLD-2; i++ {
 		key := fmt.Sprintf("keep_%02d", i)
 		wideSeparatedKeys = append(wideSeparatedKeys, key)
 		wideSeparatedWant = append(wideSeparatedWant, key)
@@ -143,8 +145,8 @@ func TestCheckPointsDuplicateKeys(t *T.T) {
 	wideSeparatedKeys = append(wideSeparatedKeys, "duplicate")
 	wideSeparatedWant = append(wideSeparatedWant, "duplicate")
 
-	wideAdjacentKeys := append([]string{"duplicate", "duplicate"}, wideSeparatedKeys[1:keyConflictMapThreshold-1]...)
-	wideAdjacentWant := wideSeparatedWant[:keyConflictMapThreshold-2]
+	wideAdjacentKeys := append([]string{"duplicate", "duplicate"}, wideSeparatedKeys[1:KEY_CONFLICT_MAP_THRESHOLD-1]...)
+	wideAdjacentWant := wideSeparatedWant[:KEY_CONFLICT_MAP_THRESHOLD-2]
 
 	tests := []struct {
 		name      string
@@ -264,13 +266,13 @@ func TestCheckPointsDuplicateKeys(t *T.T) {
 
 	t.Run("wide-adjusted-key-conflict", func(t *T.T) {
 		kvs := KVs{NewKV("field.1", 1), NewKV("field_1", 2)}
-		for i := 0; i < keyConflictMapThreshold-2; i++ {
+		for i := 0; i < KEY_CONFLICT_MAP_THRESHOLD-2; i++ {
 			kvs = append(kvs, NewKV(fmt.Sprintf("keep_%02d", i), i))
 		}
 
 		pt := NewPoint("measurement", kvs, WithDotInKey(false), WithKeySorted(false))
 
-		require.Len(t, pt.pt.Fields, keyConflictMapThreshold-1)
+		require.Len(t, pt.pt.Fields, KEY_CONFLICT_MAP_THRESHOLD-1)
 		assert.Equal(t, "field_1", pt.pt.Fields[0].Key)
 		assert.Equal(t, []*Warn{
 			{Type: WarnDotInkey, Msg: "invalid field key `field.1': found `.'"},
@@ -281,13 +283,13 @@ func TestCheckPointsDuplicateKeys(t *T.T) {
 	t.Run("wide-aliased-field", func(t *T.T) {
 		shared := NewKV("duplicate.", 1)
 		kvs := KVs{shared, shared}
-		for i := 0; i < keyConflictMapThreshold-2; i++ {
+		for i := 0; i < KEY_CONFLICT_MAP_THRESHOLD-2; i++ {
 			kvs = append(kvs, NewKV(fmt.Sprintf("keep_%02d", i), i))
 		}
 
 		pt := NewPoint("measurement", kvs, WithDotInKey(false), WithKeySorted(false))
 
-		require.Len(t, pt.pt.Fields, keyConflictMapThreshold-2)
+		require.Len(t, pt.pt.Fields, KEY_CONFLICT_MAP_THRESHOLD-2)
 		assert.Equal(t, []*Warn{
 			{Type: WarnDotInkey, Msg: "invalid field key `duplicate.': found `.'"},
 			{Type: WarnKeyNameConflict, Msg: `same key ("duplicate_")`},
@@ -296,8 +298,8 @@ func TestCheckPointsDuplicateKeys(t *T.T) {
 	})
 
 	t.Run("wide-point-before-narrow-duplicate", func(t *T.T) {
-		wideKVs := make(KVs, 0, keyConflictMapThreshold)
-		for i := 0; i < keyConflictMapThreshold; i++ {
+		wideKVs := make(KVs, 0, KEY_CONFLICT_MAP_THRESHOLD)
+		for i := 0; i < KEY_CONFLICT_MAP_THRESHOLD; i++ {
 			wideKVs = append(wideKVs, NewKV(fmt.Sprintf("wide_%02d", i), i))
 		}
 
@@ -325,7 +327,7 @@ func TestCheckPointsDuplicateKeys(t *T.T) {
 		t.Cleanup(ClearPointPool)
 
 		kvs := KVs{NewKV("drop", "value")}
-		for i := 1; i < keyConflictMapThreshold; i++ {
+		for i := 1; i < KEY_CONFLICT_MAP_THRESHOLD; i++ {
 			kvs = append(kvs, NewKV(fmt.Sprintf("keep_%02d", i), i))
 		}
 
@@ -333,7 +335,7 @@ func TestCheckPointsDuplicateKeys(t *T.T) {
 		pts := CheckPoints([]*Point{pt}, WithStrField(false))
 
 		require.Len(t, pts, 1)
-		require.Len(t, pts[0].pt.Fields, keyConflictMapThreshold-1)
+		require.Len(t, pts[0].pt.Fields, KEY_CONFLICT_MAP_THRESHOLD-1)
 		assert.Equal(t, []*Warn{
 			{
 				Type: WarnInvalidFieldValueType,
@@ -886,6 +888,8 @@ func BenchmarkCheckPoints(b *T.B) {
 }
 
 func BenchmarkCheckPointsWide(b *T.B) {
+	const KEY_CONFLICT_MAP_THRESHOLD = 16
+
 	for _, fields := range []int{16, 32, 64, 256, 1024} {
 		b.Run(fmt.Sprintf("%d-fields", fields), func(b *T.B) {
 			kvs := make(KVs, fields)
@@ -895,6 +899,32 @@ func BenchmarkCheckPointsWide(b *T.B) {
 
 			pt := NewPoint("measurement", kvs, WithPrecheck(false), WithKeySorted(false))
 			pts := []*Point{pt}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				CheckPoints(pts)
+			}
+		})
+	}
+
+	for _, fields := range []int{1024, 1280, 2048} {
+		b.Run(fmt.Sprintf("threshold-after-%d-fields", fields), func(b *T.B) {
+			wideKVs := make(KVs, fields)
+			for i := range wideKVs {
+				wideKVs[i] = NewKV(fmt.Sprintf("wide_%04d", i), i)
+			}
+			CheckPoints([]*Point{
+				NewPoint("wide", wideKVs, WithPrecheck(false), WithKeySorted(false)),
+			}, WithMaxFields(0))
+
+			kvs := make(KVs, KEY_CONFLICT_MAP_THRESHOLD)
+			for i := range kvs {
+				kvs[i] = NewKV(fmt.Sprintf("field_%04d", i), i)
+			}
+			pts := []*Point{
+				NewPoint("measurement", kvs, WithPrecheck(false), WithKeySorted(false)),
+			}
 
 			b.ReportAllocs()
 			b.ResetTimer()
