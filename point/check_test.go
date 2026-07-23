@@ -128,6 +128,221 @@ func TestCheckPoints(t *T.T) {
 	})
 }
 
+func TestCheckPointsDuplicateKeys(t *T.T) {
+	previousPool := GetPointPool()
+	ClearPointPool()
+	t.Cleanup(func() { SetPointPool(previousPool) })
+
+	wideSeparatedKeys := []string{"duplicate"}
+	wideSeparatedWant := make([]string, 0, keyConflictMapThreshold-1)
+	for i := 0; i < keyConflictMapThreshold-2; i++ {
+		key := fmt.Sprintf("keep_%02d", i)
+		wideSeparatedKeys = append(wideSeparatedKeys, key)
+		wideSeparatedWant = append(wideSeparatedWant, key)
+	}
+	wideSeparatedKeys = append(wideSeparatedKeys, "duplicate")
+	wideSeparatedWant = append(wideSeparatedWant, "duplicate")
+
+	wideAdjacentKeys := append([]string{"duplicate", "duplicate"}, wideSeparatedKeys[1:keyConflictMapThreshold-1]...)
+	wideAdjacentWant := wideSeparatedWant[:keyConflictMapThreshold-2]
+
+	tests := []struct {
+		name      string
+		keys      []string
+		wantKeys  []string
+		wantWarns int
+		withPool  bool
+	}{
+		{
+			name:      "adjacent",
+			keys:      []string{"duplicate", "duplicate", "keep"},
+			wantKeys:  []string{"keep"},
+			wantWarns: 2,
+		},
+		{
+			name:      "separated",
+			keys:      []string{"duplicate", "keep", "duplicate"},
+			wantKeys:  []string{"keep", "duplicate"},
+			wantWarns: 1,
+		},
+		{
+			name:      "adjacent-with-point-pool",
+			keys:      []string{"duplicate", "duplicate", "keep"},
+			wantKeys:  []string{"duplicate", "keep"},
+			wantWarns: 1,
+			withPool:  true,
+		},
+		{
+			name:      "wide-separated",
+			keys:      wideSeparatedKeys,
+			wantKeys:  wideSeparatedWant,
+			wantWarns: 1,
+		},
+		{
+			name:      "wide-adjacent-with-point-pool",
+			keys:      wideAdjacentKeys,
+			wantKeys:  append([]string{"duplicate"}, wideAdjacentWant...),
+			wantWarns: 1,
+			withPool:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *T.T) {
+			if tc.withPool {
+				SetPointPool(NewReservedCapPointPool(16))
+				t.Cleanup(ClearPointPool)
+			}
+
+			kvs := make(KVs, 0, len(tc.keys))
+			for i, key := range tc.keys {
+				kvs = append(kvs, NewKV(key, i))
+			}
+
+			pt := NewPoint("measurement", kvs, WithPrecheck(false), WithKeySorted(false))
+			pts := CheckPoints([]*Point{pt})
+			require.Len(t, pts, 1)
+
+			gotKeys := make([]string, 0, len(pts[0].pt.Fields))
+			for _, kv := range pts[0].pt.Fields {
+				gotKeys = append(gotKeys, kv.Key)
+			}
+			assert.Equal(t, tc.wantKeys, gotKeys)
+			require.Len(t, pts[0].Warns(), tc.wantWarns)
+			for _, warn := range pts[0].Warns() {
+				assert.Equal(t, &Warn{Type: WarnKeyNameConflict, Msg: `same key ("duplicate")`}, warn)
+			}
+		})
+	}
+
+	t.Run("tag-and-field", func(t *T.T) {
+		kvs := KVs{
+			NewKV("duplicate", "tag", WithKVTagSet(true)),
+			NewKV("duplicate", 1),
+			NewKV("keep", 2),
+		}
+
+		pt := NewPoint("measurement", kvs, WithPrecheck(false), WithKeySorted(false))
+		pts := CheckPoints([]*Point{pt})
+		require.Len(t, pts, 1)
+		require.Len(t, pts[0].pt.Fields, 1)
+		assert.Equal(t, "keep", pts[0].pt.Fields[0].Key)
+		assert.Equal(t, []*Warn{
+			{Type: WarnKeyNameConflict, Msg: `same key ("duplicate")`},
+			{Type: WarnKeyNameConflict, Msg: `same key ("duplicate")`},
+		}, pts[0].Warns())
+	})
+
+	t.Run("new-point", func(t *T.T) {
+		pt := NewPoint("measurement", KVs{
+			NewKV("duplicate", 1),
+			NewKV("duplicate", 2),
+			NewKV("keep", 3),
+		}, WithKeySorted(false))
+
+		require.Len(t, pt.pt.Fields, 1)
+		assert.Equal(t, "keep", pt.pt.Fields[0].Key)
+		assert.Equal(t, []*Warn{
+			{Type: WarnKeyNameConflict, Msg: `same key ("duplicate")`},
+			{Type: WarnKeyNameConflict, Msg: `same key ("duplicate")`},
+		}, pt.Warns())
+	})
+
+	t.Run("adjusted-key-conflict", func(t *T.T) {
+		pt := NewPoint("measurement", KVs{
+			NewKV("field.1", 1),
+			NewKV("field_1", 2),
+		}, WithDotInKey(false), WithKeySorted(false))
+
+		require.Len(t, pt.pt.Fields, 1)
+		assert.Equal(t, "field_1", pt.pt.Fields[0].Key)
+		assert.Equal(t, []*Warn{
+			{Type: WarnDotInkey, Msg: "invalid field key `field.1': found `.'"},
+			{Type: WarnInvalidTagKey, Msg: `field key "field_1" exist after adjust`},
+		}, pt.Warns())
+	})
+
+	t.Run("wide-adjusted-key-conflict", func(t *T.T) {
+		kvs := KVs{NewKV("field.1", 1), NewKV("field_1", 2)}
+		for i := 0; i < keyConflictMapThreshold-2; i++ {
+			kvs = append(kvs, NewKV(fmt.Sprintf("keep_%02d", i), i))
+		}
+
+		pt := NewPoint("measurement", kvs, WithDotInKey(false), WithKeySorted(false))
+
+		require.Len(t, pt.pt.Fields, keyConflictMapThreshold-1)
+		assert.Equal(t, "field_1", pt.pt.Fields[0].Key)
+		assert.Equal(t, []*Warn{
+			{Type: WarnDotInkey, Msg: "invalid field key `field.1': found `.'"},
+			{Type: WarnInvalidTagKey, Msg: `field key "field_1" exist after adjust`},
+		}, pt.Warns())
+	})
+
+	t.Run("wide-aliased-field", func(t *T.T) {
+		shared := NewKV("duplicate.", 1)
+		kvs := KVs{shared, shared}
+		for i := 0; i < keyConflictMapThreshold-2; i++ {
+			kvs = append(kvs, NewKV(fmt.Sprintf("keep_%02d", i), i))
+		}
+
+		pt := NewPoint("measurement", kvs, WithDotInKey(false), WithKeySorted(false))
+
+		require.Len(t, pt.pt.Fields, keyConflictMapThreshold-2)
+		assert.Equal(t, []*Warn{
+			{Type: WarnDotInkey, Msg: "invalid field key `duplicate.': found `.'"},
+			{Type: WarnKeyNameConflict, Msg: `same key ("duplicate_")`},
+			{Type: WarnKeyNameConflict, Msg: `same key ("duplicate_")`},
+		}, pt.Warns())
+	})
+
+	t.Run("wide-point-before-narrow-duplicate", func(t *T.T) {
+		wideKVs := make(KVs, 0, keyConflictMapThreshold)
+		for i := 0; i < keyConflictMapThreshold; i++ {
+			wideKVs = append(wideKVs, NewKV(fmt.Sprintf("wide_%02d", i), i))
+		}
+
+		pts := CheckPoints([]*Point{
+			NewPoint("wide", wideKVs, WithPrecheck(false), WithKeySorted(false)),
+			NewPoint("duplicate", KVs{
+				NewKV("duplicate", 1),
+				NewKV("keep", 2),
+				NewKV("duplicate", 3),
+			}, WithPrecheck(false), WithKeySorted(false)),
+		})
+
+		require.Len(t, pts, 2)
+		assert.Empty(t, pts[0].Warns())
+		require.Len(t, pts[1].pt.Fields, 2)
+		assert.Equal(t, "keep", pts[1].pt.Fields[0].Key)
+		assert.Equal(t, "duplicate", pts[1].pt.Fields[1].Key)
+		assert.Equal(t, []*Warn{
+			{Type: WarnKeyNameConflict, Msg: `same key ("duplicate")`},
+		}, pts[1].Warns())
+	})
+
+	t.Run("wide-unique-with-point-pool-drop", func(t *T.T) {
+		SetPointPool(NewReservedCapPointPool(16))
+		t.Cleanup(ClearPointPool)
+
+		kvs := KVs{NewKV("drop", "value")}
+		for i := 1; i < keyConflictMapThreshold; i++ {
+			kvs = append(kvs, NewKV(fmt.Sprintf("keep_%02d", i), i))
+		}
+
+		pt := NewPoint("measurement", kvs, WithPrecheck(false), WithKeySorted(false))
+		pts := CheckPoints([]*Point{pt}, WithStrField(false))
+
+		require.Len(t, pts, 1)
+		require.Len(t, pts[0].pt.Fields, keyConflictMapThreshold-1)
+		assert.Equal(t, []*Warn{
+			{
+				Type: WarnInvalidFieldValueType,
+				Msg:  "field(drop) dropped with string value, when [DisableStringField] enabled",
+			},
+		}, pts[0].Warns())
+	})
+}
+
 func TestCheckTags(t *T.T) {
 	cases := []struct {
 		name   string
@@ -668,4 +883,24 @@ func BenchmarkCheckPoints(b *T.B) {
 			CheckPoints(pts, WithU64Field(false))
 		}
 	})
+}
+
+func BenchmarkCheckPointsWide(b *T.B) {
+	for _, fields := range []int{16, 32, 64, 256, 1024} {
+		b.Run(fmt.Sprintf("%d-fields", fields), func(b *T.B) {
+			kvs := make(KVs, fields)
+			for i := range kvs {
+				kvs[i] = NewKV(fmt.Sprintf("field_%04d", i), i)
+			}
+
+			pt := NewPoint("measurement", kvs, WithPrecheck(false), WithKeySorted(false))
+			pts := []*Point{pt}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				CheckPoints(pts)
+			}
+		})
+	}
 }

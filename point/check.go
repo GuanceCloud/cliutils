@@ -10,15 +10,27 @@ import (
 	"math"
 	"reflect"
 	"strings"
+	"sync"
 )
+
+const (
+	// A scratch map is faster than repeatedly scanning KVs once a point is this wide.
+	keyConflictMapThreshold = 16
+	// Bound scratch-map retention when callers disable the default field and tag limits.
+	keyConflictMapMaxRetainedKeys = 2048
+)
+
+var keyConflictMapPool sync.Pool
 
 type checker struct {
 	*cfg
-	warns []*Warn
+	warns            []*Warn
+	skipKeyConflicts bool
 }
 
 func (c *checker) reset() {
 	c.warns = c.warns[:0]
+	c.skipKeyConflicts = false
 }
 
 func (c *checker) check(pt *Point) *Point {
@@ -75,6 +87,8 @@ func (c *checker) checkKVs(kvs KVs) KVs {
 		kvs = kvs.TrimTags(c.cfg.maxTags)
 	}
 
+	c.skipKeyConflicts = canSkipKeyConflicts(kvs)
+
 	// check each kv valid
 	idx := 0
 	for _, kv := range kvs {
@@ -84,6 +98,7 @@ func (c *checker) checkKVs(kvs KVs) KVs {
 		} else if defaultPTPool != nil {
 			// When point-pool enabled, on drop f, we should put-back to pool.
 			defaultPTPool.PutKV(x)
+			c.skipKeyConflicts = false
 		}
 	}
 
@@ -97,6 +112,37 @@ func (c *checker) checkKVs(kvs KVs) KVs {
 	kvs = c.keyMiss(kvs)
 
 	return kvs
+}
+
+// canSkipKeyConflicts keeps duplicate inputs on the legacy scan path because
+// in-place compaction and PointPool mutations make conflict order observable.
+func canSkipKeyConflicts(kvs KVs) bool {
+	if len(kvs) < keyConflictMapThreshold {
+		return false
+	}
+
+	var keys map[string]struct{}
+	if pooled := keyConflictMapPool.Get(); pooled == nil {
+		keys = make(map[string]struct{}, min(len(kvs), keyConflictMapMaxRetainedKeys))
+	} else {
+		keys = pooled.(map[string]struct{})
+	}
+
+	unique := true
+	for _, kv := range kvs {
+		if _, ok := keys[kv.Key]; ok {
+			unique = false
+			break
+		}
+		keys[kv.Key] = struct{}{}
+	}
+
+	clear(keys)
+	if len(kvs) <= keyConflictMapMaxRetainedKeys {
+		keyConflictMapPool.Put(keys)
+	}
+
+	return unique
 }
 
 // Remove all `\` suffix on key/val
@@ -122,6 +168,10 @@ func (c *checker) checkKV(f *Field, kvs KVs) (*Field, bool) {
 }
 
 func (c *checker) keyConflict(key string, kvs KVs) bool {
+	if c.skipKeyConflicts {
+		return false
+	}
+
 	i := 0
 	for _, kv := range kvs {
 		if kv.Key == key {
@@ -271,6 +321,7 @@ func (c *checker) checkField(f *Field, kvs KVs) (*Field, bool) {
 				//    `abc,tag=1 f1=32i`
 				if defaultPTPool != nil {
 					defaultPTPool.PutKV(f)
+					c.skipKeyConflicts = false
 					f = defaultPTPool.GetKV(f.Key, int64(x.U))
 				} else {
 					f.Val = &Field_I{I: int64(x.U)}
