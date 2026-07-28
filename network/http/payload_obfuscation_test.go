@@ -15,7 +15,7 @@ import (
 )
 
 func TestPayloadObfuscationGzipCaesarV1SingleByte(t *testing.T) {
-	assert.Equal(t, "X-Guance-Payload-Obfuscation", PayloadObfuscationHeader)
+	assert.Equal(t, "X-Payload-Obfuscation", PayloadObfuscationHeader)
 	assert.Equal(t, "gzip-caesar-v1", PayloadObfuscationGzipCaesarV1)
 
 	body := []byte{250}
