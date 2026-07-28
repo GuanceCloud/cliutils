@@ -9,7 +9,7 @@ import "errors"
 
 const (
 	// PayloadObfuscationHeader is the HTTP header name carrying the payload obfuscation mode.
-	PayloadObfuscationHeader = "X-Guance-Payload-Obfuscation"
+	PayloadObfuscationHeader = "X-Payload-Obfuscation"
 	// PayloadObfuscationGzipCaesarV1 identifies a mode that adds 10 modulo 256 to each of the first 256 bytes
 	// of a gzip-compressed payload, or to all bytes when the payload is shorter. The transformation is in place
 	// and allocation-free. It is obfuscation, not encryption, and does not protect against MITM attacks or tampering.
