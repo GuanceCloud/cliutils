@@ -143,6 +143,15 @@ func TestNetPathTaskValidation(t *testing.T) {
 			},
 			want: "success_when is required",
 		},
+		{
+			name: "numeric assertion rejects null",
+			replace: func(task map[string]any) {
+				success := task["success_when"].([]any)[0].(map[string]any)
+				condition := success["e2e_probe_loss_percent"].([]any)[0].(map[string]any)
+				condition["target"] = nil
+			},
+			want: "target must be numeric",
+		},
 	}
 
 	for _, test := range tests {
@@ -160,6 +169,74 @@ func TestNetPathTaskValidation(t *testing.T) {
 			require.ErrorContains(t, task.Check(), test.want)
 		})
 	}
+}
+
+func TestNetPathTaskRendersAndValidatesTemplates(t *testing.T) {
+	var raw map[string]any
+	require.NoError(t, json.Unmarshal([]byte(validNetPathTaskJSON()), &raw))
+	raw["protocol"] = "{{protocol}}"
+	raw["host"] = "{{host}}"
+	raw["port"] = "{{port}}"
+	raw["success_when_logic"] = "{{logic}}"
+	advanceOptions := raw["advance_options"].(map[string]any)
+	advanceOptions["timeout"] = "{{timeout}}"
+	advanceOptions["source_name"] = "{{source}}"
+	success := raw["success_when"].([]any)[0].(map[string]any)
+	loss := success["e2e_probe_loss_percent"].([]any)[0].(map[string]any)
+	loss["target"] = "{{loss}}"
+	status := success["e2e_status"].([]any)[0].(map[string]any)
+	status["target"] = "{{status}}"
+	raw["config_vars"] = []any{
+		map[string]any{"name": "protocol", "value": " TCP "},
+		map[string]any{"name": "host", "value": "rendered.example.com"},
+		map[string]any{"name": "port", "value": "8443"},
+		map[string]any{"name": "logic", "value": "or"},
+		map[string]any{"name": "timeout", "value": "5s"},
+		map[string]any{"name": "source", "value": `source "quoted"`},
+		map[string]any{"name": "loss", "value": "2.5"},
+		map[string]any{"name": "status", "value": "reached"},
+	}
+	data, err := json.Marshal(raw)
+	require.NoError(t, err)
+
+	child, err := CreateTaskChild(ClassNetPath)
+	require.NoError(t, err)
+	task, err := NewTask(string(data), child)
+	require.NoError(t, err)
+
+	// The debug path validates before rendering. Template placeholders must
+	// not be parsed as concrete NetPath values at this stage.
+	require.NoError(t, task.CheckTask())
+	require.NoError(t, task.RenderTemplateAndInit(nil))
+
+	netPathTask := task.(*NetPathTask)
+	assert.Equal(t, " TCP ", netPathTask.Protocol)
+	assert.Equal(t, "rendered.example.com", netPathTask.Host)
+	assert.Equal(t, "8443", netPathTask.Port)
+	assert.Equal(t, "5s", netPathTask.AdvanceOptions.Timeout)
+	assert.Equal(t, `source "quoted"`, netPathTask.AdvanceOptions.SourceName)
+	assert.Equal(t, "or", netPathTask.SuccessWhenLogic)
+
+	var number float64
+	require.NoError(t, json.Unmarshal(
+		netPathTask.SuccessWhen[0].E2EProbeLossPercent[0].Target,
+		&number,
+	))
+	assert.Equal(t, 2.5, number)
+	assert.JSONEq(t, `"reached"`, string(netPathTask.SuccessWhen[0].E2EStatus[0].Target))
+}
+
+func TestNetPathTaskRejectsInvalidRenderedEndpoint(t *testing.T) {
+	raw := strings.Replace(validNetPathTaskJSON(), `"tcp"`, `"{{protocol}}"`, 1)
+	raw = strings.Replace(raw, `"config_vars": [`, `"config_vars": [
+			{"name": "protocol", "value": "http"},`, 1)
+
+	child, err := CreateTaskChild(ClassNetPath)
+	require.NoError(t, err)
+	task, err := NewTask(raw, child)
+	require.NoError(t, err)
+	require.NoError(t, task.CheckTask())
+	require.ErrorContains(t, task.RenderTemplateAndInit(nil), "unsupported protocol")
 }
 
 func TestNetPathTaskTemplateAndCancellation(t *testing.T) {

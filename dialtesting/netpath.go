@@ -119,6 +119,16 @@ func (t *NetPathTask) init() error {
 		return nil
 	}
 
+	// CheckTask runs before variables are rendered by the debug API. Defer
+	// value validation until RenderTemplateAndInit replaces every template.
+	if t.rawTask == nil && t.hasUnrenderedTemplate() {
+		return nil
+	}
+
+	if err := t.check(); err != nil {
+		return err
+	}
+
 	config, err := t.probeConfig(time.Time{})
 	if err != nil {
 		return err
@@ -130,6 +140,10 @@ func (t *NetPathTask) init() error {
 }
 
 func (t *NetPathTask) check() error {
+	if t.rawTask == nil && t.hasUnrenderedTemplate() {
+		return nil
+	}
+
 	if strings.TrimSpace(t.Host) == "" {
 		return errors.New("host should not be empty")
 	}
@@ -157,6 +171,25 @@ func (t *NetPathTask) check() error {
 		return errors.New("port must be between 1 and 65535")
 	}
 	return nil
+}
+
+func (t *NetPathTask) hasUnrenderedTemplate() bool {
+	data, err := json.Marshal(struct {
+		Protocol         string                `json:"protocol"`
+		Host             string                `json:"host"`
+		Port             string                `json:"port"`
+		AdvanceOptions   NetPathAdvanceOptions `json:"advance_options"`
+		SuccessWhen      []*NetPathSuccess     `json:"success_when"`
+		SuccessWhenLogic string                `json:"success_when_logic"`
+	}{
+		Protocol:         t.Protocol,
+		Host:             t.Host,
+		Port:             t.Port,
+		AdvanceOptions:   t.AdvanceOptions,
+		SuccessWhen:      t.SuccessWhen,
+		SuccessWhenLogic: t.SuccessWhenLogic,
+	})
+	return err == nil && hasTemplateTags(string(data))
 }
 
 func (t *NetPathTask) run() error {
@@ -271,25 +304,144 @@ func (t *NetPathTask) renderTemplate(fm template.FuncMap) error {
 		t.rawTask = rawTask
 	}
 
-	raw, err := json.Marshal(t.rawTask)
-	if err != nil {
-		return fmt.Errorf("marshal raw NETPATH task failed: %w", err)
-	}
-	rendered, err := t.GetParsedString(string(raw), fm)
-	if err != nil {
-		return fmt.Errorf("render NETPATH task failed: %w", err)
+	rawTask := t.rawTask
+	if rawTask == nil {
+		return errors.New("raw NETPATH task is nil")
 	}
 
-	task := &NetPathTask{}
-	if err := json.Unmarshal([]byte(rendered), task); err != nil {
-		return fmt.Errorf("unmarshal rendered NETPATH task failed: %w", err)
+	var err error
+	if t.Protocol, err = t.renderNetPathString("protocol", rawTask.Protocol, fm); err != nil {
+		return err
 	}
-	t.Protocol = task.Protocol
-	t.Host = task.Host
-	t.Port = task.Port
-	t.AdvanceOptions = task.AdvanceOptions
-	t.SuccessWhen = task.SuccessWhen
-	t.SuccessWhenLogic = task.SuccessWhenLogic
+	if t.Host, err = t.renderNetPathString("host", rawTask.Host, fm); err != nil {
+		return err
+	}
+	if t.Port, err = t.renderNetPathString("port", rawTask.Port, fm); err != nil {
+		return err
+	}
+	if t.SuccessWhenLogic, err = t.renderNetPathString(
+		"success_when_logic",
+		rawTask.SuccessWhenLogic,
+		fm,
+	); err != nil {
+		return err
+	}
+
+	t.AdvanceOptions = rawTask.AdvanceOptions
+	if t.AdvanceOptions.Timeout, err = t.renderNetPathString(
+		"advance_options.timeout",
+		rawTask.AdvanceOptions.Timeout,
+		fm,
+	); err != nil {
+		return err
+	}
+	if t.AdvanceOptions.SourceName, err = t.renderNetPathString(
+		"advance_options.source_name",
+		rawTask.AdvanceOptions.SourceName,
+		fm,
+	); err != nil {
+		return err
+	}
+	if t.AdvanceOptions.TargetName, err = t.renderNetPathString(
+		"advance_options.target_name",
+		rawTask.AdvanceOptions.TargetName,
+		fm,
+	); err != nil {
+		return err
+	}
+
+	t.SuccessWhen, err = cloneNetPathSuccessWhen(rawTask.SuccessWhen)
+	if err != nil {
+		return err
+	}
+	if err := t.renderNetPathSuccessWhen(fm); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *NetPathTask) renderNetPathString(
+	field string,
+	value string,
+	fm template.FuncMap,
+) (string, error) {
+	rendered, err := t.GetParsedString(value, fm)
+	if err != nil {
+		return "", fmt.Errorf("render %s failed: %w", field, err)
+	}
+	return rendered, nil
+}
+
+func cloneNetPathSuccessWhen(successWhen []*NetPathSuccess) ([]*NetPathSuccess, error) {
+	data, err := json.Marshal(successWhen)
+	if err != nil {
+		return nil, fmt.Errorf("marshal raw NETPATH success_when failed: %w", err)
+	}
+	var cloned []*NetPathSuccess
+	if err := json.Unmarshal(data, &cloned); err != nil {
+		return nil, fmt.Errorf("unmarshal raw NETPATH success_when failed: %w", err)
+	}
+	return cloned, nil
+}
+
+func (t *NetPathTask) renderNetPathSuccessWhen(fm template.FuncMap) error {
+	for _, success := range t.SuccessWhen {
+		if success == nil {
+			continue
+		}
+		for _, assertions := range success.assertions() {
+			for _, condition := range assertions.conditions {
+				if condition == nil {
+					continue
+				}
+				op, err := t.renderNetPathString(assertions.field+" operator", condition.Op, fm)
+				if err != nil {
+					return err
+				}
+				condition.Op = op
+				if err := t.renderNetPathConditionTarget(assertions.field, condition, fm); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (t *NetPathTask) renderNetPathConditionTarget(
+	field string,
+	condition *NetPathCondition,
+	fm template.FuncMap,
+) error {
+	var target string
+	if err := json.Unmarshal(condition.Target, &target); err != nil {
+		return nil
+	}
+
+	rendered, err := t.renderNetPathString(field+" target", target, fm)
+	if err != nil {
+		return err
+	}
+
+	// Config variables are strings. For numeric assertions, convert a
+	// templated string such as "{{loss}}" back to a JSON number after
+	// rendering; ordinary string targets remain strings and validation
+	// reports their type mismatch as before.
+	if !isNetPathStatusField(field) &&
+		!isNetPathDurationField(field) &&
+		hasTemplateTags(target) {
+		var number *float64
+		if err := json.Unmarshal([]byte(rendered), &number); err == nil && number != nil {
+			condition.Target = json.RawMessage(rendered)
+			return nil
+		}
+	}
+
+	data, err := json.Marshal(rendered)
+	if err != nil {
+		return fmt.Errorf("marshal rendered %s target failed: %w", field, err)
+	}
+	condition.Target = data
 	return nil
 }
 
@@ -479,9 +631,9 @@ func (c *NetPathCondition) durationTarget() (time.Duration, error) {
 }
 
 func (c *NetPathCondition) numberTarget() (float64, error) {
-	var target float64
-	if err := json.Unmarshal(c.Target, &target); err != nil {
+	var target *float64
+	if err := json.Unmarshal(c.Target, &target); err != nil || target == nil {
 		return 0, errors.New("target must be numeric")
 	}
-	return target, nil
+	return *target, nil
 }
