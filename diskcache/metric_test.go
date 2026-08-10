@@ -37,6 +37,77 @@ func getSamples(data []byte) []byte {
 	}
 }
 
+func TestOpenInitializesColdStartMetrics(t *T.T) {
+	ResetMetrics()
+
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(Metrics()...)
+
+	cachePath := t.TempDir()
+	c, err := Open(WithPath(cachePath))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, c.Close())
+		ResetMetrics()
+	})
+
+	mfs, err := reg.Gather()
+	require.NoError(t, err)
+	fullMetrics := metrics.MetricFamily2Text(mfs)
+
+	sizeMetric := metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
+	require.NotNilf(t, sizeMetric, fullMetrics)
+	assert.Zero(t, sizeMetric.GetGauge().GetValue(), fullMetrics)
+
+	for _, name := range []string{
+		"diskcache_put_bytes",
+		"diskcache_get_bytes",
+		"diskcache_put_latency",
+		"diskcache_get_latency",
+	} {
+		metric := metrics.GetMetricOnLabels(mfs, name, c.path)
+		require.NotNilf(t, metric, "%s:\n%s", name, fullMetrics)
+		assert.Zero(t, metric.GetSummary().GetSampleCount(), name)
+		assert.Zero(t, metric.GetSummary().GetSampleSum(), name)
+	}
+
+	lastCloseMetric := metrics.GetMetricOnLabels(mfs, "diskcache_last_close_time", c.path)
+	assert.Nilf(t, lastCloseMetric, fullMetrics)
+}
+
+func TestOpenInitializesSizeMetricFromRotatedFiles(t *T.T) {
+	ResetMetrics()
+
+	cachePath := t.TempDir()
+	seedCache, err := Open(WithPath(cachePath), WithNoSync(true))
+	require.NoError(t, err)
+	require.NoError(t, seedCache.Put(make([]byte, 9)))
+	require.NoError(t, seedCache.Rotate())
+	require.NoError(t, seedCache.Put(make([]byte, 21)))
+	require.NoError(t, seedCache.Rotate())
+	require.NoError(t, seedCache.Close())
+	ResetMetrics()
+
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(Metrics()...)
+
+	c, err := Open(WithPath(cachePath))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, c.Close())
+		ResetMetrics()
+	})
+
+	mfs, err := reg.Gather()
+	require.NoError(t, err)
+	fullMetrics := metrics.MetricFamily2Text(mfs)
+
+	sizeMetric := metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
+	require.NotNilf(t, sizeMetric, fullMetrics)
+	assert.Equal(t, int64(46), c.size.Load())
+	assert.Equal(t, float64(46), sizeMetric.GetGauge().GetValue(), fullMetrics)
+}
+
 func TestPutGetMetrics(t *T.T) {
 	t.Run("test-wakeup-count", func(t *T.T) {
 		reg := prometheus.NewRegistry()
@@ -152,7 +223,9 @@ func TestMetric(t *T.T) {
 		require.Nilf(t, m, fullMetrics)
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_latency", c.path)
-		require.Nilf(t, m, fullMetrics)
+		require.NotNilf(t, m, fullMetrics)
+		assert.Zero(t, m.GetSummary().GetSampleCount(), fullMetrics)
+		assert.Zero(t, m.GetSummary().GetSampleSum(), fullMetrics)
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_rotate", c.path)
 		require.Nilf(t, m, fullMetrics)
@@ -169,6 +242,14 @@ func TestMetric(t *T.T) {
 		require.NotNilf(t, m, fullMetrics)
 		assert.Equalf(t, uint64(1), m.GetSummary().GetSampleCount(), fullMetrics)
 		assert.Equalf(t, float64(108), m.GetSummary().GetSampleSum(), fullMetrics)
+
+		m = metrics.GetMetricOnLabels(mfs, "diskcache_put_latency", c.path)
+		require.NotNilf(t, m, fullMetrics)
+		assert.Equalf(t, uint64(1), m.GetSummary().GetSampleCount(), fullMetrics)
+
+		m = metrics.GetMetricOnLabels(mfs, "diskcache_get_latency", c.path)
+		require.NotNilf(t, m, fullMetrics)
+		assert.Equalf(t, uint64(1), m.GetSummary().GetSampleCount(), fullMetrics)
 
 		m = metrics.GetMetricOnLabels(mfs, "diskcache_size", c.path)
 		require.NotNilf(t, m, fullMetrics)
