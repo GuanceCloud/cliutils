@@ -58,7 +58,12 @@ func TestBrowserTaskRunSetsLightpandaPath(t *testing.T) {
 	task, err := NewTask("", browserTask)
 	require.NoError(t, err)
 	task.SetOption(map[string]string{
-		optionLightpandaPath: "/opt/datakit/lightpanda",
+		optionLightpandaPath:      "/opt/datakit/lightpanda",
+		optionBrowserCACertFile:   "/etc/datakit/certs/internal-ca.pem",
+		optionBrowserCACertDir:    "/etc/datakit/certs/roots",
+		optionBrowserProxyURL:     "http://proxy.example.com:8080",
+		optionBlockPrivateNetwork: "true",
+		optionBrowserBlockCIDRs:   "10.0.0.0/8, 192.168.0.0/16",
 	})
 
 	var gotOptions browserrunner.EngineOptions
@@ -70,6 +75,11 @@ func TestBrowserTaskRunSetsLightpandaPath(t *testing.T) {
 	assert.Equal(t, "OK", tags["status"])
 	assert.Equal(t, int64(1), fields["success"])
 	assert.Equal(t, "/opt/datakit/lightpanda", gotOptions.LightpandaPath)
+	assert.Equal(t, "/etc/datakit/certs/internal-ca.pem", gotOptions.CACertFile)
+	assert.Equal(t, "/etc/datakit/certs/roots", gotOptions.CACertDir)
+	assert.Equal(t, "http://proxy.example.com:8080", gotOptions.ProxyURL)
+	assert.True(t, gotOptions.BlockPrivateNetwork)
+	assert.Equal(t, []string{"10.0.0.0/8", "192.168.0.0/16"}, gotOptions.PrivateNetworkCIDRs)
 }
 
 func TestBrowserTaskRunSetsChromePath(t *testing.T) {
@@ -689,6 +699,22 @@ func TestBrowserTaskLightpandaPathOption(t *testing.T) {
 
 	task.SetOption(map[string]string{})
 	assert.Empty(t, task.lightpandaPath())
+}
+
+func TestBrowserTaskLightpandaRuntimeOptions(t *testing.T) {
+	task := &BrowserTask{Task: &Task{}}
+	task.SetOption(map[string]string{
+		optionBrowserCACertFile:   " /etc/datakit/certs/internal-ca.pem ",
+		optionBrowserCACertDir:    " /etc/datakit/certs/roots ",
+		optionBrowserProxyURL:     " http://proxy.example.com:8080 ",
+		optionBlockPrivateNetwork: "TRUE",
+		optionBrowserBlockCIDRs:   "10.0.0.0/8, 192.168.0.0/16",
+	})
+	assert.Equal(t, "/etc/datakit/certs/internal-ca.pem", task.browserCACertFile())
+	assert.Equal(t, "/etc/datakit/certs/roots", task.browserCACertDir())
+	assert.Equal(t, "http://proxy.example.com:8080", task.browserDefaultProxyURL())
+	assert.True(t, task.browserBlockPrivateNetwork())
+	assert.Equal(t, []string{"10.0.0.0/8", "192.168.0.0/16"}, task.browserPrivateNetworkCIDRs())
 }
 
 func TestBrowserTaskChromePathOption(t *testing.T) {

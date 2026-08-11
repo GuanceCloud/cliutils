@@ -182,6 +182,7 @@ func TestValidateCoversErrorBranchesAndStepHelpers(t *testing.T) {
 		{Steps: []Step{{Action: "unknown"}}},
 		{Steps: []Step{{Action: "goto"}}},
 		{Steps: []Step{{Action: "wait_for_selector"}}},
+		{Steps: []Step{{Action: "wait_for_url"}}},
 		{Steps: []Step{{Action: "assert_text", Selector: "body"}}},
 		{Steps: []Step{{Action: "assert_title"}}},
 		{Steps: []Step{{Action: "assert_url"}}},
@@ -191,6 +192,9 @@ func TestValidateCoversErrorBranchesAndStepHelpers(t *testing.T) {
 		if err := tc.Validate(); err == nil {
 			t.Fatalf("expected validation error for %#v", tc)
 		}
+	}
+	if err := (Script{Steps: []Step{{Action: "wait_for_url", Contains: "/dashboard"}}}).Validate(); err != nil {
+		t.Fatalf("valid wait_for_url failed validation: %v", err)
 	}
 
 	jsonPath := filepath.Join(t.TempDir(), "script.json")

@@ -607,12 +607,11 @@ func TestRunAdditionalFailureAndStepBranches(t *testing.T) {
 			gotOptions = options
 			return &fakeEngine{}, nil
 		},
-	}); !result.Success || gotOptions.ProxyURL != "" {
-		t.Fatalf("expected lightpanda proxy to be ignored, result=%#v options=%#v", result, gotOptions)
+	}); !result.Success || gotOptions.ProxyURL != "http://127.0.0.1:7897" {
+		t.Fatalf("expected lightpanda task proxy, result=%#v options=%#v", result, gotOptions)
 	}
 	scriptWithProxy := scriptForTest()
 	scriptWithProxy.ProxyURL = "http://127.0.0.1:7897"
-	var ignored []string
 	if result := RunScript(context.Background(), scriptWithProxy, Options{
 		ScriptPath: "task:lightpanda-script-proxy",
 		TimeoutMS:  1_000,
@@ -621,11 +620,8 @@ func TestRunAdditionalFailureAndStepBranches(t *testing.T) {
 			gotOptions = options
 			return &fakeEngine{}, nil
 		},
-		IgnoredOptionLogger: func(option string, reason string) {
-			ignored = append(ignored, option+" "+reason)
-		},
-	}); !result.Success || gotOptions.ProxyURL != "" || len(ignored) != 1 || !strings.Contains(ignored[0], "proxy_url") {
-		t.Fatalf("expected script proxy ignore warning, result=%#v options=%#v ignored=%#v", result, gotOptions, ignored)
+	}); !result.Success || gotOptions.ProxyURL != "http://127.0.0.1:7897" {
+		t.Fatalf("expected lightpanda script proxy, result=%#v options=%#v", result, gotOptions)
 	}
 
 	result := RunScript(context.Background(), script.Script{
@@ -693,6 +689,89 @@ func TestRunConfigureAndScreenshotUnavailableBranches(t *testing.T) {
 	}
 }
 
+func TestConditionsPollUntilMatch(t *testing.T) {
+	tests := []struct {
+		name   string
+		step   script.Step
+		engine *pollingEngine
+		calls  func(*pollingEngine) int
+	}{
+		{
+			name:   "wait for URL",
+			step:   script.Step{Action: "wait_for_url", Contains: "/dashboard"},
+			engine: &pollingEngine{urls: []string{"https://example.com/login", "https://example.com/dashboard"}},
+			calls:  func(engine *pollingEngine) int { return engine.urlCalls },
+		},
+		{
+			name:   "assert title",
+			step:   script.Step{Action: "assert_title", Equals: "Dashboard"},
+			engine: &pollingEngine{titles: []string{"Loading", "Dashboard"}},
+			calls:  func(engine *pollingEngine) int { return engine.titleCalls },
+		},
+		{
+			name:   "assert text",
+			step:   script.Step{Action: "assert_text", Selector: "main", Contains: "Ready"},
+			engine: &pollingEngine{texts: []string{"Loading", "Ready"}},
+			calls:  func(engine *pollingEngine) int { return engine.textCalls },
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			if err := executeStep(ctx, test.engine, script.Script{}, test.step, nil); err != nil {
+				t.Fatal(err)
+			}
+			if calls := test.calls(test.engine); calls != 2 {
+				t.Fatalf("condition checks = %d, want 2", calls)
+			}
+		})
+	}
+}
+
+func TestConditionTimeoutClassification(t *testing.T) {
+	for _, test := range []struct {
+		action      string
+		failureType string
+	}{
+		{action: "wait_for_url", failureType: "timeout"},
+		{action: "assert_url", failureType: "assertion_failed"},
+	} {
+		t.Run(test.action, func(t *testing.T) {
+			result := RunScript(context.Background(), script.Script{
+				TimeoutMS: 1_000,
+				Steps: []script.Step{{
+					Action:    test.action,
+					Contains:  "/dashboard",
+					TimeoutMS: 150,
+				}},
+			}, Options{
+				EngineFactory: func(context.Context, EngineOptions) (Engine, error) {
+					return &pollingEngine{urls: []string{"https://example.com/login"}}, nil
+				},
+			})
+			if result.Success || result.FailureType != test.failureType {
+				t.Fatalf("unexpected result: %#v", result)
+			}
+			if result.Error == nil || !strings.Contains(result.Error.Message, "https://example.com/login") {
+				t.Fatalf("last observed URL is missing: %#v", result.Error)
+			}
+		})
+	}
+}
+
+func TestProxyPrecedence(t *testing.T) {
+	if got := engineProxyURL("task", "script", "node"); got != "task" {
+		t.Fatalf("proxy = %q, want task", got)
+	}
+	if got := engineProxyURL("", "script", "node"); got != "script" {
+		t.Fatalf("proxy = %q, want script", got)
+	}
+	if got := engineProxyURL("", "", "node"); got != "node" {
+		t.Fatalf("proxy = %q, want node", got)
+	}
+}
+
 func writeScript(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -716,6 +795,44 @@ func scriptForTest() script.Script {
 			{Action: "assert_title", Contains: "Example"},
 		},
 	}
+}
+
+type pollingEngine struct {
+	fakeEngine
+	urls       []string
+	titles     []string
+	texts      []string
+	urlCalls   int
+	titleCalls int
+	textCalls  int
+}
+
+func (e *pollingEngine) URL(context.Context) (string, error) {
+	value := sequenceValue(e.urls, e.urlCalls)
+	e.urlCalls++
+	return value, nil
+}
+
+func (e *pollingEngine) Title(context.Context) (string, error) {
+	value := sequenceValue(e.titles, e.titleCalls)
+	e.titleCalls++
+	return value, nil
+}
+
+func (e *pollingEngine) Text(context.Context, string) (string, error) {
+	value := sequenceValue(e.texts, e.textCalls)
+	e.textCalls++
+	return value, nil
+}
+
+func sequenceValue(values []string, index int) string {
+	if len(values) == 0 {
+		return ""
+	}
+	if index >= len(values) {
+		return values[len(values)-1]
+	}
+	return values[index]
 }
 
 type fakeEngine struct {
