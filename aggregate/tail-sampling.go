@@ -571,23 +571,6 @@ func compressPacketPayload(packet *DataPacket) {
 	packet.PayloadCompression = compression
 }
 
-// spanDurationUs 提取 span 的 duration（微秒）。
-// 与 filter 语义保持一致：字段缺失或类型不可用时返回 false。
-func spanDurationUs(pt *point.Point) (int64, bool) {
-	if pt == nil {
-		return 0, false
-	}
-
-	if d, ok := pt.GetI("duration"); ok {
-		return d, true
-	}
-	if f, ok := pt.GetF("duration"); ok {
-		return int64(f), true
-	}
-
-	return 0, false
-}
-
 // applySpanPredicates 从已见 span 提取谓词摘要到 DataPacket。
 // 谓词语义与 cliutils/filter 的条件求值严格一致（缺失字段不命中），
 // 供 dataway 决策时免解压评估；跨 Datakit 时由 Ingest 合并路径 OR 聚合。
@@ -596,39 +579,67 @@ func applySpanPredicates(packet *DataPacket, pt *point.Point) {
 		return
 	}
 
-	if v := pt.Get("status"); v != nil {
+	applySpanPredicatesWith(packet, func(key string) (any, bool) {
+		v := pt.Get(key)
+		if v == nil {
+			return nil, false
+		}
+		return v, true
+	})
+}
+
+// applySpanPredicatesWith 基于字段 getter 提取 span 谓词摘要，
+// 供 Point（组包时）与 PBPoint（dataway 补算时）两条路径共用。
+func applySpanPredicatesWith(packet *DataPacket, get func(string) (any, bool)) {
+	if packet == nil || get == nil {
+		return
+	}
+
+	if v, ok := get("status"); ok {
 		if s, ok := v.(string); ok && s == "error" {
 			packet.PredError = true
 		}
 	}
 
-	if v := pt.Get("http_status_code"); v != nil {
+	if v, ok := get("http_status_code"); ok {
 		if s, ok := v.(string); ok && isHTTPErrorStatus(s) {
 			packet.PredHttpError = true
 		}
 	}
 
-	if v := pt.Get("body_code"); v != nil {
+	if v, ok := get("body_code"); ok {
 		if s, ok := v.(string); ok && s != "0" && s != "200" {
 			packet.PredBizError = true
 		}
 	}
 
-	if v := pt.Get("trace_keep"); v != nil {
+	if v, ok := get("trace_keep"); ok {
 		if b, ok := v.(bool); ok && b {
 			packet.PredTraceKeep = true
 		}
 	}
 
-	duration, ok := spanDurationUs(pt)
-	if !ok {
+	var duration int64
+	switch v, ok := get("duration"); {
+	case !ok:
 		return
+	case v == nil:
+		return
+	default:
+		switch d := v.(type) {
+		case int64:
+			duration = d
+		case float64:
+			duration = int64(d)
+		default:
+			return
+		}
 	}
 	if duration > packet.MaxSpanDurationUs {
 		packet.MaxSpanDurationUs = duration
 	}
 
-	if v := pt.Get("parent_id"); v != nil {
+	if v, ok := get("parent_id"); ok {
 		pid, ok := v.(string)
 		if !ok {
 			return
@@ -645,6 +656,36 @@ func applySpanPredicates(packet *DataPacket, pt *point.Point) {
 			}
 		}
 	}
+}
+
+// ComputeSpanPredicates 为缺少谓词摘要的 DataPacket 补算 span 谓词。
+// 用于 dataway 入轮前对旧版本 Datakit（未计算谓词）的数据补算，
+// 使决策快速路径对任意客户端版本生效，解除 datakit/dataway 版本绑定。
+// 谓词摘要已存在（非全零）时不做任何事；payload 为空或损坏时返回错误，
+// 调用方应保留"谓词全零 → 回退解压 walk"的兜底语义。
+func ComputeSpanPredicates(packet *DataPacket) error {
+	if packet == nil || packetHasSpanPredicates(packet) {
+		return nil
+	}
+
+	payload, err := DecompressPointsPayload(packet.PointsPayload, packet.PayloadCompression)
+	if err != nil {
+		return err
+	}
+
+	ptw := &ptWrap{}
+	walkErr := point.WalkPBPointsPayload(payload, func(raw []byte) bool {
+		if err := ptw.Reset(raw); err != nil {
+			return false
+		}
+		applySpanPredicatesWith(packet, ptw.Get)
+		return true
+	})
+	if walkErr != nil {
+		return walkErr
+	}
+
+	return nil
 }
 
 // isHTTPErrorStatus 判断 http_status_code 是否为 4xx/5xx。

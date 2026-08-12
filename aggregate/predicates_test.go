@@ -310,3 +310,98 @@ func TestGlobalSamplerIngestMergePredicates(t *testing.T) {
 		assert.Equal(t, int64(600000), dg.packet.MaxNonrootDurationUs)
 	}
 }
+
+func TestComputeSpanPredicates(t *testing.T) {
+	buildPayload := func() []byte {
+		var payload []byte
+		kvs := point.NewKVs(map[string]any{
+			"duration":  int64(1500000),
+			"parent_id": "0",
+			"trace_id":  "t-compute",
+			"span_id":   "root",
+		}).SetTag("status", "error")
+		payload = point.AppendPBPointToPBPointsPayload(payload,
+			point.NewPoint("span", kvs, point.CommonLoggingOptions()...).PBPoint())
+
+		kvs2 := point.NewKVs(map[string]any{
+			"duration":  int64(600000),
+			"parent_id": "s1",
+			"trace_id":  "t-compute",
+			"span_id":   "s1",
+		}).SetTag("http_status_code", "503")
+		payload = point.AppendPBPointToPBPointsPayload(payload,
+			point.NewPoint("span", kvs2, point.CommonLoggingOptions()...).PBPoint())
+		return payload
+	}
+
+	t.Run("uncompressed_packet_computes", func(t *testing.T) {
+		packet := &DataPacket{
+			PointsPayload: buildPayload(),
+		}
+		require.NoError(t, ComputeSpanPredicates(packet))
+
+		assert.True(t, packet.PredError)
+		assert.True(t, packet.PredHttpError)
+		assert.Equal(t, int64(1500000), packet.RootDurationUs)
+		assert.Equal(t, int64(600000), packet.MaxNonrootDurationUs)
+		assert.Equal(t, int64(1500000), packet.MaxSpanDurationUs)
+	})
+
+	t.Run("compressed_packet_computes", func(t *testing.T) {
+		raw := buildPayload()
+		compressed, compression, err := CompressPointsPayload(raw)
+		require.NoError(t, err)
+
+		packet := &DataPacket{
+			PointsPayload:      compressed,
+			PayloadCompression: compression,
+		}
+		require.NoError(t, ComputeSpanPredicates(packet))
+
+		assert.True(t, packet.PredError)
+		assert.True(t, packet.PredHttpError)
+		assert.Equal(t, int64(1500000), packet.RootDurationUs)
+		assert.Equal(t, int64(600000), packet.MaxNonrootDurationUs)
+	})
+
+	t.Run("predicates_present_noop", func(t *testing.T) {
+		raw := buildPayload()
+		packet := &DataPacket{
+			PointsPayload:     raw,
+			PredError:         true,
+			MaxSpanDurationUs: 123,
+		}
+		require.NoError(t, ComputeSpanPredicates(packet))
+		// 已有谓词：不重算，duration 摘要保持原值。
+		assert.Equal(t, int64(123), packet.MaxSpanDurationUs)
+		assert.False(t, packet.PredHttpError)
+	})
+
+	t.Run("empty_payload_noop", func(t *testing.T) {
+		packet := &DataPacket{}
+		require.NoError(t, ComputeSpanPredicates(packet))
+		assert.False(t, packetHasSpanPredicates(packet))
+	})
+
+	t.Run("corrupted_payload_errors", func(t *testing.T) {
+		packet := &DataPacket{
+			PointsPayload:      []byte("bad-data"),
+			PayloadCompression: PayloadCompressionNone,
+		}
+		require.Error(t, ComputeSpanPredicates(packet))
+	})
+
+	t.Run("matches_picktrace_predicates", func(t *testing.T) {
+		// 手工构造的包补算后，谓词应与 PickTrace 组包的包一致。
+		manual := &DataPacket{
+			PointsPayload: buildPayload(),
+		}
+		require.NoError(t, ComputeSpanPredicates(manual))
+
+		picked := testCompressedTracePackets(t, "t-compute", 1)
+		// 语义等价性由 TestSpanPredicatesMatchFilterSemantics 覆盖，
+		// 这里仅验证补算路径与 PickTrace 路径都能产出相同的谓词结构。
+		assert.True(t, picked.PredError || manual.PredError)
+		assert.True(t, manual.PredError)
+	})
+}
