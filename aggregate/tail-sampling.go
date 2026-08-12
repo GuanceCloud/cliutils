@@ -83,6 +83,30 @@ func evaluatePipelines(td *DataPacket, pipelines []*SamplingPipeline) (bool, *Da
 		return false, nil
 	}
 
+	// 快速路径：pipeline 条件可被 span 谓词摘要覆盖（或为 match-all 概率采样）时，
+	// 无需解压 payload 即可判定；无法覆盖时回退到解压 walk，行为与旧逻辑一致。
+	// 谓词全零（旧数据/手工构造）或空 payload 的包也回退到原逻辑。
+	if len(td.PointsPayload) > 0 && packetHasSpanPredicates(td) {
+		// 未压缩 payload 需保证首个 point 可解码：原逻辑中首个损坏 point 会使
+		// walk 立即停止并判定不匹配（见 TestTailSamplingBusinessBranches）。
+		// 压缩 payload 由 zstd 帧保证完整性（帧损坏时解压即失败），无需预检。
+		if td.PayloadCompression == PayloadCompressionNone && !payloadHasDecodablePoint(td.PointsPayload) {
+			return false, nil
+		}
+
+		if exprs, ok := compilePipelinesFast(pipelines); ok {
+			for idx, expr := range exprs {
+				if expr == nil {
+					continue
+				}
+				if expr(td) {
+					return true, pipelineMatchedPacket(td, pipelines[idx])
+				}
+			}
+			return false, nil
+		}
+	}
+
 	ptw := &ptWrap{}
 	matchedPipelines := make([]bool, len(pipelines))
 
@@ -116,6 +140,36 @@ func evaluatePipelines(td *DataPacket, pipelines []*SamplingPipeline) (bool, *Da
 	}
 
 	return false, nil
+}
+
+// compilePipelinesFast 编译所有 pipeline 的谓词判定。
+// 任一条无法覆盖时整体返回 false（回退解压 walk）。
+func compilePipelinesFast(pipelines []*SamplingPipeline) ([]spanPredicateExpr, bool) {
+	exprs := make([]spanPredicateExpr, len(pipelines))
+	for idx, pipeline := range pipelines {
+		expr, ok := compilePipelinePredicate(pipeline)
+		if !ok {
+			return nil, false
+		}
+		exprs[idx] = expr
+	}
+	return exprs, true
+}
+
+// payloadHasDecodablePoint 检查 payload 中首个 point 是否可解码。
+// 与原 walk 逻辑的首点语义保持一致（首个损坏 point 使遍历立即停止）。
+func payloadHasDecodablePoint(payload []byte) bool {
+	var pb point.PBPoint
+	found := false
+	_ = point.WalkPBPointsPayload(payload, func(raw []byte) bool {
+		pb.Reset()
+		if err := pb.Unmarshal(raw); err != nil {
+			return false
+		}
+		found = true
+		return false
+	})
+	return found
 }
 
 func (sp *SamplingPipeline) isMatchAllSampling() bool {
@@ -224,9 +278,19 @@ func PickTrace(source string, pts []*point.Point, version int64) map[uint64]*Dat
 		if traceData.TraceEndTimeUnixNano < start+duration {
 			traceData.TraceEndTimeUnixNano = start + duration
 		}
+
+		applySpanPredicates(traceData, pt)
 	}
 
+	compressGroupedPackets(traceDatas)
+
 	return traceDatas
+}
+
+func compressGroupedPackets(packets map[uint64]*DataPacket) {
+	for _, packet := range packets {
+		compressPacketPayload(packet)
+	}
 }
 
 type TraceTailSampling struct {
@@ -483,9 +547,117 @@ func pickByGroupKey(groupKey string, source string, pts []*point.Point, category
 		if status == "error" {
 			traceData.HasError = true
 		}
+
+		applySpanPredicates(traceData, pt)
 	}
 
+	compressGroupedPackets(traceDatas)
+
 	return traceDatas, passedThrough
+}
+
+func compressPacketPayload(packet *DataPacket) {
+	if packet == nil {
+		return
+	}
+
+	compressed, compression, err := CompressPointsPayload(packet.PointsPayload)
+	if err != nil {
+		l.Errorf("compress points payload failed: %v", err)
+		return
+	}
+
+	packet.PointsPayload = compressed
+	packet.PayloadCompression = compression
+}
+
+// spanDurationUs 提取 span 的 duration（微秒）。
+// 与 filter 语义保持一致：字段缺失或类型不可用时返回 false。
+func spanDurationUs(pt *point.Point) (int64, bool) {
+	if pt == nil {
+		return 0, false
+	}
+
+	if d, ok := pt.GetI("duration"); ok {
+		return d, true
+	}
+	if f, ok := pt.GetF("duration"); ok {
+		return int64(f), true
+	}
+
+	return 0, false
+}
+
+// applySpanPredicates 从已见 span 提取谓词摘要到 DataPacket。
+// 谓词语义与 cliutils/filter 的条件求值严格一致（缺失字段不命中），
+// 供 dataway 决策时免解压评估；跨 Datakit 时由 Ingest 合并路径 OR 聚合。
+func applySpanPredicates(packet *DataPacket, pt *point.Point) {
+	if packet == nil || pt == nil {
+		return
+	}
+
+	if v := pt.Get("status"); v != nil {
+		if s, ok := v.(string); ok && s == "error" {
+			packet.PredError = true
+		}
+	}
+
+	if v := pt.Get("http_status_code"); v != nil {
+		if s, ok := v.(string); ok && isHTTPErrorStatus(s) {
+			packet.PredHttpError = true
+		}
+	}
+
+	if v := pt.Get("body_code"); v != nil {
+		if s, ok := v.(string); ok && s != "0" && s != "200" {
+			packet.PredBizError = true
+		}
+	}
+
+	if v := pt.Get("trace_keep"); v != nil {
+		if b, ok := v.(bool); ok && b {
+			packet.PredTraceKeep = true
+		}
+	}
+
+	duration, ok := spanDurationUs(pt)
+	if !ok {
+		return
+	}
+	if duration > packet.MaxSpanDurationUs {
+		packet.MaxSpanDurationUs = duration
+	}
+
+	if v := pt.Get("parent_id"); v != nil {
+		pid, ok := v.(string)
+		if !ok {
+			return
+		}
+
+		switch pid {
+		case "0":
+			if duration > packet.RootDurationUs {
+				packet.RootDurationUs = duration
+			}
+		default:
+			if duration > packet.MaxNonrootDurationUs {
+				packet.MaxNonrootDurationUs = duration
+			}
+		}
+	}
+}
+
+// isHTTPErrorStatus 判断 http_status_code 是否为 4xx/5xx。
+func isHTTPErrorStatus(code string) bool {
+	if len(code) != 3 {
+		return false
+	}
+	switch code[0] {
+	case '4', '5':
+		return code[1] >= '0' && code[1] <= '9' && code[2] >= '0' && code[2] <= '9'
+	default:
+		return false
+	}
 }
 
 // RUMTailSampling holds the RUM tail-sampling configuration.
