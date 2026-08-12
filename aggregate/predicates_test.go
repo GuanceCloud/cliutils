@@ -405,3 +405,23 @@ func TestComputeSpanPredicates(t *testing.T) {
 		assert.True(t, manual.PredError)
 	})
 }
+
+func TestComputeSpanPredicatesPartialCorruptionLeavesNoPartialPredicates(t *testing.T) {
+	// 合法 error span + 损坏帧：补算必须整体失败且不写入部分谓词，
+	// 否则快速路径会信任"部分谓词"导致决策与完整 walk 不一致。
+	payload := point.AppendPBPointToPBPointsPayload(nil,
+		point.NewPoint("span", point.NewKVs(map[string]any{
+			"trace_id": "t-partial",
+			"span_id":  "s1",
+		}).SetTag("status", "error"), point.CommonLoggingOptions()...).PBPoint())
+
+	// 追加一个 frame 结构合法、但 PBPoint 内部字段损坏的 point（varint 截断）。
+	payload = append(payload, 0x0a, 0x04, 0x08, 0x80, 0x80, 0x80)
+
+	packet := &DataPacket{PointsPayload: payload}
+	err := ComputeSpanPredicates(packet)
+	require.Error(t, err, "损坏的 span 应使补算整体失败")
+
+	assert.False(t, packet.PredError, "失败时不得留下部分谓词")
+	assert.False(t, packetHasSpanPredicates(packet), "谓词应保持全零，决策回退解压 walk")
+}

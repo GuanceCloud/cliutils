@@ -317,7 +317,11 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 		oldSpillKey := old.spillKey
 		if oldSpillKey != "" {
 			if err := s.hydrateDataGroup(old); err != nil {
-				l.Errorf("hydrate spill payload for merge failed: %v", err)
+				// 读回失败：跳过本次合并，丢弃该批数据。
+				// 若继续合并，payload 将只含新包数据而 PointCount 仍累计，
+				// 造成数据错位和决策错误。
+				l.Errorf("hydrate spill payload for merge failed, skip merge: %v", err)
+				return
 			}
 		}
 

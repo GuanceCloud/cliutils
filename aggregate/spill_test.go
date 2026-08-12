@@ -20,6 +20,7 @@ type mockSpiller struct {
 	putCalls    int
 	getCalls    int
 	deleteCalls int
+	failGet     bool
 }
 
 func newMockSpiller() *mockSpiller {
@@ -39,6 +40,9 @@ func (m *mockSpiller) Get(key string) ([]byte, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.getCalls++
+	if m.failGet {
+		return nil, fmt.Errorf("key %s read failed", key)
+	}
 	payload, ok := m.data[key]
 	if !ok {
 		return nil, fmt.Errorf("key %s not found", key)
@@ -366,4 +370,69 @@ func TestSamplerSmallPacketStaysInMemory(t *testing.T) {
 	}
 
 	assert.Equal(t, 0, spiller.putCount())
+}
+
+func TestSamplerSpillMergeHydrateFailureSkipsMerge(t *testing.T) {
+	const token = "tkn_spill_hydrate_fail"
+
+	spiller := newMockSpiller()
+	sampler := NewGlobalSampler(1, time.Second)
+	sampler.SetPayloadSpiller(spiller, 1024)
+
+	require.NoError(t, sampler.UpdateConfig(token, &TailSamplingConfigs{
+		Version: 1,
+		Tracing: &TraceTailSampling{
+			DataTTL: time.Second,
+			Pipelines: []*SamplingPipeline{
+				{Name: "keep-all", Type: PipelineTypeSampling, Rate: 1},
+			},
+		},
+	}))
+
+	first := &DataPacket{
+		GroupIdHash:          9,
+		RawGroupId:           "trace-hydrate-fail",
+		Token:                token,
+		DataType:             point.STracing,
+		GroupKey:             "trace_id",
+		PointCount:           50,
+		PointsPayload:        []byte(strings.Repeat("a", 4096)),
+		MaxSpanDurationUs:    1000,
+		MaxPointTimeUnixNano: time.Now().UnixNano(),
+	}
+	sampler.Ingest(first)
+
+	// 磁盘读失败后同一 trace 再来一批：合并必须被跳过，
+	// 否则 PointCount 累计但 payload 只有新包（数据错位）。
+	spiller.failGet = true
+	second := &DataPacket{
+		GroupIdHash:          9,
+		RawGroupId:           "trace-hydrate-fail",
+		Token:                token,
+		DataType:             point.STracing,
+		GroupKey:             "trace_id",
+		PointCount:           50,
+		PointsPayload:        []byte(strings.Repeat("b", 4096)),
+		MaxSpanDurationUs:    1000,
+		MaxPointTimeUnixNano: time.Now().UnixNano(),
+	}
+	sampler.Ingest(second)
+
+	expired := sampler.AdvanceTime()
+	require.Len(t, expired, 1)
+
+	for _, dg := range expired {
+		require.NotEmpty(t, dg.spillKey)
+		require.Empty(t, dg.packet.PointsPayload)
+		// 合并被跳过：PointCount 保持第一包的值，未与第二包累计。
+		assert.Equal(t, int32(50), dg.packet.PointCount)
+	}
+
+	// 决策：谓词可信 → 快速路径判定 kept；补读 payload 仍失败 → 保持空。
+	outcomes := sampler.TailSamplingOutcomes(expired)
+	for _, outcome := range outcomes {
+		require.Equal(t, DerivedMetricDecisionKept, outcome.Decision)
+		require.NotNil(t, outcome.Packet)
+		assert.Empty(t, outcome.Packet.PointsPayload, "hydrate 失败时 kept 包 payload 应为空")
+	}
 }

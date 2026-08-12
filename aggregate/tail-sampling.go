@@ -661,8 +661,8 @@ func applySpanPredicatesWith(packet *DataPacket, get func(string) (any, bool)) {
 // ComputeSpanPredicates 为缺少谓词摘要的 DataPacket 补算 span 谓词。
 // 用于 dataway 入轮前对旧版本 Datakit（未计算谓词）的数据补算，
 // 使决策快速路径对任意客户端版本生效，解除 datakit/dataway 版本绑定。
-// 谓词摘要已存在（非全零）时不做任何事；payload 为空或损坏时返回错误，
-// 调用方应保留"谓词全零 → 回退解压 walk"的兜底语义。
+// 谓词摘要已存在（非全零）时不做任何事；payload 为空或任一 span 解码失败时
+// 返回错误且不写入部分谓词（调用方保留"谓词全零 → 回退解压 walk"的兜底语义）。
 func ComputeSpanPredicates(packet *DataPacket) error {
 	if packet == nil || packetHasSpanPredicates(packet) {
 		return nil
@@ -673,17 +673,32 @@ func ComputeSpanPredicates(packet *DataPacket) error {
 		return err
 	}
 
+	// 先计算到临时结构：任一 span 解码失败则整体失败，避免部分谓词被快速路径信任。
+	tmp := &DataPacket{}
 	ptw := &ptWrap{}
+	var decodeErr error
 	walkErr := point.WalkPBPointsPayload(payload, func(raw []byte) bool {
 		if err := ptw.Reset(raw); err != nil {
+			decodeErr = err
 			return false
 		}
-		applySpanPredicatesWith(packet, ptw.Get)
+		applySpanPredicatesWith(tmp, ptw.Get)
 		return true
 	})
 	if walkErr != nil {
 		return walkErr
 	}
+	if decodeErr != nil {
+		return decodeErr
+	}
+
+	packet.PredError = tmp.PredError
+	packet.PredHttpError = tmp.PredHttpError
+	packet.PredBizError = tmp.PredBizError
+	packet.PredTraceKeep = tmp.PredTraceKeep
+	packet.MaxSpanDurationUs = tmp.MaxSpanDurationUs
+	packet.RootDurationUs = tmp.RootDurationUs
+	packet.MaxNonrootDurationUs = tmp.MaxNonrootDurationUs
 
 	return nil
 }
