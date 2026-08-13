@@ -28,8 +28,9 @@ func TestCompilePipelinePredicateCoverage(t *testing.T) {
 		{"custom_field", `{ resource = "/x" }`, false},
 		{"constant_condition", `{ 1 = 1 }`, false},
 		{"flag_and_root", `{ status = "error" AND parent_id = "0" AND duration > 1000000 }`, true},
-		// parent 单独（无 duration 阈值）严格不等价：无 duration 字段的 root span
-		// 在 filter 中仍命中 parent_id="0"，但谓词摘要无法表达，保守回退。
+		// parent alone (no duration threshold) is not strictly equivalent: a root
+		// span without a duration field still matches parent_id="0" in the filter,
+		// which the predicate summary cannot express, so it conservatively falls back.
 		{"or_combination", `{ parent_id = "0" OR status = "error" }`, false},
 		{"parent_conflict", `{ parent_id = "0" AND parent_id != "0" }`, false},
 		{"needs_walk_nested_or", `{ parent_id = "0" AND duration > 1000000 OR status = "error" }`, true},
@@ -62,8 +63,9 @@ func TestCompilePipelinePredicateMatchAll(t *testing.T) {
 	assert.Nil(t, nilExpr)
 }
 
-// TestEvaluatePipelinesFastPathMatchesWalk 验证快速路径与解压 walk 路径的决策一致。
-// 通过"1 = 1 AND (...)"恒真但不可编译的条件强制对照 pipeline 走 walk 路径。
+// TestEvaluatePipelinesFastPathMatchesWalk verifies the fast path and the
+// decompressed-walk path make identical decisions. The walk counterpart uses
+// a "1 = 1 AND (...)" always-true but uncompilable condition to force the walk.
 func TestEvaluatePipelinesFastPathMatchesWalk(t *testing.T) {
 	fastPipelines := []*SamplingPipeline{
 		{
@@ -89,7 +91,8 @@ func TestEvaluatePipelinesFastPathMatchesWalk(t *testing.T) {
 		require.NoError(t, p.Apply())
 	}
 
-	// 语义等价的 walk 对照：恒真条件使编译失败 → 强制解压 walk。
+	// Semantically equivalent walk counterpart: the always-true condition fails
+	// compilation, forcing the decompressed walk.
 	walkPipelines := []*SamplingPipeline{
 		{
 			Name:      "keep-error-or-5xx-walk",
@@ -169,7 +172,8 @@ func TestEvaluatePipelinesFastPathMatchAll(t *testing.T) {
 }
 
 func TestEvaluatePipelinesFastPathCorruptedPayload(t *testing.T) {
-	// 未压缩的损坏 payload：快速路径必须与原逻辑一致（不匹配）。
+	// Uncompressed corrupted payload: the fast path must agree with the legacy
+	// logic (no match).
 	pipeline := &SamplingPipeline{Name: "keep-all", Type: PipelineTypeSampling, Rate: 1}
 	corrupted := &DataPacket{
 		GroupIdHash:        99,
@@ -182,7 +186,7 @@ func TestEvaluatePipelinesFastPathCorruptedPayload(t *testing.T) {
 	assert.False(t, matched)
 	assert.Nil(t, packet)
 
-	// 空 payload：同样不匹配。
+	// Empty payload: also no match.
 	empty := &DataPacket{PointsPayload: nil, PredError: true}
 	matched, packet = evaluatePipelines(empty, []*SamplingPipeline{pipeline})
 	assert.False(t, matched)

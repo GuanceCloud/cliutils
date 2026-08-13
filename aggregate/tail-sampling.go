@@ -83,13 +83,17 @@ func evaluatePipelines(td *DataPacket, pipelines []*SamplingPipeline) (bool, *Da
 		return false, nil
 	}
 
-	// 快速路径：pipeline 条件可被 span 谓词摘要覆盖（或为 match-all 概率采样）时，
-	// 无需解压 payload 即可判定；无法覆盖时回退到解压 walk，行为与旧逻辑一致。
-	// 谓词全零（旧数据/手工构造）或空 payload 的包也回退到原逻辑。
+	// Fast path: when pipeline conditions can be covered by span predicates
+	// (or are match-all probabilistic samplers), the decision needs no payload
+	// decompression; otherwise it falls back to the decompressed walk, keeping
+	// behavior identical to the legacy logic. Packets with all-zero predicates
+	// (legacy data / hand-crafted) or an empty payload also fall back.
 	if len(td.PointsPayload) > 0 && packetHasSpanPredicates(td) {
-		// 未压缩 payload 需保证首个 point 可解码：原逻辑中首个损坏 point 会使
-		// walk 立即停止并判定不匹配（见 TestTailSamplingBusinessBranches）。
-		// 压缩 payload 由 zstd 帧保证完整性（帧损坏时解压即失败），无需预检。
+		// An uncompressed payload must have a decodable first point: in the legacy
+		// logic a corrupted first point stops the walk and yields no match
+		// (see TestTailSamplingBusinessBranches). Compressed payloads are protected
+		// by the zstd frame itself (a corrupted frame fails to decompress), so no
+		// pre-check is needed.
 		if td.PayloadCompression == PayloadCompressionNone && !payloadHasDecodablePoint(td.PointsPayload) {
 			return false, nil
 		}
@@ -142,8 +146,9 @@ func evaluatePipelines(td *DataPacket, pipelines []*SamplingPipeline) (bool, *Da
 	return false, nil
 }
 
-// compilePipelinesFast 编译所有 pipeline 的谓词判定。
-// 任一条无法覆盖时整体返回 false（回退解压 walk）。
+// compilePipelinesFast compiles predicate decisions for all pipelines.
+// It returns false overall (falling back to the decompressed walk) when any
+// pipeline cannot be covered.
 func compilePipelinesFast(pipelines []*SamplingPipeline) ([]spanPredicateExpr, bool) {
 	exprs := make([]spanPredicateExpr, len(pipelines))
 	for idx, pipeline := range pipelines {
@@ -156,8 +161,9 @@ func compilePipelinesFast(pipelines []*SamplingPipeline) ([]spanPredicateExpr, b
 	return exprs, true
 }
 
-// payloadHasDecodablePoint 检查 payload 中首个 point 是否可解码。
-// 与原 walk 逻辑的首点语义保持一致（首个损坏 point 使遍历立即停止）。
+// payloadHasDecodablePoint checks whether the first point in the payload is decodable.
+// It matches the first-point semantics of the original walk (a corrupted first
+// point stops the traversal immediately).
 func payloadHasDecodablePoint(payload []byte) bool {
 	var pb point.PBPoint
 	found := false
@@ -571,9 +577,10 @@ func compressPacketPayload(packet *DataPacket) {
 	packet.PayloadCompression = compression
 }
 
-// applySpanPredicates 从已见 span 提取谓词摘要到 DataPacket。
-// 谓词语义与 cliutils/filter 的条件求值严格一致（缺失字段不命中），
-// 供 dataway 决策时免解压评估；跨 Datakit 时由 Ingest 合并路径 OR 聚合。
+// applySpanPredicates extracts the span predicate summary of seen spans into
+// a DataPacket. Predicate semantics strictly match cliutils/filter condition
+// evaluation (missing fields never match), enabling decompression-free dataway
+// decisions; across DataKits the Ingest merge path OR-aggregates the summary.
 func applySpanPredicates(packet *DataPacket, pt *point.Point) {
 	if packet == nil || pt == nil {
 		return
@@ -588,8 +595,9 @@ func applySpanPredicates(packet *DataPacket, pt *point.Point) {
 	})
 }
 
-// applySpanPredicatesWith 基于字段 getter 提取 span 谓词摘要，
-// 供 Point（组包时）与 PBPoint（dataway 补算时）两条路径共用。
+// applySpanPredicatesWith extracts the span predicate summary via a field
+// getter, shared by the Point path (grouping) and the PBPoint path
+// (dataway backfill).
 func applySpanPredicatesWith(packet *DataPacket, get func(string) (any, bool)) {
 	if packet == nil || get == nil {
 		return
@@ -658,11 +666,13 @@ func applySpanPredicatesWith(packet *DataPacket, get func(string) (any, bool)) {
 	}
 }
 
-// ComputeSpanPredicates 为缺少谓词摘要的 DataPacket 补算 span 谓词。
-// 用于 dataway 入轮前对旧版本 Datakit（未计算谓词）的数据补算，
-// 使决策快速路径对任意客户端版本生效，解除 datakit/dataway 版本绑定。
-// 谓词摘要已存在（非全零）时不做任何事；payload 为空或任一 span 解码失败时
-// 返回错误且不写入部分谓词（调用方保留"谓词全零 → 回退解压 walk"的兜底语义）。
+// ComputeSpanPredicates backfills span predicates for DataPackets missing the
+// summary. It runs at dataway ingestion for legacy DataKit data (no predicates),
+// so the decision fast path works for any client version and removes the
+// datakit/dataway version coupling. It is a no-op when predicates already exist
+// (non-zero); when the payload is empty or any span fails to decode it returns
+// an error without writing partial predicates (the caller keeps the
+// all-zero → decompressed-walk fallback semantics).
 func ComputeSpanPredicates(packet *DataPacket) error {
 	if packet == nil || packetHasSpanPredicates(packet) {
 		return nil
@@ -673,7 +683,9 @@ func ComputeSpanPredicates(packet *DataPacket) error {
 		return err
 	}
 
-	// 先计算到临时结构：任一 span 解码失败则整体失败，避免部分谓词被快速路径信任。
+	// Compute into a temporary struct first: any span decode failure fails the
+	// whole computation, preventing partial predicates from being trusted by the
+	// fast path.
 	tmp := &DataPacket{}
 	ptw := &ptWrap{}
 	var decodeErr error
@@ -703,7 +715,7 @@ func ComputeSpanPredicates(packet *DataPacket) error {
 	return nil
 }
 
-// isHTTPErrorStatus 判断 http_status_code 是否为 4xx/5xx。
+// isHTTPErrorStatus reports whether http_status_code is 4xx/5xx.
 func isHTTPErrorStatus(code string) bool {
 	if len(code) != 3 {
 		return false

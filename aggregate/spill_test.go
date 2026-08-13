@@ -95,7 +95,7 @@ func TestFilePayloadSpiller(t *testing.T) {
 	assert.Equal(t, payload, got)
 
 	require.NoError(t, spiller.Delete(key))
-	require.NoError(t, spiller.Delete(key)) // 幂等
+	require.NoError(t, spiller.Delete(key)) // idempotent
 	_, err = spiller.Get(key)
 	require.Error(t, err)
 
@@ -164,7 +164,7 @@ func TestSamplerSpillLargePacketKept(t *testing.T) {
 	for _, outcome := range outcomes {
 		require.Equal(t, DerivedMetricDecisionKept, outcome.Decision)
 		require.NotNil(t, outcome.Packet)
-		// kept 包必须读回完整 payload（发送需要）。
+		// Kept packets must have the full payload read back (needed for sending).
 		assert.Equal(t, 4096, len(outcome.Packet.PointsPayload))
 	}
 
@@ -211,7 +211,8 @@ func TestSamplerSpillLargePacketDroppedNoHydrate(t *testing.T) {
 		assert.Nil(t, outcome.Packet)
 	}
 
-	// 概率采样（match-all）决策不需要 payload：dropped 场景应零读盘。
+	// Probabilistic (match-all) decisions need no payload: dropped packets
+	// should incur zero disk reads.
 	assert.Equal(t, 0, spiller.getCount())
 	assert.Equal(t, 1, spiller.deleteCount())
 }
@@ -223,7 +224,8 @@ func TestSamplerSpillNeedsWalkHydrates(t *testing.T) {
 	sampler := NewGlobalSampler(1, time.Second)
 	sampler.SetPayloadSpiller(spiller, 1024)
 
-	// 不可编译的 condition（自定义字段）：决策必须读回 payload 解压 walk。
+	// Uncompilable condition (custom field): the decision must read back the
+	// payload and decompress to walk.
 	require.NoError(t, sampler.UpdateConfig(token, &TailSamplingConfigs{
 		Version: 1,
 		Tracing: &TraceTailSampling{
@@ -328,7 +330,7 @@ func TestSamplerSpillMergeAcrossDataKits(t *testing.T) {
 	for _, outcome := range outcomes {
 		require.Equal(t, DerivedMetricDecisionKept, outcome.Decision)
 		require.NotNil(t, outcome.Packet)
-		// 合并语义：payload 完整（两段之和）。
+		// Merge semantics: full payload (sum of both parts).
 		assert.Equal(t, 8192, len(outcome.Packet.PointsPayload))
 	}
 }
@@ -402,8 +404,9 @@ func TestSamplerSpillMergeHydrateFailureSkipsMerge(t *testing.T) {
 	}
 	sampler.Ingest(first)
 
-	// 磁盘读失败后同一 trace 再来一批：合并必须被跳过，
-	// 否则 PointCount 累计但 payload 只有新包（数据错位）。
+	// After a disk read failure, another batch of the same trace must be
+	// skipped at merge time; otherwise PointCount accumulates while the payload
+	// holds only the new packet (data misalignment).
 	spiller.failGet = true
 	second := &DataPacket{
 		GroupIdHash:          9,
@@ -424,11 +427,13 @@ func TestSamplerSpillMergeHydrateFailureSkipsMerge(t *testing.T) {
 	for _, dg := range expired {
 		require.NotEmpty(t, dg.spillKey)
 		require.Empty(t, dg.packet.PointsPayload)
-		// 合并被跳过：PointCount 保持第一包的值，未与第二包累计。
+		// Merge was skipped: PointCount keeps the first packet value, not
+		// accumulated with the second.
 		assert.Equal(t, int32(50), dg.packet.PointCount)
 	}
 
-	// 决策：谓词可信 → 快速路径判定 kept；补读 payload 仍失败 → 保持空。
+	// Decision: trusted predicates → fast-path kept; the payload hydrate still
+	// fails → stays empty.
 	outcomes := sampler.TailSamplingOutcomes(expired)
 	for _, outcome := range outcomes {
 		require.Equal(t, DerivedMetricDecisionKept, outcome.Decision)

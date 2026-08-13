@@ -24,7 +24,7 @@ type DataGroup struct {
 	ExpiredTime int64
 	slotIndex   int
 	element     *list.Element
-	spillKey    string // 大包 payload 落盘后的 key（空表示在内存）
+	spillKey    string // key of the spilled payload on disk (empty means in memory)
 }
 
 // Reset 清理函数.
@@ -57,9 +57,10 @@ type GlobalSampler struct {
 	configMap  map[string]*TailSamplingConfigs
 	lock       sync.RWMutex
 
-	// 大包分级落盘（可选，默认不启用）：
-	// 超过 spillThreshold 的 payload 写入 spiller，时间轮只保留元数据；
-	// 决策需要时惰性读回，决策完成后立即释放。
+	// Oversized-packet tiered spilling (optional, disabled by default):
+	// payloads larger than spillThreshold are written to the spiller while the
+	// time wheel keeps metadata only; data is lazily read back when a decision
+	// needs it and released right after the decision.
 	spiller        PayloadSpiller
 	spillThreshold int
 }
@@ -95,8 +96,8 @@ func NewGlobalSampler(shardCount int, waitTime time.Duration) *GlobalSampler {
 	return sampler
 }
 
-// SetPayloadSpiller 启用大包分级落盘。
-// threshold 为落盘阈值（字节），<=0 或 spiller 为 nil 时不启用。
+// SetPayloadSpiller enables tiered spilling of oversized payloads.
+// threshold is the spill threshold in bytes; <=0 or a nil spiller disables it.
 func (s *GlobalSampler) SetPayloadSpiller(spiller PayloadSpiller, threshold int) {
 	if s == nil {
 		return
@@ -112,8 +113,8 @@ func (s *GlobalSampler) SetPayloadSpiller(spiller PayloadSpiller, threshold int)
 	s.spillThreshold = threshold
 }
 
-// spillIfNeeded 将超过阈值的 payload 落盘并清空内存字节；
-// 返回落盘 key 与是否实际落盘。
+// spillIfNeeded spills the payload when it exceeds the threshold and clears
+// the in-memory bytes; it returns the spill key and whether it spilled.
 func (s *GlobalSampler) spillIfNeeded(packet *DataPacket) (string, bool) {
 	if s == nil || s.spiller == nil || packet == nil {
 		return "", false
@@ -132,7 +133,7 @@ func (s *GlobalSampler) spillIfNeeded(packet *DataPacket) (string, bool) {
 	return key, true
 }
 
-// hydrateDataGroup 读回 spill 的 payload 到内存。
+// hydrateDataGroup reads the spilled payload back into memory.
 func (s *GlobalSampler) hydrateDataGroup(dg *DataGroup) error {
 	if dg == nil || dg.spillKey == "" || s.spiller == nil {
 		return nil
@@ -148,7 +149,7 @@ func (s *GlobalSampler) hydrateDataGroup(dg *DataGroup) error {
 	return nil
 }
 
-// releaseSpill 删除 spill 数据（幂等）。
+// releaseSpill deletes spilled data (idempotent).
 func (s *GlobalSampler) releaseSpill(key string) {
 	if s == nil || s.spiller == nil || key == "" {
 		return
@@ -159,8 +160,10 @@ func (s *GlobalSampler) releaseSpill(key string) {
 	}
 }
 
-// needsPayloadForDecision 判断该 token/类型/分组的决策是否需要 payload 内容。
-// 全部 pipeline 可被谓词摘要覆盖（或为 match-all 概率采样）时无需 payload。
+// needsPayloadForDecision reports whether the decision for this token/type/
+// group requires payload content.
+// No payload is needed when all pipelines can be covered by predicates
+// (or are match-all probabilistic samplers).
 func (s *GlobalSampler) needsPayloadForDecision(dataType, token, groupKey string) bool {
 	if s == nil {
 		return true
@@ -186,8 +189,9 @@ func tailSamplingGroupMapKeyByFields(token string, groupIDHash uint64, dataType,
 	return key
 }
 
-// mergePacketPayload 将 src 的 points payload 合并进 dst。
-// 两边都未压缩时保持直接拼接路径；任一压缩时解压后合并并重新压缩。
+// mergePacketPayload merges the src points payload into dst.
+// When both sides are uncompressed it keeps the direct-append path; when either
+// side is compressed it decompresses, merges, and re-compresses.
 func mergePacketPayload(dst, src *DataPacket) error {
 	if dst == nil || src == nil {
 		return nil
@@ -221,10 +225,11 @@ func mergePacketPayload(dst, src *DataPacket) error {
 	return nil
 }
 
-// mergeSpanPredicates 将 src 的 span 谓词摘要 OR 合并进 dst。
-// 布尔谓词取或；duration 摘要取最大值。
-// 跨 Datakit 场景：同一 trace 的 span 分散在多个 Datakit，
-// 合并后谓词即为"所有已见 Datakit 的并集"，与决策时 walk 完整 payload 的结果一致。
+// mergeSpanPredicates OR-merges the src span predicate summary into dst.
+// Boolean predicates are OR-ed; duration summaries take the maximum.
+// Cross-DataKit scenario: spans of the same trace are spread across multiple
+// DataKits, so the merged predicates are the union of all seen DataKits,
+// consistent with walking the full merged payload at decision time.
 func mergeSpanPredicates(dst, src *DataPacket) {
 	if dst == nil || src == nil {
 		return
@@ -317,9 +322,10 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 		oldSpillKey := old.spillKey
 		if oldSpillKey != "" {
 			if err := s.hydrateDataGroup(old); err != nil {
-				// 读回失败：跳过本次合并，丢弃该批数据。
-				// 若继续合并，payload 将只含新包数据而 PointCount 仍累计，
-				// 造成数据错位和决策错误。
+				// Hydrate failure: skip this merge and drop the incoming packet.
+				// Continuing would leave the payload with only the new packet while
+				// PointCount keeps accumulating, causing data misalignment and
+				// wrong decisions.
 				l.Errorf("hydrate spill payload for merge failed, skip merge: %v", err)
 				return
 			}
@@ -354,7 +360,8 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 			old.packet.Source = packet.Source
 		}
 
-		// 合并后重新判定是否落盘，并释放合并前的磁盘数据。
+		// Re-decide whether to spill after the merge, then release the disk
+		// data used before the merge.
 		if key, spilled := s.spillIfNeeded(old.packet); spilled {
 			old.spillKey = key
 		} else {
@@ -382,7 +389,7 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 
 		dg.slotIndex = expirePos
 		dg.ExpiredTime = time.Now().Unix() + int64(ttlSec)
-		// 大包落盘：时间轮只保留元数据
+		// Spill oversized payloads: the time wheel keeps metadata only
 		if key, spilled := s.spillIfNeeded(packet); spilled {
 			dg.spillKey = key
 		}
@@ -438,8 +445,10 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 
 		sourcePacket := dg.packet
 
-		// 落盘的包：决策需要 payload 内容（pipeline 无法被谓词摘要覆盖），
-		// 或谓词摘要不可信（全零，旧数据/手工构造）时读回；决策完成后统一释放。
+		// Spilled packets are read back only when the decision needs payload
+		// content (pipelines not coverable by predicates) or when the predicate
+		// summary is untrusted (all-zero: legacy data / hand-crafted). Disk data
+		// is released uniformly after the decision.
 		spillKey := dg.spillKey
 		if spillKey != "" && (s.needsPayloadForDecision(dg.dataType, sourcePacket.Token, sourcePacket.GroupKey) ||
 			!packetHasSpanPredicates(sourcePacket)) {
@@ -456,8 +465,9 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 
 		pipelines := s.pipelinesFor(dg.dataType, token, groupKey)
 		if pipelines != nil && sourcePacket != nil {
-			// spill 包且 pipeline 可编译、谓词可信：直接谓词判定，避免读盘；
-			// 其余情况走 evaluatePipelines（内部快速路径或解压 walk）。
+			// For spilled packets with coverable pipelines and trusted predicates,
+			// decide directly from predicates to avoid disk reads; otherwise go
+			// through evaluatePipelines (internal fast path or decompressed walk).
 			usePredicates := spillKey != "" &&
 				!s.needsPayloadForDecision(dg.dataType, token, groupKey) &&
 				packetHasSpanPredicates(sourcePacket)
@@ -474,13 +484,15 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 			}
 		}
 
-		// kept 包后续要发送给下游，必须持有完整 payload：决策未读回时此处补读。
+		// Kept packets are sent downstream and must hold the full payload:
+		// hydrate here when the decision did not read it back.
 		if spillKey != "" && keptPacket != nil && len(keptPacket.PointsPayload) == 0 {
 			if err := s.hydrateDataGroup(dg); err != nil {
 				l.Errorf("hydrate spill payload for kept packet failed: %v", err)
 			}
 		}
-		// 决策完成，释放磁盘数据（无论 kept/dropped，payload 已读回或已丢弃）。
+		// Decision done: release disk data (payload was either read back or
+		// discarded, regardless of kept/dropped).
 		s.releaseSpill(spillKey)
 
 		outcomes[key] = &TailSamplingOutcome{
@@ -495,7 +507,7 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 	return outcomes
 }
 
-// pipelinesFor 按数据类型/分组维度返回采样 pipeline 配置。
+// pipelinesFor returns the sampling pipeline config by data type / group dimension.
 func (s *GlobalSampler) pipelinesFor(dataType, token, groupKey string) []*SamplingPipeline {
 	switch dataType {
 	case point.STracing:
@@ -522,8 +534,8 @@ func (s *GlobalSampler) pipelinesFor(dataType, token, groupKey string) []*Sampli
 	return nil
 }
 
-// decideWithPredicates 用 span 谓词摘要判定 pipelines（不读 payload）。
-// pipelines 必须全部可编译，否则返回不匹配。
+// decideWithPredicates decides pipelines via span predicates without reading
+// the payload. All pipelines must be compilable; otherwise no match is returned.
 func decideWithPredicates(sourcePacket *DataPacket, pipelines []*SamplingPipeline) (bool, *DataPacket) {
 	exprs, ok := compilePipelinesFast(pipelines)
 	if !ok {

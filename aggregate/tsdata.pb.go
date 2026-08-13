@@ -40,8 +40,8 @@ type DataPacket struct {
 	TraceEndTimeUnixNano   int64  `protobuf:"varint,11,opt,name=trace_end_time_unix_nano,json=traceEndTimeUnixNano,proto3" json:"trace_end_time_unix_nano,omitempty"`
 	PointsPayload          []byte `protobuf:"bytes,12,opt,name=points_payload,json=pointsPayload,proto3" json:"points_payload,omitempty"`
 	MaxPointTimeUnixNano   int64  `protobuf:"varint,13,opt,name=max_point_time_unix_nano,json=maxPointTimeUnixNano,proto3" json:"max_point_time_unix_nano,omitempty"`
-	// points_payload 的压缩方式：0=未压缩（PBPoints 原始编码），1=zstd。
-	// 兼容性：旧数据/旧版本读取方将按 0 处理。
+	// Compression method of points_payload: 0=raw PBPoints encoding, 1=zstd.
+	// Backward compatible: old data / old readers treat it as 0.
 	PayloadCompression   int32 `protobuf:"varint,14,opt,name=payload_compression,json=payloadCompression,proto3" json:"payload_compression,omitempty"`
 	PredError            bool  `protobuf:"varint,15,opt,name=pred_error,json=predError,proto3" json:"pred_error,omitempty"`
 	PredHttpError        bool  `protobuf:"varint,16,opt,name=pred_http_error,json=predHttpError,proto3" json:"pred_http_error,omitempty"`

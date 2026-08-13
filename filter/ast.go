@@ -881,7 +881,7 @@ func (x *WhereCondition) Eval(data KVs) bool {
 	return true
 }
 
-// Conds 返回该条件内部的表达式列表（AND 组合）。
+// Conds returns the expression list inside this condition (AND-combined).
 func (x *WhereCondition) Conds() []Node {
 	if x == nil {
 		return nil

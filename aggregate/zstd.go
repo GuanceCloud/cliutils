@@ -8,13 +8,13 @@ import (
 )
 
 const (
-	// PayloadCompressionNone 表示 points_payload 为原始 PBPoints 编码，未压缩。
+	// PayloadCompressionNone means points_payload is raw PBPoints encoding (uncompressed).
 	PayloadCompressionNone int32 = 0
-	// PayloadCompressionZstd 表示 points_payload 为 zstd 压缩的 PBPoints 编码。
+	// PayloadCompressionZstd means points_payload is zstd-compressed PBPoints encoding.
 	PayloadCompressionZstd int32 = 1
 )
 
-// zstdEncoderPool 复用 zstd encoder，避免高频压缩时重复初始化。
+// zstdEncoderPool reuses zstd encoders to avoid re-initialization on hot paths.
 var zstdEncoderPool = sync.Pool{
 	New: func() any {
 		enc, err := zstd.NewWriter(nil)
@@ -25,7 +25,7 @@ var zstdEncoderPool = sync.Pool{
 	},
 }
 
-// zstdDecoderPool 复用 zstd decoder。
+// zstdDecoderPool reuses zstd decoders.
 var zstdDecoderPool = sync.Pool{
 	New: func() any {
 		dec, err := zstd.NewReader(nil)
@@ -36,9 +36,10 @@ var zstdDecoderPool = sync.Pool{
 	},
 }
 
-// CompressPointsPayload 压缩 PBPoints payload。
-// 返回压缩后的字节与压缩方式；若压缩无收益（结果不小于原始大小），
-// 返回原始字节与 PayloadCompressionNone。
+// CompressPointsPayload compresses a PBPoints payload.
+// It returns the compressed bytes together with the compression method;
+// when compression has no benefit (result not smaller than the input),
+// the original bytes and PayloadCompressionNone are returned.
 func CompressPointsPayload(payload []byte) ([]byte, int32, error) {
 	if len(payload) == 0 {
 		return payload, PayloadCompressionNone, nil
@@ -55,8 +56,8 @@ func CompressPointsPayload(payload []byte) ([]byte, int32, error) {
 	return compressed, PayloadCompressionZstd, nil
 }
 
-// DecompressPointsPayload 按压缩方式解压 PBPoints payload。
-// compression 为 PayloadCompressionNone 时原样返回，不复制。
+// DecompressPointsPayload decompresses a PBPoints payload by the given compression method.
+// PayloadCompressionNone returns the input as-is without copying.
 func DecompressPointsPayload(payload []byte, compression int32) ([]byte, error) {
 	if len(payload) == 0 || compression == PayloadCompressionNone {
 		return payload, nil

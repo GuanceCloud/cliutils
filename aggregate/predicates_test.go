@@ -140,7 +140,8 @@ func TestSpanPredicatesExtraction(t *testing.T) {
 }
 
 func TestSpanPredicatesMatchFilterSemantics(t *testing.T) {
-	// 与 bingX 调研报告真实规则集对齐，验证谓词摘要与 filter 条件求值结果一致。
+	// Aligned with the real rule set from the bingX survey report: verifies the
+	// predicate summary agrees with filter condition evaluation.
 	rule1 := &SamplingPipeline{
 		Name:      "keep-technical-or-business-error",
 		Type:      PipelineTypeCondition,
@@ -240,8 +241,8 @@ func TestSpanPredicatesMatchFilterSemantics(t *testing.T) {
 }
 
 func TestMergeSpanPredicatesAcrossDataKits(t *testing.T) {
-	// 模拟同一 trace 的 span 分散在两个 Datakit：
-	// datakit-a 见 error + root 慢；datakit-b 见 5xx + 非根慢。
+	// Simulates spans of the same trace spread across two DataKits:
+	// datakit-a sees error + slow root; datakit-b sees 5xx + slow non-root.
 	packetA := pickSinglePredicatePacket(t, []*point.Point{
 		predicateTracePoint("t", "0", 1500000, "status", "error"),
 		predicateTracePoint("t", "s1", 10000),
@@ -262,7 +263,8 @@ func TestMergeSpanPredicatesAcrossDataKits(t *testing.T) {
 	assert.Equal(t, int64(600000), merged.MaxNonrootDurationUs)
 	assert.Equal(t, int64(1500000), merged.MaxSpanDurationUs)
 
-	// 合并等价性：OR 结果 == 对合并后完整 payload 的 filter 求值。
+	// Merge equivalence: the OR result equals filter evaluation over the full
+	// merged payload.
 	require.NoError(t, mergePacketPayload(packetA, packetB))
 	rule1 := &SamplingPipeline{
 		Name:      "keep-error",
@@ -372,7 +374,7 @@ func TestComputeSpanPredicates(t *testing.T) {
 			MaxSpanDurationUs: 123,
 		}
 		require.NoError(t, ComputeSpanPredicates(packet))
-		// 已有谓词：不重算，duration 摘要保持原值。
+		// Predicates already present: no recomputation, duration summary kept.
 		assert.Equal(t, int64(123), packet.MaxSpanDurationUs)
 		assert.False(t, packet.PredHttpError)
 	})
@@ -392,30 +394,34 @@ func TestComputeSpanPredicates(t *testing.T) {
 	})
 
 	t.Run("matches_picktrace_predicates", func(t *testing.T) {
-		// 手工构造的包补算后，谓词应与 PickTrace 组包的包一致。
+		// After computing on a hand-crafted packet, the predicates must agree
+		// with a PickTrace-grouped packet.
 		manual := &DataPacket{
 			PointsPayload: buildPayload(),
 		}
 		require.NoError(t, ComputeSpanPredicates(manual))
 
 		picked := testCompressedTracePackets(t, "t-compute", 1)
-		// 语义等价性由 TestSpanPredicatesMatchFilterSemantics 覆盖，
-		// 这里仅验证补算路径与 PickTrace 路径都能产出相同的谓词结构。
+		// Semantic equivalence is covered by TestSpanPredicatesMatchFilterSemantics;
+		// here we only verify both the compute path and the PickTrace path produce
+		// the same predicate structure.
 		assert.True(t, picked.PredError || manual.PredError)
 		assert.True(t, manual.PredError)
 	})
 }
 
 func TestComputeSpanPredicatesPartialCorruptionLeavesNoPartialPredicates(t *testing.T) {
-	// 合法 error span + 损坏帧：补算必须整体失败且不写入部分谓词，
-	// 否则快速路径会信任"部分谓词"导致决策与完整 walk 不一致。
+	// A valid error span plus a corrupted frame: computation must fail as a
+	// whole without writing partial predicates, otherwise the fast path would
+	// trust partial predicates and disagree with the full walk.
 	payload := point.AppendPBPointToPBPointsPayload(nil,
 		point.NewPoint("span", point.NewKVs(map[string]any{
 			"trace_id": "t-partial",
 			"span_id":  "s1",
 		}).SetTag("status", "error"), point.CommonLoggingOptions()...).PBPoint())
 
-	// 追加一个 frame 结构合法、但 PBPoint 内部字段损坏的 point（varint 截断）。
+	// Append a point whose frame is structurally valid but whose PBPoint fields
+	// are corrupted (truncated varint).
 	payload = append(payload, 0x0a, 0x04, 0x08, 0x80, 0x80, 0x80)
 
 	packet := &DataPacket{PointsPayload: payload}

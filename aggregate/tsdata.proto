@@ -24,22 +24,25 @@ message DataPacket {
   bytes points_payload = 12;
   int64 max_point_time_unix_nano = 13;
 
-  // points_payload 的压缩方式：0=未压缩（PBPoints 原始编码），1=zstd。
-  // 兼容性：旧数据/旧版本读取方将按 0 处理。
+  // Compression method of points_payload: 0=raw PBPoints encoding, 1=zstd.
+  // Backward compatible: old data / old readers treat it as 0.
   int32 payload_compression = 14;
 
-  // ---- 已见 span 谓词摘要（跨 Datakit 由 dataway Ingest 合并路径 OR 聚合）----
-  // 语义：本 DataPacket 组包时已见 span 的特征摘要，供 dataway 决策时免解压评估；
-  // 仅统计"已见"数据，跨 Datakit 合并后即为所有已见 Datakit 的并集。
+  // ---- Span predicate summary of seen spans (OR-aggregated across DataKits
+  // by the dataway Ingest merge path) ----
+  // Semantics: features of the spans seen when this DataPacket was grouped,
+  // evaluated without decompression at dataway decision time; only "seen"
+  // data is counted, and after cross-DataKit merging it is the union of all
+  // seen DataKits.
 
-  bool pred_error = 15; // 任一已见 span: status="error"
-  bool pred_http_error = 16; // 任一已见 span: http_status_code 匹配 4xx/5xx
-  bool pred_biz_error = 17; // 任一已见 span: body_code 业务错误（非 "0"/"200"）
-  bool pred_trace_keep = 18; // 任一已见 span: trace_keep=true
+  bool pred_error = 15; // any seen span: status="error"
+  bool pred_http_error = 16; // any seen span: http_status_code matches 4xx/5xx
+  bool pred_biz_error = 17; // any seen span: body_code business error (not "0"/"200")
+  bool pred_trace_keep = 18; // any seen span: trace_keep=true
 
-  int64 max_span_duration_us = 19; // 已见 span 最大 duration（微秒）
-  int64 root_duration_us = 20; // 已见 root span（parent_id="0"）的 duration（微秒，0=未见）
-  int64 max_nonroot_duration_us = 21; // 已见非 root span 最大 duration（微秒）
+  int64 max_span_duration_us = 19; // max duration (us) of seen spans
+  int64 root_duration_us = 20; // duration (us) of the seen root span (parent_id="0"); 0=not seen
+  int64 max_nonroot_duration_us = 21; // max duration (us) of seen non-root spans
 }
 
 // batch packages

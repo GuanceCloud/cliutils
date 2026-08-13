@@ -9,21 +9,23 @@ import (
 	"time"
 )
 
-// PayloadSpiller 大包 payload 的磁盘溢出存储。
-// 用于时间轮分级缓存：大包（占内存主体的少数包）落盘，时间轮只保留元数据。
+// PayloadSpiller stores oversized payloads on disk.
+// It backs the time-wheel tiered cache: large packets (a few packets holding
+// most of the memory footprint) spill to disk while the time wheel keeps metadata only.
 type PayloadSpiller interface {
-	// Put 写入 payload，返回可在后续 Get/Delete 中使用的 key。
+	// Put writes a payload and returns a key usable with Get/Delete later.
 	Put(payload []byte) (key string, err error)
-	// Get 按 key 读回 payload。
+	// Get reads back a payload by key.
 	Get(key string) ([]byte, error)
-	// Delete 删除 key 对应的数据（幂等）。
+	// Delete removes the data for a key (idempotent).
 	Delete(key string) error
-	// Close 关闭存储。
+	// Close closes the storage.
 	Close() error
 }
 
-// FilePayloadSpiller 目录 + 文件实现的 PayloadSpiller。
-// 打开时清空目录，清理上一次运行遗留的 spill 数据（spill 生命周期不超过进程生命周期）。
+// FilePayloadSpiller is a directory-plus-file implementation of PayloadSpiller.
+// The directory is cleared on open to remove spill data left by a previous run
+// (spill lifetime never exceeds the process lifetime).
 type FilePayloadSpiller struct {
 	dir string
 	seq atomic.Int64
@@ -86,7 +88,7 @@ func (f *FilePayloadSpiller) Close() error {
 	return nil
 }
 
-// validSpillKey 限制 key 的字符集，防止路径穿越。
+// validSpillKey restricts the key character set to prevent path traversal.
 func validSpillKey(key string) bool {
 	if key == "" || len(key) > 64 {
 		return false

@@ -4,15 +4,19 @@ import (
 	fp "github.com/GuanceCloud/cliutils/filter"
 )
 
-// span 谓词编译：将 SamplingPipeline 的条件静态编译为基于 DataPacket
-// span 谓词摘要（Pred* / *DurationUs 字段）的判定，使决策无需解压 payload。
-// 无法被摘要覆盖的条件（回退到解压 walk）在编译期返回 ok=false。
+// Span-predicate compilation: statically compiles SamplingPipeline conditions into
+// predicates over the DataPacket span summary (Pred* / *DurationUs fields),
+// allowing decisions without decompressing the payload.
+// Conditions that cannot be covered by the summary (falling back to decompressed
+// walk) return ok=false at compile time.
 
 type spanPredicateExpr func(*DataPacket) bool
 
-// packetHasSpanPredicates 判断 packet 是否携带 PickTrace 组包时计算的谓词摘要。
-// 谓词全零的包（旧版本 Datakit / 手工构造 / 无 duration 字段的异常数据）不信任摘要，
-// 决策回退到解压 walk，保持与旧逻辑一致。
+// packetHasSpanPredicates reports whether the packet carries span predicates
+// computed by PickTrace during grouping. Packets with all-zero predicates
+// (old DataKit versions / hand-crafted / abnormal data without a duration field)
+// are not trusted and decisions fall back to the decompressed walk to keep
+// behavior identical to the legacy logic.
 func packetHasSpanPredicates(packet *DataPacket) bool {
 	if packet == nil {
 		return false
@@ -30,13 +34,14 @@ const (
 )
 
 type spanPred struct {
-	flag       spanPredicateExpr // 直接布尔谓词（error/5xx/biz/trace_keep 等）
+	flag       spanPredicateExpr // direct boolean predicate (error/5xx/biz/trace_keep, etc.)
 	parentID   int               // predParentNone / predParentRoot / predParentNonRoot
-	durationGT int64             // duration 阈值（微秒），0 表示无约束
+	durationGT int64             // duration threshold (microseconds); 0 means unconstrained
 }
 
-// compilePipelinePredicate 编译单条 pipeline。
-// match-all 概率采样（无条件）恒匹配；条件管道逐条分析，任一无法覆盖则失败。
+// compilePipelinePredicate compiles a single pipeline.
+// A match-all probabilistic sampler (no condition) always matches; condition
+// pipelines are analyzed one by one and fail when any of them cannot be covered.
 func compilePipelinePredicate(pipeline *SamplingPipeline) (spanPredicateExpr, bool) {
 	if pipeline == nil {
 		return nil, false
@@ -63,7 +68,7 @@ func compilePipelinePredicate(pipeline *SamplingPipeline) (spanPredicateExpr, bo
 		exprs = append(exprs, expr)
 	}
 
-	// WhereConditions.Eval 语义：任一 WhereCondition 满足即命中。
+	// WhereConditions.Eval semantics: a hit occurs when any WhereCondition matches.
 	return func(packet *DataPacket) bool {
 		for _, expr := range exprs {
 			if expr(packet) {
@@ -74,7 +79,7 @@ func compilePipelinePredicate(pipeline *SamplingPipeline) (spanPredicateExpr, bo
 	}, true
 }
 
-// compileWhereCondition 编译一个 {} 内的 AND 组合。
+// compileWhereCondition compiles the AND combination inside one {}.
 func compileWhereCondition(wc *fp.WhereCondition) (spanPredicateExpr, bool) {
 	if wc == nil {
 		return nil, false
@@ -140,8 +145,9 @@ func asBinaryExpr(node fp.Node) *fp.BinaryExpr {
 	}
 }
 
-// mergePreds 按 AND 语义合并两个谓词片段。
-// parent 约束冲突（root 与 nonroot 并存）或组合无法表达时返回 false。
+// mergePreds merges two predicate fragments under AND semantics.
+// It returns false when parent constraints conflict (root and non-root together)
+// or the combination cannot be expressed.
 func mergePreds(a, b spanPred) (spanPred, bool) {
 	out := spanPred{}
 
@@ -169,7 +175,8 @@ func mergePreds(a, b spanPred) (spanPred, bool) {
 	return out, true
 }
 
-// eval 生成最终判定函数；nil 表示该组合无法被谓词覆盖。
+// eval produces the final decision function; nil means the combination
+// cannot be covered by predicates.
 func (p *spanPred) eval() spanPredicateExpr {
 	var dur spanPredicateExpr
 	switch {
@@ -197,7 +204,7 @@ func (p *spanPred) eval() spanPredicateExpr {
 	}
 }
 
-// compileAtomic 编译原子比较条件。
+// compileAtomic compiles an atomic comparison condition.
 func compileAtomic(be *fp.BinaryExpr) (spanPred, bool) {
 	if be == nil {
 		return spanPred{}, false
@@ -273,8 +280,9 @@ func numberLiteralInt(node fp.Node) (int64, bool) {
 	return n.Int, true
 }
 
-// isHTTPErrorRegex 判断 MATCH 正则是否精确等价于 4xx/5xx 状态码匹配。
-// 仅识别已知等价形式；其余正则回退解压 walk，保证语义不变。
+// isHTTPErrorRegex reports whether the MATCH regex is exactly equivalent to
+// a 4xx/5xx status-code match. Only known equivalent forms are recognized;
+// other regexes fall back to the decompressed walk to keep semantics unchanged.
 func isHTTPErrorRegex(node fp.Node) bool {
 	list, ok := node.(fp.NodeList)
 	if !ok || len(list) != 1 {
@@ -299,7 +307,7 @@ func isHTTPErrorRegex(node fp.Node) bool {
 	}
 }
 
-// isBizErrorList 判断 NOT_IN 列表是否精确为 ["0", "200", null]。
+// isBizErrorList reports whether the NOT_IN list is exactly ["0", "200", null].
 func isBizErrorList(node fp.Node) bool {
 	list, ok := node.(fp.NodeList)
 	if !ok || len(list) != 3 {
