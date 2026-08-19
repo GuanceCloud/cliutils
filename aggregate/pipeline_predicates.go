@@ -146,19 +146,33 @@ func asBinaryExpr(node fp.Node) *fp.BinaryExpr {
 }
 
 // mergePreds merges two predicate fragments under AND semantics.
-// It returns false when parent constraints conflict (root and non-root together)
-// or the combination cannot be expressed.
+// Only same-span-associative combinations are allowed:
+//   - parent constraint + duration threshold (extracted as a per-span pair)
+//   - multiple duration thresholds (max is equivalent)
+//
+// Any AND combination involving a flag predicate (Pred* booleans) is rejected:
+// flags are "exists a span" summaries, and AND-ing two exists summaries does
+// not imply a single span satisfying the full condition. For example, with
+// span A {status=error, duration short} and span B {status=ok, duration long},
+// `status="error" AND duration>N` matches no span in per-point evaluation, but
+// PredError AND MaxSpanDurationUs>N would wrongly match.
 func mergePreds(a, b spanPred) (spanPred, bool) {
 	out := spanPred{}
 
-	switch {
-	case a.flag != nil && b.flag != nil:
-		fa, fb := a.flag, b.flag
-		out.flag = func(packet *DataPacket) bool { return fa(packet) && fb(packet) }
-	case a.flag != nil:
-		out.flag = a.flag
-	case b.flag != nil:
-		out.flag = b.flag
+	// Empty fragments pass through (first-merge and no-op cases).
+	aEmpty := a.flag == nil && a.parentID == predParentNone && a.durationGT == 0
+	bEmpty := b.flag == nil && b.parentID == predParentNone && b.durationGT == 0
+	if aEmpty {
+		return b, true
+	}
+	if bEmpty {
+		return a, true
+	}
+
+	if a.flag != nil || b.flag != nil {
+		// A flag AND anything else cannot preserve the same-span semantics:
+		// fall back to the decompressed walk.
+		return spanPred{}, false
 	}
 
 	switch {
@@ -192,10 +206,9 @@ func (p *spanPred) eval() spanPredicateExpr {
 	}
 
 	switch {
-	case p.flag != nil && dur != nil:
-		flag := p.flag
-		return func(packet *DataPacket) bool { return flag(packet) && dur(packet) }
 	case p.flag != nil:
+		// A lone flag is safe (single exists-summary); flag AND anything else
+		// is rejected at merge time, so flag and dur never coexist here.
 		return p.flag
 	case dur != nil:
 		return dur
