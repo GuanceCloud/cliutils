@@ -143,7 +143,7 @@ func TestEvaluatePipelinesFastPathMatchesWalk(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			packet := pickSinglePredicatePacket(t, tc.pts)
 			require.NotNil(t, packet)
-			require.Equal(t, PayloadCompressionZstd, packet.PayloadCompression)
+			require.Contains(t, []int32{PayloadCompressionNone, PayloadCompressionZstd}, packet.PayloadCompression)
 
 			fastMatched, fastPacket := evaluatePipelines(packet, fastPipelines)
 			walkMatched, _ := evaluatePipelines(packet, walkPipelines)

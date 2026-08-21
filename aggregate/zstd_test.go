@@ -87,6 +87,7 @@ func TestPickTraceCompressesAndWalks(t *testing.T) {
 	require.NotNil(t, packet)
 
 	assert.Equal(t, PayloadCompressionZstd, packet.PayloadCompression)
+	assert.Equal(t, CurrentPredicateSummaryVersion, packet.PredicateSummaryVersion)
 	assert.Less(t, len(packet.PointsPayload), 1024*1024, "compressed payload should be small")
 
 	var count int

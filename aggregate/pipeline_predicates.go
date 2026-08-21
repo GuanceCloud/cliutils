@@ -12,12 +12,25 @@ import (
 
 type spanPredicateExpr func(*DataPacket) bool
 
-// packetHasSpanPredicates reports whether the packet carries span predicates
-// computed by PickTrace during grouping. Packets with all-zero predicates
-// (old DataKit versions / hand-crafted / abnormal data without a duration field)
-// are not trusted and decisions fall back to the decompressed walk to keep
-// behavior identical to the legacy logic.
+// CurrentPredicateSummaryVersion is the predicate summary format emitted by
+// the current Pick* helpers. A zero version denotes a legacy packet whose
+// summary completeness is unknown.
+const CurrentPredicateSummaryVersion uint32 = 1
+
+// packetHasSpanPredicates reports whether the packet carries a complete span
+// predicate summary. Versioned packets may legitimately contain an all-zero
+// summary; legacy packets are trusted only when at least one summary value is
+// non-zero, otherwise decisions fall back to the decompressed walk.
 func packetHasSpanPredicates(packet *DataPacket) bool {
+	if packet == nil {
+		return false
+	}
+
+	return packet.PredicateSummaryVersion >= CurrentPredicateSummaryVersion ||
+		packetHasLegacySpanPredicateValues(packet)
+}
+
+func packetHasLegacySpanPredicateValues(packet *DataPacket) bool {
 	if packet == nil {
 		return false
 	}
