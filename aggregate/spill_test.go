@@ -104,19 +104,37 @@ func TestFilePayloadSpiller(t *testing.T) {
 	require.NoError(t, spiller.Delete("../../etc/passwd"))
 }
 
-func TestFilePayloadSpillerClearsOnOpen(t *testing.T) {
+func TestFilePayloadSpillerClearsOnlyOwnedFilesOnOpen(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "leftover"), []byte("stale"), 0o600))
+	first, err := NewFilePayloadSpiller(dir)
+	require.NoError(t, err)
+	staleKey, err := first.Put([]byte("stale spill"))
+	require.NoError(t, err)
+	require.NoError(t, first.Close())
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "keep.txt"), []byte("user data"), 0o600))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "keep-dir"), 0o700))
 
 	spiller, err := NewFilePayloadSpiller(dir)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = spiller.Close() })
 
-	entries, err := os.ReadDir(dir)
-	require.NoError(t, err)
-	assert.Empty(t, entries, "打开时应清空上次运行遗留的 spill 文件")
+	_, err = os.Stat(filepath.Join(dir, staleKey))
+	assert.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(filepath.Join(dir, "keep.txt"))
+	require.NoError(t, err, "不得删除不属于 spiller 的文件")
+	_, err = os.Stat(filepath.Join(dir, "keep-dir"))
+	require.NoError(t, err, "不得递归删除子目录")
+}
+
+func TestFilePayloadSpillerRejectsUnsafeDirectory(t *testing.T) {
+	t.Parallel()
+
+	_, err := NewFilePayloadSpiller("")
+	require.Error(t, err)
+	_, err = NewFilePayloadSpiller(string(filepath.Separator))
+	require.Error(t, err)
 }
 
 func TestSamplerSpillLargePacketKept(t *testing.T) {

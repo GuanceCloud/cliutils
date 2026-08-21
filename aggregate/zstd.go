@@ -12,12 +12,18 @@ const (
 	PayloadCompressionNone int32 = 0
 	// PayloadCompressionZstd means points_payload is zstd-compressed PBPoints encoding.
 	PayloadCompressionZstd int32 = 1
+
+	zstdDecoderMaxWindowBytes = 64 << 20
+	zstdDecoderMaxMemoryBytes = 256 << 20
 )
 
 // zstdEncoderPool reuses zstd encoders to avoid re-initialization on hot paths.
 var zstdEncoderPool = sync.Pool{
 	New: func() any {
-		enc, err := zstd.NewWriter(nil)
+		enc, err := zstd.NewWriter(nil,
+			zstd.WithEncoderConcurrency(1),
+			zstd.WithEncoderLevel(zstd.SpeedFastest),
+		)
 		if err != nil {
 			panic(fmt.Sprintf("new zstd encoder: %v", err))
 		}
@@ -28,7 +34,12 @@ var zstdEncoderPool = sync.Pool{
 // zstdDecoderPool reuses zstd decoders.
 var zstdDecoderPool = sync.Pool{
 	New: func() any {
-		dec, err := zstd.NewReader(nil)
+		dec, err := zstd.NewReader(nil,
+			zstd.WithDecoderConcurrency(1),
+			zstd.WithDecoderLowmem(true),
+			zstd.WithDecoderMaxWindow(zstdDecoderMaxWindowBytes),
+			zstd.WithDecoderMaxMemory(zstdDecoderMaxMemoryBytes),
+		)
 		if err != nil {
 			panic(fmt.Sprintf("new zstd decoder: %v", err))
 		}

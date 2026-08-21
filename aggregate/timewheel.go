@@ -69,6 +69,16 @@ type TailSamplingOutcome struct {
 	Packet       *DataPacket
 	SourcePacket *DataPacket
 	Decision     DerivedMetricDecision
+	MatchedRule  *TailSamplingMatchedRule
+}
+
+// TailSamplingMatchedRule identifies the first sampling pipeline that matched
+// a packet. Index is one-based to match user-visible rule ordering.
+type TailSamplingMatchedRule struct {
+	Index  int
+	Name   string
+	Type   PipelineType
+	Action PipelineAction
 }
 
 func NewGlobalSampler(shardCount int, waitTime time.Duration) *GlobalSampler {
@@ -169,9 +179,8 @@ func (s *GlobalSampler) needsPayloadForDecision(dataType, token, groupKey string
 		return true
 	}
 
-	pipelines := s.pipelinesFor(dataType, token, groupKey)
-	_, ok := compilePipelinesFast(pipelines)
-	return !ok
+	plan := s.decisionPlanFor(dataType, token, groupKey)
+	return plan == nil || !plan.fast
 }
 
 func tailSamplingGroupMapKey(packet *DataPacket) uint64 {
@@ -235,6 +244,9 @@ func mergeSpanPredicates(dst, src *DataPacket) {
 		return
 	}
 
+	summaryComplete := dst.PredicateSummaryVersion >= CurrentPredicateSummaryVersion &&
+		src.PredicateSummaryVersion >= CurrentPredicateSummaryVersion
+
 	dst.PredError = dst.PredError || src.PredError
 	dst.PredHttpError = dst.PredHttpError || src.PredHttpError
 	dst.PredBizError = dst.PredBizError || src.PredBizError
@@ -248,6 +260,11 @@ func mergeSpanPredicates(dst, src *DataPacket) {
 	}
 	if src.MaxNonrootDurationUs > dst.MaxNonrootDurationUs {
 		dst.MaxNonrootDurationUs = src.MaxNonrootDurationUs
+	}
+	if summaryComplete {
+		dst.PredicateSummaryVersion = CurrentPredicateSummaryVersion
+	} else {
+		dst.PredicateSummaryVersion = 0
 	}
 }
 
@@ -445,12 +462,15 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 
 		sourcePacket := dg.packet
 
+		plan := s.decisionPlanFor(dg.dataType, sourcePacket.Token, sourcePacket.GroupKey)
+		needsPayload := plan == nil || !plan.fast
+
 		// Spilled packets are read back only when the decision needs payload
 		// content (pipelines not coverable by predicates) or when the predicate
-		// summary is untrusted (all-zero: legacy data / hand-crafted). Disk data
+		// summary is untrusted (unversioned all-zero legacy data). Disk data
 		// is released uniformly after the decision.
 		spillKey := dg.spillKey
-		if spillKey != "" && (s.needsPayloadForDecision(dg.dataType, sourcePacket.Token, sourcePacket.GroupKey) ||
+		if spillKey != "" && (needsPayload ||
 			!packetHasSpanPredicates(sourcePacket)) {
 			if err := s.hydrateDataGroup(dg); err != nil {
 				l.Errorf("hydrate spill payload for decision failed: %v", err)
@@ -459,28 +479,31 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 
 		decision := DerivedMetricDecisionDropped
 		var keptPacket *DataPacket
+		var matchedRule *TailSamplingMatchedRule
 
-		token := dg.packet.Token
-		groupKey := dg.packet.GroupKey
-
-		pipelines := s.pipelinesFor(dg.dataType, token, groupKey)
-		if pipelines != nil && sourcePacket != nil {
+		if plan != nil && sourcePacket != nil {
 			// For spilled packets with coverable pipelines and trusted predicates,
 			// decide directly from predicates to avoid disk reads; otherwise go
 			// through evaluatePipelines (internal fast path or decompressed walk).
 			usePredicates := spillKey != "" &&
-				!s.needsPayloadForDecision(dg.dataType, token, groupKey) &&
+				!needsPayload &&
 				packetHasSpanPredicates(sourcePacket)
+			var (
+				matched      bool
+				matchedIndex int
+				packet       *DataPacket
+			)
 			if usePredicates {
-				if match, packet := decideWithPredicates(sourcePacket, pipelines); match && packet != nil {
-					keptPacket = packet
-					decision = DerivedMetricDecisionKept
-				}
+				matched, matchedIndex, packet = decideWithPredicates(sourcePacket, plan)
 			} else {
-				if match, packet := evaluatePipelines(sourcePacket, pipelines); match && packet != nil {
-					keptPacket = packet
-					decision = DerivedMetricDecisionKept
-				}
+				matched, matchedIndex, packet = evaluateDecisionPlan(sourcePacket, plan)
+			}
+			if matched {
+				matchedRule = tailSamplingMatchedRule(plan, matchedIndex)
+			}
+			if packet != nil {
+				keptPacket = packet
+				decision = DerivedMetricDecisionKept
 			}
 		}
 
@@ -499,6 +522,7 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 			Packet:       keptPacket,
 			SourcePacket: sourcePacket,
 			Decision:     decision,
+			MatchedRule:  matchedRule,
 		}
 
 		dg.Reset()
@@ -509,16 +533,24 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 
 // pipelinesFor returns the sampling pipeline config by data type / group dimension.
 func (s *GlobalSampler) pipelinesFor(dataType, token, groupKey string) []*SamplingPipeline {
+	plan := s.decisionPlanFor(dataType, token, groupKey)
+	if plan == nil {
+		return nil
+	}
+	return plan.pipelines
+}
+
+func (s *GlobalSampler) decisionPlanFor(dataType, token, groupKey string) *compiledDecisionPlan {
 	switch dataType {
 	case point.STracing:
 		if cfg := s.GetTraceConfig(token); cfg != nil {
-			return cfg.Pipelines
+			return cfg.decisionPlan
 		}
 	case point.SLogging:
 		if cfg := s.GetLoggingConfig(token); cfg != nil {
 			for _, group := range cfg.GroupDimensions {
 				if group != nil && group.GroupKey == groupKey {
-					return group.Pipelines
+					return group.decisionPlan
 				}
 			}
 		}
@@ -526,7 +558,7 @@ func (s *GlobalSampler) pipelinesFor(dataType, token, groupKey string) []*Sampli
 		if cfg := s.GetRUMConfig(token); cfg != nil {
 			for _, group := range cfg.GroupDimensions {
 				if group != nil && group.GroupKey == groupKey {
-					return group.Pipelines
+					return group.decisionPlan
 				}
 			}
 		}
@@ -536,22 +568,28 @@ func (s *GlobalSampler) pipelinesFor(dataType, token, groupKey string) []*Sampli
 
 // decideWithPredicates decides pipelines via span predicates without reading
 // the payload. All pipelines must be compilable; otherwise no match is returned.
-func decideWithPredicates(sourcePacket *DataPacket, pipelines []*SamplingPipeline) (bool, *DataPacket) {
-	exprs, ok := compilePipelinesFast(pipelines)
-	if !ok {
-		return false, nil
+func decideWithPredicates(sourcePacket *DataPacket, plan *compiledDecisionPlan) (bool, int, *DataPacket) {
+	if plan == nil || !plan.fast {
+		return false, -1, nil
 	}
 
-	for idx, expr := range exprs {
+	for idx, expr := range plan.predicates {
 		if expr == nil {
 			continue
 		}
 		if expr(sourcePacket) {
-			return true, pipelineMatchedPacket(sourcePacket, pipelines[idx])
+			return true, idx, pipelineMatchedPacket(sourcePacket, plan.pipelines[idx])
 		}
 	}
 
-	return false, nil
+	return false, -1, nil
+}
+
+func tailSamplingMatchedRule(plan *compiledDecisionPlan, index int) *TailSamplingMatchedRule {
+	if plan == nil || index < 0 || index >= len(plan.matchedRules) || plan.pipelines[index] == nil {
+		return nil
+	}
+	return &plan.matchedRules[index]
 }
 
 func (s *GlobalSampler) TailSamplingData(dataGroups map[uint64]*DataGroup) map[uint64]*DataPacket {

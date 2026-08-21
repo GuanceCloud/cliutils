@@ -43,6 +43,10 @@ message DataPacket {
   int64 max_span_duration_us = 19; // max duration (us) of seen spans
   int64 root_duration_us = 20; // duration (us) of the seen root span (parent_id="0"); 0=not seen
   int64 max_nonroot_duration_us = 21; // max duration (us) of seen non-root spans
+
+  // Version of the predicate summary carried by this packet. Zero means the
+  // sender did not explicitly mark the summary as complete (legacy packet).
+  uint32 predicate_summary_version = 22;
 }
 
 // batch packages
