@@ -41,7 +41,8 @@ type DataPacket struct {
 	PointsPayload          []byte `protobuf:"bytes,12,opt,name=points_payload,json=pointsPayload,proto3" json:"points_payload,omitempty"`
 	MaxPointTimeUnixNano   int64  `protobuf:"varint,13,opt,name=max_point_time_unix_nano,json=maxPointTimeUnixNano,proto3" json:"max_point_time_unix_nano,omitempty"`
 	// Compression method of points_payload: 0=raw PBPoints encoding, 1=zstd.
-	// Backward compatible: old data / old readers treat it as 0.
+	// Senders must negotiate non-zero methods at the HTTP protocol layer: old
+	// readers ignore this field but cannot decode compressed points_payload.
 	PayloadCompression   int32 `protobuf:"varint,14,opt,name=payload_compression,json=payloadCompression,proto3" json:"payload_compression,omitempty"`
 	PredError            bool  `protobuf:"varint,15,opt,name=pred_error,json=predError,proto3" json:"pred_error,omitempty"`
 	PredHttpError        bool  `protobuf:"varint,16,opt,name=pred_http_error,json=predHttpError,proto3" json:"pred_http_error,omitempty"`

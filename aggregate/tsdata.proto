@@ -25,7 +25,8 @@ message DataPacket {
   int64 max_point_time_unix_nano = 13;
 
   // Compression method of points_payload: 0=raw PBPoints encoding, 1=zstd.
-  // Backward compatible: old data / old readers treat it as 0.
+  // Senders must negotiate non-zero methods at the HTTP protocol layer: old
+  // readers ignore this field but cannot decode compressed points_payload.
   int32 payload_compression = 14;
 
   // ---- Span predicate summary of seen spans (OR-aggregated across DataKits

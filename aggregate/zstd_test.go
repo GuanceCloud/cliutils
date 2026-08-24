@@ -82,6 +82,27 @@ func TestCompressPointsPayload(t *testing.T) {
 	})
 }
 
+func TestPointsPayloadDecodedSize(t *testing.T) {
+	raw := []byte(strings.Repeat("decoded-size-", 4096))
+
+	size, err := PointsPayloadDecodedSize(raw, PayloadCompressionNone)
+	require.NoError(t, err)
+	assert.Equal(t, int64(len(raw)), size)
+
+	compressed, compression, err := CompressPointsPayload(raw)
+	require.NoError(t, err)
+	require.Equal(t, PayloadCompressionZstd, compression)
+	size, err = PointsPayloadDecodedSize(compressed, compression)
+	require.NoError(t, err)
+	assert.Equal(t, int64(len(raw)), size)
+
+	_, err = PointsPayloadDecodedSize([]byte("not-zstd"), PayloadCompressionZstd)
+	require.Error(t, err)
+
+	_, err = PointsPayloadDecodedSize(raw, 99)
+	require.ErrorIs(t, err, ErrUnsupportedPayloadCompression)
+}
+
 func TestPickTraceCompressesAndWalks(t *testing.T) {
 	packet := testCompressedTracePackets(t, "trace-compress-1", 2000)
 	require.NotNil(t, packet)
