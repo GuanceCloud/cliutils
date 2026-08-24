@@ -386,7 +386,7 @@ processor := aggregate.NewTailSamplingProcessor(sampler, collector, metrics)
 
 整体流程：
 
-`point -> PickTrace/PickLogging/PickRUM -> DataPacket -> TailSamplingProcessor.IngestPacket() -> GlobalSampler -> AdvanceTime() -> TailSamplingData() -> kept packets + derived metric points`
+`point -> PickTrace/PickLogging/PickRUM -> DataPacket -> TailSamplingProcessor.IngestPacket() -> GlobalSampler -> ProcessTick() -> outcomes + derived metric points`
 
 最小调用顺序：
 
@@ -394,7 +394,7 @@ processor := aggregate.NewTailSamplingProcessor(sampler, collector, metrics)
 2. 为每个 token 调用 `processor.UpdateConfig(token, cfg)`
 3. 业务侧用 `PickTrace()` / `PickLogging()` / `PickRUM()` 组包
 4. packet 进入 `processor.IngestPacket()`
-5. 每秒调用一次 `AdvanceTime()` 和 `TailSamplingData()`
+5. 每秒调用一次 `ProcessTick()`；它会先推进全部 shard，再并行处理各 shard 的到期决策
 6. 每 30 秒左右调用一次 `FlushDerivedMetrics()`
 7. 分别消费保留的 `DataPacket` 和 `DerivedMetricPoints`
 
@@ -537,8 +537,12 @@ data_ttl = "1m"
 时间轮在 `GlobalSampler` 里，关键行为：
 
 - 每个 shard 有 `activeMap + 3600 slots`
-- `AdvanceTime()` 每调用一次，时间轮前进一步
+- `ProcessTick()` 每调用一次，全部 shard 的时间轮前进一步；所有 shard 推进完成后，到期决策按活跃 shard 并行执行
 - 每次推进会吐出当前槽位到期的 `DataGroup`
+
+`ProcessTick()` 返回 `TailSamplingTickResult`，其中包含 `Outcomes`、到期分组数、活跃 shard 数，
+以及推进、决策、最慢 shard 决策和整个 tick 的耗时。旧的 `AdvanceTime()` +
+`TailSamplingOutcomes()` 接口仍保留，主要用于兼容和串行对照测试。
 
 这意味着：
 
@@ -629,6 +633,8 @@ point 的通用特点：
   trace / logging / RUM 分组与 pipeline 行为
 - `aggregate/timewheel_test.go`
   TTL 到期和时间轮吐数据
+- `aggregate/tail_sampling_tick_test.go`
+  分片决策与串行决策等价性、并发执行和 tick 统计
 - `aggregate/derived_metric_collector_test.go`
   builtin 派生指标 flush、时间窗口和 histogram 输出
 

@@ -2,6 +2,7 @@ package aggregate
 
 import (
 	"container/list"
+	"maps"
 	"sync"
 	"time"
 
@@ -422,34 +423,43 @@ func (s *GlobalSampler) AdvanceTime() map[uint64]*DataGroup {
 	frozenMap := make(map[uint64]*DataGroup)
 
 	for _, shard := range s.shards {
-		shard.mu.Lock()
-
-		// 1. 指针向前跳一格
-		shard.currentPos = (shard.currentPos + 1) % 3600
-
-		// 2. 获取当前格子的链表
-		currList := shard.slots[shard.currentPos]
-
-		// 3. 遍历链表，这里面的全是这一秒该过期的
-		for e := currList.Front(); e != nil; {
-			next := e.Next()
-			key := e.Value.(uint64) //nolint:forcetypeassert
-
-			if dg, ok := shard.activeMap[key]; ok {
-				// 提取数据
-				frozenMap[key] = dg
-				// 从 Map 中删除
-				delete(shard.activeMap, key)
-			}
-
-			// 从链表删除
-			currList.Remove(e)
-			e = next
-		}
-
-		shard.mu.Unlock()
+		maps.Copy(frozenMap, advanceTailSamplingShard(shard))
 	}
 	return frozenMap
+}
+
+// advanceTailSamplingShard advances one shard and detaches the groups that
+// expire in the current slot. The detached groups are exclusively owned by
+// the caller and can be decided without holding the shard lock.
+func advanceTailSamplingShard(shard *Shard) map[uint64]*DataGroup {
+	if shard == nil {
+		return nil
+	}
+
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
+
+	shard.currentPos = (shard.currentPos + 1) % len(shard.slots)
+	currList := shard.slots[shard.currentPos]
+	if currList == nil || currList.Len() == 0 {
+		return nil
+	}
+
+	expired := make(map[uint64]*DataGroup, currList.Len())
+	for e := currList.Front(); e != nil; {
+		next := e.Next()
+		key := e.Value.(uint64) //nolint:forcetypeassert
+
+		if dg, ok := shard.activeMap[key]; ok {
+			expired[key] = dg
+			delete(shard.activeMap, key)
+		}
+
+		currList.Remove(e)
+		e = next
+	}
+
+	return expired
 }
 
 func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) map[uint64]*TailSamplingOutcome {

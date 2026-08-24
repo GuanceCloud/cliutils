@@ -1,6 +1,7 @@
 package aggregate
 
 import (
+	"sync"
 	"time"
 
 	"github.com/GuanceCloud/cliutils/point"
@@ -43,6 +44,21 @@ type TailSamplingProcessor struct {
 	sampler   *GlobalSampler
 	collector *DerivedMetricCollector
 	metrics   TailSamplingBuiltinMetrics
+}
+
+// TailSamplingTickResult contains the decisions and critical-path timings for
+// one time-wheel tick. Outcomes intentionally omit internal shard/map keys:
+// callers only need the decision and packet, while shard ownership remains an
+// implementation detail of TailSamplingProcessor.
+type TailSamplingTickResult struct {
+	Outcomes                 []*TailSamplingOutcome
+	ExpiredGroups            int
+	ShardCount               int
+	ActiveShards             int
+	AdvanceDuration          time.Duration
+	DecisionDuration         time.Duration
+	MaxShardDecisionDuration time.Duration
+	TotalDuration            time.Duration
 }
 
 func NewDefaultTailSamplingProcessor(shardCount int, waitTime time.Duration) *TailSamplingProcessor {
@@ -114,6 +130,75 @@ func (r *TailSamplingProcessor) AdvanceTime() map[uint64]*DataGroup {
 	}
 
 	return r.sampler.AdvanceTime()
+}
+
+// ProcessTick advances every time-wheel shard and evaluates expired groups in
+// parallel. It preserves the previous two-phase ordering: all shards advance
+// before any decision starts, so callers get the same tick semantics as
+// AdvanceTime followed by TailSamplingOutcomes.
+func (r *TailSamplingProcessor) ProcessTick() TailSamplingTickResult {
+	var result TailSamplingTickResult
+	if r == nil || r.sampler == nil || len(r.sampler.shards) == 0 {
+		return result
+	}
+
+	started := time.Now()
+	result.ShardCount = len(r.sampler.shards)
+	expiredByShard := make([]map[uint64]*DataGroup, len(r.sampler.shards))
+
+	advanceStarted := time.Now()
+	var wg sync.WaitGroup
+	wg.Add(len(r.sampler.shards))
+	for index, shard := range r.sampler.shards {
+		go func() {
+			defer wg.Done()
+			expiredByShard[index] = advanceTailSamplingShard(shard)
+		}()
+	}
+	wg.Wait()
+	result.AdvanceDuration = time.Since(advanceStarted)
+
+	for _, expired := range expiredByShard {
+		if len(expired) == 0 {
+			continue
+		}
+		result.ActiveShards++
+		result.ExpiredGroups += len(expired)
+	}
+	if result.ExpiredGroups == 0 {
+		result.TotalDuration = time.Since(started)
+		return result
+	}
+
+	outcomesByShard := make([]map[uint64]*TailSamplingOutcome, len(expiredByShard))
+	decisionDurations := make([]time.Duration, len(expiredByShard))
+	decisionStarted := time.Now()
+	for index, expired := range expiredByShard {
+		if len(expired) == 0 {
+			continue
+		}
+
+		wg.Go(func() {
+			shardStarted := time.Now()
+			outcomesByShard[index] = r.TailSamplingOutcomes(expired)
+			decisionDurations[index] = time.Since(shardStarted)
+		})
+	}
+	wg.Wait()
+	result.DecisionDuration = time.Since(decisionStarted)
+
+	result.Outcomes = make([]*TailSamplingOutcome, 0, result.ExpiredGroups)
+	for index, outcomes := range outcomesByShard {
+		if decisionDurations[index] > result.MaxShardDecisionDuration {
+			result.MaxShardDecisionDuration = decisionDurations[index]
+		}
+		for _, outcome := range outcomes {
+			result.Outcomes = append(result.Outcomes, outcome)
+		}
+	}
+	result.TotalDuration = time.Since(started)
+
+	return result
 }
 
 func (r *TailSamplingProcessor) TailSamplingData(dataGroups map[uint64]*DataGroup) map[uint64]*DataPacket {

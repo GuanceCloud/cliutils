@@ -111,6 +111,131 @@ func BenchmarkGlobalSamplerTimeWheelTailSamplingOutcomesKeepAll(b *testing.B) {
 	}
 }
 
+func BenchmarkTailSamplingProcessorDecisionTick120K(b *testing.B) {
+	const groupCount = 120_000
+
+	scenarios := []struct {
+		name           string
+		pipelines      []*SamplingPipeline
+		payload        []byte
+		prepare        func(*DataPacket)
+		defaultMetrics bool
+	}{
+		{
+			name: "fast_predicates",
+			pipelines: []*SamplingPipeline{
+				{Name: "keep_error", Type: PipelineTypeCondition, Condition: `{ status = "error" }`, Action: PipelineActionKeep},
+			},
+			payload: benchmarkTracePayload(),
+			prepare: func(packet *DataPacket) {
+				packet.PredError = true
+				packet.PredicateSummaryVersion = CurrentPredicateSummaryVersion
+			},
+		},
+		{
+			name: "custom_condition",
+			pipelines: []*SamplingPipeline{
+				{Name: "keep_custom", Type: PipelineTypeCondition, Condition: `{ custom_flag = "keep" }`, Action: PipelineActionKeep},
+			},
+			payload: benchmarkCustomTracePayload(),
+		},
+		{
+			name: "custom_condition_with_default_metrics",
+			pipelines: []*SamplingPipeline{
+				{Name: "keep_custom", Type: PipelineTypeCondition, Condition: `{ custom_flag = "keep" }`, Action: PipelineActionKeep},
+			},
+			payload:        benchmarkCustomTracePayload(),
+			defaultMetrics: true,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		b.Run(scenario.name, func(b *testing.B) {
+			packets := newBenchmarkTracePackets(groupCount, scenario.payload)
+			if scenario.prepare != nil {
+				for _, packet := range packets {
+					scenario.prepare(packet)
+				}
+			}
+
+			b.Run("serial", func(b *testing.B) {
+				benchmarkDecisionTicks(b, packets, scenario.pipelines, scenario.defaultMetrics, false)
+			})
+			b.Run("sharded", func(b *testing.B) {
+				benchmarkDecisionTicks(b, packets, scenario.pipelines, scenario.defaultMetrics, true)
+			})
+		})
+	}
+}
+
+func benchmarkDecisionTicks(
+	b *testing.B,
+	packets []*DataPacket,
+	pipelines []*SamplingPipeline,
+	defaultMetrics bool,
+	sharded bool,
+) {
+	b.Helper()
+	processor := newBenchmarkTailSamplingProcessor(b, pipelines, defaultMetrics)
+	b.ReportAllocs()
+	b.ReportMetric(float64(len(packets)), "groups/tick")
+	b.ResetTimer()
+
+	for range b.N {
+		b.StopTimer()
+		for _, packet := range packets {
+			processor.IngestPacket(packet)
+		}
+		b.StartTimer()
+
+		if sharded {
+			tick := processor.ProcessTick()
+			if len(tick.Outcomes) != len(packets) {
+				b.Fatalf("outcomes = %d, want %d", len(tick.Outcomes), len(packets))
+			}
+			continue
+		}
+
+		expired := processor.AdvanceTime()
+		outcomes := processor.TailSamplingOutcomes(expired)
+		if len(outcomes) != len(packets) {
+			b.Fatalf("outcomes = %d, want %d", len(outcomes), len(packets))
+		}
+	}
+}
+
+func newBenchmarkTailSamplingProcessor(
+	tb testing.TB,
+	pipelines []*SamplingPipeline,
+	defaultMetrics bool,
+) *TailSamplingProcessor {
+	tb.Helper()
+
+	const ttl = time.Second
+	sampler := NewGlobalSampler(64, ttl)
+	err := sampler.UpdateConfig(benchmarkTailSamplingToken, &TailSamplingConfigs{
+		Version: 1,
+		Tracing: &TraceTailSampling{
+			DataTTL:   ttl,
+			GroupKey:  benchmarkTraceGroupKey,
+			Pipelines: pipelines,
+		},
+	})
+	if err != nil {
+		tb.Fatalf("update tail sampling config: %v", err)
+	}
+
+	if defaultMetrics {
+		return NewTailSamplingProcessor(
+			sampler,
+			NewDerivedMetricCollector(DefaultDerivedMetricFlushWindow),
+			DefaultTailSamplingBuiltinMetrics(),
+		)
+	}
+
+	return NewTailSamplingProcessor(sampler, nil, nil)
+}
+
 func newBenchmarkGlobalSampler(tb testing.TB, ttl time.Duration, pipelines []*SamplingPipeline) *GlobalSampler {
 	tb.Helper()
 
@@ -155,6 +280,15 @@ func newBenchmarkTracePacket(groupIDHash uint64, payload []byte) *DataPacket {
 
 func benchmarkTracePayload() []byte {
 	return point.AppendPBPointToPBPointsPayload(nil, &point.PBPoint{Name: "benchmark-span"})
+}
+
+func benchmarkCustomTracePayload() []byte {
+	return point.AppendPBPointToPBPointsPayload(nil, &point.PBPoint{
+		Name: "benchmark-span",
+		Fields: []*point.Field{
+			{Key: "custom_flag", Val: &point.Field_S{S: "keep"}},
+		},
+	})
 }
 
 func drainBenchmarkSampler(sampler *GlobalSampler, seconds int) {
