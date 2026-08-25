@@ -26,6 +26,9 @@ var ErrUnsupportedPayloadCompression = errors.New("unsupported payload compressi
 // advertise its decoded size, so callers cannot reserve bounded memory first.
 var ErrPayloadDecodedSizeUnknown = errors.New("payload decoded size is unknown")
 
+// ErrPayloadEmpty indicates that a DataPacket has no points payload.
+var ErrPayloadEmpty = errors.New("points payload is empty")
+
 func unsupportedPayloadCompressionError(compression int32) error {
 	return fmt.Errorf("%w: %d", ErrUnsupportedPayloadCompression, compression)
 }
@@ -90,6 +93,9 @@ func DecompressPointsPayload(payload []byte, compression int32) ([]byte, error) 
 	if compression != PayloadCompressionZstd {
 		return nil, unsupportedPayloadCompressionError(compression)
 	}
+	if _, err := decodeZstdSingleFrameHeader(payload); err != nil {
+		return nil, err
+	}
 
 	dec := zstdDecoderPool.Get().(*zstd.Decoder)
 	decompressed, err := dec.DecodeAll(payload, nil)
@@ -113,9 +119,9 @@ func PointsPayloadDecodedSize(payload []byte, compression int32) (int64, error) 
 		return 0, unsupportedPayloadCompressionError(compression)
 	}
 
-	var header zstd.Header
-	if err := header.Decode(payload); err != nil {
-		return 0, fmt.Errorf("decode zstd points payload header: %w", err)
+	header, err := decodeZstdSingleFrameHeader(payload)
+	if err != nil {
+		return 0, err
 	}
 	if !header.HasFCS {
 		return 0, ErrPayloadDecodedSizeUnknown
@@ -124,4 +130,68 @@ func PointsPayloadDecodedSize(payload []byte, compression int32) (int64, error) 
 		return 0, fmt.Errorf("points payload decoded size overflows int64: %d", header.FrameContentSize)
 	}
 	return int64(header.FrameContentSize), nil
+}
+
+func decodeZstdSingleFrameHeader(payload []byte) (zstd.Header, error) {
+	var header zstd.Header
+	if err := header.Decode(payload); err != nil {
+		return zstd.Header{}, fmt.Errorf("decode zstd points payload header: %w", err)
+	}
+	frameSize, err := zstdFrameSize(payload, &header)
+	if err != nil {
+		return zstd.Header{}, err
+	}
+	if frameSize != len(payload) {
+		return zstd.Header{}, fmt.Errorf("points payload contains trailing or concatenated zstd data: frame=%d payload=%d",
+			frameSize, len(payload))
+	}
+	return header, nil
+}
+
+// zstdFrameSize returns the compressed byte length of the first zstd frame.
+// It walks block headers only and does not allocate or decode the frame body.
+func zstdFrameSize(payload []byte, header *zstd.Header) (int, error) {
+	if header == nil || header.Skippable {
+		return 0, errors.New("invalid zstd points payload frame")
+	}
+
+	offset := header.HeaderSize
+	for {
+		if len(payload)-offset < 3 {
+			return 0, errors.New("truncated zstd points payload block header")
+		}
+
+		blockHeader := uint32(payload[offset]) |
+			uint32(payload[offset+1])<<8 |
+			uint32(payload[offset+2])<<16
+		offset += 3
+
+		lastBlock := blockHeader&1 != 0
+		blockType := (blockHeader >> 1) & 3
+		blockSize := int(blockHeader >> 3)
+		switch blockType {
+		case 0, 2: // raw or compressed
+		case 1: // RLE stores one byte regardless of the decoded block size.
+			blockSize = 1
+		default:
+			return 0, errors.New("zstd points payload uses a reserved block type")
+		}
+		if blockSize > len(payload)-offset {
+			return 0, errors.New("truncated zstd points payload block")
+		}
+		offset += blockSize
+
+		if lastBlock {
+			break
+		}
+	}
+
+	if header.HasCheckSum {
+		if len(payload)-offset < 4 {
+			return 0, errors.New("truncated zstd points payload checksum")
+		}
+		offset += 4
+	}
+
+	return offset, nil
 }

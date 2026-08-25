@@ -124,7 +124,7 @@ func newCompiledDecisionPlan(pipelines []*SamplingPipeline) *compiledDecisionPla
 // pipeline index together with its packet result. The index is zero-based and
 // is -1 when no pipeline matched.
 func evaluateDecisionPlan(td *DataPacket, plan *compiledDecisionPlan) (bool, int, *DataPacket) {
-	if td == nil || plan == nil || len(plan.pipelines) == 0 {
+	if td == nil || len(td.PointsPayload) == 0 || plan == nil || len(plan.pipelines) == 0 {
 		return false, -1, nil
 	}
 
@@ -132,12 +132,8 @@ func evaluateDecisionPlan(td *DataPacket, plan *compiledDecisionPlan) (bool, int
 	// (or are match-all probabilistic samplers), the decision needs no payload
 	// decompression; otherwise it falls back to the decompressed walk, keeping
 	// behavior identical to the legacy logic. Legacy packets with an all-zero
-	// summary fall back; an explicitly versioned all-zero summary is trusted.
+	// summary fall back; a current-version all-zero summary is trusted.
 	if plan.fast && packetHasSpanPredicates(td) {
-		if len(td.PointsPayload) == 0 &&
-			td.PredicateSummaryVersion < CurrentPredicateSummaryVersion {
-			return false, -1, nil
-		}
 		// An uncompressed payload must have a decodable first point: in the legacy
 		// logic a corrupted first point stops the walk and yields no match
 		// (see TestTailSamplingBusinessBranches). Compressed payloads are protected
@@ -747,25 +743,27 @@ func applySpanPredicatesWith(packet *DataPacket, get func(string) (any, bool)) {
 // ComputeSpanPredicates backfills span predicates for DataPackets missing the
 // summary. It runs at dataway ingestion for legacy DataKit data (no predicates),
 // so the decision fast path works for any client version and removes the
-// datakit/dataway version coupling. It is a no-op when predicates already exist
-// (non-zero); when the payload is empty or any span fails to decode it returns
-// an error without writing partial predicates (the caller keeps the
-// unversioned all-zero → decompressed-walk fallback semantics).
+// datakit/dataway version coupling. Current summaries and unversioned legacy
+// summaries with known values avoid another payload walk. Unknown versions are
+// recomputed. An empty or undecodable payload returns an error without writing
+// partial predicates.
 func ComputeSpanPredicates(packet *DataPacket) error {
-	if packet == nil || packet.PredicateSummaryVersion >= CurrentPredicateSummaryVersion {
+	if packet == nil {
+		return nil
+	}
+	if len(packet.PointsPayload) == 0 {
+		return ErrPayloadEmpty
+	}
+	if packet.PredicateSummaryVersion == CurrentPredicateSummaryVersion {
 		return nil
 	}
 	// Predicate fields emitted by the previous protocol revision were complete,
 	// but did not carry an explicit version. Mark them without another payload
 	// walk so rolling upgrades keep the existing fast path.
-	if packetHasLegacySpanPredicateValues(packet) {
+	if packet.PredicateSummaryVersion == 0 && packetHasLegacySpanPredicateValues(packet) {
 		packet.PredicateSummaryVersion = CurrentPredicateSummaryVersion
 		return nil
 	}
-	if len(packet.PointsPayload) == 0 {
-		return nil
-	}
-
 	payload, err := DecompressPointsPayload(packet.PointsPayload, packet.PayloadCompression)
 	if err != nil {
 		return err

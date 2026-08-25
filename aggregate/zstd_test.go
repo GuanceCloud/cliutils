@@ -103,6 +103,25 @@ func TestPointsPayloadDecodedSize(t *testing.T) {
 	require.ErrorIs(t, err, ErrUnsupportedPayloadCompression)
 }
 
+func TestPointsPayloadDecodedSizeRejectsConcatenatedFrames(t *testing.T) {
+	rawA := []byte(strings.Repeat("frame-a-", 128*1024))
+	rawB := []byte(strings.Repeat("frame-b-", 128*1024))
+
+	frameA, compressionA, err := CompressPointsPayload(rawA)
+	require.NoError(t, err)
+	require.Equal(t, PayloadCompressionZstd, compressionA)
+	frameB, compressionB, err := CompressPointsPayload(rawB)
+	require.NoError(t, err)
+	require.Equal(t, PayloadCompressionZstd, compressionB)
+
+	payload := append(append([]byte(nil), frameA...), frameB...)
+	_, err = PointsPayloadDecodedSize(payload, PayloadCompressionZstd)
+	require.Error(t, err)
+
+	_, err = DecompressPointsPayload(payload, PayloadCompressionZstd)
+	require.Error(t, err)
+}
+
 func TestPickTraceCompressesAndWalks(t *testing.T) {
 	packet := testCompressedTracePackets(t, "trace-compress-1", 2000)
 	require.NotNil(t, packet)

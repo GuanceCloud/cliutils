@@ -170,19 +170,6 @@ func (s *GlobalSampler) releaseSpill(key string) {
 	}
 }
 
-// needsPayloadForDecision reports whether the decision for this token/type/
-// group requires payload content.
-// No payload is needed when all pipelines can be covered by predicates
-// (or are match-all probabilistic samplers).
-func (s *GlobalSampler) needsPayloadForDecision(dataType, token, groupKey string) bool {
-	if s == nil {
-		return true
-	}
-
-	plan := s.decisionPlanFor(dataType, token, groupKey)
-	return plan == nil || !plan.fast
-}
-
 func tailSamplingGroupMapKey(packet *DataPacket) uint64 {
 	if packet == nil {
 		return 0
@@ -529,15 +516,6 @@ func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) m
 		dataGroupPool.Put(dg)
 	}
 	return outcomes
-}
-
-// pipelinesFor returns the sampling pipeline config by data type / group dimension.
-func (s *GlobalSampler) pipelinesFor(dataType, token, groupKey string) []*SamplingPipeline {
-	plan := s.decisionPlanFor(dataType, token, groupKey)
-	if plan == nil {
-		return nil
-	}
-	return plan.pipelines
 }
 
 func (s *GlobalSampler) decisionPlanFor(dataType, token, groupKey string) *compiledDecisionPlan {
