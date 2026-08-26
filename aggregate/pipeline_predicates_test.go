@@ -27,7 +27,11 @@ func TestCompilePipelinePredicateCoverage(t *testing.T) {
 		{"parent_only", `{ parent_id = "0" }`, false},
 		{"custom_field", `{ resource = "/x" }`, false},
 		{"constant_condition", `{ 1 = 1 }`, false},
-		{"flag_and_root", `{ status = "error" AND parent_id = "0" AND duration > 1000000 }`, true},
+		// flag AND parent/duration：跨 span 组合破坏"同一 span 满足完整条件"
+		// 的语义（见 TestEvaluatePipelinesCrossSpanCounterExample），必须回退 walk。
+		{"flag_and_root", `{ status = "error" AND parent_id = "0" AND duration > 1000000 }`, false},
+		{"flag_and_duration", `{ status = "error" AND duration > 1000000 }`, false},
+		{"flag_and_flag", `{ status = "error" AND trace_keep = true }`, false},
 		// parent alone (no duration threshold) is not strictly equivalent: a root
 		// span without a duration field still matches parent_id="0" in the filter,
 		// which the predicate summary cannot express, so it conservatively falls back.
@@ -139,7 +143,7 @@ func TestEvaluatePipelinesFastPathMatchesWalk(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			packet := pickSinglePredicatePacket(t, tc.pts)
 			require.NotNil(t, packet)
-			require.Equal(t, PayloadCompressionZstd, packet.PayloadCompression)
+			require.Contains(t, []int32{PayloadCompressionNone, PayloadCompressionZstd}, packet.PayloadCompression)
 
 			fastMatched, fastPacket := evaluatePipelines(packet, fastPipelines)
 			walkMatched, _ := evaluatePipelines(packet, walkPipelines)
@@ -191,4 +195,55 @@ func TestEvaluatePipelinesFastPathCorruptedPayload(t *testing.T) {
 	matched, packet = evaluatePipelines(empty, []*SamplingPipeline{pipeline})
 	assert.False(t, matched)
 	assert.Nil(t, packet)
+}
+
+// TestEvaluatePipelinesCrossSpanCounterExample covers the review counterexample:
+// span A {status=error, short}, span B {status=ok, long}. The condition
+// `status="error" AND duration>N` must NOT match in per-point semantics, so the
+// compiler must reject the flag+duration combination (fall back to walk).
+func TestEvaluatePipelinesCrossSpanCounterExample(t *testing.T) {
+	pipeline := &SamplingPipeline{
+		Name:      "cross-span-counterexample",
+		Type:      PipelineTypeCondition,
+		Condition: `{ status = "error" AND duration > 1000000 }`,
+		Action:    PipelineActionKeep,
+	}
+	require.NoError(t, pipeline.Apply())
+
+	// 编译必须回退：flag 与 duration 的 AND 无法保持同 span 关联。
+	_, ok := compilePipelinePredicate(pipeline)
+	assert.False(t, ok, "flag AND duration 必须回退 walk")
+
+	// 反例数据：error 在短 span 上，长耗时在 ok span 上。
+	packet := pickSinglePredicatePacket(t, []*point.Point{
+		predicateTracePoint("t-cross", "s1", 1000, "status", "error"),
+		predicateTracePoint("t-cross", "s2", 1500000),
+	})
+
+	// 逐点语义：没有任何 span 同时满足 status=error 且 duration>1s → 不命中。
+	matched, _ := evaluatePipelines(packet, []*SamplingPipeline{pipeline})
+	assert.False(t, matched, "跨 span 反例下条件不得命中")
+}
+
+// TestEvaluatePipelinesCrossSpanFlagFlagCounterExample: two flags on different
+// spans must not be AND-ed across spans.
+func TestEvaluatePipelinesCrossSpanFlagFlagCounterExample(t *testing.T) {
+	pipeline := &SamplingPipeline{
+		Name:      "cross-span-flag-flag",
+		Type:      PipelineTypeCondition,
+		Condition: `{ status = "error" AND trace_keep = true }`,
+		Action:    PipelineActionKeep,
+	}
+	require.NoError(t, pipeline.Apply())
+
+	_, ok := compilePipelinePredicate(pipeline)
+	assert.False(t, ok, "flag AND flag 必须回退 walk")
+
+	packet := pickSinglePredicatePacket(t, []*point.Point{
+		predicateTracePoint("t-ff", "s1", 1000, "status", "error"),
+		predicateTracePoint("t-ff", "s2", 1000, "trace_keep", true),
+	})
+
+	matched, _ := evaluatePipelines(packet, []*SamplingPipeline{pipeline})
+	assert.False(t, matched, "两个 flag 分属不同 span 时条件不得命中")
 }

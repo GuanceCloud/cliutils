@@ -82,11 +82,52 @@ func TestCompressPointsPayload(t *testing.T) {
 	})
 }
 
+func TestPointsPayloadDecodedSize(t *testing.T) {
+	raw := []byte(strings.Repeat("decoded-size-", 4096))
+
+	size, err := PointsPayloadDecodedSize(raw, PayloadCompressionNone)
+	require.NoError(t, err)
+	assert.Equal(t, int64(len(raw)), size)
+
+	compressed, compression, err := CompressPointsPayload(raw)
+	require.NoError(t, err)
+	require.Equal(t, PayloadCompressionZstd, compression)
+	size, err = PointsPayloadDecodedSize(compressed, compression)
+	require.NoError(t, err)
+	assert.Equal(t, int64(len(raw)), size)
+
+	_, err = PointsPayloadDecodedSize([]byte("not-zstd"), PayloadCompressionZstd)
+	require.Error(t, err)
+
+	_, err = PointsPayloadDecodedSize(raw, 99)
+	require.ErrorIs(t, err, ErrUnsupportedPayloadCompression)
+}
+
+func TestPointsPayloadDecodedSizeRejectsConcatenatedFrames(t *testing.T) {
+	rawA := []byte(strings.Repeat("frame-a-", 128*1024))
+	rawB := []byte(strings.Repeat("frame-b-", 128*1024))
+
+	frameA, compressionA, err := CompressPointsPayload(rawA)
+	require.NoError(t, err)
+	require.Equal(t, PayloadCompressionZstd, compressionA)
+	frameB, compressionB, err := CompressPointsPayload(rawB)
+	require.NoError(t, err)
+	require.Equal(t, PayloadCompressionZstd, compressionB)
+
+	payload := append(append([]byte(nil), frameA...), frameB...)
+	_, err = PointsPayloadDecodedSize(payload, PayloadCompressionZstd)
+	require.Error(t, err)
+
+	_, err = DecompressPointsPayload(payload, PayloadCompressionZstd)
+	require.Error(t, err)
+}
+
 func TestPickTraceCompressesAndWalks(t *testing.T) {
 	packet := testCompressedTracePackets(t, "trace-compress-1", 2000)
 	require.NotNil(t, packet)
 
 	assert.Equal(t, PayloadCompressionZstd, packet.PayloadCompression)
+	assert.Equal(t, CurrentPredicateSummaryVersion, packet.PredicateSummaryVersion)
 	assert.Less(t, len(packet.PointsPayload), 1024*1024, "compressed payload should be small")
 
 	var count int

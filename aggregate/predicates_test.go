@@ -379,9 +379,9 @@ func TestComputeSpanPredicates(t *testing.T) {
 		assert.False(t, packet.PredHttpError)
 	})
 
-	t.Run("empty_payload_noop", func(t *testing.T) {
+	t.Run("empty_payload_errors", func(t *testing.T) {
 		packet := &DataPacket{}
-		require.NoError(t, ComputeSpanPredicates(packet))
+		require.ErrorIs(t, ComputeSpanPredicates(packet), ErrPayloadEmpty)
 		assert.False(t, packetHasSpanPredicates(packet))
 	})
 

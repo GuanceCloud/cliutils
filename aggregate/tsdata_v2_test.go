@@ -43,14 +43,15 @@ func TestDataPacketProtoRoundTrip(t *testing.T) {
 	}), point.WithTime(now)))
 
 	original := &DataPacket{
-		GroupIdHash:          1,
-		RawGroupId:           "trace-compat",
-		Token:                "tkn_compat",
-		DataType:             point.STracing,
-		GroupKey:             "trace_id",
-		PointCount:           1,
-		PointsPayload:        payload,
-		MaxPointTimeUnixNano: now.UnixNano(),
+		GroupIdHash:             1,
+		RawGroupId:              "trace-compat",
+		Token:                   "tkn_compat",
+		DataType:                point.STracing,
+		GroupKey:                "trace_id",
+		PointCount:              1,
+		PointsPayload:           payload,
+		MaxPointTimeUnixNano:    now.UnixNano(),
+		PredicateSummaryVersion: CurrentPredicateSummaryVersion,
 	}
 
 	body, err := proto.Marshal(original)
@@ -61,6 +62,7 @@ func TestDataPacketProtoRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), packetPointCount(decoded))
 	assert.Equal(t, now.UnixNano(), decoded.MaxPointTimeUnixNano)
+	assert.Equal(t, CurrentPredicateSummaryVersion, decoded.PredicateSummaryVersion)
 
 	dec := point.GetDecoder(point.WithDecEncoding(point.Protobuf))
 	defer point.PutDecoder(dec)
