@@ -26,6 +26,7 @@ func TestLightpandaArguments(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
+		"--load-resources", "iframe", "--load-resources", "worker",
 		"--ca-cert", caFile,
 		"--ca-path", caDir,
 		"--http-proxy", "http://user:password@proxy.example.com:8080",
@@ -38,14 +39,14 @@ func TestLightpandaArguments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(arguments, []string{"--block-private-networks"}) {
+	if !reflect.DeepEqual(arguments, []string{"--load-resources", "iframe", "--load-resources", "worker", "--block-private-networks"}) {
 		t.Fatalf("private network block argument is missing: %#v", arguments)
 	}
 	arguments, err = lightpandaArguments(runner.EngineOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(arguments) != 0 {
+	if !reflect.DeepEqual(arguments, []string{"--load-resources", "iframe", "--load-resources", "worker"}) {
 		t.Fatalf("zero-value options should preserve existing behavior: %#v", arguments)
 	}
 }
@@ -61,9 +62,10 @@ func TestLightpandaArgumentsPreserveSystemCAAndCustomCIDRs(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
+		"--load-resources", "iframe", "--load-resources", "worker",
 		"--ca-path", systemDirectory,
 		"--ca-path", customDirectory,
-		"--block-cidrs", "10.0.0.0/8,192.168.0.0/16",
+		"--block-cidrs", "10.0.0.0/8", "--block-cidrs", "192.168.0.0/16",
 	}
 	if !reflect.DeepEqual(arguments, want) {
 		t.Fatalf("arguments = %#v, want %#v", arguments, want)
