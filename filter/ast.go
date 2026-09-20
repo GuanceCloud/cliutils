@@ -915,7 +915,7 @@ func (x WhereConditions) String() string {
 
 		arr = append(arr, c.String())
 	}
-	return strings.Join(arr, "; ")
+	return strings.Join(arr, ";\n")
 }
 
 func (x WhereConditions) Eval(data KVs) int {
