@@ -13,6 +13,7 @@ import (
 	"net"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"text/template"
 	"time"
@@ -76,6 +77,8 @@ type TCPTask struct {
 	messageError     string
 	tracerouteError  string
 	sharedTimeout    bool
+	cancelMu         sync.Mutex
+	cancelRun        context.CancelFunc
 
 	rawTask *TCPTask
 }
@@ -342,9 +345,38 @@ func (t *TCPTask) clear() {
 
 func (t *TCPTask) run() error {
 	var d net.Dialer
-	ctx, cancel := context.WithTimeout(context.Background(), t.timeout)
+	runCtx, cancelRun := context.WithCancel(context.Background())
+	defer cancelRun()
+	if t.sharedTimeout {
+		t.cancelMu.Lock()
+		t.cancelRun = cancelRun
+		t.cancelMu.Unlock()
+		defer func() {
+			t.cancelMu.Lock()
+			defer t.cancelMu.Unlock()
+			if err := runCtx.Err(); err != nil {
+				t.reqError = err.Error()
+			}
+			t.cancelRun = nil
+		}()
+	}
+	ctx, cancel := context.WithTimeout(runCtx, t.timeout)
 	defer cancel()
-	return t.runWithNetwork(ctx, net.DefaultResolver.LookupIP, d.DialContext)
+	var stopClose func() bool
+	defer func() {
+		if stopClose != nil {
+			stopClose()
+		}
+	}()
+	return t.runWithNetwork(ctx, net.DefaultResolver.LookupIP,
+		func(ctx context.Context, network, address string) (net.Conn, error) {
+			conn, err := d.DialContext(ctx, network, address)
+			if err == nil && t.sharedTimeout {
+				// Explicit cancellation also interrupts message I/O, independently of the connection budget.
+				stopClose = context.AfterFunc(runCtx, func() { _ = conn.Close() }) //nolint:errcheck
+			}
+			return conn, err
+		})
 }
 
 func (t *TCPTask) runWithNetwork(ctx context.Context,
@@ -456,7 +488,13 @@ func tcpConnectionStatus(err error) string {
 	return ""
 }
 
-func (t *TCPTask) stop() {}
+func (t *TCPTask) stop() {
+	t.cancelMu.Lock()
+	defer t.cancelMu.Unlock()
+	if t.cancelRun != nil {
+		t.cancelRun()
+	}
+}
 
 func (t *TCPTask) class() string {
 	return ClassTCP
@@ -479,7 +517,7 @@ func (t *TCPTask) getRawTask(taskString string) (string, error) {
 
 	task.Task = nil
 
-	bytes, _ := json.Marshal(task)
+	bytes, _ := json.Marshal(&task)
 	return string(bytes), nil
 }
 

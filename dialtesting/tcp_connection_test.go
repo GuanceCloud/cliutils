@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"sync"
 	"syscall"
 	"testing"
 	"testing/synctest"
@@ -161,6 +162,7 @@ func TestTCPConnectionDialErrorsCannotBeHidden(t *testing.T) {
 
 func TestTCPConnectionSharedBudget(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
+		t.Helper()
 		task := connectionTask(t, "eq", "timeout")
 		task.Host = "budget.example"
 		task.Timeout = "10s"
@@ -194,6 +196,7 @@ func TestTCPConnectionSharedBudget(t *testing.T) {
 
 func TestTCPConnectionThreeSecondDeadline(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
+		t.Helper()
 		task := connectionTask(t, "eq", "timeout")
 		task.Timeout = "3s"
 		require.NoError(t, task.CheckTask())
@@ -255,6 +258,7 @@ func TestTCPConnectionLegacyCompatibility(t *testing.T) {
 
 func TestTCPConnectionDNSDeadline(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
+		t.Helper()
 		task := connectionTask(t, "eq", "timeout")
 		task.Host = "slow.example"
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
@@ -276,6 +280,7 @@ func TestTCPConnectionDNSDeadline(t *testing.T) {
 
 func TestTCPConnectionMessageOutsideConnectionBudget(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
+		t.Helper()
 		task := connectionTask(t, "eq", "established")
 		task.Message, task.SuccessWhenLogic = "ping", "or"
 		client, server := net.Pipe()
@@ -330,6 +335,72 @@ func TestTCPConnectionMissingTimingCannotPass(t *testing.T) {
 	}
 }
 
+func TestTCPConnectionStopCancelsDNS(t *testing.T) {
+	previousResolver := net.DefaultResolver
+	started, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	net.DefaultResolver = &net.Resolver{PreferGo: true, Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+		once.Do(func() { close(started) })
+		select {
+		case <-ctx.Done():
+		case <-release:
+		}
+		return nil, context.Canceled
+	}}
+	t.Cleanup(func() { close(release); net.DefaultResolver = previousResolver })
+	task := connectionTask(t, "eq", "timeout")
+	task.Host, task.Timeout, task.SuccessWhenLogic = "cancel.example.invalid", "10s", "or"
+	task.SuccessWhen[0].ResponseTime = []*TCPResponseTime{{Target: "1m"}}
+	require.NoError(t, task.CheckTask())
+	done := make(chan error, 1)
+	go func() { done <- task.Run() }()
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("DNS resolution did not start")
+	}
+	task.Stop()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("Stop did not cancel DNS resolution")
+	}
+	tags, fields := task.GetResults()
+	assert.Equal(t, "FAIL", tags["status"])
+	assert.Empty(t, fields["connection_status"])
+	assert.Contains(t, fields["fail_reason"], context.Canceled.Error())
+}
+
+func TestTCPConnectionStopClosesEstablishedConnection(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, listener.Close()) })
+	task := connectionTask(t, "eq", "established")
+	task.Message, task.SuccessWhenLogic = "ping", "or"
+	task.Host, task.Port, err = net.SplitHostPort(listener.Addr().String())
+	require.NoError(t, err)
+	done := make(chan error, 1)
+	go func() { done <- task.Run() }()
+	conn, err := listener.Accept()
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, conn.Close()) })
+	_, err = io.ReadFull(conn, make([]byte, len(task.Message)))
+	require.NoError(t, err)
+	task.Stop()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("Stop did not interrupt message I/O")
+	}
+	tags, fields := task.GetResults()
+	assert.Equal(t, "FAIL", tags["status"])
+	assert.Equal(t, "established", fields["connection_status"])
+	assert.Contains(t, fields["fail_reason"], context.Canceled.Error())
+	assert.NotEmpty(t, fields["message_error"])
+}
+
 func TestTCPConnectionTracerouteErrorDoesNotOverwriteConnection(t *testing.T) {
 	previousTrace := runTracerouteIP
 	t.Cleanup(func() { runTracerouteIP = previousTrace })
@@ -354,11 +425,16 @@ func TestTCPConnectionRealDroppedPackets(t *testing.T) {
 	var err error
 	task.Host, task.Port, err = net.SplitHostPort(address)
 	require.NoError(t, err)
+	task.Timeout = "3s"
+	require.NoError(t, task.CheckTask())
+	start := time.Now()
 	require.NoError(t, task.Run())
+	assert.LessOrEqual(t, time.Since(start), 4*time.Second, "connection timeout cleanup exceeded one second")
 	tags, fields := task.GetResults()
 	assert.Equal(t, "OK", tags["status"])
 	assert.Equal(t, "timeout", fields["connection_status"])
 	assert.Positive(t, fields["response_time"])
+	assert.GreaterOrEqual(t, task.reqCost, 3*time.Second)
 }
 
 func TestTCPConnectionRealNetworkAndRepeatedRun(t *testing.T) {
