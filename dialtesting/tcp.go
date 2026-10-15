@@ -64,6 +64,7 @@ type TCPTask struct {
 	SuccessWhenLogic string            `json:"success_when_logic"`
 
 	reqCost          time.Duration
+	reqCostAvailable bool
 	reqDNSCost       time.Duration
 	reqError         string
 	destIP           string
@@ -175,6 +176,10 @@ func (t *TCPTask) checkResult() (reasons []string, succFlag bool) {
 		// check response time
 		if chk.ResponseTime != nil {
 			for _, v := range chk.ResponseTime {
+				if t.sharedTimeout && !t.reqCostAvailable {
+					reasons = append(reasons, "TCP response time unavailable: no connection attempt")
+					continue
+				}
 				reqCost := t.reqCost
 
 				if v.IsContainDNS {
@@ -323,6 +328,7 @@ func (t *TCPTask) metricName() string {
 
 func (t *TCPTask) clear() {
 	t.reqCost = 0
+	t.reqCostAvailable = false
 	t.reqDNSCost = 0
 	t.reqError = ""
 	t.destIP = ""
@@ -379,6 +385,7 @@ func (t *TCPTask) runWithNetwork(ctx context.Context,
 	start := time.Now()
 	conn, err := dial(ctx, "tcp", tcpIPAddr)
 	t.reqCost = time.Since(start)
+	t.reqCostAvailable = true
 
 	if err != nil {
 		t.connectionStatus = tcpConnectionStatus(err)
@@ -389,11 +396,7 @@ func (t *TCPTask) runWithNetwork(ctx context.Context,
 	} else {
 		t.connectionStatus = "established"
 		if t.Message != "" { // send message and get response
-			deadline := time.Now().Add(defaultTCPTimeout)
-			if end, ok := ctx.Deadline(); t.sharedTimeout && ok && end.Before(deadline) {
-				deadline = end
-			}
-			if err := conn.SetDeadline(deadline); err != nil {
+			if err := conn.SetDeadline(time.Now().Add(defaultTCPTimeout)); err != nil {
 				t.messageError = err.Error()
 			} else if _, err := conn.Write([]byte(t.Message)); err != nil {
 				t.messageError = err.Error()

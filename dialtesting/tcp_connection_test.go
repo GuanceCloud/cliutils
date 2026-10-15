@@ -9,11 +9,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"runtime"
 	"syscall"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -158,30 +160,55 @@ func TestTCPConnectionDialErrorsCannotBeHidden(t *testing.T) {
 }
 
 func TestTCPConnectionSharedBudget(t *testing.T) {
-	task := connectionTask(t, "eq", "timeout")
-	task.Host = "budget.example"
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	deadline, _ := ctx.Deadline()
-	err := task.runWithNetwork(ctx,
-		func(dnsCtx context.Context, network, host string) ([]net.IP, error) {
-			end, _ := dnsCtx.Deadline()
-			assert.Equal(t, deadline, end)
-			time.Sleep(20 * time.Millisecond)
-			return []net.IP{net.ParseIP("127.0.0.1")}, nil
-		}, func(dialCtx context.Context, network, address string) (net.Conn, error) {
-			end, _ := dialCtx.Deadline()
-			assert.Equal(t, deadline, end)
-			assert.Equal(t, "127.0.0.1:1", address)
-			<-dialCtx.Done()
-			return nil, dialCtx.Err()
-		})
-	require.NoError(t, err)
-	assert.Positive(t, task.reqDNSCost)
-	assert.Positive(t, task.reqCost)
-	tags, fields := task.GetResults()
-	assert.Equal(t, "OK", tags["status"])
-	assert.Greater(t, fields["response_time_with_dns"], fields["response_time"])
+	synctest.Test(t, func(t *testing.T) {
+		task := connectionTask(t, "eq", "timeout")
+		task.Host = "budget.example"
+		task.Timeout = "10s"
+		require.NoError(t, task.CheckTask())
+		ctx, cancel := context.WithTimeout(context.Background(), task.timeout)
+		defer cancel()
+		deadline, _ := ctx.Deadline()
+		err := task.runWithNetwork(ctx,
+			func(dnsCtx context.Context, network, host string) ([]net.IP, error) {
+				end, _ := dnsCtx.Deadline()
+				assert.Equal(t, deadline, end)
+				time.Sleep(4 * time.Second)
+				return []net.IP{net.ParseIP("127.0.0.1")}, nil
+			}, func(dialCtx context.Context, network, address string) (net.Conn, error) {
+				end, _ := dialCtx.Deadline()
+				assert.Equal(t, deadline, end)
+				assert.Equal(t, "127.0.0.1:1", address)
+				<-dialCtx.Done()
+				return nil, dialCtx.Err()
+			})
+		require.NoError(t, err)
+		assert.Positive(t, task.reqDNSCost)
+		assert.Positive(t, task.reqCost)
+		tags, fields := task.GetResults()
+		assert.Equal(t, "OK", tags["status"])
+		assert.Greater(t, fields["response_time_with_dns"], fields["response_time"])
+		assert.Equal(t, 6*time.Second, task.reqCost)
+		assert.Equal(t, 4*time.Second, task.reqDNSCost)
+	})
+}
+
+func TestTCPConnectionThreeSecondDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		task := connectionTask(t, "eq", "timeout")
+		task.Timeout = "3s"
+		require.NoError(t, task.CheckTask())
+		ctx, cancel := context.WithTimeout(context.Background(), task.timeout)
+		defer cancel()
+		require.NoError(t, task.runWithNetwork(ctx, nil,
+			func(ctx context.Context, _, _ string) (net.Conn, error) {
+				<-ctx.Done()
+				return nil, ctx.Err()
+			}))
+		tags, fields := task.GetResults()
+		assert.Equal(t, "OK", tags["status"])
+		assert.Equal(t, 3*time.Second, task.reqCost)
+		assert.Equal(t, int64(3000000), fields["effective_timeout"])
+	})
 }
 
 func TestTCPConnectionDNSFailureIsNotConnectionTimeout(t *testing.T) {
@@ -227,41 +254,80 @@ func TestTCPConnectionLegacyCompatibility(t *testing.T) {
 }
 
 func TestTCPConnectionDNSDeadline(t *testing.T) {
-	task := connectionTask(t, "eq", "timeout")
-	task.Host = "slow.example"
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-	defer cancel()
-	require.NoError(t, task.runWithNetwork(ctx,
-		func(ctx context.Context, _, _ string) ([]net.IP, error) {
-			<-ctx.Done()
-			return nil, ctx.Err()
-		}, func(context.Context, string, string) (net.Conn, error) {
-			t.Fatal("DNS deadline must prevent dialing")
-			return nil, nil
-		}))
-	tags, fields := task.GetResults()
-	assert.Equal(t, "FAIL", tags["status"])
-	assert.Empty(t, fields["connection_status"])
-	assert.Positive(t, fields["response_time_with_dns"])
+	synctest.Test(t, func(t *testing.T) {
+		task := connectionTask(t, "eq", "timeout")
+		task.Host = "slow.example"
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+		defer cancel()
+		require.NoError(t, task.runWithNetwork(ctx,
+			func(ctx context.Context, _, _ string) ([]net.IP, error) {
+				<-ctx.Done()
+				return nil, ctx.Err()
+			}, func(context.Context, string, string) (net.Conn, error) {
+				t.Fatal("DNS deadline must prevent dialing")
+				return nil, nil
+			}))
+		tags, fields := task.GetResults()
+		assert.Equal(t, "FAIL", tags["status"])
+		assert.Empty(t, fields["connection_status"])
+		assert.Positive(t, fields["response_time_with_dns"])
+	})
 }
 
-func TestTCPConnectionMessageDeadline(t *testing.T) {
-	task := connectionTask(t, "eq", "established")
-	task.Message, task.SuccessWhenLogic = "ping", "or"
-	client, server := net.Pipe()
-	t.Cleanup(func() { assert.NoError(t, server.Close()) })
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-	defer cancel()
-	// A blocked write must expire within the shared budget and preserve established.
-	require.NoError(t, task.runWithNetwork(ctx, nil,
-		func(context.Context, string, string) (net.Conn, error) { return client, nil }))
-	tags, fields := task.GetResults()
-	assert.Equal(t, "FAIL", tags["status"])
-	assert.Equal(t, "established", fields["connection_status"])
-	assert.NotEmpty(t, fields["message_error"])
-	assert.NotContains(t, fields, "connection_error")
-	_, err := server.Read(make([]byte, 1))
-	require.Error(t, err, "client must be closed after deadline")
+func TestTCPConnectionMessageOutsideConnectionBudget(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		task := connectionTask(t, "eq", "established")
+		task.Message, task.SuccessWhenLogic = "ping", "or"
+		client, server := net.Pipe()
+		t.Cleanup(func() { assert.NoError(t, server.Close()) })
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+		done := make(chan error, 1)
+		go func() {
+			if _, err := io.ReadFull(server, make([]byte, len(task.Message))); err != nil {
+				done <- err
+				return
+			}
+			<-ctx.Done()
+			time.Sleep(10 * time.Millisecond)
+			_, err := server.Write([]byte("pong"))
+			done <- err
+		}()
+		// Message I/O retains its own deadline after the connection budget expires.
+		require.NoError(t, task.runWithNetwork(ctx, nil,
+			func(context.Context, string, string) (net.Conn, error) { return client, nil }))
+		require.NoError(t, <-done)
+		tags, fields := task.GetResults()
+		assert.Equal(t, "OK", tags["status"])
+		assert.Equal(t, "established", fields["connection_status"])
+		assert.Equal(t, "pong", fields["response_message"])
+		assert.NotContains(t, fields, "message_error")
+		assert.NotContains(t, fields, "connection_error")
+		_, err := server.Read(make([]byte, 1))
+		require.Error(t, err, "client must be closed after message I/O")
+	})
+}
+
+func TestTCPConnectionMissingTimingCannotPass(t *testing.T) {
+	for _, logic := range []string{"and", "or"} {
+		task := connectionTask(t, "eq", "established")
+		task.SuccessWhenLogic = logic
+		task.SuccessWhen[0].ResponseTime = []*TCPResponseTime{{Target: "1s"}}
+		require.NoError(t, task.CheckTask())
+		task.connectionStatus = "refused"
+		if logic == "and" {
+			task.connectionStatus = "established"
+		}
+		tags, fields := task.GetResults()
+		assert.Equal(t, "FAIL", tags["status"])
+		assert.Contains(t, fields["fail_reason"], "response time unavailable")
+		// A measured zero is distinct from missing timing on coarse platform clocks.
+		task.reqCostAvailable = true
+		tags, _ = task.GetResults()
+		assert.Equal(t, "OK", tags["status"])
+		task.clear()
+		assert.False(t, task.reqCostAvailable)
+	}
 }
 
 func TestTCPConnectionTracerouteErrorDoesNotOverwriteConnection(t *testing.T) {
