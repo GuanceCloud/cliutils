@@ -11,7 +11,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"runtime"
 	"strings"
+	"sync"
+	"syscall"
 	"text/template"
 	"time"
 )
@@ -31,9 +34,23 @@ type TCPResponseTime struct {
 }
 
 type TCPSuccess struct {
-	ResponseTime    []*TCPResponseTime `json:"response_time,omitempty"`
-	Hops            []*ValueSuccess    `json:"hops,omitempty"`
-	ResponseMessage []*SuccessOption   `json:"response_message,omitempty"`
+	Connection      []*TCPConnectionSuccess `json:"connection,omitempty"`
+	ResponseTime    []*TCPResponseTime      `json:"response_time,omitempty"`
+	Hops            []*ValueSuccess         `json:"hops,omitempty"`
+	ResponseMessage []*SuccessOption        `json:"response_message,omitempty"`
+}
+
+// TCPConnectionSuccess compares the outcome of a connection attempt.
+type TCPConnectionSuccess struct {
+	Op     string `json:"op"`
+	Target string `json:"target"`
+}
+
+func (c *TCPConnectionSuccess) check(status string) error {
+	if status == "" || (c.Op == "eq" && status != c.Target) || (c.Op == "ne" && status == c.Target) {
+		return fmt.Errorf("TCP connection: expect %s %s, got %q", c.Op, c.Target, status)
+	}
+	return nil
 }
 
 type TCPTask struct {
@@ -47,18 +64,27 @@ type TCPTask struct {
 	SuccessWhen      []*TCPSuccess     `json:"success_when"`
 	SuccessWhenLogic string            `json:"success_when_logic"`
 
-	reqCost         time.Duration
-	reqDNSCost      time.Duration
-	reqError        string
-	destIP          string
-	responseMessage string
-	timeout         time.Duration
-	traceroute      []*Route
+	reqCost          time.Duration
+	reqCostAvailable bool
+	reqDNSCost       time.Duration
+	reqError         string
+	destIP           string
+	responseMessage  string
+	timeout          time.Duration
+	traceroute       []*Route
+	connectionStatus string
+	connectionError  string
+	messageError     string
+	tracerouteError  string
+	sharedTimeout    bool
+	cancelMu         sync.Mutex
+	cancelRun        context.CancelFunc
 
 	rawTask *TCPTask
 }
 
 func (t *TCPTask) init() error {
+	t.sharedTimeout = false
 	if len(t.Timeout) == 0 {
 		t.timeout = 10 * time.Second
 	} else {
@@ -74,6 +100,20 @@ func (t *TCPTask) init() error {
 	}
 
 	for _, checker := range t.SuccessWhen {
+		if checker == nil {
+			return errors.New("TCP success rule must not be null")
+		}
+		for _, c := range checker.Connection {
+			if c == nil || (c.Op != "eq" && c.Op != "ne") {
+				return errors.New("TCP connection operator must be eq or ne")
+			}
+			switch c.Target {
+			case "established", "refused", "timeout":
+			default:
+				return fmt.Errorf("invalid TCP connection target %q", c.Target)
+			}
+			t.sharedTimeout = true
+		}
 		if checker.ResponseTime != nil {
 			for _, v := range checker.ResponseTime {
 				du, err := time.ParseDuration(v.Target)
@@ -99,6 +139,10 @@ func (t *TCPTask) init() error {
 		}
 	}
 
+	if t.sharedTimeout && t.timeout <= 0 {
+		return errors.New("TCP timeout must be positive")
+	}
+
 	return nil
 }
 
@@ -115,10 +159,30 @@ func (t *TCPTask) check() error {
 }
 
 func (t *TCPTask) checkResult() (reasons []string, succFlag bool) {
+	// Execution failures must never be hidden by a passing OR assertion.
+	for _, err := range []string{t.reqError, t.messageError, t.tracerouteError} {
+		if err != "" {
+			reasons = append(reasons, err)
+		}
+	}
+	if len(reasons) > 0 {
+		return reasons, false
+	}
 	for _, chk := range t.SuccessWhen {
+		for _, c := range chk.Connection {
+			if err := c.check(t.connectionStatus); err != nil {
+				reasons = append(reasons, err.Error())
+			} else {
+				succFlag = true
+			}
+		}
 		// check response time
 		if chk.ResponseTime != nil {
 			for _, v := range chk.ResponseTime {
+				if t.sharedTimeout && !t.reqCostAvailable {
+					reasons = append(reasons, "TCP response time unavailable: no connection attempt")
+					continue
+				}
 				reqCost := t.reqCost
 
 				if v.IsContainDNS {
@@ -183,6 +247,17 @@ func (t *TCPTask) getResults() (tags map[string]string, fields map[string]interf
 		"response_time":          responseTime,
 		"response_time_with_dns": responseTimeWithDNS,
 		"success":                int64(-1),
+		"connection_status":      t.connectionStatus,
+		"effective_timeout":      t.timeout.Microseconds(),
+	}
+	for key, value := range map[string]string{
+		"connection_error": t.connectionError,
+		"message_error":    t.messageError,
+		"traceroute_error": t.tracerouteError,
+	} {
+		if value != "" {
+			fields[key] = value
+		}
 	}
 
 	if t.responseMessage != "" {
@@ -211,9 +286,6 @@ func (t *TCPTask) getResults() (tags map[string]string, fields map[string]interf
 	message := map[string]interface{}{}
 
 	reasons, succFlag := t.checkResult()
-	if t.reqError != "" {
-		reasons = append(reasons, t.reqError)
-	}
 
 	switch t.SuccessWhenLogic {
 	case "or":
@@ -259,54 +331,111 @@ func (t *TCPTask) metricName() string {
 
 func (t *TCPTask) clear() {
 	t.reqCost = 0
+	t.reqCostAvailable = false
+	t.reqDNSCost = 0
 	t.reqError = ""
+	t.destIP = ""
+	t.responseMessage = ""
+	t.connectionStatus = ""
+	t.connectionError = ""
+	t.messageError = ""
+	t.tracerouteError = ""
 	t.traceroute = nil
 }
 
 func (t *TCPTask) run() error {
 	var d net.Dialer
-	ctx, cancel := context.WithTimeout(context.Background(), t.timeout)
+	runCtx, cancelRun := context.WithCancel(context.Background())
+	defer cancelRun()
+	if t.sharedTimeout {
+		t.cancelMu.Lock()
+		t.cancelRun = cancelRun
+		t.cancelMu.Unlock()
+		defer func() {
+			t.cancelMu.Lock()
+			defer t.cancelMu.Unlock()
+			if err := runCtx.Err(); err != nil {
+				t.reqError = err.Error()
+			}
+			t.cancelRun = nil
+		}()
+	}
+	ctx, cancel := context.WithTimeout(runCtx, t.timeout)
 	defer cancel()
+	var stopClose func() bool
+	defer func() {
+		if stopClose != nil {
+			stopClose()
+		}
+	}()
+	return t.runWithNetwork(ctx, net.DefaultResolver.LookupIP,
+		func(ctx context.Context, network, address string) (net.Conn, error) {
+			conn, err := d.DialContext(ctx, network, address)
+			if err == nil && t.sharedTimeout {
+				// Explicit cancellation also interrupts message I/O, independently of the connection budget.
+				stopClose = context.AfterFunc(runCtx, func() { _ = conn.Close() }) //nolint:errcheck
+			}
+			return conn, err
+		})
+}
 
+func (t *TCPTask) runWithNetwork(ctx context.Context,
+	resolve func(context.Context, string, string) ([]net.IP, error),
+	dial func(context.Context, string, string) (net.Conn, error),
+) error {
 	hostIP := net.ParseIP(t.Host)
 
 	if hostIsName := hostIP == nil; hostIsName { // host name
 		start := time.Now()
-		if ips, err := lookupIP(t.Host); err != nil {
-			t.reqError = err.Error()
-			return nil
+		var ips []net.IP
+		var err error
+		if t.sharedTimeout {
+			ips, err = resolve(ctx, "ip", t.Host)
 		} else {
-			if len(ips) == 0 {
-				err := fmt.Errorf("invalid host: %s, found no ip record", t.Host)
-				t.reqError = err.Error()
-				return nil
-			} else {
-				t.reqDNSCost = time.Since(start)
-				hostIP = ips[0] // TODO: support mutiple ip for one host
-			}
+			// Preserve the resolver and timing semantics of tasks without connection assertions.
+			ips, err = lookupIP(t.Host)
 		}
+		t.reqDNSCost = time.Since(start)
+		if err != nil {
+			t.reqError = fmt.Sprintf("DNS lookup failed: %s", err)
+			return nil
+		}
+		if len(ips) == 0 {
+			t.reqError = fmt.Sprintf("invalid host: %s, found no ip record", t.Host)
+			return nil
+		}
+		hostIP = ips[0]
 	}
 
 	t.destIP = hostIP.String()
 	tcpIPAddr := net.JoinHostPort(hostIP.String(), t.Port)
+	if t.sharedTimeout && ctx.Err() != nil {
+		t.reqError = fmt.Sprintf("TCP connection budget exhausted before dialing: %s", ctx.Err())
+		return nil
+	}
 
 	start := time.Now()
-	conn, err := d.DialContext(ctx, "tcp", tcpIPAddr)
+	conn, err := dial(ctx, "tcp", tcpIPAddr)
+	t.reqCost = time.Since(start)
+	t.reqCostAvailable = true
 
 	if err != nil {
-		t.reqError = err.Error()
-		t.reqDNSCost = 0
+		t.connectionStatus = tcpConnectionStatus(err)
+		t.connectionError = err.Error()
+		if !t.sharedTimeout || t.connectionStatus == "" {
+			t.reqError = err.Error()
+		}
 	} else {
-		t.reqCost = time.Since(start)
+		t.connectionStatus = "established"
 		if t.Message != "" { // send message and get response
 			if err := conn.SetDeadline(time.Now().Add(defaultTCPTimeout)); err != nil {
-				t.reqError = err.Error()
+				t.messageError = err.Error()
 			} else if _, err := conn.Write([]byte(t.Message)); err != nil {
-				t.reqError = err.Error()
+				t.messageError = err.Error()
 			} else {
 				buf := make([]byte, 1024)
 				if n, err := conn.Read(buf); err != nil {
-					t.reqError = err.Error()
+					t.messageError = err.Error()
 				} else {
 					t.responseMessage = string(buf[:n])
 				}
@@ -319,7 +448,7 @@ func (t *TCPTask) run() error {
 	if t.EnableTraceroute {
 		routes, err := runTracerouteIP(hostIP.String(), t.TracerouteConfig)
 		if err != nil {
-			t.reqError = err.Error()
+			t.tracerouteError = err.Error()
 		} else {
 			t.traceroute = routes
 		}
@@ -328,7 +457,44 @@ func (t *TCPTask) run() error {
 	return nil
 }
 
-func (t *TCPTask) stop() {}
+func tcpConnectionStatus(err error) string {
+	if err == nil {
+		return "established"
+	}
+	if errors.Is(err, context.Canceled) {
+		return ""
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return ""
+	}
+	// Windows reports Winsock WSAECONNREFUSED (10061), not syscall.ECONNREFUSED.
+	if errors.Is(err, syscall.ECONNREFUSED) || (runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(10061))) {
+		return "refused"
+	}
+	// Winsock WSAETIMEDOUT (10060) does not implement syscall.Errno.Timeout.
+	if errors.Is(err, syscall.ETIMEDOUT) || (runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(10060))) {
+		return "timeout"
+	}
+	// Other syscall failures, including EAGAIN, are execution errors even if Timeout reports true.
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return ""
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return "timeout"
+	}
+	return ""
+}
+
+func (t *TCPTask) stop() {
+	t.cancelMu.Lock()
+	defer t.cancelMu.Unlock()
+	if t.cancelRun != nil {
+		t.cancelRun()
+	}
+}
 
 func (t *TCPTask) class() string {
 	return ClassTCP
@@ -351,7 +517,7 @@ func (t *TCPTask) getRawTask(taskString string) (string, error) {
 
 	task.Task = nil
 
-	bytes, _ := json.Marshal(task)
+	bytes, _ := json.Marshal(&task)
 	return string(bytes), nil
 }
 
