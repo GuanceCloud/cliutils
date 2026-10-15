@@ -437,6 +437,15 @@ func tcpConnectionStatus(err error) string {
 	if errors.Is(err, syscall.ECONNREFUSED) || (runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(10061))) {
 		return "refused"
 	}
+	// Winsock WSAETIMEDOUT (10060) does not implement syscall.Errno.Timeout.
+	if errors.Is(err, syscall.ETIMEDOUT) || (runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(10060))) {
+		return "timeout"
+	}
+	// Other syscall failures, including EAGAIN, are execution errors even if Timeout reports true.
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return ""
+	}
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
 		return "timeout"

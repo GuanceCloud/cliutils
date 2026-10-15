@@ -128,12 +128,32 @@ func TestTCPConnectionErrorClassification(t *testing.T) {
 	}{
 		{nil, "established"}, {connectionError("refused"), "refused"}, {connectionError("timeout"), "timeout"},
 		{context.Canceled, ""}, {syscall.ENETUNREACH, ""}, {syscall.EHOSTUNREACH, ""},
+		{syscall.ETIMEDOUT, "timeout"}, {syscall.EAGAIN, ""},
+		{&net.OpError{Op: "dial", Err: os.NewSyscallError("connect", syscall.EAGAIN)}, ""},
 		{&net.DNSError{Err: "timeout", IsTimeout: true}, ""}, {errors.New("connection refused"), ""},
 	} {
 		assert.Equal(t, tc.want, tcpConnectionStatus(tc.err), "%v", tc.err)
 	}
 	if runtime.GOOS == "windows" {
 		assert.Equal(t, "refused", tcpConnectionStatus(os.NewSyscallError("connect", syscall.Errno(10061))))
+		assert.Equal(t, "timeout", tcpConnectionStatus(os.NewSyscallError("connect", syscall.Errno(10060))))
+	}
+}
+
+func TestTCPConnectionDialErrorsCannotBeHidden(t *testing.T) {
+	for _, dialErr := range []error{syscall.EAGAIN, syscall.ENETUNREACH, context.Canceled} {
+		task := connectionTask(t, "eq", "timeout")
+		task.SuccessWhenLogic = "or"
+		task.SuccessWhen[0].ResponseTime = []*TCPResponseTime{{Target: "1s"}}
+		require.NoError(t, task.CheckTask())
+		require.NoError(t, task.runWithNetwork(context.Background(), nil,
+			func(context.Context, string, string) (net.Conn, error) {
+				return nil, &net.OpError{Op: "dial", Err: os.NewSyscallError("connect", dialErr)}
+			}))
+		tags, fields := task.GetResults()
+		assert.Equal(t, "FAIL", tags["status"])
+		assert.Empty(t, fields["connection_status"])
+		assert.NotEmpty(t, fields["fail_reason"])
 	}
 }
 
