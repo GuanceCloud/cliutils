@@ -104,9 +104,6 @@ func (t *TCPTask) init() error {
 		if checker == nil {
 			return errors.New("TCP success rule must not be null")
 		}
-		if checker.Connection != nil && len(checker.Connection) == 0 {
-			return errors.New("TCP connection rules must not be empty")
-		}
 		for _, c := range checker.Connection {
 			if c == nil || (c.Op != "eq" && c.Op != "ne") {
 				return errors.New("TCP connection operator must be eq or ne")

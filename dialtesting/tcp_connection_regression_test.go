@@ -15,28 +15,45 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTCPConnectionEmptyArrayValidation(t *testing.T) {
+func TestTCPConnectionEmptyArrayCompatibility(t *testing.T) {
 	for _, tc := range []struct {
 		name, rules string
-		invalid     bool
+		connection  bool
 	}{
-		{"empty", `[{"connection":[]}]`, true},
-		{"empty with response time", `[{"connection":[],"response_time":[{"target":"1s"}]}]`, true},
+		{"empty", `[{"connection":[]}]`, false},
+		{"empty with response time", `[{"connection":[],"response_time":[{"target":"1s"}]}]`, false},
 		{"empty after valid connection", `[{"connection":[{"op":"eq","target":"refused"}]},{"connection":[]}]`, true},
 		{"legacy omitted", `[{"response_time":[{"target":"1s"}]}]`, false},
+		{"legacy connection only", `[{}]`, false},
 		{"optional null", `[{"connection":null,"response_time":[{"target":"1s"}]}]`, false},
-		{"valid", `[{"connection":[{"op":"eq","target":"refused"}]}]`, false},
+		{"valid", `[{"connection":[{"op":"eq","target":"refused"}]}]`, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw := `{"external_id":"tcp-review","frequency":"1m","host":"127.0.0.1","port":"1","success_when":` + tc.rules + `}`
 			task, err := NewTask(raw, &TCPTask{})
 			require.NoError(t, err)
-			for _, err := range []error{task.Check(), task.RenderTemplateAndInit(nil)} {
-				if tc.invalid {
-					require.ErrorContains(t, err, "TCP connection rules must not be empty")
-				} else {
-					require.NoError(t, err)
+			require.NoError(t, task.Check())
+			require.NoError(t, task.RenderTemplateAndInit(nil))
+			tcp, ok := task.(*TCPTask)
+			require.True(t, ok)
+			assert.Equal(t, tc.connection, tcp.sharedTimeout)
+			for _, state := range []string{"established", "refused", "timeout"} {
+				tcp.clear()
+				require.NoError(t, tcp.runWithNetwork(context.Background(), nil,
+					func(context.Context, string, string) (net.Conn, error) {
+						if state == "established" {
+							client, server := net.Pipe()
+							require.NoError(t, server.Close())
+							return client, nil
+						}
+						return nil, connectionError(state)
+					}))
+				tags, _ := tcp.GetResults()
+				success := state == "established"
+				if tc.connection {
+					success = state == "refused"
 				}
+				assert.Equal(t, success, tags["status"] == "OK", state)
 			}
 		})
 	}
