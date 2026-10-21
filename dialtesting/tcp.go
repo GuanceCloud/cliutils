@@ -70,6 +70,7 @@ type TCPTask struct {
 	reqError         string
 	destIP           string
 	responseMessage  string
+	messageAvailable bool
 	timeout          time.Duration
 	traceroute       []*Route
 	connectionStatus string
@@ -201,6 +202,10 @@ func (t *TCPTask) checkResult() (reasons []string, succFlag bool) {
 		// check message
 		if chk.ResponseMessage != nil {
 			for _, v := range chk.ResponseMessage {
+				if t.sharedTimeout && !t.messageAvailable {
+					reasons = append(reasons, "TCP response message unavailable: no response received")
+					continue
+				}
 				if err := v.check(t.responseMessage, "response message"); err != nil {
 					reasons = append(reasons, err.Error())
 				} else {
@@ -336,6 +341,7 @@ func (t *TCPTask) clear() {
 	t.reqError = ""
 	t.destIP = ""
 	t.responseMessage = ""
+	t.messageAvailable = false
 	t.connectionStatus = ""
 	t.connectionError = ""
 	t.messageError = ""
@@ -438,6 +444,7 @@ func (t *TCPTask) runWithNetwork(ctx context.Context,
 					t.messageError = err.Error()
 				} else {
 					t.responseMessage = string(buf[:n])
+					t.messageAvailable = true
 				}
 			}
 		}
