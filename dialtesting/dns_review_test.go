@@ -49,6 +49,19 @@ func TestDNSTemplatesDoNotBypassStaticValidation(t *testing.T) {
 	require.Error(t, task.CheckTask())
 }
 
+func TestDNSNullPayloadDoesNotPanic(t *testing.T) {
+	require.NotPanics(t, func() {
+		task, err := NewTask("null", &DNSTask{})
+		require.Error(t, err)
+		require.Nil(t, task)
+	})
+	require.NotPanics(t, func() {
+		task, err := NewTask("", nil)
+		require.Error(t, err)
+		require.Nil(t, task)
+	})
+}
+
 func TestDNSValidationBoundaries(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

@@ -278,6 +278,9 @@ func NewTask(taskString string, task TaskChild) (ITask, error) {
 		taskString = string(bytes)
 	}
 
+	if task == nil {
+		return nil, errors.New("task must not be null")
+	}
 	task.initTask()
 
 	if t, ok := task.(ITask); !ok {
