@@ -13,6 +13,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -360,4 +361,99 @@ func TestDNSSecretValuesCannotChangeStatusEnums(t *testing.T) {
 	tags, _ := task.GetResults()
 	require.Equal(t, "127.0.0.1", tags["dest_ip"])
 	require.Equal(t, "dns", tags["proto"])
+}
+
+func TestDNSDoHPortTemplateSurvivesTaskCopy(t *testing.T) {
+	for _, tc := range []struct {
+		port  string
+		valid bool
+	}{{"443", true}, {"8443", false}} {
+		t.Run(tc.port, func(t *testing.T) {
+			raw := `{"external_id":"port-template","frequency":"1m","domain":"example.com",
+				"dns_server":"resolver.test","protocol":"doh","port":"{{port}}",
+				"doh":{"url":"https://resolver.test/dns-query"},
+				"config_vars":[{"name":"port","value":"` + tc.port + `"}],
+				"success_when":[{"response_time":"1s"}]}`
+			task, err := NewTask(raw, &DNSTask{})
+			require.NoError(t, err)
+			require.NoError(t, task.Check())
+			// Kodo serializes a checked task before copying it per region.
+			copied, err := NewTask(task.String(), &DNSTask{})
+			require.NoError(t, err)
+			require.Equal(t, "{{port}}", copied.(*DNSTask).Port)
+			err = copied.RenderTemplateAndInit(nil)
+			if tc.valid {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, "port must match")
+			}
+		})
+	}
+}
+
+func TestDNSRawTaskRedactsSecureLiterals(t *testing.T) {
+	for _, secret := range []string{"verification=example", "quoted\"value\\with\nnewline"} {
+		t.Run(secret, func(t *testing.T) {
+			port := dnsFixturePlain(t, func(packet []byte) []byte {
+				var message dnsmessage.Message
+				_ = message.Unpack(dnsFixtureReply(packet))
+				message.Answers[0].Body = &dnsmessage.TXTResource{TXT: []string{secret}}
+				out, _ := message.Pack()
+				return out
+			}, false)
+			task := dnsFixtureTask(t, "tcp", port)
+			task.ConfigVars = []*ConfigVar{{Name: "token", Value: secret, Secure: true}}
+			task.SuccessWhen = []*DNSSuccess{{AtLeastOneRecord: &DNSRecordAssertions{TXT: []*DNSRecordCondition{{SuccessOption: SuccessOption{Is: secret}}}}}}
+			_, err := NewTask("", task)
+			require.NoError(t, err)
+			fields := dnsAssertRun(t, task, true)
+			var reported DNSTask
+			require.NoError(t, json.Unmarshal([]byte(fields["task"].(string)), &reported))
+			require.Equal(t, "[redacted]", reported.SuccessWhen[0].AtLeastOneRecord.TXT[0].Is)
+			require.Equal(t, "tcp", reported.Protocol)
+			require.Equal(t, task.Domain, reported.Domain)
+			// A cached report must not expose a variable newly marked secure.
+			task.ConfigVars[0].Secure = false
+			fields = dnsAssertRun(t, task, true)
+			require.NoError(t, json.Unmarshal([]byte(fields["task"].(string)), &reported))
+			require.Equal(t, secret, reported.SuccessWhen[0].AtLeastOneRecord.TXT[0].Is)
+			task.ConfigVars[0].Secure = true
+			fields = dnsAssertRun(t, task, true)
+			require.NoError(t, json.Unmarshal([]byte(fields["task"].(string)), &reported))
+			require.Equal(t, "[redacted]", reported.SuccessWhen[0].AtLeastOneRecord.TXT[0].Is)
+		})
+	}
+}
+
+func TestDNSRecordLengthTruncationIsReported(t *testing.T) {
+	for _, length := range []int{10, 5000} {
+		t.Run(strconv.Itoa(length), func(t *testing.T) {
+			value := strings.Repeat("x", length) + "tail_marker"
+			port := dnsFixturePlain(t, func(packet []byte) []byte {
+				var message dnsmessage.Message
+				_ = message.Unpack(dnsFixtureReply(packet))
+				parts := []string{}
+				for remaining := value; len(remaining) > 0; {
+					n := min(200, len(remaining))
+					parts = append(parts, remaining[:n])
+					remaining = remaining[n:]
+				}
+				message.Answers[0].Body = &dnsmessage.TXTResource{TXT: parts}
+				out, _ := message.Pack()
+				return out
+			}, false)
+			task := dnsFixtureTask(t, "tcp", port)
+			task.SuccessWhen = []*DNSSuccess{{EveryRecord: &DNSRecordAssertions{TXT: []*DNSRecordCondition{{SuccessOption: SuccessOption{Contains: "tail_marker"}}}}}}
+			fields := dnsAssertRun(t, task, true)
+			var queries []dnsQueryResult
+			var assertions []dnsAssertionResult
+			require.NoError(t, json.Unmarshal([]byte(fields["dns_queries"].(string)), &queries))
+			require.NoError(t, json.Unmarshal([]byte(fields["assertion_results"].(string)), &assertions))
+			wantTruncated := length > 4096
+			require.Equal(t, wantTruncated, fields["details_truncated"])
+			require.Equal(t, wantTruncated, queries[0].Truncated)
+			require.Equal(t, wantTruncated, assertions[0].Truncated)
+			require.Equal(t, "passed", assertions[0].Status)
+		})
+	}
 }

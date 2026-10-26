@@ -268,7 +268,9 @@ func (t *DNSTask) prepareDoH(allowTemplate bool) error {
 		if t.Port != "" && !templated(t.Port) && t.Port != port {
 			return errors.New("port must match doh.url port")
 		}
-		t.Port = port
+		if !templated(t.Port) {
+			t.Port = port
+		}
 	}
 	if t.DoH.Method == "" {
 		t.DoH.Method = "POST"
@@ -304,9 +306,13 @@ func (t *DNSTask) initTask() {
 		t.Task = &Task{}
 	}
 }
-func (t *DNSTask) class() string        { return ClassDNS }
-func (t *DNSTask) metricName() string   { return dnsMetricName }
-func (t *DNSTask) clear()               { t.result = dnsRunResult{} }
+func (t *DNSTask) class() string      { return ClassDNS }
+func (t *DNSTask) metricName() string { return dnsMetricName }
+func (t *DNSTask) clear() {
+	t.result = dnsRunResult{}
+	// Secure variable values can change between runs.
+	t.Task.rawTask = ""
+}
 func (t *DNSTask) setReqError(s string) { t.result.Code, t.result.Error = "address_denied", s }
 func (t *DNSTask) stop() {
 	t.mu.Lock()
@@ -410,6 +416,31 @@ func (t *DNSTask) getRawTask(s string) (string, error) {
 		}
 	}
 	b, err := json.Marshal(&raw)
+	if err != nil {
+		return "", err
+	}
+	// Redact string values before encoding so escaping and JSON syntax remain intact.
+	var config any
+	if err = json.Unmarshal(b, &config); err != nil {
+		return "", err
+	}
+	var redact func(any) any
+	redact = func(value any) any {
+		switch v := value.(type) {
+		case string:
+			return t.redactDNSString(v)
+		case map[string]any:
+			for key, item := range v {
+				v[key] = redact(item)
+			}
+		case []any:
+			for i, item := range v {
+				v[i] = redact(item)
+			}
+		}
+		return value
+	}
+	b, err = json.Marshal(redact(config))
 	return string(b), err
 }
 

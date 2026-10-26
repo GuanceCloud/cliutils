@@ -391,6 +391,7 @@ func (t *DNSTask) getResults() (map[string]string, map[string]any) {
 		fields["bootstrap_source"] = t.result.BootstrapSource
 	}
 	queries := append([]dnsQueryResult{}, t.result.Queries...)
+	trimmed := false
 	for i := range queries {
 		q := &queries[i]
 		if q.RCode != "" {
@@ -403,7 +404,9 @@ func (t *DNSTask) getResults() (map[string]string, map[string]any) {
 			q.Truncated = true
 		}
 		for j := range q.Records {
-			q.Records[j].Value = t.safeDNSString(q.Records[j].Value)
+			value, shortened := t.dnsDisplayString(q.Records[j].Value)
+			q.Records[j].Value = value
+			q.Truncated = q.Truncated || shortened
 			q.Records[j].Name = t.safeDNSString(q.Records[j].Name)
 		}
 		q.Error = t.safeDNSString(q.Error)
@@ -411,11 +414,13 @@ func (t *DNSTask) getResults() (map[string]string, map[string]any) {
 	}
 	rows := t.assertionResults()
 	for i := range rows {
-		rows[i].Expected = t.sanitizeDNSValue(rows[i].Expected)
-		rows[i].Actual = t.sanitizeDNSValue(rows[i].Actual)
+		var expectedShortened, actualShortened bool
+		rows[i].Expected, expectedShortened = t.sanitizeDNSValue(rows[i].Expected)
+		rows[i].Actual, actualShortened = t.sanitizeDNSValue(rows[i].Actual)
+		rows[i].Truncated = actualShortened
+		trimmed = trimmed || expectedShortened || actualShortened
 	}
 	budget := max(128, min(MaxMsgSize/2, 32768))
-	trimmed := false
 	for len(dnsJSON(queries)) > budget {
 		changed := false
 		for i := range queries {
@@ -465,6 +470,19 @@ func (t *DNSTask) getResults() (map[string]string, map[string]any) {
 }
 
 func (t *DNSTask) safeDNSString(s string) string {
+	value, _ := t.dnsDisplayString(s)
+	return value
+}
+
+func (t *DNSTask) dnsDisplayString(s string) (string, bool) {
+	s = t.redactDNSString(s)
+	if len(s) > 4096 {
+		return strings.ToValidUTF8(s[:4096], ""), true
+	}
+	return s, false
+}
+
+func (t *DNSTask) redactDNSString(s string) string {
 	if t.DoH != nil {
 		for _, value := range t.DoH.Headers {
 			if value != "" {
@@ -490,23 +508,23 @@ func (t *DNSTask) safeDNSString(s string) string {
 	if t.Certificate != nil && t.Certificate.PrivateKey != "" {
 		s = strings.ReplaceAll(s, t.Certificate.PrivateKey, "[redacted]")
 	}
-	if len(s) > 4096 {
-		s = strings.ToValidUTF8(s[:4096], "")
-	}
 	return s
 }
 
-func (t *DNSTask) sanitizeDNSValue(v any) any {
+func (t *DNSTask) sanitizeDNSValue(v any) (any, bool) {
 	switch x := v.(type) {
 	case string:
-		return t.safeDNSString(x)
+		return t.dnsDisplayString(x)
 	case []string:
 		out := make([]string, len(x))
+		shortened := false
 		for i, s := range x {
-			out[i] = t.safeDNSString(s)
+			value, clipped := t.dnsDisplayString(s)
+			out[i] = value
+			shortened = shortened || clipped
 		}
-		return out
+		return out, shortened
 	default:
-		return v
+		return v, false
 	}
 }
