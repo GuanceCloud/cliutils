@@ -61,10 +61,13 @@ func (e *Encoder) tryTrim(curSize, ptsize, bufLen int) (int, error) {
 		}
 
 		// Pop some points and step back point index for next iterator.
-		e.pbpts.Arr = e.pbpts.Arr[:len(e.pbpts.Arr)-trimmed]
-		e.trimmedPts += trimmed
-		e.lastPtsIdx -= trimmed
-		e.totalPts -= trimmed
+		// Keep one point so the next pass either encodes or skips it. Emptying
+		// the batch would rewind all input and make the caller retry forever.
+		toTrim := min(trimmed, len(e.pbpts.Arr)-1)
+		e.pbpts.Arr = e.pbpts.Arr[:len(e.pbpts.Arr)-toTrim]
+		e.trimmedPts += toTrim
+		e.lastPtsIdx -= toTrim
+		e.totalPts -= toTrim
 		trimmed *= 2 // try trim more tail points to save e.pbpts.Size() cost
 	}
 }
