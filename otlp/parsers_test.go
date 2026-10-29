@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GuanceCloud/cliutils/point"
 	common "github.com/GuanceCloud/tracing-protos/opentelemetry-gen-go/common/v1"
 	logs "github.com/GuanceCloud/tracing-protos/opentelemetry-gen-go/logs/v1"
 	metrics "github.com/GuanceCloud/tracing-protos/opentelemetry-gen-go/metrics/v1"
@@ -170,4 +171,43 @@ func stringValue(v string) *common.AnyValue {
 	return &common.AnyValue{
 		Value: &common.AnyValue_StringValue{StringValue: v},
 	}
+}
+
+func TestParseResourceSpansSelectSpanAttrs(t *testing.T) {
+	resourceAttr := &common.KeyValue{Key: AttrServiceName, Value: stringValue("svc")}
+	scopeAttr := &common.KeyValue{Key: "scope.key", Value: stringValue("scope")}
+	spanAttr := &common.KeyValue{Key: "span.key", Value: stringValue("span")}
+	eventAttr := &common.KeyValue{Key: "event.key", Value: stringValue("event")}
+	var called bool
+
+	batches := ParseResourceSpans([]*trace.ResourceSpans{{
+		Resource: &resource.Resource{Attributes: []*common.KeyValue{resourceAttr}},
+		ScopeSpans: []*trace.ScopeSpans{{
+			Scope: &common.InstrumentationScope{Attributes: []*common.KeyValue{scopeAttr}},
+			Spans: []*trace.Span{{
+				TraceId: []byte{1}, SpanId: []byte{2}, Name: "span",
+				Attributes: []*common.KeyValue{spanAttr},
+				Events:     []*trace.Span_Event{{Name: "custom", Attributes: []*common.KeyValue{eventAttr}}},
+			}},
+		}},
+	}}, TracesParserOptions{
+		SelectAttrs: func([]*common.KeyValue) (point.KVs, []*common.KeyValue) {
+			t.Fatal("SelectAttrs must not run when SelectSpanAttrs is set")
+			return nil, nil
+		},
+		SelectSpanAttrs: func(base point.KVs, groups TraceAttributeGroups) (point.KVs, []*common.KeyValue) {
+			called = true
+			require.Equal(t, "svc", groups.Resource[0].GetValue().GetStringValue())
+			require.Equal(t, "scope", groups.Scope[0].GetValue().GetStringValue())
+			require.Equal(t, "span", groups.Span[0].GetValue().GetStringValue())
+			require.Equal(t, "event", groups.Events[0].GetAttributes()[0].GetValue().GetStringValue())
+			return base.Add("extracted", "yes"), []*common.KeyValue{scopeAttr}
+		},
+	})
+
+	require.True(t, called)
+	require.Len(t, batches, 1)
+	require.Len(t, batches[0], 1)
+	require.Equal(t, "yes", batches[0][0].Get("extracted"))
+	require.Contains(t, batches[0][0].Get(DefaultTraceMessageField), "scope.key")
 }

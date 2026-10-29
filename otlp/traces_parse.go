@@ -48,6 +48,14 @@ const (
 
 type TraceBatch []*point.Point
 
+// TraceAttributeGroups contains all attribute sources for one span.
+type TraceAttributeGroups struct {
+	Resource []*common.KeyValue
+	Scope    []*common.KeyValue
+	Span     []*common.KeyValue
+	Events   []*trace.Span_Event
+}
+
 type TracesParserOptions struct {
 	PointName string
 	Source    string
@@ -79,17 +87,20 @@ type TracesParserOptions struct {
 
 	GlobalTags map[string]string
 
-	IDConverter    func([]byte) string
-	SelectAttrs    func([]*common.KeyValue) (point.KVs, []*common.KeyValue)
-	ScopeKVs       func(*trace.ScopeSpans) point.KVs
-	SpanType       func(spanID, parentID string, spanIDs, parentIDs map[string]bool) string
-	SpanStatus     func(*trace.Status) string
-	SpanKind       func(int32) string
-	SourceType     func(point.KVs) string
-	BaseService    func(map[string]string) string
-	DecorateKVs    func(point.KVs, *trace.ResourceSpans, *trace.ScopeSpans, *trace.Span) point.KVs
-	MessageEncoder func(*trace.Span) (string, error)
-	CleanSpan      func(*trace.Span) *trace.Span
+	IDConverter func([]byte) string
+	SelectAttrs func([]*common.KeyValue) (point.KVs, []*common.KeyValue)
+	// SelectSpanAttrs replaces SelectAttrs when all attribute sources must be
+	// processed together for one span.
+	SelectSpanAttrs func(point.KVs, TraceAttributeGroups) (point.KVs, []*common.KeyValue)
+	ScopeKVs        func(*trace.ScopeSpans) point.KVs
+	SpanType        func(spanID, parentID string, spanIDs, parentIDs map[string]bool) string
+	SpanStatus      func(*trace.Status) string
+	SpanKind        func(int32) string
+	SourceType      func(point.KVs) string
+	BaseService     func(map[string]string) string
+	DecorateKVs     func(point.KVs, *trace.ResourceSpans, *trace.ScopeSpans, *trace.Span) point.KVs
+	MessageEncoder  func(*trace.Span) (string, error)
+	CleanSpan       func(*trace.Span) *trace.Span
 }
 
 func defaultTracesParserOptions(opts TracesParserOptions) TracesParserOptions {
@@ -253,25 +264,34 @@ func ParseResourceSpans(resourceSpans []*trace.ResourceSpans, opts TracesParserO
 					kvs = append(kvs, opts.ScopeKVs(scopeSpans)...)
 				}
 
-				for _, attrs := range [][]*common.KeyValue{
-					resourceSpan.GetResource().GetAttributes(),
-					scopeSpans.GetScope().GetAttributes(),
-					spanAttrs,
-				} {
-					newKVs, newAttrs := opts.SelectAttrs(attrs)
-					kvs = append(kvs, newKVs...)
-					mergedAttrs = append(mergedAttrs, newAttrs...)
-				}
-
-				for _, event := range span.GetEvents() {
-					if event == nil {
-						continue
+				if opts.SelectSpanAttrs != nil {
+					kvs, mergedAttrs = opts.SelectSpanAttrs(kvs, TraceAttributeGroups{
+						Resource: resourceSpan.GetResource().GetAttributes(),
+						Scope:    scopeSpans.GetScope().GetAttributes(),
+						Span:     spanAttrs,
+						Events:   span.GetEvents(),
+					})
+				} else {
+					for _, attrs := range [][]*common.KeyValue{
+						resourceSpan.GetResource().GetAttributes(),
+						scopeSpans.GetScope().GetAttributes(),
+						spanAttrs,
+					} {
+						newKVs, newAttrs := opts.SelectAttrs(attrs)
+						kvs = append(kvs, newKVs...)
+						mergedAttrs = append(mergedAttrs, newAttrs...)
 					}
-					newKVs, newAttrs := opts.SelectAttrs(event.GetAttributes())
-					kvs = append(kvs, newKVs...)
-					mergedAttrs = append(mergedAttrs, newAttrs...)
-					if event.GetName() == EventException {
-						kvs = append(kvs, exceptionEventKVs(event.GetAttributes())...)
+
+					for _, event := range span.GetEvents() {
+						if event == nil {
+							continue
+						}
+						newKVs, newAttrs := opts.SelectAttrs(event.GetAttributes())
+						kvs = append(kvs, newKVs...)
+						mergedAttrs = append(mergedAttrs, newAttrs...)
+						if event.GetName() == EventException {
+							kvs = append(kvs, exceptionEventKVs(event.GetAttributes())...)
+						}
 					}
 				}
 
