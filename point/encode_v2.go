@@ -41,7 +41,7 @@ func (e *Encoder) tryTrim(curSize, ptsize, bufLen int) (int, error) {
 	trimmed := 1
 	for { // exists point(added) may still exceed buf, try tail points until size fit to @buf.
 		pbptsSize := e.pbpts.Size()
-		if pbptsSize < bufLen {
+		if pbptsSize <= bufLen {
 			return pbptsSize, nil
 		}
 
@@ -78,6 +78,7 @@ func (e *Encoder) doEncodeProtobuf(buf []byte) ([]byte, bool) {
 		e.pbpts.Arr = e.pbpts.Arr[:0]
 	}()
 
+retry:
 	curSize := 0
 	for {
 		if e.lastPtsIdx >= len(e.pts) {
@@ -125,7 +126,10 @@ func (e *Encoder) doEncodeProtobuf(buf []byte) ([]byte, bool) {
 	if err != nil {
 		e.lastErr = err
 	} else if after == 0 {
-		// nothing left
+		// Skipping one oversized point must not end the remaining input.
+		if e.lastPtsIdx < len(e.pts) {
+			goto retry
+		}
 		return nil, false
 	}
 

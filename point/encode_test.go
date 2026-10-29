@@ -1233,7 +1233,8 @@ func TestEncTrim(t *T.T) {
 		assert.NoError(t, enc.LastErr())
 		assert.False(t, ok) // noting encode
 		assert.Nil(t, encBuf)
-		assert.Equal(t, 1, enc.SkippedPoints())
+		// All oversized points must be consumed before reporting exhaustion.
+		assert.Equal(t, 2, enc.SkippedPoints())
 		t.Logf("encoder: %s", enc)
 
 		encBuf, ok = enc.Next(tc.buf)
