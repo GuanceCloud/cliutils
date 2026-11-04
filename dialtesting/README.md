@@ -22,11 +22,27 @@ The embedded runner executes the browser script and returns the final
 
 Browser tasks require these binaries on the dial node:
 
-- Chrome/Chromium when `engine=chrome`
+- Official Chrome Headless Shell when `engine=chrome`
 - Lightpanda when `engine=lightpanda`
 
 Chrome can be configured by `Task.SetOption()["chrome_path"]`. Lightpanda can be
 configured by `Task.SetOption()["lightpanda_path"]`.
+
+Chrome also reads `CHROME_EXECUTABLE_PATH`, or discovers `chrome-headless-shell`
+on `PATH`. It no longer discovers desktop Chrome/Chromium automatically.
+Chrome accepts the private-network/CIDR options below and HTTP/HTTPS upstream
+proxies through `browser_proxy_url`; custom CA options remain Lightpanda-only.
+
+Additional Chrome node options are:
+
+- `browser_load_images` and `browser_load_fonts`: default `false`.
+- `browser_allow_no_sandbox`: default `false` in this library. Set to `true`
+  only when the node permits unsandboxed execution. Non-root users still try
+  the sandbox first; root or sandbox-unavailable environments fail otherwise.
+
+These options are supplied by the node through `Task.SetOption()`, not the task
+script. DataKit exposes its own collector configuration and defaults, including
+Lightpanda as its default engine and `allow_no_sandbox = true`.
 
 Lightpanda also reads these node-level task options:
 
@@ -289,3 +305,5 @@ Common result fields include:
 - `lcp`
 - `cls`
 - `steps`
+
+For platform browser tasks, the runner injects the Web RUM synthetic context before document scripts run: `_DATAFLUX_SYNTHETICS_BROWSER = true`, `_GUANCE_SYNTHETICS_PUBLIC_ID = external_id`, and `_GUANCE_SYNTHETICS_RESULT_ID = browser_run_id`. The existing SDK supplies `synthetics_test_id`, `synthetics_result_id`, and `session_type = synthetics`. Each DataKit retry has its own result ID, preserved in `retry_records[].browser_run_id`; the top-level `browser_run_id` remains the final attempt's ID. Navigation and reload in the controlled target retain the context. Independent popup targets require separate support. SDK installation, sampling, replay, and ingestion guarantees are unchanged.

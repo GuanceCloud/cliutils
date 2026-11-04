@@ -37,16 +37,17 @@ type StepResult struct {
 }
 
 type RetryRecord struct {
-	Attempt     int       `json:"attempt"`
-	StartedAt   string    `json:"started_at,omitempty"`
-	EndedAt     string    `json:"ended_at,omitempty"`
-	DurationUS  int64     `json:"duration_us,omitempty"`
-	Status      RunStatus `json:"status"`
-	Success     bool      `json:"success"`
-	FailedStep  int       `json:"failed_step,omitempty"`
-	FailReason  string    `json:"fail_reason,omitempty"`
-	FailureType string    `json:"failure_type,omitempty"`
-	Message     string    `json:"message,omitempty"`
+	BrowserRunID string    `json:"browser_run_id,omitempty"`
+	Attempt      int       `json:"attempt"`
+	StartedAt    string    `json:"started_at,omitempty"`
+	EndedAt      string    `json:"ended_at,omitempty"`
+	DurationUS   int64     `json:"duration_us,omitempty"`
+	Status       RunStatus `json:"status"`
+	Success      bool      `json:"success"`
+	FailedStep   int       `json:"failed_step,omitempty"`
+	FailReason   string    `json:"fail_reason,omitempty"`
+	FailureType  string    `json:"failure_type,omitempty"`
+	Message      string    `json:"message,omitempty"`
 }
 
 type ConsoleEvent struct {

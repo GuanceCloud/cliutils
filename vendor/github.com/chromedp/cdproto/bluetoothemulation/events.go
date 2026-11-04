@@ -10,3 +10,26 @@ type EventGattOperationReceived struct {
 	Address string            `json:"address"`
 	Type    GATTOperationType `json:"type"`
 }
+
+// EventCharacteristicOperationReceived event for when a characteristic
+// operation of |type| to the characteristic respresented by |characteristicId|
+// happened. |data| and |writeType| is expected to exist when |type| is write.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/BluetoothEmulation#event-characteristicOperationReceived
+type EventCharacteristicOperationReceived struct {
+	CharacteristicID string                      `json:"characteristicId"`
+	Type             CharacteristicOperationType `json:"type"`
+	Data             string                      `json:"data,omitempty,omitzero"`
+	WriteType        CharacteristicWriteType     `json:"writeType,omitempty,omitzero"`
+}
+
+// EventDescriptorOperationReceived event for when a descriptor operation of
+// |type| to the descriptor respresented by |descriptorId| happened. |data| is
+// expected to exist when |type| is write.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/BluetoothEmulation#event-descriptorOperationReceived
+type EventDescriptorOperationReceived struct {
+	DescriptorID string                  `json:"descriptorId"`
+	Type         DescriptorOperationType `json:"type"`
+	Data         string                  `json:"data,omitempty,omitzero"`
+}

@@ -242,6 +242,86 @@ type EventDirectTCPSocketClosed struct {
 	Timestamp  *cdp.MonotonicTime `json:"timestamp"`
 }
 
+// EventDirectTCPSocketChunkSent fired when data is sent to tcp direct socket
+// stream.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-directTCPSocketChunkSent
+type EventDirectTCPSocketChunkSent struct {
+	Identifier RequestID          `json:"identifier"`
+	Data       string             `json:"data"`
+	Timestamp  *cdp.MonotonicTime `json:"timestamp"`
+}
+
+// EventDirectTCPSocketChunkReceived fired when data is received from tcp
+// direct socket stream.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-directTCPSocketChunkReceived
+type EventDirectTCPSocketChunkReceived struct {
+	Identifier RequestID          `json:"identifier"`
+	Data       string             `json:"data"`
+	Timestamp  *cdp.MonotonicTime `json:"timestamp"`
+}
+
+// EventDirectUDPSocketCreated fired upon direct_socket.UDPSocket creation.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-directUDPSocketCreated
+type EventDirectUDPSocketCreated struct {
+	Identifier RequestID               `json:"identifier"`
+	Options    *DirectUDPSocketOptions `json:"options"`
+	Timestamp  *cdp.MonotonicTime      `json:"timestamp"`
+	Initiator  *Initiator              `json:"initiator,omitempty,omitzero"`
+}
+
+// EventDirectUDPSocketOpened fired when direct_socket.UDPSocket connection
+// is opened.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-directUDPSocketOpened
+type EventDirectUDPSocketOpened struct {
+	Identifier RequestID          `json:"identifier"`
+	LocalAddr  string             `json:"localAddr"`
+	LocalPort  int64              `json:"localPort"` // Expected to be unsigned integer.
+	Timestamp  *cdp.MonotonicTime `json:"timestamp"`
+	RemoteAddr string             `json:"remoteAddr,omitempty,omitzero"`
+	RemotePort int64              `json:"remotePort,omitempty,omitzero"` // Expected to be unsigned integer.
+}
+
+// EventDirectUDPSocketAborted fired when direct_socket.UDPSocket is aborted.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-directUDPSocketAborted
+type EventDirectUDPSocketAborted struct {
+	Identifier   RequestID          `json:"identifier"`
+	ErrorMessage string             `json:"errorMessage"`
+	Timestamp    *cdp.MonotonicTime `json:"timestamp"`
+}
+
+// EventDirectUDPSocketClosed fired when direct_socket.UDPSocket is closed.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-directUDPSocketClosed
+type EventDirectUDPSocketClosed struct {
+	Identifier RequestID          `json:"identifier"`
+	Timestamp  *cdp.MonotonicTime `json:"timestamp"`
+}
+
+// EventDirectUDPSocketChunkSent fired when message is sent to udp direct
+// socket stream.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-directUDPSocketChunkSent
+type EventDirectUDPSocketChunkSent struct {
+	Identifier RequestID          `json:"identifier"`
+	Message    *DirectUDPMessage  `json:"message"`
+	Timestamp  *cdp.MonotonicTime `json:"timestamp"`
+}
+
+// EventDirectUDPSocketChunkReceived fired when message is received from udp
+// direct socket stream.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-directUDPSocketChunkReceived
+type EventDirectUDPSocketChunkReceived struct {
+	Identifier RequestID          `json:"identifier"`
+	Message    *DirectUDPMessage  `json:"message"`
+	Timestamp  *cdp.MonotonicTime `json:"timestamp"`
+}
+
 // EventRequestWillBeSentExtraInfo fired when additional information about a
 // requestWillBeSent event is available from the network stack. Not every
 // requestWillBeSent event will have an additional requestWillBeSentExtraInfo

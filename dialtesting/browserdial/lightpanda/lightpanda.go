@@ -187,6 +187,16 @@ func (e *Engine) ConfigureBrowser(ctx context.Context, config runner.BrowserConf
 	actionCtx, cancel := e.actionContext(ctx)
 	defer cancel()
 	actions := []chromedp.Action{}
+	initScript, err := config.Synthetics.InitScript()
+	if err != nil {
+		return fmt.Errorf("encode RUM correlation context: %w", err)
+	}
+	if initScript != "" {
+		actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
+			_, err := page.AddScriptToEvaluateOnNewDocument(initScript).Do(ctx)
+			return err
+		}))
+	}
 	if config.IgnoreHTTPSErrors {
 		actions = append(actions, security.SetIgnoreCertificateErrors(true))
 	}
@@ -458,7 +468,7 @@ func (e *Engine) listen(event any) {
 		}
 		e.responses[ev.RequestID] = struct{}{}
 		info := e.requests[ev.RequestID]
-		status := int64(ev.Response.Status)
+		status := ev.Response.Status
 		e.network = append(e.network, evidence.NetworkEvent{
 			Seq:          len(e.network) + 1,
 			Timestamp:    util.NowISO(),
@@ -500,7 +510,7 @@ func start(parent context.Context, executable string, startupTimeout time.Durati
 	if err != nil {
 		return nil, err
 	}
-	endpoint := fmt.Sprintf("http://%s:%d", defaultHost, port)
+	endpoint := "http://" + net.JoinHostPort(defaultHost, strconv.Itoa(port))
 	procCtx, cancel := context.WithCancel(parent)
 	logs := &limitedBuffer{limit: 8_000}
 	arguments := []string{"serve", "--host", defaultHost, "--port", strconv.Itoa(port)}

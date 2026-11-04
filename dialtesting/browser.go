@@ -38,15 +38,18 @@ const (
 	maxBrowserTotalTimeoutMS  = 300_000
 	maxBrowserStepTimeoutMS   = 60_000
 
-	optionLightpandaPath      = "lightpanda_path"
-	optionLightpandaPathCamel = "lightpandaPath"
-	optionBrowserCACertFile   = "browser_ca_cert_file"
-	optionBrowserCACertDir    = "browser_ca_cert_dir"
-	optionBrowserProxyURL     = "browser_proxy_url"
-	optionBlockPrivateNetwork = "browser_block_private_network"
-	optionBrowserBlockCIDRs   = "browser_block_cidrs"
-	optionChromePath          = "chrome_path"
-	optionChromePathCamel     = "chromePath"
+	optionLightpandaPath        = "lightpanda_path"
+	optionLightpandaPathCamel   = "lightpandaPath"
+	optionBrowserCACertFile     = "browser_ca_cert_file"
+	optionBrowserCACertDir      = "browser_ca_cert_dir"
+	optionBrowserProxyURL       = "browser_proxy_url"
+	optionBlockPrivateNetwork   = "browser_block_private_network"
+	optionBrowserBlockCIDRs     = "browser_block_cidrs"
+	optionChromePath            = "chrome_path"
+	optionChromePathCamel       = "chromePath"
+	optionBrowserLoadImages     = "browser_load_images"
+	optionBrowserLoadFonts      = "browser_load_fonts"
+	optionBrowserAllowNoSandbox = "browser_allow_no_sandbox"
 
 	browserSystemErrorMessage = "Browser dial testing system error, please check agent logs"
 )
@@ -212,16 +215,17 @@ type browserDialError struct {
 }
 
 type browserRetryRecord struct {
-	Attempt     int    `json:"attempt"`
-	StartedAt   string `json:"started_at,omitempty"`
-	EndedAt     string `json:"ended_at,omitempty"`
-	DurationUS  int64  `json:"duration_us,omitempty"`
-	Status      string `json:"status"`
-	Success     bool   `json:"success"`
-	FailedStep  int    `json:"failed_step,omitempty"`
-	FailReason  string `json:"fail_reason,omitempty"`
-	FailureType string `json:"failure_type,omitempty"`
-	Message     string `json:"message,omitempty"`
+	BrowserRunID string `json:"browser_run_id,omitempty"`
+	Attempt      int    `json:"attempt"`
+	StartedAt    string `json:"started_at,omitempty"`
+	EndedAt      string `json:"ended_at,omitempty"`
+	DurationUS   int64  `json:"duration_us,omitempty"`
+	Status       string `json:"status"`
+	Success      bool   `json:"success"`
+	FailedStep   int    `json:"failed_step,omitempty"`
+	FailReason   string `json:"fail_reason,omitempty"`
+	FailureType  string `json:"failure_type,omitempty"`
+	Message      string `json:"message,omitempty"`
 }
 
 func browserDialRunFromEmbedded(result browserrunner.Result) browserDialRun {
@@ -272,6 +276,12 @@ func (t *BrowserTask) metricName() string {
 }
 
 func (t *BrowserTask) run() error {
+	// Stop must cancel the entire execution, including waits between retries.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cancelState := t.setCancel(cancel)
+	defer t.clearCancel(cancelState)
+
 	if err := t.check(); err != nil {
 		t.setConfigError(err)
 		return nil
@@ -284,14 +294,14 @@ func (t *BrowserTask) run() error {
 	}
 	defer os.Remove(path) //nolint:errcheck
 
-	result := t.runViewport(path, t.effectiveViewports()[0])
+	result := t.runViewport(ctx, path, t.effectiveViewports()[0])
 	t.results = append(t.results, result)
 	t.setLastResult(result)
 
 	return nil
 }
 
-func (t *BrowserTask) runViewport(path string, viewport BrowserViewport) browserViewportResult {
+func (t *BrowserTask) runViewport(ctx context.Context, path string, viewport BrowserViewport) browserViewportResult {
 	maxAttempts := 1
 	if t.RetryOptions != nil && t.RetryOptions.Enabled {
 		maxAttempts += clampBrowserRetryCount(t.RetryOptions.Count)
@@ -300,7 +310,10 @@ func (t *BrowserTask) runViewport(path string, viewport BrowserViewport) browser
 	var result browserViewportResult
 	retryRecords := make([]browserRetryRecord, 0, maxAttempts)
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		result = t.runBrowserDial(path, viewport)
+		if attempt > 1 && ctx.Err() != nil {
+			return result
+		}
+		result = t.runBrowserDial(ctx, path, viewport)
 		result.attempts = attempt
 		if len(result.result.RetryRecords) > 0 {
 			retryRecords = append(retryRecords, result.result.RetryRecords...)
@@ -313,27 +326,27 @@ func (t *BrowserTask) runViewport(path string, viewport BrowserViewport) browser
 		if result.reqError == "" && result.result.Success {
 			return result
 		}
-		if isBrowserParseFailure(result) || attempt == maxAttempts {
+		if ctx.Err() != nil || isBrowserParseFailure(result) || attempt == maxAttempts {
 			return result
 		}
 		if interval := t.retryInterval(); interval > 0 {
-			browserRetrySleep(interval)
+			timer := time.NewTimer(interval)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return result
+			case <-timer.C:
+			}
 		}
 	}
 	return result
 }
 
-func (t *BrowserTask) runBrowserDial(path string, viewport BrowserViewport) browserViewportResult {
-	return t.runBrowserDialEmbedded(path, viewport)
-}
-
-func (t *BrowserTask) runBrowserDialEmbedded(path string, viewport BrowserViewport) browserViewportResult {
+func (t *BrowserTask) runBrowserDial(parent context.Context, path string, viewport BrowserViewport) browserViewportResult {
 	start := time.Now()
 	timeoutMS := t.effectiveTimeoutMS()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMS)*time.Millisecond+15*time.Second)
+	ctx, cancel := context.WithTimeout(parent, time.Duration(timeoutMS)*time.Millisecond+15*time.Second)
 	defer cancel()
-	cancelState := t.setCancel(cancel)
-	defer t.clearCancel(cancelState)
 
 	result := browserViewportResult{viewport: viewport, startedAt: start.UTC().Format(time.RFC3339Nano)}
 	engineName, engineFactory, err := t.embeddedEngineFactory()
@@ -345,6 +358,7 @@ func (t *BrowserTask) runBrowserDialEmbedded(path string, viewport BrowserViewpo
 	}
 
 	runResult := browserrunner.Run(ctx, browserrunner.Options{
+		SyntheticsTestID:    t.GetExternalID(),
 		ScriptPath:          path,
 		Name:                t.Name,
 		TimeoutMS:           timeoutMS,
@@ -357,6 +371,9 @@ func (t *BrowserTask) runBrowserDialEmbedded(path string, viewport BrowserViewpo
 		BlockPrivateNetwork: t.browserBlockPrivateNetwork(),
 		PrivateNetworkCIDRs: t.browserPrivateNetworkCIDRs(),
 		ChromePath:          t.chromePath(),
+		LoadImages:          strings.EqualFold(t.GetOption()[optionBrowserLoadImages], "true"),
+		LoadFonts:           strings.EqualFold(t.GetOption()[optionBrowserLoadFonts], "true"),
+		AllowNoSandbox:      strings.EqualFold(t.GetOption()[optionBrowserAllowNoSandbox], "true"),
 		StartupTimeout:      5 * time.Second,
 		ScreenshotOnFailure: t.AdvanceOptions != nil && t.AdvanceOptions.ScreenshotOnFailure,
 		ViewportWidth:       viewport.Width,
@@ -396,14 +413,15 @@ func browserRetryRecordFromResult(result browserViewportResult, attempt int) bro
 		}
 	}
 	record := browserRetryRecord{
-		Attempt:     attempt,
-		StartedAt:   firstNonEmpty(result.result.StartedAt, result.startedAt),
-		EndedAt:     firstNonEmpty(result.result.EndedAt, result.endedAt),
-		DurationUS:  result.result.DurationUS,
-		Status:      status,
-		Success:     success,
-		FailReason:  result.result.FailReason,
-		FailureType: result.result.FailureType,
+		BrowserRunID: result.result.RunID,
+		Attempt:      attempt,
+		StartedAt:    firstNonEmpty(result.result.StartedAt, result.startedAt),
+		EndedAt:      firstNonEmpty(result.result.EndedAt, result.endedAt),
+		DurationUS:   result.result.DurationUS,
+		Status:       status,
+		Success:      success,
+		FailReason:   result.result.FailReason,
+		FailureType:  result.result.FailureType,
 	}
 	if record.DurationUS == 0 && result.duration > 0 {
 		record.DurationUS = int64(result.duration) / 1000
@@ -1158,8 +1176,6 @@ func isBrowserParseFailure(result browserViewportResult) bool {
 	}
 	return strings.Contains(text, "parse")
 }
-
-var browserRetrySleep = time.Sleep
 
 func sanitizeBrowserConfig(config string) string {
 	if strings.TrimSpace(config) == "" {

@@ -551,10 +551,6 @@ func TestBrowserTaskRunAdvanceOptions(t *testing.T) {
 }
 
 func TestBrowserTaskRetryStopsAfterSuccess(t *testing.T) {
-	oldSleep := browserRetrySleep
-	browserRetrySleep = func(time.Duration) {}
-	defer func() { browserRetrySleep = oldSleep }()
-
 	browserTask := newBrowserTaskForTest()
 	browserTask.RetryOptions = &BrowserRetryOption{Enabled: true, Count: 2, IntervalSec: 5}
 	task, err := NewTask("", browserTask)
@@ -588,6 +584,55 @@ func TestBrowserTaskRetryStopsAfterSuccess(t *testing.T) {
 	assert.Equal(t, "OK", records[1].Status)
 	assert.True(t, records[1].Success)
 	assert.Equal(t, 2, calls)
+}
+
+func TestBrowserTaskStopDuringRetry(t *testing.T) {
+	browserTask := newBrowserTaskForTest()
+	browserTask.RetryOptions = &BrowserRetryOption{Enabled: true, Count: 1, IntervalSec: 5}
+	task, err := NewTask("", browserTask)
+	require.NoError(t, err)
+	closed := make(chan struct{}, 1)
+	calls := 0
+	stubBrowserEngineWithFactory(t, func(context.Context, browserrunner.EngineOptions) (browserrunner.Engine, error) {
+		calls++
+		if calls == 1 {
+			return &fakeBrowserEngine{title: "Wrong Title", onClose: func() { closed <- struct{}{} }}, nil
+		}
+		return &fakeBrowserEngine{}, nil
+	})
+	done := make(chan error, 1)
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		done <- task.Run()
+	}()
+	t.Cleanup(func() {
+		task.Stop()
+		select {
+		case <-finished:
+		case <-time.After(3 * time.Second):
+			t.Error("task did not stop during cleanup")
+		}
+	})
+	select {
+	case <-closed:
+	case <-time.After(3 * time.Second):
+		t.Fatal("first attempt did not finish")
+	}
+	task.Stop()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("stopped task kept waiting for a retry")
+	}
+	require.Equal(t, 1, calls)
+	_, fields := task.GetResults()
+	require.Equal(t, int64(-1), fields["success"])
+	// A subsequent scheduled execution must get a fresh cancellation state.
+	require.NoError(t, task.Run())
+	_, fields = task.GetResults()
+	require.Equal(t, int64(1), fields["success"])
 }
 
 func TestBrowserTaskParseFailureDoesNotRetry(t *testing.T) {
@@ -928,9 +973,15 @@ type fakeBrowserEngine struct {
 	config  *browserrunner.BrowserConfig
 	title   string
 	evalErr error
+	onClose func()
 }
 
-func (e *fakeBrowserEngine) Close(context.Context) error { return nil }
+func (e *fakeBrowserEngine) Close(context.Context) error {
+	if e.onClose != nil {
+		e.onClose()
+	}
+	return nil
+}
 
 func (e *fakeBrowserEngine) Navigate(context.Context, string) error { return nil }
 
