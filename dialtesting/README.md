@@ -289,3 +289,5 @@ Common result fields include:
 - `lcp`
 - `cls`
 - `steps`
+
+For platform browser tasks, the runner injects the Web RUM synthetic context before document scripts run: `_DATAFLUX_SYNTHETICS_BROWSER = true`, `_GUANCE_SYNTHETICS_PUBLIC_ID = external_id`, and `_GUANCE_SYNTHETICS_RESULT_ID = browser_run_id`. The existing SDK supplies `synthetics_test_id`, `synthetics_result_id`, and `session_type = synthetics`. Each DataKit retry has its own result ID, preserved in `retry_records[].browser_run_id`; the top-level `browser_run_id` remains the final attempt's ID. Navigation and reload in the controlled target retain the context. Independent popup targets require separate support. SDK installation, sampling, replay, and ingestion guarantees are unchanged.

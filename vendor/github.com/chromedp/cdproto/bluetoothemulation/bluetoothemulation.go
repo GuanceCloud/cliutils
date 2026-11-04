@@ -174,6 +174,94 @@ func (p *SimulateGATTOperationResponseParams) Do(ctx context.Context) (err error
 	return cdp.Execute(ctx, CommandSimulateGATTOperationResponse, p, nil)
 }
 
+// SimulateCharacteristicOperationResponseParams simulates the response from
+// the characteristic with |characteristicId| for a characteristic operation of
+// |type|. The |code| value follows the Error Codes from Bluetooth Core
+// Specification Vol 3 Part F 3.4.1.1 Error Response. The |data| is expected to
+// exist when simulating a successful read operation response.
+type SimulateCharacteristicOperationResponseParams struct {
+	CharacteristicID string                      `json:"characteristicId"`
+	Type             CharacteristicOperationType `json:"type"`
+	Code             int64                       `json:"code"`
+	Data             string                      `json:"data,omitempty,omitzero"`
+}
+
+// SimulateCharacteristicOperationResponse simulates the response from the
+// characteristic with |characteristicId| for a characteristic operation of
+// |type|. The |code| value follows the Error Codes from Bluetooth Core
+// Specification Vol 3 Part F 3.4.1.1 Error Response. The |data| is expected to
+// exist when simulating a successful read operation response.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/BluetoothEmulation#method-simulateCharacteristicOperationResponse
+//
+// parameters:
+//
+//	characteristicID
+//	type
+//	code
+func SimulateCharacteristicOperationResponse(characteristicID string, typeVal CharacteristicOperationType, code int64) *SimulateCharacteristicOperationResponseParams {
+	return &SimulateCharacteristicOperationResponseParams{
+		CharacteristicID: characteristicID,
+		Type:             typeVal,
+		Code:             code,
+	}
+}
+
+// WithData [no description].
+func (p SimulateCharacteristicOperationResponseParams) WithData(data string) *SimulateCharacteristicOperationResponseParams {
+	p.Data = data
+	return &p
+}
+
+// Do executes BluetoothEmulation.simulateCharacteristicOperationResponse against the provided context.
+func (p *SimulateCharacteristicOperationResponseParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSimulateCharacteristicOperationResponse, p, nil)
+}
+
+// SimulateDescriptorOperationResponseParams simulates the response from the
+// descriptor with |descriptorId| for a descriptor operation of |type|. The
+// |code| value follows the Error Codes from Bluetooth Core Specification Vol 3
+// Part F 3.4.1.1 Error Response. The |data| is expected to exist when
+// simulating a successful read operation response.
+type SimulateDescriptorOperationResponseParams struct {
+	DescriptorID string                  `json:"descriptorId"`
+	Type         DescriptorOperationType `json:"type"`
+	Code         int64                   `json:"code"`
+	Data         string                  `json:"data,omitempty,omitzero"`
+}
+
+// SimulateDescriptorOperationResponse simulates the response from the
+// descriptor with |descriptorId| for a descriptor operation of |type|. The
+// |code| value follows the Error Codes from Bluetooth Core Specification Vol 3
+// Part F 3.4.1.1 Error Response. The |data| is expected to exist when
+// simulating a successful read operation response.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/BluetoothEmulation#method-simulateDescriptorOperationResponse
+//
+// parameters:
+//
+//	descriptorID
+//	type
+//	code
+func SimulateDescriptorOperationResponse(descriptorID string, typeVal DescriptorOperationType, code int64) *SimulateDescriptorOperationResponseParams {
+	return &SimulateDescriptorOperationResponseParams{
+		DescriptorID: descriptorID,
+		Type:         typeVal,
+		Code:         code,
+	}
+}
+
+// WithData [no description].
+func (p SimulateDescriptorOperationResponseParams) WithData(data string) *SimulateDescriptorOperationResponseParams {
+	p.Data = data
+	return &p
+}
+
+// Do executes BluetoothEmulation.simulateDescriptorOperationResponse against the provided context.
+func (p *SimulateDescriptorOperationResponseParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSimulateDescriptorOperationResponse, p, nil)
+}
+
 // AddServiceParams adds a service with |serviceUuid| to the peripheral with
 // |address|.
 type AddServiceParams struct {
@@ -219,24 +307,21 @@ func (p *AddServiceParams) Do(ctx context.Context) (serviceID string, err error)
 }
 
 // RemoveServiceParams removes the service respresented by |serviceId| from
-// the peripheral with |address|.
+// the simulated central.
 type RemoveServiceParams struct {
-	Address   string `json:"address"`
 	ServiceID string `json:"serviceId"`
 }
 
 // RemoveService removes the service respresented by |serviceId| from the
-// peripheral with |address|.
+// simulated central.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/BluetoothEmulation#method-removeService
 //
 // parameters:
 //
-//	address
 //	serviceID
-func RemoveService(address string, serviceID string) *RemoveServiceParams {
+func RemoveService(serviceID string) *RemoveServiceParams {
 	return &RemoveServiceParams{
-		Address:   address,
 		ServiceID: serviceID,
 	}
 }
@@ -247,30 +332,25 @@ func (p *RemoveServiceParams) Do(ctx context.Context) (err error) {
 }
 
 // AddCharacteristicParams adds a characteristic with |characteristicUuid|
-// and |properties| to the service represented by |serviceId| in the peripheral
-// with |address|.
+// and |properties| to the service represented by |serviceId|.
 type AddCharacteristicParams struct {
-	Address            string                    `json:"address"`
 	ServiceID          string                    `json:"serviceId"`
 	CharacteristicUUID string                    `json:"characteristicUuid"`
 	Properties         *CharacteristicProperties `json:"properties"`
 }
 
 // AddCharacteristic adds a characteristic with |characteristicUuid| and
-// |properties| to the service represented by |serviceId| in the peripheral with
-// |address|.
+// |properties| to the service represented by |serviceId|.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/BluetoothEmulation#method-addCharacteristic
 //
 // parameters:
 //
-//	address
 //	serviceID
 //	characteristicUUID
 //	properties
-func AddCharacteristic(address string, serviceID string, characteristicUUID string, properties *CharacteristicProperties) *AddCharacteristicParams {
+func AddCharacteristic(serviceID string, characteristicUUID string, properties *CharacteristicProperties) *AddCharacteristicParams {
 	return &AddCharacteristicParams{
-		Address:            address,
 		ServiceID:          serviceID,
 		CharacteristicUUID: characteristicUUID,
 		Properties:         properties,
@@ -299,29 +379,21 @@ func (p *AddCharacteristicParams) Do(ctx context.Context) (characteristicID stri
 }
 
 // RemoveCharacteristicParams removes the characteristic respresented by
-// |characteristicId| from the service respresented by |serviceId| in the
-// peripheral with |address|.
+// |characteristicId| from the simulated central.
 type RemoveCharacteristicParams struct {
-	Address          string `json:"address"`
-	ServiceID        string `json:"serviceId"`
 	CharacteristicID string `json:"characteristicId"`
 }
 
 // RemoveCharacteristic removes the characteristic respresented by
-// |characteristicId| from the service respresented by |serviceId| in the
-// peripheral with |address|.
+// |characteristicId| from the simulated central.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/BluetoothEmulation#method-removeCharacteristic
 //
 // parameters:
 //
-//	address
-//	serviceID
 //	characteristicID
-func RemoveCharacteristic(address string, serviceID string, characteristicID string) *RemoveCharacteristicParams {
+func RemoveCharacteristic(characteristicID string) *RemoveCharacteristicParams {
 	return &RemoveCharacteristicParams{
-		Address:          address,
-		ServiceID:        serviceID,
 		CharacteristicID: characteristicID,
 	}
 }
@@ -332,31 +404,23 @@ func (p *RemoveCharacteristicParams) Do(ctx context.Context) (err error) {
 }
 
 // AddDescriptorParams adds a descriptor with |descriptorUuid| to the
-// characteristic respresented by |characteristicId| in the service represented
-// by |serviceId| of the peripheral with |address|.
+// characteristic respresented by |characteristicId|.
 type AddDescriptorParams struct {
-	Address          string `json:"address"`
-	ServiceID        string `json:"serviceId"`
 	CharacteristicID string `json:"characteristicId"`
 	DescriptorUUID   string `json:"descriptorUuid"`
 }
 
 // AddDescriptor adds a descriptor with |descriptorUuid| to the
-// characteristic respresented by |characteristicId| in the service represented
-// by |serviceId| of the peripheral with |address|.
+// characteristic respresented by |characteristicId|.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/BluetoothEmulation#method-addDescriptor
 //
 // parameters:
 //
-//	address
-//	serviceID
 //	characteristicID
 //	descriptorUUID
-func AddDescriptor(address string, serviceID string, characteristicID string, descriptorUUID string) *AddDescriptorParams {
+func AddDescriptor(characteristicID string, descriptorUUID string) *AddDescriptorParams {
 	return &AddDescriptorParams{
-		Address:          address,
-		ServiceID:        serviceID,
 		CharacteristicID: characteristicID,
 		DescriptorUUID:   descriptorUUID,
 	}
@@ -384,33 +448,22 @@ func (p *AddDescriptorParams) Do(ctx context.Context) (descriptorID string, err 
 }
 
 // RemoveDescriptorParams removes the descriptor with |descriptorId| from the
-// characteristic respresented by |characteristicId| in the service represented
-// by |serviceId| of the peripheral with |address|.
+// simulated central.
 type RemoveDescriptorParams struct {
-	Address          string `json:"address"`
-	ServiceID        string `json:"serviceId"`
-	CharacteristicID string `json:"characteristicId"`
-	DescriptorID     string `json:"descriptorId"`
+	DescriptorID string `json:"descriptorId"`
 }
 
 // RemoveDescriptor removes the descriptor with |descriptorId| from the
-// characteristic respresented by |characteristicId| in the service represented
-// by |serviceId| of the peripheral with |address|.
+// simulated central.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/BluetoothEmulation#method-removeDescriptor
 //
 // parameters:
 //
-//	address
-//	serviceID
-//	characteristicID
 //	descriptorID
-func RemoveDescriptor(address string, serviceID string, characteristicID string, descriptorID string) *RemoveDescriptorParams {
+func RemoveDescriptor(descriptorID string) *RemoveDescriptorParams {
 	return &RemoveDescriptorParams{
-		Address:          address,
-		ServiceID:        serviceID,
-		CharacteristicID: characteristicID,
-		DescriptorID:     descriptorID,
+		DescriptorID: descriptorID,
 	}
 }
 
@@ -419,18 +472,46 @@ func (p *RemoveDescriptorParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandRemoveDescriptor, p, nil)
 }
 
+// SimulateGATTDisconnectionParams simulates a GATT disconnection from the
+// peripheral with |address|.
+type SimulateGATTDisconnectionParams struct {
+	Address string `json:"address"`
+}
+
+// SimulateGATTDisconnection simulates a GATT disconnection from the
+// peripheral with |address|.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/BluetoothEmulation#method-simulateGATTDisconnection
+//
+// parameters:
+//
+//	address
+func SimulateGATTDisconnection(address string) *SimulateGATTDisconnectionParams {
+	return &SimulateGATTDisconnectionParams{
+		Address: address,
+	}
+}
+
+// Do executes BluetoothEmulation.simulateGATTDisconnection against the provided context.
+func (p *SimulateGATTDisconnectionParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSimulateGATTDisconnection, p, nil)
+}
+
 // Command names.
 const (
-	CommandEnable                         = "BluetoothEmulation.enable"
-	CommandSetSimulatedCentralState       = "BluetoothEmulation.setSimulatedCentralState"
-	CommandDisable                        = "BluetoothEmulation.disable"
-	CommandSimulatePreconnectedPeripheral = "BluetoothEmulation.simulatePreconnectedPeripheral"
-	CommandSimulateAdvertisement          = "BluetoothEmulation.simulateAdvertisement"
-	CommandSimulateGATTOperationResponse  = "BluetoothEmulation.simulateGATTOperationResponse"
-	CommandAddService                     = "BluetoothEmulation.addService"
-	CommandRemoveService                  = "BluetoothEmulation.removeService"
-	CommandAddCharacteristic              = "BluetoothEmulation.addCharacteristic"
-	CommandRemoveCharacteristic           = "BluetoothEmulation.removeCharacteristic"
-	CommandAddDescriptor                  = "BluetoothEmulation.addDescriptor"
-	CommandRemoveDescriptor               = "BluetoothEmulation.removeDescriptor"
+	CommandEnable                                  = "BluetoothEmulation.enable"
+	CommandSetSimulatedCentralState                = "BluetoothEmulation.setSimulatedCentralState"
+	CommandDisable                                 = "BluetoothEmulation.disable"
+	CommandSimulatePreconnectedPeripheral          = "BluetoothEmulation.simulatePreconnectedPeripheral"
+	CommandSimulateAdvertisement                   = "BluetoothEmulation.simulateAdvertisement"
+	CommandSimulateGATTOperationResponse           = "BluetoothEmulation.simulateGATTOperationResponse"
+	CommandSimulateCharacteristicOperationResponse = "BluetoothEmulation.simulateCharacteristicOperationResponse"
+	CommandSimulateDescriptorOperationResponse     = "BluetoothEmulation.simulateDescriptorOperationResponse"
+	CommandAddService                              = "BluetoothEmulation.addService"
+	CommandRemoveService                           = "BluetoothEmulation.removeService"
+	CommandAddCharacteristic                       = "BluetoothEmulation.addCharacteristic"
+	CommandRemoveCharacteristic                    = "BluetoothEmulation.removeCharacteristic"
+	CommandAddDescriptor                           = "BluetoothEmulation.addDescriptor"
+	CommandRemoveDescriptor                        = "BluetoothEmulation.removeDescriptor"
+	CommandSimulateGATTDisconnection               = "BluetoothEmulation.simulateGATTDisconnection"
 )

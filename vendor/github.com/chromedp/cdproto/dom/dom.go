@@ -677,9 +677,10 @@ func (p *GetNodeForLocationParams) Do(ctx context.Context) (backendNodeID cdp.Ba
 
 // GetOuterHTMLParams returns node's HTML markup.
 type GetOuterHTMLParams struct {
-	NodeID        cdp.NodeID             `json:"nodeId,omitempty,omitzero"`        // Identifier of the node.
-	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node.
-	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`      // JavaScript object id of the node wrapper.
+	NodeID           cdp.NodeID             `json:"nodeId,omitempty,omitzero"`        // Identifier of the node.
+	BackendNodeID    cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node.
+	ObjectID         runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`      // JavaScript object id of the node wrapper.
+	IncludeShadowDOM bool                   `json:"includeShadowDOM"`                 // Include all shadow roots. Equals to false if not specified.
 }
 
 // GetOuterHTML returns node's HTML markup.
@@ -688,7 +689,9 @@ type GetOuterHTMLParams struct {
 //
 // parameters:
 func GetOuterHTML() *GetOuterHTMLParams {
-	return &GetOuterHTMLParams{}
+	return &GetOuterHTMLParams{
+		IncludeShadowDOM: false,
+	}
 }
 
 // WithNodeID identifier of the node.
@@ -706,6 +709,13 @@ func (p GetOuterHTMLParams) WithBackendNodeID(backendNodeID cdp.BackendNodeID) *
 // WithObjectID JavaScript object id of the node wrapper.
 func (p GetOuterHTMLParams) WithObjectID(objectID runtime.RemoteObjectID) *GetOuterHTMLParams {
 	p.ObjectID = objectID
+	return &p
+}
+
+// WithIncludeShadowDOM include all shadow roots. Equals to false if not
+// specified.
+func (p GetOuterHTMLParams) WithIncludeShadowDOM(includeShadowDOM bool) *GetOuterHTMLParams {
+	p.IncludeShadowDOM = includeShadowDOM
 	return &p
 }
 
@@ -1998,6 +2008,50 @@ func (p *GetAnchorElementParams) Do(ctx context.Context) (nodeID cdp.NodeID, err
 	return res.NodeID, nil
 }
 
+// ForceShowPopoverParams when enabling, this API force-opens the popover
+// identified by nodeId and keeps it open until disabled.
+type ForceShowPopoverParams struct {
+	NodeID cdp.NodeID `json:"nodeId"` // Id of the popover HTMLElement
+	Enable bool       `json:"enable"` // If true, opens the popover and keeps it open. If false, closes the popover if it was previously force-opened.
+}
+
+// ForceShowPopover when enabling, this API force-opens the popover
+// identified by nodeId and keeps it open until disabled.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/DOM#method-forceShowPopover
+//
+// parameters:
+//
+//	nodeID - Id of the popover HTMLElement
+//	enable - If true, opens the popover and keeps it open. If false, closes the popover if it was previously force-opened.
+func ForceShowPopover(nodeID cdp.NodeID, enable bool) *ForceShowPopoverParams {
+	return &ForceShowPopoverParams{
+		NodeID: nodeID,
+		Enable: enable,
+	}
+}
+
+// ForceShowPopoverReturns return values.
+type ForceShowPopoverReturns struct {
+	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty,omitzero"` // List of popovers that were closed in order to respect popover stacking order.
+}
+
+// Do executes DOM.forceShowPopover against the provided context.
+//
+// returns:
+//
+//	nodeIDs - List of popovers that were closed in order to respect popover stacking order.
+func (p *ForceShowPopoverParams) Do(ctx context.Context) (nodeIDs []cdp.NodeID, err error) {
+	// execute
+	var res ForceShowPopoverReturns
+	err = cdp.Execute(ctx, CommandForceShowPopover, p, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.NodeIDs, nil
+}
+
 // Command names.
 const (
 	CommandCollectClassNamesFromSubtree       = "DOM.collectClassNamesFromSubtree"
@@ -2048,4 +2102,5 @@ const (
 	CommandGetContainerForNode                = "DOM.getContainerForNode"
 	CommandGetQueryingDescendantsForContainer = "DOM.getQueryingDescendantsForContainer"
 	CommandGetAnchorElement                   = "DOM.getAnchorElement"
+	CommandForceShowPopover                   = "DOM.forceShowPopover"
 )

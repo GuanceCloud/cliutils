@@ -54,6 +54,7 @@ type BrowserConfig struct {
 	Headers           map[string]string
 	Cookies           []BrowserCookie
 	IgnoreHTTPSErrors bool
+	Synthetics        SyntheticsContext
 }
 
 type BrowserCookie struct {
@@ -69,6 +70,9 @@ type BrowserCookie struct {
 type EngineFactory func(context.Context, EngineOptions) (Engine, error)
 
 type EngineOptions struct {
+	AllowNoSandbox      bool
+	LoadImages          bool
+	LoadFonts           bool
 	LightpandaPath      string
 	CACertFile          string
 	CACertDir           string
@@ -82,9 +86,17 @@ type EngineOptions struct {
 	ProxyURL            string
 	IgnoreHTTPSErrors   bool
 	StartupTimeout      time.Duration
+
+	// ProxyFromNode is set by the runner only when the selected proxy comes
+	// from node configuration. It exempts that endpoint, never the origin.
+	ProxyFromNode bool
 }
 
 type Options struct {
+	AllowNoSandbox      bool
+	LoadImages          bool
+	LoadFonts           bool
+	SyntheticsTestID    string
 	ScriptPath          string
 	Name                string
 	TimeoutMS           int
@@ -216,6 +228,11 @@ func runLoaded(ctx context.Context, loaded script.Script, options Options, runID
 		attemptStart := start
 		if attempt > 1 {
 			attemptStart = time.Now().UTC()
+			// RUM's result identifier must distinguish failed attempts even
+			// when a caller uses runner retries instead of DataKit retries.
+			if options.SyntheticsTestID != "" {
+				runID = util.NewRunID()
+			}
 		}
 		last = runAttempt(ctx, loaded, options, runID, resolvedPath, attemptStart, tags, vars, browserConfig, name, timeoutMS, engineName, attempt, maxAttempts)
 		if maxAttempts > 1 {
@@ -246,14 +263,15 @@ func cleanupResultScreenshots(result Result) {
 
 func retryRecordFromResult(result Result) evidence.RetryRecord {
 	record := evidence.RetryRecord{
-		Attempt:     result.Attempt,
-		StartedAt:   result.StartedAtText,
-		EndedAt:     result.EndedAtText,
-		DurationUS:  result.DurationUS,
-		Status:      result.Status,
-		Success:     result.Success,
-		FailReason:  result.FailReason,
-		FailureType: result.FailureType,
+		BrowserRunID: result.RunID,
+		Attempt:      result.Attempt,
+		StartedAt:    result.StartedAtText,
+		EndedAt:      result.EndedAtText,
+		DurationUS:   result.DurationUS,
+		Status:       result.Status,
+		Success:      result.Success,
+		FailReason:   result.FailReason,
+		FailureType:  result.FailureType,
 	}
 	if result.Error != nil {
 		record.Message = result.Error.Message
@@ -272,11 +290,18 @@ func retryRecordFromResult(result Result) evidence.RetryRecord {
 }
 
 func runAttempt(ctx context.Context, loaded script.Script, options Options, runID string, resolvedPath string, start time.Time, tags map[string]string, vars map[string]string, browserConfig BrowserConfig, name string, timeoutMS int, engineName string, attempt int, maxAttempts int) Result {
+	// DataKit invokes the runner once per attempt, so this ID also identifies
+	// the RUM data produced by this attempt, including failed attempts.
+	browserConfig.Synthetics = SyntheticsContext{TestID: options.SyntheticsTestID, ResultID: runID}
 	proxyURL := engineProxyURL(options.ProxyURL, loaded.ProxyURL, options.DefaultProxyURL)
+	proxyFromNode := proxyURL != "" && strings.TrimSpace(options.ProxyURL) == "" && strings.TrimSpace(loaded.ProxyURL) == ""
 	engineCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutMS)*time.Millisecond)
 	defer cancel()
 
 	engine, err := options.EngineFactory(engineCtx, EngineOptions{
+		AllowNoSandbox:      options.AllowNoSandbox,
+		LoadImages:          options.LoadImages,
+		LoadFonts:           options.LoadFonts,
 		LightpandaPath:      options.LightpandaPath,
 		CACertFile:          options.CACertFile,
 		CACertDir:           options.CACertDir,
@@ -288,6 +313,7 @@ func runAttempt(ctx context.Context, loaded script.Script, options Options, runI
 		ViewportWidth:       options.ViewportWidth,
 		ViewportHeight:      options.ViewportHeight,
 		ProxyURL:            proxyURL,
+		ProxyFromNode:       proxyFromNode,
 		IgnoreHTTPSErrors:   browserConfig.IgnoreHTTPSErrors,
 		StartupTimeout:      options.StartupTimeout,
 	})
@@ -467,7 +493,12 @@ type screenshotOptions struct {
 }
 
 func engineProxyURL(values ...string) string {
-	return firstNonEmpty(values...)
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func collectTraceIDs(events []evidence.NetworkEvent) []string {

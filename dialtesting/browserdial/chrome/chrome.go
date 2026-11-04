@@ -39,28 +39,43 @@ type requestInfo struct {
 	TraceID      string
 }
 
+const (
+	maxNetworkPayloadBufferBytes = 1 << 20
+	maxResourcePayloadBytes      = 256 << 10
+)
+
 func NewEngine(ctx context.Context, options runner.EngineOptions) (runner.Engine, error) {
+	if err := validateOptions(options); err != nil {
+		return nil, err
+	}
 	executable, err := resolveExecutable(options.ChromePath)
 	if err != nil {
 		return nil, err
 	}
 	width, height := viewportSize(options.ViewportWidth, options.ViewportHeight)
-	allocatorOptions := chromeAllocatorOptions(executable, width, height, options)
-	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, allocatorOptions...)
-	tabCtx, tabCancel := chromedp.NewContext(allocCtx)
+	proxy, err := startNetworkProxy(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	if proxy != nil {
+		options.ProxyURL = proxy.address
+	}
+	tabCtx, browserCancel, err := startChrome(ctx, executable, width, height, options)
+	if err != nil {
+		proxy.close()
+		return nil, err
+	}
 	engine, err := newEngineFromContext(tabCtx, chromedp.Run, func() {
-		tabCancel()
-		allocCancel()
+		proxy.close()
+		browserCancel()
 	})
 	if err != nil {
-		tabCancel()
-		allocCancel()
 		return nil, err
 	}
 	return engine, nil
 }
 
-func chromeAllocatorOptions(executable string, width int, height int, options runner.EngineOptions) []chromedp.ExecAllocatorOption {
+func chromeAllocatorOptions(executable string, width int, height int, options runner.EngineOptions, noSandbox bool) []chromedp.ExecAllocatorOption {
 	allocatorOptions := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.ExecPath(executable),
 		chromedp.Flag("headless", true),
@@ -69,13 +84,35 @@ func chromeAllocatorOptions(executable string, width int, height int, options ru
 		chromedp.Flag("no-default-browser-check", true),
 		chromedp.Flag("ignore-certificate-errors", options.IgnoreHTTPSErrors),
 		chromedp.WindowSize(width, height),
+		chromedp.Flag("no-sandbox", noSandbox),
+		chromedp.Flag("site-per-process", true),
+		chromedp.Flag("disable-features", "Translate,BlinkGenPropertyTrees"),
+		chromedp.Flag("enable-features", "NetworkService"),
+		chromedp.Flag("disable-ipc-flooding-protection", false),
+	)
+	allocatorOptions = append(allocatorOptions,
+		chromedp.Flag("blink-settings", fmt.Sprintf("imagesEnabled=%t", options.LoadImages)),
+		chromedp.Flag("disable-remote-fonts", !options.LoadFonts),
 	)
 	if strings.TrimSpace(options.ProxyURL) != "" {
-		allocatorOptions = append(allocatorOptions, chromedp.ProxyServer(options.ProxyURL))
+		allocatorOptions = append(allocatorOptions,
+			chromedp.ProxyServer(options.ProxyURL),
+			chromedp.Flag("proxy-bypass-list", "<-loopback>"),
+			chromedp.Flag("disable-quic", true),
+			chromedp.Flag("force-webrtc-ip-handling-policy", "disable_non_proxied_udp"),
+		)
 	}
 	return allocatorOptions
 }
 
+func validateOptions(options runner.EngineOptions) error {
+	if options.CACertFile != "" || options.CACertDir != "" {
+		return fmt.Errorf("Chrome does not support browser ca_cert_file or ca_cert_dir; use its system trust store or Lightpanda")
+	}
+	return nil
+}
+
+// newEngineFromContext owns cancel, including when initialization fails.
 func newEngineFromContext(tabCtx context.Context, run func(context.Context, ...chromedp.Action) error, cancel context.CancelFunc) (*Engine, error) {
 	engine := &Engine{
 		ctx:       tabCtx,
@@ -85,7 +122,12 @@ func newEngineFromContext(tabCtx context.Context, run func(context.Context, ...c
 	}
 	engine.cancel = cancel
 	chromedp.ListenTarget(tabCtx, engine.listen)
-	if err := engine.run(tabCtx, network.Enable(), cdpruntime.Enable(), chromedp.ActionFunc(func(ctx context.Context) error {
+	// Evidence uses network metadata, not response bodies. Bound the inspector's
+	// extra payload retention without limiting response delivery to the page.
+	networkEvents := network.Enable().
+		WithMaxTotalBufferSize(maxNetworkPayloadBufferBytes).
+		WithMaxResourceBufferSize(maxResourcePayloadBytes)
+	if err := engine.run(tabCtx, networkEvents, cdpruntime.Enable(), chromedp.ActionFunc(func(ctx context.Context) error {
 		_, err := page.AddScriptToEvaluateOnNewDocument(performanceObserverScript).Do(ctx)
 		return err
 	})); err != nil {
@@ -99,6 +141,16 @@ func (e *Engine) ConfigureBrowser(ctx context.Context, config runner.BrowserConf
 	actionCtx, cancel := e.actionContext(ctx)
 	defer cancel()
 	actions := []chromedp.Action{}
+	initScript, err := config.Synthetics.InitScript()
+	if err != nil {
+		return fmt.Errorf("encode RUM correlation context: %w", err)
+	}
+	if initScript != "" {
+		actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
+			_, err := page.AddScriptToEvaluateOnNewDocument(initScript).Do(ctx)
+			return err
+		}))
+	}
 	if config.IgnoreHTTPSErrors {
 		actions = append(actions, security.SetIgnoreCertificateErrors(true))
 	}
@@ -403,7 +455,7 @@ func (e *Engine) listen(event any) {
 			Method:       info.Method,
 			ResourceType: string(ev.Type),
 			TraceID:      firstNonEmpty(info.TraceID, extractTraceID(ev.Response.URL, ev.Response.RequestHeaders, ev.Response.Headers)),
-			Status:       int64(ev.Response.Status),
+			Status:       ev.Response.Status,
 		})
 	case *network.EventLoadingFailed:
 		info := e.requests[ev.RequestID]
@@ -421,45 +473,22 @@ func (e *Engine) listen(event any) {
 }
 
 func resolveExecutable(override string) (string, error) {
-	candidates := []string{}
-	if override != "" {
-		candidates = append(candidates, override)
+	path := strings.TrimSpace(override)
+	if path == "" {
+		path = strings.TrimSpace(os.Getenv("CHROME_EXECUTABLE_PATH"))
 	}
-	if env := os.Getenv("CHROME_EXECUTABLE_PATH"); env != "" {
-		candidates = append(candidates, env)
-	}
-	if goruntime.GOOS == "darwin" {
-		candidates = append(candidates,
-			"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-			filepath.Join(os.Getenv("HOME"), "Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
-		)
-	}
-	for _, name := range []string{"google-chrome", "chromium", "chromium-browser", "chrome"} {
-		if path, err := exec.LookPath(name); err == nil {
-			candidates = append(candidates, path)
+	if path == "" {
+		var err error
+		path, err = exec.LookPath("chrome-headless-shell")
+		if err != nil {
+			return "", fmt.Errorf("Chrome Headless Shell not found; set engine_path or CHROME_EXECUTABLE_PATH to the official executable")
 		}
 	}
-
-	seen := map[string]struct{}{}
-	var problems []string
-	for _, candidate := range candidates {
-		if candidate == "" {
-			continue
-		}
-		if _, ok := seen[candidate]; ok {
-			continue
-		}
-		seen[candidate] = struct{}{}
-		if err := checkExecutable(candidate); err != nil {
-			problems = append(problems, fmt.Sprintf("%s: %v", candidate, err))
-			continue
-		}
-		return candidate, nil
+	// A configured path must fail explicitly rather than selecting another browser.
+	if err := checkExecutable(path); err != nil {
+		return "", fmt.Errorf("unusable Chrome Headless Shell executable %q: %w", path, err)
 	}
-	if len(problems) > 0 {
-		return "", fmt.Errorf("no usable chrome executable found (%s)", strings.Join(problems, "; "))
-	}
-	return "", fmt.Errorf("no chrome executable found; set --chrome-path or CHROME_EXECUTABLE_PATH")
+	return path, nil
 }
 
 func checkExecutable(path string) error {

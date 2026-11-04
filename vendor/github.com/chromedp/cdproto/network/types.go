@@ -45,6 +45,7 @@ const (
 	ResourceTypePing               ResourceType = "Ping"
 	ResourceTypeCSPViolationReport ResourceType = "CSPViolationReport"
 	ResourceTypePreflight          ResourceType = "Preflight"
+	ResourceTypeFedCM              ResourceType = "FedCM"
 	ResourceTypeOther              ResourceType = "Other"
 )
 
@@ -88,6 +89,8 @@ func (t *ResourceType) UnmarshalJSON(buf []byte) error {
 		*t = ResourceTypeCSPViolationReport
 	case ResourceTypePreflight:
 		*t = ResourceTypePreflight
+	case ResourceTypeFedCM:
+		*t = ResourceTypeFedCM
 	case ResourceTypeOther:
 		*t = ResourceTypeOther
 	default:
@@ -536,6 +539,7 @@ const (
 	BlockedReasonMixedContent                                            BlockedReason = "mixed-content"
 	BlockedReasonOrigin                                                  BlockedReason = "origin"
 	BlockedReasonInspector                                               BlockedReason = "inspector"
+	BlockedReasonIntegrity                                               BlockedReason = "integrity"
 	BlockedReasonSubresourceFilter                                       BlockedReason = "subresource-filter"
 	BlockedReasonContentType                                             BlockedReason = "content-type"
 	BlockedReasonCoepFrameResourceNeedsCoepHeader                        BlockedReason = "coep-frame-resource-needs-coep-header"
@@ -564,6 +568,8 @@ func (t *BlockedReason) UnmarshalJSON(buf []byte) error {
 		*t = BlockedReasonOrigin
 	case BlockedReasonInspector:
 		*t = BlockedReasonInspector
+	case BlockedReasonIntegrity:
+		*t = BlockedReasonIntegrity
 	case BlockedReasonSubresourceFilter:
 		*t = BlockedReasonSubresourceFilter
 	case BlockedReasonContentType:
@@ -880,6 +886,7 @@ const (
 	ServiceWorkerRouterSourceCache                      ServiceWorkerRouterSource = "cache"
 	ServiceWorkerRouterSourceFetchEvent                 ServiceWorkerRouterSource = "fetch-event"
 	ServiceWorkerRouterSourceRaceNetworkAndFetchHandler ServiceWorkerRouterSource = "race-network-and-fetch-handler"
+	ServiceWorkerRouterSourceRaceNetworkAndCache        ServiceWorkerRouterSource = "race-network-and-cache"
 )
 
 // UnmarshalJSON satisfies [json.Unmarshaler].
@@ -896,6 +903,8 @@ func (t *ServiceWorkerRouterSource) UnmarshalJSON(buf []byte) error {
 		*t = ServiceWorkerRouterSourceFetchEvent
 	case ServiceWorkerRouterSourceRaceNetworkAndFetchHandler:
 		*t = ServiceWorkerRouterSourceRaceNetworkAndFetchHandler
+	case ServiceWorkerRouterSourceRaceNetworkAndCache:
+		*t = ServiceWorkerRouterSourceRaceNetworkAndCache
 	default:
 		return fmt.Errorf("unknown ServiceWorkerRouterSource value: %v", s)
 	}
@@ -940,6 +949,7 @@ type Response struct {
 	AlternateProtocolUsage      AlternateProtocolUsage      `json:"alternateProtocolUsage,omitempty,omitzero"`      // The reason why Chrome uses a specific transport protocol for HTTP semantics.
 	SecurityState               security.State              `json:"securityState"`                                  // Security state of the request resource.
 	SecurityDetails             *SecurityDetails            `json:"securityDetails,omitempty,omitzero"`             // Security details for the request.
+	IsIPProtectionUsed          bool                        `json:"isIpProtectionUsed"`                             // Indicates whether the request was sent through IP Protection proxies. If set to true, the request used the IP Protection privacy feature.
 }
 
 // WebSocketRequest webSocket request data.
@@ -1481,6 +1491,7 @@ type SignedExchangeError struct {
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-SignedExchangeInfo
 type SignedExchangeInfo struct {
 	OuterResponse   *Response              `json:"outerResponse"`                      // The outer response of signed HTTP exchange which was received from network.
+	HasExtraInfo    bool                   `json:"hasExtraInfo"`                       // Whether network response for the signed exchange was accompanied by extra headers.
 	Header          *SignedExchangeHeader  `json:"header,omitempty,omitzero"`          // Information about the signed exchange header.
 	SecurityDetails *SecurityDetails       `json:"securityDetails,omitempty,omitzero"` // Security details for the signed exchange header.
 	Errors          []*SignedExchangeError `json:"errors,omitempty,omitzero"`          // Errors occurred while handling the signed exchange.
@@ -1567,6 +1578,28 @@ type DirectTCPSocketOptions struct {
 	DNSQueryType      DirectSocketDNSQueryType `json:"dnsQueryType,omitempty,omitzero"`
 }
 
+// DirectUDPSocketOptions [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DirectUDPSocketOptions
+type DirectUDPSocketOptions struct {
+	RemoteAddr        string                   `json:"remoteAddr,omitempty,omitzero"`
+	RemotePort        int64                    `json:"remotePort,omitempty,omitzero"` // Unsigned int 16.
+	LocalAddr         string                   `json:"localAddr,omitempty,omitzero"`
+	LocalPort         int64                    `json:"localPort,omitempty,omitzero"` // Unsigned int 16.
+	DNSQueryType      DirectSocketDNSQueryType `json:"dnsQueryType,omitempty,omitzero"`
+	SendBufferSize    float64                  `json:"sendBufferSize,omitempty,omitzero"`    // Expected to be unsigned integer.
+	ReceiveBufferSize float64                  `json:"receiveBufferSize,omitempty,omitzero"` // Expected to be unsigned integer.
+}
+
+// DirectUDPMessage [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-DirectUDPMessage
+type DirectUDPMessage struct {
+	Data       string `json:"data"`
+	RemoteAddr string `json:"remoteAddr,omitempty,omitzero"` // Null for connected mode.
+	RemotePort int64  `json:"remotePort,omitempty,omitzero"` // Null for connected mode. Expected to be unsigned integer.
+}
+
 // PrivateNetworkRequestPolicy [no description].
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-PrivateNetworkRequestPolicy
@@ -1626,10 +1659,10 @@ func (t IPAddressSpace) String() string {
 
 // IPAddressSpace values.
 const (
-	IPAddressSpaceLocal   IPAddressSpace = "Local"
-	IPAddressSpacePrivate IPAddressSpace = "Private"
-	IPAddressSpacePublic  IPAddressSpace = "Public"
-	IPAddressSpaceUnknown IPAddressSpace = "Unknown"
+	IPAddressSpaceLoopback IPAddressSpace = "Loopback"
+	IPAddressSpaceLocal    IPAddressSpace = "Local"
+	IPAddressSpacePublic   IPAddressSpace = "Public"
+	IPAddressSpaceUnknown  IPAddressSpace = "Unknown"
 )
 
 // UnmarshalJSON satisfies [json.Unmarshaler].
@@ -1638,10 +1671,10 @@ func (t *IPAddressSpace) UnmarshalJSON(buf []byte) error {
 	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
 
 	switch IPAddressSpace(s) {
+	case IPAddressSpaceLoopback:
+		*t = IPAddressSpaceLoopback
 	case IPAddressSpaceLocal:
 		*t = IPAddressSpaceLocal
-	case IPAddressSpacePrivate:
-		*t = IPAddressSpacePrivate
 	case IPAddressSpacePublic:
 		*t = IPAddressSpacePublic
 	case IPAddressSpaceUnknown:

@@ -19,9 +19,12 @@ type Pool struct {
 	workers chan *poolWorker
 	done    chan struct{}
 
-	mu     sync.Mutex
-	all    []*poolWorker
-	closed bool
+	mu             sync.Mutex
+	all            []*poolWorker
+	closed         bool
+	loadImages     bool
+	loadFonts      bool
+	allowNoSandbox bool
 }
 
 type poolWorker struct {
@@ -30,13 +33,19 @@ type poolWorker struct {
 }
 
 func NewPool(ctx context.Context, size int, options runner.EngineOptions) (*Pool, error) {
+	if err := validatePoolOptions(options); err != nil {
+		return nil, err
+	}
 	if size <= 0 {
 		size = 1
 	}
 	pool := &Pool{
-		ctx:     ctx,
-		workers: make(chan *poolWorker, size),
-		done:    make(chan struct{}),
+		ctx:            ctx,
+		workers:        make(chan *poolWorker, size),
+		done:           make(chan struct{}),
+		loadImages:     options.LoadImages,
+		loadFonts:      options.LoadFonts,
+		allowNoSandbox: options.AllowNoSandbox,
 	}
 	for i := 0; i < size; i++ {
 		worker, err := newPoolWorker(ctx, options)
@@ -56,23 +65,26 @@ func newPoolWorker(ctx context.Context, options runner.EngineOptions) (*poolWork
 		return nil, err
 	}
 	width, height := viewportSize(options.ViewportWidth, options.ViewportHeight)
-	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, chromeAllocatorOptions(executable, width, height, options)...)
-	browserCtx, browserCancel := chromedp.NewContext(allocCtx)
-	if err := chromedp.Run(browserCtx, chromedp.Navigate("about:blank")); err != nil {
-		browserCancel()
-		allocCancel()
+	browserCtx, browserCancel, err := startChrome(ctx, executable, width, height, options)
+	if err != nil {
 		return nil, fmt.Errorf("start pooled chrome: %w", err)
 	}
 	return &poolWorker{
-		ctx: browserCtx,
-		cancel: func() {
-			browserCancel()
-			allocCancel()
-		},
+		ctx:    browserCtx,
+		cancel: browserCancel,
 	}, nil
 }
 
 func (p *Pool) Factory(ctx context.Context, options runner.EngineOptions) (runner.Engine, error) {
+	if err := validatePoolOptions(options); err != nil {
+		return nil, err
+	}
+	if options.LoadImages != p.loadImages || options.LoadFonts != p.loadFonts {
+		return nil, fmt.Errorf("Chrome resource loading settings must match the browser pool configuration")
+	}
+	if options.AllowNoSandbox != p.allowNoSandbox {
+		return nil, fmt.Errorf("Chrome sandbox setting must match the browser pool configuration")
+	}
 	select {
 	case <-p.ctx.Done():
 		return nil, p.ctx.Err()
@@ -102,11 +114,20 @@ func (p *Pool) Factory(ctx context.Context, options runner.EngineOptions) (runne
 		}
 		engine, err := newEngineFromContext(taskCtx, chromedp.Run, release)
 		if err != nil {
-			release()
 			return nil, err
 		}
 		return engine, nil
 	}
+}
+
+func validatePoolOptions(options runner.EngineOptions) error {
+	if err := validateOptions(options); err != nil {
+		return err
+	}
+	if options.BlockPrivateNetwork || len(options.PrivateNetworkCIDRs) > 0 || options.ProxyURL != "" {
+		return fmt.Errorf("Chrome network policies require a dedicated browser per task; pooling is unsupported")
+	}
+	return nil
 }
 
 func (w *poolWorker) newIsolatedTarget(ctx context.Context) (cdp.BrowserContextID, target.ID, error) {
