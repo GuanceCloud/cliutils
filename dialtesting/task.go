@@ -236,6 +236,8 @@ func CreateTaskChild(taskType string) (TaskChild, error) {
 
 	case "tcp", ClassTCP:
 		ct = &TCPTask{}
+	case "dns", ClassDNS:
+		ct = &DNSTask{}
 
 	case "websocket", ClassWebsocket:
 		ct = &WebsocketTask{}
@@ -266,6 +268,9 @@ func NewTask(taskString string, task TaskChild) (ITask, error) {
 
 	if taskString != "" {
 		if err := json.Unmarshal([]byte(taskString), &task); err != nil {
+			if _, dns := task.(*DNSTask); dns {
+				return nil, errors.New("invalid DNS task JSON")
+			}
 			return nil, fmt.Errorf("json.Unmarshal failed: %w, task json: %s", err, taskString)
 		}
 	} else {
@@ -273,6 +278,9 @@ func NewTask(taskString string, task TaskChild) (ITask, error) {
 		taskString = string(bytes)
 	}
 
+	if task == nil {
+		return nil, errors.New("task must not be null")
+	}
 	task.initTask()
 
 	if t, ok := task.(ITask); !ok {
