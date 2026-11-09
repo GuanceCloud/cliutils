@@ -60,7 +60,7 @@ func TestTraceMaterializationAdmissionAndErrorRelease(t *testing.T) {
 	frame := traceBudgetTestFrame(1)
 	fragments := []tracePayloadFragment{{payload: frame, compression: PayloadCompressionZstd}, {payload: frame, compression: PayloadCompressionZstd}}
 	dg := traceBudgetTestGroup(fragments)
-	budget := newTraceMaterializationBudget(7, 1) // Two decoded bytes require eight working bytes.
+	budget := newTraceMaterializationBudget(tracePayloadWorkBytes(2)-1, 1)
 	err := dg.materializeTraceFragmentsWithBudget(true, budget)
 	require.ErrorIs(t, err, ErrTraceMaterializationBudgetExceeded)
 	assert.Equal(t, int64(0), budget.used)
@@ -84,10 +84,11 @@ func TestTraceMaterializationAdmissionAndErrorRelease(t *testing.T) {
 }
 
 func TestTraceMaterializationWaitsForSharedAdmission(t *testing.T) {
-	budget := newTraceMaterializationBudget(8, 1)
-	require.NoError(t, budget.reserve(8))
+	workBytes := tracePayloadWorkBytes(2)
+	budget := newTraceMaterializationBudget(workBytes, 1)
+	require.NoError(t, budget.reserve(workBytes))
 	var once sync.Once
-	release := func() { once.Do(func() { budget.release(8) }) }
+	release := func() { once.Do(func() { budget.release(workBytes) }) }
 	defer release()
 	frame := traceBudgetTestFrame(1)
 	dg := traceBudgetTestGroup([]tracePayloadFragment{{payload: frame, compression: PayloadCompressionZstd}, {payload: frame, compression: PayloadCompressionZstd}})
@@ -108,6 +109,51 @@ func TestTraceMaterializationWaitsForSharedAdmission(t *testing.T) {
 	assert.Zero(t, budget.used)
 	assert.Zero(t, budget.active)
 	assert.Equal(t, []byte("xx"), dg.packet.PointsPayload)
+}
+
+func TestBoundedDecodeAndMaterializationShareWorkBudget(t *testing.T) {
+	budget := sharedTraceMaterializationBudget
+	require.NoError(t, budget.reserve(budget.capacity))
+	var once sync.Once
+	release := func() { once.Do(func() { budget.release(budget.capacity) }) }
+	defer release()
+	done := make(chan error, 1)
+	go func() {
+		_, err := DecompressPointsPayloadWithLimit(traceBudgetTestFrame(4<<20), PayloadCompressionZstd, 4<<20)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		t.Fatalf("public decode bypassed work admission: %v", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+	release()
+	select {
+	case err := <-done:
+		require.Error(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("public decode did not resume")
+	}
+	budget.mu.Lock()
+	assert.Zero(t, budget.used, "decode errors must release the shared reservation")
+	assert.Zero(t, budget.active)
+	budget.mu.Unlock()
+
+	// Leave exactly enough room for the group, but not a nested public decode.
+	workBytes := tracePayloadWorkBytes(2)
+	held := budget.capacity - workBytes
+	require.NoError(t, budget.reserve(held))
+	defer budget.release(held)
+	frame := traceBudgetTestFrame(1)
+	dg := traceBudgetTestGroup([]tracePayloadFragment{{payload: frame, compression: PayloadCompressionZstd}, {payload: frame, compression: PayloadCompressionZstd}})
+	go func() { done <- dg.materializeTraceFragments(true) }()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+		assert.Equal(t, []byte("xx"), dg.packet.PointsPayload)
+	case <-time.After(time.Second):
+		t.Fatal("materialization recursively acquired its work budget")
+	}
 }
 
 func TestTraceFallbackValidatesBeforeAllocatingJoinedPayload(t *testing.T) {
@@ -195,12 +241,18 @@ func TestDecompressPointsPayloadWithLimit(t *testing.T) {
 	require.NoError(t, err, "legacy decoder retains unknown-size support")
 	assert.Equal(t, []byte("x"), legacy)
 	// FCS is one byte, but the raw block contains much more data.
-	underdeclared := append([]byte(nil), frame[:13]...)
+	underdeclared := []byte{0x28, 0xb5, 0x2f, 0xfd, 0xc0, 40} // Non-single-segment, 32 KiB window.
+	underdeclared = binary.LittleEndian.AppendUint64(underdeclared, 1)
 	block := uint32(32<<10)<<3 | 1
 	underdeclared = append(underdeclared, byte(block), byte(block>>8), byte(block>>16))
 	underdeclared = append(underdeclared, bytes.Repeat([]byte("x"), 32<<10)...)
+	runtime.GC()
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
 	_, err = DecompressPointsPayloadWithLimit(underdeclared, PayloadCompressionZstd, 1)
+	runtime.ReadMemStats(&after)
 	require.Error(t, err)
+	assert.Less(t, after.TotalAlloc-before.TotalAlloc, uint64(traceDecodeBlockSlackBytes), "false FCS block growth stays within reserved slack")
 	// A bad checksum also has to fail before a group can be materialized.
 	checksum := append([]byte(nil), frame...)
 	checksum[4] |= 4

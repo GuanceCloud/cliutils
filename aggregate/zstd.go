@@ -123,9 +123,35 @@ func DecompressPointsPayload(payload []byte, compression int32) ([]byte, error) 
 }
 
 // DecompressPointsPayloadWithLimit decodes within a caller-reserved output budget.
-// A zstd payload must advertise its size. Both the claimed size and decoder window
-// are checked before allocation, and actual decoding cannot grow the output buffer.
+// A zstd payload must advertise its size. The returned output never exceeds limit.
+// Temporary output growth before a decoder error is covered by the same shared
+// payload work budget as trace materialization, including bounded block slack.
+// Codec-owned history/tables remain subject to decoder settings, not this budget.
 func DecompressPointsPayloadWithLimit(payload []byte, compression int32, limit int64) ([]byte, error) {
+	if limit < 0 {
+		return nil, ErrPayloadDecodedSizeExceeded
+	}
+	size, err := PointsPayloadDecodedSize(payload, compression)
+	if err != nil {
+		return nil, err
+	}
+	if size > limit || size > maxTraceMaterializedBytes {
+		return nil, fmt.Errorf("%w: decoded=%d limit=%d", ErrPayloadDecodedSizeExceeded, size, limit)
+	}
+	if len(payload) == 0 || compression == PayloadCompressionNone {
+		return payload, nil
+	}
+	workBytes := tracePayloadWorkBytes(size)
+	if err := sharedTraceMaterializationBudget.reserve(workBytes); err != nil {
+		return nil, err
+	}
+	defer sharedTraceMaterializationBudget.release(workBytes)
+	return decompressPointsPayloadWithLimit(payload, compression, limit)
+}
+
+// The caller must already hold the shared work reservation. Materialization uses
+// this core directly to avoid acquiring the same budget recursively.
+func decompressPointsPayloadWithLimit(payload []byte, compression int32, limit int64) ([]byte, error) {
 	if limit < 0 {
 		return nil, ErrPayloadDecodedSizeExceeded
 	}

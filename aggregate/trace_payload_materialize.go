@@ -9,21 +9,26 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	"github.com/klauspost/compress/zstd"
 )
 
 const (
 	// A materialized group must fit Dataway's existing 64 MiB send budget.
 	maxTraceMaterializedBytes int64 = 64 << 20
 	// Account conservatively for decoded fragments, joined output, encoding and compaction.
-	traceMaterializationWorkFactor     int64 = 4
-	maxTraceMaterializationBytes             = traceMaterializationWorkFactor * maxTraceMaterializedBytes
+	traceMaterializationWorkFactor int64 = 4
+	// DecodeAll can grow by a block before rejecting a false FCS. Reserve bounded
+	// output slack separately; codec-owned history/tables are not payload buffers.
+	traceDecodeBlockSlackBytes         int64 = 1 << 20
+	maxTraceMaterializationBytes             = traceMaterializationWorkFactor*maxTraceMaterializedBytes + traceDecodeBlockSlackBytes
 	maxTraceMaterializationConcurrency       = 4
 )
 
 // ErrTraceMaterializationBudgetExceeded indicates that a group cannot be safely materialized.
 var ErrTraceMaterializationBudgetExceeded = errors.New("trace payload materialization budget exceeded")
 
-// The work budget is shared by all samplers and shard/expiry callers in this process.
+// The work budget is shared by all samplers, shard/expiry and bounded-decode callers in this process.
 var sharedTraceMaterializationBudget = newTraceMaterializationBudget(maxTraceMaterializationBytes, maxTraceMaterializationConcurrency)
 
 type traceMaterializationBudget struct {
@@ -63,6 +68,25 @@ func (b *traceMaterializationBudget) release(bytes int64) {
 	b.mu.Unlock()
 }
 
+func tracePayloadWorkBytes(size int64) int64 {
+	return traceMaterializationWorkFactor*size + traceDecodeBlockSlackBytes
+}
+
+// Use a maximum-sized encoding destination so output growth stays in the work reservation.
+// The public compressor keeps its existing allocation behavior.
+func compressMaterializedTracePayload(payload []byte) ([]byte, int32, error) {
+	if len(payload) == 0 {
+		return payload, PayloadCompressionNone, nil
+	}
+	enc := zstdEncoderPool.Get().(*zstd.Encoder)
+	compressed := enc.EncodeAll(payload, make([]byte, 0, enc.MaxEncodedSize(len(payload))))
+	zstdEncoderPool.Put(enc)
+	if len(compressed) >= len(payload) {
+		return payload, PayloadCompressionNone, nil
+	}
+	return compressed, PayloadCompressionZstd, nil
+}
+
 func traceMaterializedSize(fragments []tracePayloadFragment) (int64, error) {
 	var total int64
 	for _, fragment := range fragments {
@@ -90,7 +114,7 @@ func (dg *DataGroup) materializeTraceFragmentsWithBudget(compress bool, budget *
 	if err != nil {
 		return err
 	}
-	workBytes := traceMaterializationWorkFactor * declared
+	workBytes := tracePayloadWorkBytes(declared)
 	if err := budget.reserve(workBytes); err != nil {
 		return err
 	}
@@ -103,7 +127,7 @@ func (dg *DataGroup) materializeTraceFragmentsWithBudget(compress bool, budget *
 		if err != nil {
 			return err
 		}
-		payload, err := DecompressPointsPayloadWithLimit(fragment.payload, fragment.compression, size)
+		payload, err := decompressPointsPayloadWithLimit(fragment.payload, fragment.compression, size)
 		if err != nil {
 			return err
 		}
@@ -124,7 +148,7 @@ func (dg *DataGroup) materializeTraceFragmentsWithBudget(compress bool, budget *
 	}
 	compression := PayloadCompressionNone
 	if compress {
-		merged, compression, err = CompressPointsPayload(merged)
+		merged, compression, err = compressMaterializedTracePayload(merged)
 		if err != nil {
 			return err
 		}
@@ -152,7 +176,7 @@ func mergeBoundedTracePayload(dg *DataGroup, packet *DataPacket) error {
 		if err != nil {
 			return err
 		}
-		workBytes := traceMaterializationWorkFactor * size
+		workBytes := tracePayloadWorkBytes(size)
 		if err := sharedTraceMaterializationBudget.reserve(workBytes); err != nil {
 			return err
 		}
