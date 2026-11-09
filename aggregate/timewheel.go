@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package aggregate
 
 import (
@@ -11,20 +16,22 @@ import (
 )
 
 var dataGroupPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return &DataGroup{}
 	},
 }
 
 // DataGroup 是时间轮中的 entry， 仅持有原始 point 二进制切片，避免长期持有展开对象图。
 type DataGroup struct {
-	dataType    string
-	packet      *DataPacket
-	FirstSeen   time.Time
-	ExpiredTime int64
-	slotIndex   int
-	element     *list.Element
-	spillKey    string // key of the spilled payload on disk (empty means in memory)
+	dataType      string
+	packet        *DataPacket
+	FirstSeen     time.Time
+	ExpiredTime   int64
+	slotIndex     int
+	element       *list.Element
+	spillKey      string // key of the spilled payload on disk (empty means in memory)
+	fragments     []tracePayloadFragment
+	fragmentBytes int
 }
 
 // Reset 清理函数.
@@ -36,6 +43,8 @@ func (dg *DataGroup) Reset() {
 	dg.slotIndex = 0
 	dg.ExpiredTime = 0
 	dg.spillKey = ""
+	dg.fragments = nil
+	dg.fragmentBytes = 0
 }
 
 // Shard 定义分段桶.
@@ -61,11 +70,15 @@ type GlobalSampler struct {
 	// payloads larger than spillThreshold are written to the spiller while the
 	// time wheel keeps metadata only; data is lazily read back when a decision
 	// needs it and released right after the decision.
-	spiller        PayloadSpiller
-	spillThreshold int
+	spiller               PayloadSpiller
+	spillThreshold        int
+	tracePayloadFragments bool
 }
 
 type TailSamplingOutcome struct {
+	// Packets contains the original kept fragments when using TailSamplingFragmentOutcomes.
+	// A decision applies to the entire group; Packet and Packets are mutually exclusive.
+	Packets      []*DataPacket
 	Packet       *DataPacket
 	SourcePacket *DataPacket
 	Decision     DerivedMetricDecision
@@ -335,10 +348,11 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 			}
 		}
 
-		if err := mergePacketPayload(old.packet, packet); err != nil {
+		if err := s.mergeTraceGroupPayload(old, packet); err != nil {
 			l.Errorf("merge packet payload failed: %v", err)
 			return
 		}
+		compactTracePayload(old.packet)
 		old.packet.HasError = old.packet.HasError || packet.HasError
 		mergeSpanPredicates(old.packet, packet)
 		old.packet.PointCount += pointCount
@@ -385,7 +399,14 @@ func (s *GlobalSampler) Ingest(packet *DataPacket) {
 		// 从 Pool 中获取对象
 		dg := dataGroupPool.Get().(*DataGroup) //nolint:forcetypeassert
 		dg.dataType = packet.DataType
+		compactTracePayload(packet)
 		dg.packet = packet
+		if s.canBufferTracePacket(packet) {
+			// Group metadata can change, but each fragment remains immutable.
+			metadata := *packet
+			dg.packet = &metadata
+			dg.appendTraceFragment(packet)
+		}
 		if dg.packet.PointCount == 0 {
 			dg.packet.PointCount = pointCount
 		}
@@ -440,11 +461,35 @@ func (s *GlobalSampler) AdvanceTime() map[uint64]*DataGroup {
 }
 
 func (s *GlobalSampler) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) map[uint64]*TailSamplingOutcome {
+	return s.tailSamplingOutcomes(dataGroups, false)
+}
+
+// TailSamplingFragmentOutcomes decides complete groups and returns kept trace fragments without re-encoding.
+// Callers must forward every kept fragment and record decision metrics once per outcome.
+func (s *GlobalSampler) TailSamplingFragmentOutcomes(dataGroups map[uint64]*DataGroup) map[uint64]*TailSamplingOutcome {
+	return s.tailSamplingOutcomes(dataGroups, true)
+}
+
+func (s *GlobalSampler) tailSamplingOutcomes(dataGroups map[uint64]*DataGroup, fragmented bool) map[uint64]*TailSamplingOutcome {
 	outcomes := make(map[uint64]*TailSamplingOutcome, len(dataGroups))
 	for key, dg := range dataGroups {
 		if dg == nil || dg.packet == nil {
 			outcomes[key] = &TailSamplingOutcome{Decision: DerivedMetricDecisionDropped}
 			continue
+		}
+
+		if len(dg.fragments) > 0 {
+			outcome, err := s.traceFragmentOutcome(dg, fragmented)
+			if err != nil {
+				l.Errorf("materialize trace payload fragments failed: %v", err)
+				outcome = &TailSamplingOutcome{SourcePacket: dg.packet, Decision: DerivedMetricDecisionDropped}
+			}
+			if outcome != nil {
+				outcomes[key] = outcome
+				dg.Reset()
+				dataGroupPool.Put(dg)
+				continue
+			}
 		}
 
 		sourcePacket := dg.packet

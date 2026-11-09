@@ -1,3 +1,8 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the MIT License.
+// This product includes software developed at Guance Cloud (https://www.guance.com/).
+// Copyright 2021-present Guance, Inc.
+
 package aggregate
 
 import (
@@ -135,6 +140,15 @@ func (r *TailSamplingProcessor) TailSamplingData(dataGroups map[uint64]*DataGrou
 }
 
 func (r *TailSamplingProcessor) TailSamplingOutcomes(dataGroups map[uint64]*DataGroup) map[uint64]*TailSamplingOutcome {
+	return r.tailSamplingOutcomes(dataGroups, false)
+}
+
+// TailSamplingFragmentOutcomes records group metrics once and returns original kept trace fragments.
+func (r *TailSamplingProcessor) TailSamplingFragmentOutcomes(dataGroups map[uint64]*DataGroup) map[uint64]*TailSamplingOutcome {
+	return r.tailSamplingOutcomes(dataGroups, true)
+}
+
+func (r *TailSamplingProcessor) tailSamplingOutcomes(dataGroups map[uint64]*DataGroup, fragmented bool) map[uint64]*TailSamplingOutcome {
 	if r == nil || r.sampler == nil {
 		return nil
 	}
@@ -148,7 +162,7 @@ func (r *TailSamplingProcessor) TailSamplingOutcomes(dataGroups map[uint64]*Data
 		}
 	}
 
-	outcomes := r.sampler.TailSamplingOutcomes(dataGroups)
+	outcomes := r.sampler.tailSamplingOutcomes(dataGroups, fragmented)
 
 	if r.collector == nil || len(r.metrics) == 0 {
 		return outcomes
