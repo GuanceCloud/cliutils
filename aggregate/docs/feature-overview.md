@@ -704,3 +704,14 @@ point 的通用特点：
 - `aggregate/bug.md` 是问题日志占位文件，不作为正式说明文档合并
 
 如果以后发现实现变化，优先更新这份文档，再决定是否同步扩展阅读材料。
+
+
+## tracing 压缩分片缓冲
+
+在开始接收数据前调用 `GlobalSampler.EnableTracePayloadFragments()`，可使具有完整摘要的 zstd tracing 分片先保留在时间轮中，避免每次到达都解压、拼接并重新压缩。分组键、最后到达时间刷新 TTL、规则顺序和决策时配置保持原有语义。
+
+`TailSamplingFragmentOutcomes()` 对整组做一次决定，谓词足够时直接返回 `TailSamplingOutcome.Packets` 中的全部保留分片，不重新编码；调用方必须发送全部分片，并只按分组记录一次决策指标。`SourcePacket` 提供整组摘要及总 point 数，其 payload 仅引用首片，不能作为整组内容发送。`Packet` 与 `Packets` 互斥。原 `TailSamplingOutcomes()` 和 `TailSamplingData()` 仍返回完整单包。
+
+每组最多缓冲 256 片、8 MiB 压缩数据；达到上限、混合压缩协议或启用 payload spiller 时回退原合并路径。复杂规则在到期后合并一次，再使用原规则求值器。采样输入的 payload 所有权交给 sampler，后续不得修改；明显过量的底层容量在驻留前通过真实复制缩容。
+
+调用方应按解压字节预算逐片提交，并在容量不足时等待或持久化，避免整轮解压后集中提交。分片缓冲不改变传输协议，也不提供无限过载接收能力。
