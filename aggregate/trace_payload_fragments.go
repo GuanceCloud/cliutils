@@ -5,11 +5,7 @@
 
 package aggregate
 
-import (
-	"fmt"
-
-	"github.com/GuanceCloud/cliutils/point"
-)
+import "github.com/GuanceCloud/cliutils/point"
 
 const (
 	maxTracePayloadFragments = 256
@@ -24,7 +20,8 @@ type tracePayloadFragment struct {
 
 // EnableTracePayloadFragments buffers compressed trace fragments until the group expires.
 // Call before ingestion starts. Ingest takes ownership of packet payload bytes.
-// Groups exceeding the fragment bounds, mixed protocols, and payload spilling use the legacy merge path.
+// Groups exceeding the fragment bounds or mixing protocols use budgeted materialization.
+// Payload spilling keeps the legacy merge path.
 func (s *GlobalSampler) EnableTracePayloadFragments() {
 	if s != nil {
 		s.tracePayloadFragments = true
@@ -57,60 +54,16 @@ func (dg *DataGroup) appendTraceFragment(packet *DataPacket) {
 }
 
 func (s *GlobalSampler) mergeTraceGroupPayload(dg *DataGroup, packet *DataPacket) error {
-	if len(dg.fragments) > 0 {
-		if s.canBufferTracePacket(packet) && len(dg.fragments) < maxTracePayloadFragments &&
-			len(packet.PointsPayload) <= maxTraceFragmentBytes-dg.fragmentBytes {
-			compactTracePayload(packet)
-			dg.appendTraceFragment(packet)
-			return nil
-		}
-		// A bounded fallback preserves the original behavior without dropping fragments.
-		if err := dg.materializeTraceFragments(false); err != nil {
-			return err
-		}
-	}
-	return mergePacketPayload(dg.packet, packet)
-}
-
-func (dg *DataGroup) materializeTraceFragments(compress bool) error {
-	if len(dg.fragments) == 1 {
-		dg.fragments = nil
-		dg.fragmentBytes = 0
+	if len(dg.fragments) > 0 && s.canBufferTracePacket(packet) && len(dg.fragments) < maxTracePayloadFragments &&
+		len(packet.PointsPayload) <= maxTraceFragmentBytes-dg.fragmentBytes {
+		compactTracePayload(packet)
+		dg.appendTraceFragment(packet)
 		return nil
 	}
-	var decodedBytes int64
-	for _, fragment := range dg.fragments {
-		size, err := PointsPayloadDecodedSize(fragment.payload, fragment.compression)
-		if err != nil {
-			return err
-		}
-		if size > int64(int(^uint(0)>>1))-decodedBytes {
-			return fmt.Errorf("trace payload size overflows int")
-		}
-		decodedBytes += size
+	if len(dg.fragments) == 0 && (!s.tracePayloadFragments || dg.dataType != point.STracing || s.spiller != nil) {
+		return mergePacketPayload(dg.packet, packet)
 	}
-	merged := make([]byte, 0, int(decodedBytes))
-	for _, fragment := range dg.fragments {
-		payload, err := DecompressPointsPayload(fragment.payload, fragment.compression)
-		if err != nil {
-			return err
-		}
-		merged = append(merged, payload...)
-	}
-	compression := PayloadCompressionNone
-	if compress {
-		var err error
-		merged, compression, err = CompressPointsPayload(merged)
-		if err != nil {
-			return err
-		}
-	}
-	dg.packet.PointsPayload = merged
-	dg.packet.PayloadCompression = compression
-	compactTracePayload(dg.packet)
-	dg.fragments = nil
-	dg.fragmentBytes = 0
-	return nil
+	return mergeBoundedTracePayload(dg, packet)
 }
 
 func (s *GlobalSampler) traceFragmentOutcome(dg *DataGroup, fragmented bool) (*TailSamplingOutcome, error) {

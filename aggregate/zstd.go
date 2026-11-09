@@ -31,6 +31,9 @@ var ErrUnsupportedPayloadCompression = errors.New("unsupported payload compressi
 // advertise its decoded size, so callers cannot reserve bounded memory first.
 var ErrPayloadDecodedSizeUnknown = errors.New("payload decoded size is unknown")
 
+// ErrPayloadDecodedSizeExceeded indicates that a payload exceeds its caller's decode budget.
+var ErrPayloadDecodedSizeExceeded = errors.New("points payload decoded size limit exceeded")
+
 // ErrPayloadEmpty indicates that a DataPacket has no points payload.
 var ErrPayloadEmpty = errors.New("points payload is empty")
 
@@ -54,18 +57,25 @@ var zstdEncoderPool = sync.Pool{
 
 // zstdDecoderPool reuses zstd decoders.
 var zstdDecoderPool = sync.Pool{
-	New: func() any {
-		dec, err := zstd.NewReader(nil,
-			zstd.WithDecoderConcurrency(1),
-			zstd.WithDecoderLowmem(true),
-			zstd.WithDecoderMaxWindow(zstdDecoderMaxWindowBytes),
-			zstd.WithDecoderMaxMemory(zstdDecoderMaxMemoryBytes),
-		)
-		if err != nil {
-			panic(fmt.Sprintf("new zstd decoder: %v", err))
-		}
-		return dec
-	},
+	New: func() any { return newPointsPayloadDecoder(false) },
+}
+
+var boundedZstdDecoderPool = sync.Pool{
+	New: func() any { return newPointsPayloadDecoder(true) },
+}
+
+func newPointsPayloadDecoder(limitToCap bool) *zstd.Decoder {
+	dec, err := zstd.NewReader(nil,
+		zstd.WithDecoderConcurrency(1),
+		zstd.WithDecoderLowmem(true),
+		zstd.WithDecoderMaxWindow(zstdDecoderMaxWindowBytes),
+		zstd.WithDecoderMaxMemory(zstdDecoderMaxMemoryBytes),
+		zstd.WithDecodeAllCapLimit(limitToCap),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("new zstd decoder: %v", err))
+	}
+	return dec
 }
 
 // CompressPointsPayload compresses a PBPoints payload.
@@ -110,6 +120,73 @@ func DecompressPointsPayload(payload []byte, compression int32) ([]byte, error) 
 	}
 
 	return decompressed, nil
+}
+
+// DecompressPointsPayloadWithLimit decodes within a caller-reserved output budget.
+// A zstd payload must advertise its size. The returned output never exceeds limit.
+// Temporary output growth before a decoder error is covered by the same shared
+// payload work budget as trace materialization, including bounded block slack.
+// Codec-owned history/tables remain subject to decoder settings, not this budget.
+func DecompressPointsPayloadWithLimit(payload []byte, compression int32, limit int64) ([]byte, error) {
+	if limit < 0 {
+		return nil, ErrPayloadDecodedSizeExceeded
+	}
+	size, err := PointsPayloadDecodedSize(payload, compression)
+	if err != nil {
+		return nil, err
+	}
+	if size > limit || size > maxTraceMaterializedBytes {
+		return nil, fmt.Errorf("%w: decoded=%d limit=%d", ErrPayloadDecodedSizeExceeded, size, limit)
+	}
+	if len(payload) == 0 || compression == PayloadCompressionNone {
+		return payload, nil
+	}
+	workBytes := tracePayloadWorkBytes(size)
+	if err := sharedTraceMaterializationBudget.reserve(workBytes); err != nil {
+		return nil, err
+	}
+	defer sharedTraceMaterializationBudget.release(workBytes)
+	return decompressPointsPayloadWithLimit(payload, compression, limit)
+}
+
+// The caller must already hold the shared work reservation. Materialization uses
+// this core directly to avoid acquiring the same budget recursively.
+func decompressPointsPayloadWithLimit(payload []byte, compression int32, limit int64) ([]byte, error) {
+	if limit < 0 {
+		return nil, ErrPayloadDecodedSizeExceeded
+	}
+	size, err := PointsPayloadDecodedSize(payload, compression)
+	if err != nil {
+		return nil, err
+	}
+	if size > limit || size > zstdDecoderMaxMemoryBytes || uint64(size) > uint64(int(^uint(0)>>1)) {
+		return nil, fmt.Errorf("%w: decoded=%d limit=%d", ErrPayloadDecodedSizeExceeded, size, limit)
+	}
+	if len(payload) == 0 || compression == PayloadCompressionNone {
+		return payload, nil
+	}
+	header, err := decodeZstdSingleFrameHeader(payload)
+	if err != nil {
+		return nil, err
+	}
+	window := header.WindowSize
+	if header.SingleSegment {
+		window = header.FrameContentSize
+	}
+	if window > zstdDecoderMaxWindowBytes {
+		return nil, fmt.Errorf("%w: window=%d limit=%d", ErrPayloadDecodedSizeExceeded, window, zstdDecoderMaxWindowBytes)
+	}
+	dst := make([]byte, 0, int(size))
+	dec := boundedZstdDecoderPool.Get().(*zstd.Decoder)
+	decoded, err := dec.DecodeAll(payload, dst)
+	boundedZstdDecoderPool.Put(dec)
+	if err != nil {
+		return nil, fmt.Errorf("zstd decode bounded points payload: %w", err)
+	}
+	if int64(len(decoded)) != size {
+		return nil, fmt.Errorf("%w: declared=%d actual=%d", ErrPayloadDecodedSizeExceeded, size, len(decoded))
+	}
+	return decoded, nil
 }
 
 // PointsPayloadDecodedSize returns the number of bytes produced by decoding a

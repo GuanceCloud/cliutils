@@ -141,7 +141,8 @@ func TestTracePayloadFragmentsTTLAndConfigChange(t *testing.T) {
 func TestTracePayloadFragmentsBoundAndLegacyInterface(t *testing.T) {
 	s := fragmentTestSampler(t, true, []*SamplingPipeline{{Name: "keep", Type: PipelineTypeSampling, Rate: 1}})
 	var expected []byte
-	for i := range maxTracePayloadFragments + 1 {
+	// Continue ingesting after the first fold to verify subsequent merges remain bounded.
+	for i := range maxTracePayloadFragments + 3 {
 		packet := fragmentTestPacket(t, i)
 		raw, err := DecompressPointsPayload(packet.PointsPayload, packet.PayloadCompression)
 		require.NoError(t, err)
