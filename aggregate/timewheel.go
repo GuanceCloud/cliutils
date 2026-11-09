@@ -482,7 +482,7 @@ func (s *GlobalSampler) tailSamplingOutcomes(dataGroups map[uint64]*DataGroup, f
 			outcome, err := s.traceFragmentOutcome(dg, fragmented)
 			if err != nil {
 				l.Errorf("materialize trace payload fragments failed: %v", err)
-				outcome = &TailSamplingOutcome{SourcePacket: dg.packet, Decision: DerivedMetricDecisionDropped}
+				outcome = &TailSamplingOutcome{SourcePacket: dg.packet, Decision: DerivedMetricDecisionUnknown}
 			}
 			if outcome != nil {
 				outcomes[key] = outcome
