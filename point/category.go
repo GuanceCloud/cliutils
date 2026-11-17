@@ -76,6 +76,7 @@ func AllCategories() []Category {
 		ExecutionLog,
 		LLM,
 		AgentLLM,
+		CloudBilling,
 	}
 }
 
@@ -99,6 +100,7 @@ const (
 	ExecutionLog
 	LLM
 	AgentLLM
+	CloudBilling
 
 	SUnknownCategory   = "unknown"
 	SDynamicDWCategory = "dynamic_dw" // NOTE: not used
@@ -118,6 +120,7 @@ const (
 	SExecutionLog      = "execution_log"
 	SLlm               = "llm"
 	SAgentLLM          = "agent_llm"
+	SCloudBilling      = "cloud_billing"
 
 	URLUnknownCategory   = "/v1/write/unknown"
 	URLDynamicDWCategory = "/v1/write/dynamic_dw" // NOTE: not used
@@ -137,6 +140,7 @@ const (
 	URLExecutionLog      = "/v1/write/siem_logging"
 	URLLlm               = "/v1/write/langfuse-v2"
 	URLAgentLLM          = "/v1/write/agent_llm"
+	URLCloudBilling      = "/v1/write/cloud_billing"
 
 	CUnknown   = "UNKNOWN"
 	CDynamicDW = "DYNAMIC_DW"
@@ -155,6 +159,7 @@ const (
 	CEL        = "EL"
 	CLlm       = "LLM"
 	CAgentLLM  = "AL"
+	CB         = "B"
 )
 
 var (
@@ -178,6 +183,7 @@ var (
 		ExecutionLog: URLExecutionLog,
 		LLM:          URLLlm,
 		AgentLLM:     URLAgentLLM,
+		CloudBilling: URLCloudBilling,
 
 		DynamicDWCategory: URLDynamicDWCategory,
 
@@ -200,6 +206,7 @@ var (
 		ExecutionLog:      CEL,
 		LLM:               CLlm,
 		AgentLLM:          CAgentLLM,
+		CloudBilling:      CB,
 		UnknownCategory:   CUnknown,
 		DynamicDWCategory: CDynamicDW,
 	}
@@ -221,6 +228,7 @@ var (
 		ExecutionLog:      SExecutionLog,
 		LLM:               SLlm,
 		AgentLLM:          SAgentLLM,
+		CloudBilling:      SCloudBilling,
 		UnknownCategory:   SUnknownCategory,
 		DynamicDWCategory: SDynamicDWCategory,
 	}
