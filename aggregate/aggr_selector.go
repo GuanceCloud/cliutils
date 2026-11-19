@@ -46,6 +46,7 @@ func (rs *RuleSelector) Setup() error {
 		point.MetricDeprecated,
 		point.ExecutionLog,
 		point.CloudBilling,
+		point.SecurityLogging,
 		point.LLM:
 		return fmt.Errorf("invalid category: %s", rs.Category)
 	default:
