@@ -32,6 +32,7 @@ func TestURL(t *testing.T) {
 		{c: "/v1/write/langfuse-v2", expect: LLM},
 		{c: "/v1/write/agent_llm", expect: AgentLLM},
 		{c: "/v1/write/cloud_billing", expect: CloudBilling},
+		{c: "/v1/write/security_logging", expect: SecurityLogging},
 	}
 
 	for _, tc := range cases {
@@ -60,6 +61,7 @@ func TestAlias(t *testing.T) {
 		{c: "LLM", expect: LLM},
 		{c: "AL", expect: AgentLLM},
 		{c: "B", expect: CloudBilling},
+		{c: "SL", expect: SecurityLogging},
 		{c: "Dynamic_dw", expect: UnknownCategory},
 	}
 
@@ -91,6 +93,7 @@ func TestString(t *testing.T) {
 		{c: "llm", expect: LLM},
 		{c: "agent_llm", expect: AgentLLM},
 		{c: "cloud_billing", expect: CloudBilling},
+		{c: "security_logging", expect: SecurityLogging},
 	}
 
 	for _, tc := range cases {
@@ -107,17 +110,28 @@ func TestAllCategoriesIncludesNewCategories(t *testing.T) {
 	assert.True(t, containsCategory(all, LLM))
 	assert.True(t, containsCategory(all, AgentLLM))
 	assert.True(t, containsCategory(all, CloudBilling))
+	assert.True(t, containsCategory(all, SecurityLogging))
 }
 
 func TestCloudBillingCategory(t *testing.T) {
 	assert.Equal(t, "cloud_billing", CloudBilling.String())
 	assert.Equal(t, "B", CloudBilling.Alias())
 	assert.Equal(t, "/v1/write/cloud_billing", CloudBilling.URL())
+}
+
+func TestSecurityLoggingCategory(t *testing.T) {
+	assert.Equal(t, "security_logging", SecurityLogging.String())
+	assert.Equal(t, "SL", SecurityLogging.Alias())
+	assert.Equal(t, "/v1/write/security_logging", SecurityLogging.URL())
+}
+
+func TestCategoryValues(t *testing.T) {
 	// Adding a category must not renumber any existing category.
 	for value, cat := range []Category{
 		UnknownCategory, DynamicDWCategory, MetricDeprecated, Metric, Network,
 		KeyEvent, Object, ObjectChange, CustomObject, Logging, Tracing, RUM,
 		Security, Profiling, DialTesting, ExecutionLog, LLM, AgentLLM, CloudBilling,
+		SecurityLogging,
 	} {
 		assert.Equal(t, Category(value), cat)
 	}
